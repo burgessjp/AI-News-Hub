@@ -118,3 +118,44 @@ data class DailySummary(
     val generatedAt: String,
     val leadTitle: String? = null
 )
+
+/**
+ * 今日热点(/api/public/hot-topics)的单条。
+ *
+ * 与 [NewsItem] 的区别:热点是「同一事件跨多源聚合」,故额外带
+ * sourceCount(聚合来源数)与 sourceNames(来源清单);没有 score/category 等字段。
+ *
+ * - latestAt:该事件最近一次更新时间(ISO 8601 UTC),用于排序与展示
+ * - permalink:站内阅读页(同 NewsItem);url 是该事件的主源原文
+ */
+data class HotTopic(
+    val id: String,
+    val title: String = "",
+    val url: String = "",
+    val permalink: String = "",
+    val source: String = "",
+    val sourceCount: Int = 0,
+    val sourceNames: List<String> = emptyList(),
+    val latestAt: String? = null
+) {
+    companion object {
+        // optString 在遇到 JSON null 时返回字面字符串 "null"(非空),需过滤。
+        private fun String?.asClean(): String? =
+            this?.takeIf { it.isNotBlank() && it != "null" }
+
+        fun fromJson(json: JSONObject): HotTopic {
+            val namesArr = json.optJSONArray("sourceNames") ?: org.json.JSONArray()
+            return HotTopic(
+                id = json.optString("id"),
+                title = json.optString("title"),
+                url = json.optString("url"),
+                permalink = json.optString("permalink").asClean().orEmpty(),
+                source = json.optString("source"),
+                sourceCount = json.optInt("sourceCount", 0),
+                sourceNames = (0 until namesArr.length())
+                    .mapNotNull { namesArr.optString(it).asClean() },
+                latestAt = json.optString("latestAt").asClean()
+            )
+        }
+    }
+}

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Article
+import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -40,9 +41,9 @@ import java.time.temporal.ChronoUnit
  * 布局(一行):
  *  - 左栏(固定窄宽):绝对时间 HH:mm(年月日由分组条承担,这里只显示时分)
  *  - 右栏(权重 1):
- *      标题(2 行,SemiBold)
+ *      标题行:标题(2 行,SemiBold) … 🔥 分数(右对齐,分档配色,带火焰图标)
  *      摘要(2 行,onSurfaceVariant)
- *      底部行:精选标记 + 来源 · 分类 … 分数(右对齐,cyan 加粗纯数字)
+ *      底部行:精选标记 + 来源 · 分类
  *
  *  - 左右 18dp / 上下 12dp 留白,行间无卡片描边,依靠列表分隔线区分
  */
@@ -79,17 +80,25 @@ fun NewsCard(
 
         // 右栏:主内容
         Column(modifier = Modifier.weight(1f)) {
-            // 标题
+            // 标题行:标题(权重 1) + 热度分数(右对齐,自然宽度)
+            //  - 分数提到标题行右侧,与标题首行对齐,避免与底部来源信息混在一起
+            //  - 带火焰图标 + 分值,明示这是"热度",而非无意义的数字
             if (item.title.isNotBlank()) {
-                Text(
-                    text = item.title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = cs.onSurface,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    lineHeight = 20.sp
-                )
+                Row(verticalAlignment = Alignment.Top) {
+                    Text(
+                        text = item.title,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = cs.onSurface,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        lineHeight = 20.sp,
+                        modifier = Modifier.weight(1f)
+                    )
+                    if (item.score > 0) {
+                        ScoreBadge(score = item.score)
+                    }
+                }
             }
 
             // 摘要
@@ -105,62 +114,78 @@ fun NewsCard(
                 )
             }
 
-            // 底部 meta 行:精选标记 + 来源 · 分类 ……(弹性间距)…… 分数
-            //
-            // 布局关键:
-            //  - 外层 Row:左侧组 weight(1f) + 右侧分数(自然宽度)
-            //    → 分数永远贴右边界(与右 padding 对齐),不受左侧文字长短影响
-            //  - 左侧组内:精选 + 来源(weight 1f,可截断) + 分类
-            //    → 长来源会被省略号截断,但不会把分数挤出右边
+            // 底部 meta 行:精选标记 + 来源 · 分类
+            //  (分数已上移到标题行右侧)
             Spacer(Modifier.height(8.dp))
             Row(
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                // 左侧组:占满分数之外的所有空间
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    if (item.selected) {
-                        Icon(
-                            Icons.Filled.Star,
-                            contentDescription = null,
-                            tint = cs.primary,
-                            modifier = Modifier.size(12.dp)
-                        )
-                    }
-                    if (item.source.isNotBlank()) {
-                        Text(
-                            text = item.source,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = cs.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false)
-                        )
-                    }
-                    if (!item.category.isNullOrBlank()) {
-                        Text(
-                            text = "· ${item.categoryLabel()}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = cs.onSurfaceVariant,
-                            maxLines = 1
-                        )
-                    }
+                if (item.selected) {
+                    Icon(
+                        Icons.Filled.Star,
+                        contentDescription = null,
+                        tint = cs.primary,
+                        modifier = Modifier.size(12.dp)
+                    )
                 }
-                // 右侧:分数,自然宽度,紧贴右边界
-                if (item.score > 0) {
+                if (item.source.isNotBlank()) {
                     Text(
-                        text = item.score.toString(),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = cs.primary,
-                        fontWeight = FontWeight.Bold
+                        text = item.source,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = cs.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                }
+                if (!item.category.isNullOrBlank()) {
+                    Text(
+                        text = "· ${item.categoryLabel()}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = cs.onSurfaceVariant,
+                        maxLines = 1
                     )
                 }
             }
         }
+    }
+}
+
+/**
+ * 列表项热度分数徽章 —— 与详情页 [com.example.aihot.ui.ScoreBadgeLarge] 同源配色,
+ * 缩到列表项可用的尺寸。
+ *
+ * 视觉:🔥 + 分值,分档配色(≥80 红 / ≥60 橙黄 / ≥40 次要 / 其余灰),
+ * 火焰图标明示语义是"热度",避免出现无单位的裸数字。
+ */
+@Composable
+private fun ScoreBadge(score: Int) {
+    val cs = MaterialTheme.colorScheme
+    val color = when {
+        score >= 80 -> cs.error
+        score >= 60 -> cs.tertiary
+        score >= 40 -> cs.secondary
+        else -> cs.outline
+    }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        modifier = Modifier.padding(start = 8.dp)
+    ) {
+        Icon(
+            Icons.Filled.LocalFireDepartment,
+            contentDescription = "热度",
+            tint = color,
+            modifier = Modifier.size(14.dp)
+        )
+        Text(
+            text = score.toString(),
+            style = MaterialTheme.typography.labelMedium,
+            color = color,
+            fontWeight = FontWeight.Bold
+        )
     }
 }
 

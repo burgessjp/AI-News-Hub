@@ -222,7 +222,8 @@ private fun TabRoot(
 ) {
     when (tab) {
         AppTab.Featured -> FeaturedTab(
-            onItemClick = onItemClick
+            onItemClick = onItemClick,
+            onOpenUrl = onOpenUrl
         )
         AppTab.All -> AllTab(onItemClick = onItemClick)
         AppTab.Daily -> DailyTab(

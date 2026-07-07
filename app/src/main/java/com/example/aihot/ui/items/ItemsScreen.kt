@@ -87,7 +87,8 @@ private fun NewsRowDivider() {
 fun ItemsScreen(
     onItemClick: (NewsItem) -> Unit,
     modifier: Modifier = Modifier,
-    vm: ItemsViewModel = viewModel()
+    vm: ItemsViewModel = viewModel(),
+    header: (@Composable () -> Unit)? = null
 ) {
     val filter by vm.filter.collectAsStateWithLifecycle()
     val state by vm.state.collectAsStateWithLifecycle()
@@ -131,13 +132,6 @@ fun ItemsScreen(
 
     Box(modifier = modifier) {
         Column(modifier = Modifier.fillMaxSize()) {
-            if (!filter.isSearching) {
-                CategoryChips(
-                    selected = filter.category,
-                    onSelect = { vm.setCategory(it) }
-                )
-            }
-
             Box(modifier = Modifier.fillMaxSize()) {
                 when (val s = state) {
                     is UiState.Loading -> NewsCardSkeletonList(count = 4)
@@ -172,6 +166,20 @@ fun ItemsScreen(
                                 contentPadding = PaddingValues(vertical = 4.dp),
                                 modifier = Modifier.fillMaxSize()
                             ) {
+                                // 顶部装饰区(如「今日热点」卡片 + 区块标题)。仅非搜索时
+                                // 显示 —— 搜索态应聚焦结果,不宜插入热点等装饰模块。
+                                if (header != null && !filter.isSearching) {
+                                    item(key = "screen-header") { header() }
+                                }
+                                // 分类 chips(搜索态隐藏)。随列表滚动,不再钉在顶部。
+                                if (!filter.isSearching) {
+                                    item(key = "category-chips") {
+                                        CategoryChips(
+                                            selected = filter.category,
+                                            onSelect = { vm.setCategory(it) }
+                                        )
+                                    }
+                                }
                                 grouped.forEach { group ->
                                     // 日期分组条(搜索模式不显示)
                                     if (!filter.isSearching && group.dayKey.isNotEmpty()) {

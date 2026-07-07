@@ -70,6 +70,19 @@ class NewsRepository {
         )
     }
 
+    // ===== /hot-topics =====
+
+    /**
+     * 今日热点 —— 跨源聚合的当日热门事件(通常 3-5 条)。
+     *
+     * 服务端按 latestAt 倒序返回,无分页。失败时返回空列表,不阻塞精选 tab 主列表。
+     */
+    suspend fun fetchHotTopics(): List<HotTopic> = withContext(Dispatchers.IO) {
+        val root = JSONObject(get("$base/hot-topics", emptyList()))
+        val arr = root.optJSONArray("items") ?: JSONArray()
+        (0 until arr.length()).map { HotTopic.fromJson(arr.getJSONObject(it)) }
+    }
+
     // ===== /daily =====
 
     /** 最新日报(date=null)或指定日期日报(YYYY-MM-DD)。 */
