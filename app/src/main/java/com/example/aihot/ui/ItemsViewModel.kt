@@ -1,0 +1,132 @@
+package com.example.aihot.ui
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.aihot.data.Mode
+import com.example.aihot.data.NewsCategory
+import com.example.aihot.data.NewsItem
+import com.example.aihot.data.NewsPage
+import com.example.aihot.data.NewsRepository
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+
+/**
+ * 动态列表 ViewModel。
+ *
+ * 支持的筛选:
+ *  - mode: 精选 / 全部
+ *  - category: 5 类之一,可清空
+ *  - query: 关键词搜索(≥2 字触发)
+ *
+ * 任一筛选变化 → 自动重新拉首页。分页通过 [loadMore] 触发,基于上次的 cursor。
+ */
+class ItemsViewModel : ViewModel() {
+
+    private val repo = NewsRepository()
+
+    /** 当前筛选条件。 */
+    data class Filter(
+        val mode: Mode = Mode.SELECTED,
+        val category: NewsCategory? = null,
+        val query: String? = null
+    ) {
+        /** 语义"搜索中"。 */
+        val isSearching: Boolean get() = !query.isNullOrBlank() && query.trim().length >= 2
+    }
+
+    private val _filter = MutableStateFlow(Filter())
+    val filter: StateFlow<Filter> = _filter.asStateFlow()
+
+    /** 累积的列表(首页 + 已加载后续页)。 */
+    private val _items = MutableStateFlow<List<NewsItem>>(emptyList())
+    val items: StateFlow<List<NewsItem>> = _items.asStateFlow()
+
+    /** 当前分页游标。null 表示无下一页或未开始分页。 */
+    private var nextCursor: String? = null
+    private val _hasMore = MutableStateFlow(false)
+    val hasMore: StateFlow<Boolean> = _hasMore.asStateFlow()
+
+    /** 是否正在加载下一页(供 UI 去重,避免重复触发同一页)。 */
+    private val _isLoadingMore = MutableStateFlow(false)
+    val isLoadingMore: StateFlow<Boolean> = _isLoadingMore.asStateFlow()
+
+    /** 列表层状态(独立于 filter,避免 filter 变化触发旧加载)。 */
+    @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
+    val state: StateFlow<UiState<List<NewsItem>>> = _filter
+        .debounce(300) // 输入抖动;仅对 query 有意义,但对 mode/category 无害
+        .distinctUntilChanged()
+        .flatMapLatest { f ->
+            kotlinx.coroutines.flow.flow {
+                emit(UiState.Loading)
+                _items.value = emptyList()
+                nextCursor = null
+                _isLoadingMore.value = false
+                runCatching { repo.fetchItems(mode = f.mode, category = f.category, query = f.query) }
+                    .onSuccess { page -> applyPage(page, replace = true); emit(UiState.Success(_items.value)) }
+                    .onFailure { emit(UiState.Error(it.message ?: "未知错误")) }
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.Lazily, UiState.Loading)
+
+    init {
+        // trigger first fetch via state subscription lazily; but ensure immediate start
+        state
+    }
+
+    fun setMode(mode: Mode) {
+        if (_filter.value.mode != mode) _filter.update { it.copy(mode = mode) }
+    }
+
+    fun setCategory(category: NewsCategory?) {
+        if (_filter.value.category != category) _filter.update { it.copy(category = category) }
+    }
+
+    fun setQuery(query: String?) {
+        val normalized = query?.trim()?.takeIf { it.isNotEmpty() }
+        if (_filter.value.query != normalized) _filter.update { it.copy(query = normalized) }
+    }
+
+    fun refresh() {
+        // 触发重新加载:复制当前 filter 写回以让 distinct 流通过
+        val cur = _filter.value
+        _filter.value = cur.copy()
+    }
+
+    /**
+     * 加载下一页。仅在:有游标、还有更多、且当前未在加载时有效。
+     * 并发去重靠 [isLoadingMore],避免快速滚动时同一页被重复请求。
+     */
+    fun loadMore() {
+        if (_isLoadingMore.value) return
+        val cursor = nextCursor ?: return
+        if (!_hasMore.value) return
+        val f = _filter.value
+        _isLoadingMore.value = true
+        viewModelScope.launch {
+            runCatching {
+                repo.fetchItems(
+                    mode = f.mode, category = f.category, query = f.query,
+                    cursor = cursor
+                )
+            }.onSuccess { page -> applyPage(page, replace = false) }
+            _isLoadingMore.value = false
+        }
+    }
+
+    private fun applyPage(page: NewsPage, replace: Boolean) {
+        _items.value = if (replace) page.items else _items.value + page.items
+        nextCursor = page.nextCursor
+        _hasMore.value = page.hasNext && !page.nextCursor.isNullOrBlank()
+    }
+}

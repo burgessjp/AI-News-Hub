@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- 圆角方形背景：深 teal → 近黑，对角渐变 -->
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#103742"/>
+      <stop offset="0.55" stop-color="#0A1B22"/>
+      <stop offset="1" stop-color="#05080D"/>
+    </linearGradient>
+
+    <!-- 主弧：cyan 亮 → teal 深 -->
+    <linearGradient id="arc" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0" stop-color="#CFFAFE"/>
+      <stop offset="0.45" stop-color="#22D3EE"/>
+      <stop offset="1" stop-color="#0891B2"/>
+    </linearGradient>
+
+    <!-- 中心核：白 → cyan 径向 -->
+    <radialGradient id="dot" cx="0.4" cy="0.4" r="0.6">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="0.5" stop-color="#A5F3FC"/>
+      <stop offset="1" stop-color="#22D3EE"/>
+    </radialGradient>
+  </defs>
+
+  <!-- 圆角方形背景 -->
+  <rect x="0" y="0" width="512" height="512" rx="116" ry="116" fill="url(#bg)"/>
+
+  <!--
+    核心图形：「光环 + 核」—— 开口的能量环 + 中心发光核
+    环留一道开口 (右下 ~80°)，破除"靶心"陈词，更具能量/动能感。
+    用多层半透明同心圆模拟柔光晕（不依赖 SVG filter）。
+  -->
+
+  <!-- 外层柔光晕 -->
+  <circle cx="256" cy="256" r="214" fill="#22D3EE" opacity="0.035"/>
+  <circle cx="256" cy="256" r="184" fill="#22D3EE" opacity="0.06"/>
+  <circle cx="256" cy="256" r="156" fill="#22D3EE" opacity="0.085"/>
+
+  <!-- 内层强辉光 (紧贴主弧) -->
+  <circle cx="256" cy="256" r="142" fill="#67E8F9" opacity="0.14"/>
+  <circle cx="256" cy="256" r="132" fill="#67E8F9" opacity="0.18"/>
+
+  <!--
+    主弧：开口圆环
+    圆心 (256,256) 半径 122，从 angle=-110° 起顺时针扫到 130°，留约 120° 开口在右下。
+    SVG arc: 起点用极坐标算出。
+    r=122, 起点角 -110° (≈从正上方逆时针 20° 的位置，在右上偏上)
+    终点角 130° (右下)
+    large-arc-flag=1 (走大弧), sweep=1 (顺时针)
+  -->
+  <!--
+    起点角 θ1 = -110°: x = 256 + 122·cos(-110°), y = 256 + 122·sin(-110°)
+       cos(-110°)= -0.342, sin(-110°)= -0.940
+       → (256 - 41.7, 256 - 114.7) = (214.3, 141.3)
+    终点角 θ2 = 130°: cos(130°)= -0.643, sin(130°)= 0.766
+       → (256 - 78.5, 256 + 93.5) = (177.5, 349.5)
+    large-arc=1 (扫过 240°), sweep=1
+  -->
+  <path d="M 214.3 141.3 A 122 122 0 1 1 177.5 349.5"
+        fill="none" stroke="url(#arc)" stroke-width="22" stroke-linecap="round"/>
+
+  <!-- 主弧上的高光 (左上一段提亮，金属/能量流动感) -->
+  <!-- 高光弧从 -160° 到 -60°，半径 122，描边更细更亮 -->
+  <!-- θ=-160°: cos=-0.940 sin=-0.342 → (141.3, 214.3)
+       θ=-60°:  cos=0.5    sin=-0.866 → (317.0, 150.3)
+       large-arc=0 sweep=1 -->
+  <path d="M 141.3 214.3 A 122 122 0 0 1 317.0 150.3"
+        fill="none" stroke="#ECFEFF" stroke-width="7" stroke-linecap="round" opacity="0.9"/>
+
+  <!-- 中心发光核 -->
+  <circle cx="256" cy="256" r="52" fill="url(#dot)"/>
+
+  <!-- 核心柔光晕 (白) -->
+  <circle cx="256" cy="256" r="70" fill="#A5F3FC" opacity="0.18"/>
+
+  <!-- 中心核高光点 (左上偏移，立体感) -->
+  <circle cx="240" cy="240" r="15" fill="#FFFFFF" opacity="0.92"/>
+</svg>

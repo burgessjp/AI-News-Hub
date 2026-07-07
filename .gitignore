@@ -1,0 +1,31 @@
+# Android / Gradle
+.gradle/
+build/
+app/build/
+local.properties
+*.iml
+.idea/
+captures/
+.cxx/
+
+# Kotlin 编译缓存
+.kotlin/
+
+# 构建产物
+*.apk
+*.aab
+*.ap_
+*.dex
+*.hprof
+
+# 通用日志
+*.log
+
+# 签名密钥 —— 绝不入库，避免密钥泄露导致包被冒名
+*.jks
+*.keystore
+keystore.properties
+
+# 操作系统
+.DS_Store
+Thumbs.db
