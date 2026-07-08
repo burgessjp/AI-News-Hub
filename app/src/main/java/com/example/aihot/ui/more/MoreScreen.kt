@@ -17,6 +17,7 @@ import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -35,14 +36,16 @@ import com.example.aihot.ui.components.AppTopBar
  * 更多 tab —— 聚合次要入口。
  *
  * 入口列表(列表式卡片行):
- *  1. 历史日报  → 二级页 DailyArchive
- *  2. 搜索      → 二级页 Search
- *  3. 设置      → 二级页 Settings(主题切换)
- *  4. 关于      → 二级页 About(版本/数据源/依赖)
+ *  1. 历史日报      → 二级页 DailyArchive
+ *  2. HackerNews    → 二级页 HackerNews
+ *  3. 搜索          → 二级页 Search
+ *  4. 设置          → 二级页 Settings(主题切换)
+ *  5. 关于          → 二级页 About(版本/数据源/依赖)
  */
 @Composable
 fun MoreScreen(
     onOpenArchive: () -> Unit,
+    onOpenHackerNews: () -> Unit,
     onOpenSearch: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenAbout: () -> Unit
@@ -62,6 +65,14 @@ fun MoreScreen(
                     title = "历史日报",
                     subtitle = "查看往期 AI 日报",
                     onClick = onOpenArchive
+                )
+            }
+            item {
+                MoreRow(
+                    icon = Icons.Filled.Whatshot,
+                    title = "HackerNews",
+                    subtitle = "HackerNews 热门榜单",
+                    onClick = onOpenHackerNews
                 )
             }
             item {

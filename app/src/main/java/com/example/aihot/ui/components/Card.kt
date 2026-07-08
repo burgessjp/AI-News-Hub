@@ -43,7 +43,7 @@ fun AppCard(
 }
 
 /**
- * 可点击版本 —— 带 ripple,无按压缩放(由调用方按需叠加 pressScale)。
+ * 可点击版本 —— 带 ripple 反馈,无按压缩放。
  */
 @Composable
 fun AppClickableCard(

@@ -5,14 +5,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,12 +22,15 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.activity.compose.BackHandler
+import com.example.aihot.data.HackerNewsStory
 import com.example.aihot.data.NewsItem
 import com.example.aihot.ui.NewsDetailScreen
 import com.example.aihot.ui.components.AppBottomBar
 import com.example.aihot.ui.components.AppTab
 import com.example.aihot.ui.daily.DailyArchiveScreen
 import com.example.aihot.ui.daily.DailyDateScreen
+import com.example.aihot.ui.items.HackerNewsCommentsScreen
+import com.example.aihot.ui.items.HackerNewsScreen
 import com.example.aihot.ui.items.SearchScreen
 import com.example.aihot.ui.more.AboutScreen
 import com.example.aihot.ui.more.MoreScreen
@@ -41,6 +39,8 @@ import com.example.aihot.ui.more.ThemeMode
 import com.example.aihot.ui.tabs.AllTab
 import com.example.aihot.ui.tabs.DailyTab
 import com.example.aihot.ui.tabs.FeaturedTab
+import com.example.aihot.ui.anim.PageNavStyle
+import com.example.aihot.ui.anim.pageTransition
 import com.example.aihot.ui.theme.AIHotTheme
 import com.example.aihot.ui.webview.WebViewScreen
 
@@ -62,15 +62,31 @@ class MainActivity : ComponentActivity() {
  * - Search:    搜索页
  * - Settings:  设置(主题)
  * - About:     关于
+ * - HackerNews: HackerNews 列表
+ * - HackerNewsComments: HackerNews 单条 story 的评论树
  */
 private sealed interface Page {
-    data class Detail(val item: NewsItem) : Page
-    data class Web(val url: String, val title: String = "加载中…") : Page
+    /**
+     * 该页面的转场风格,由 [pageTransition] 统一消费。
+     *
+     * 默认 PUSH(横向推入),绝大多数二级页无需单独声明。
+     * 仅覆盖型全屏页(Detail / Web,内含 AndroidView)需 override 为 OVERLAY。
+     */
+    val navStyle: PageNavStyle get() = PageNavStyle.PUSH
+
+    data class Detail(val item: NewsItem) : Page {
+        override val navStyle = PageNavStyle.OVERLAY
+    }
+    data class Web(val url: String, val title: String = "加载中…") : Page {
+        override val navStyle = PageNavStyle.OVERLAY
+    }
     data object DailyArchive : Page
     data class DailyDate(val date: String) : Page
     data object Search : Page
     data object Settings : Page
     data object About : Page
+    data object HackerNews : Page
+    data class HackerNewsComments(val story: HackerNewsStory) : Page
 }
 
 /**
@@ -103,12 +119,16 @@ fun AIHotApp() {
             AppTab.entries.associateWith { emptyList() }
         )
     }
+    // 转场方向:push 时为 false(前进),pop 时为 true(返回)。
+    // transitionSpec 据此决定 PUSH 类页面的位移方向(返回时方向镜像)。
+    var isNavigatingBack by remember { mutableStateOf(false) }
 
     val currentPages: List<Page> = pageStacks[currentTab].orEmpty()
     val isRoot: Boolean = currentPages.isEmpty()
 
     // 进入二级页:push 到当前 tab 栈
     val push: (Page) -> Unit = { page ->
+        isNavigatingBack = false
         pageStacks = pageStacks.toMutableMap().apply {
             this[currentTab] = (this[currentTab].orEmpty()) + page
         }
@@ -116,6 +136,7 @@ fun AIHotApp() {
     // 弹当前 tab 栈顶
     val pop: () -> Unit = {
         if (pageStacks[currentTab].orEmpty().isNotEmpty()) {
+            isNavigatingBack = true
             pageStacks = pageStacks.toMutableMap().apply {
                 this[currentTab] = (this[currentTab].orEmpty()).dropLast(1)
             }
@@ -123,7 +144,10 @@ fun AIHotApp() {
     }
     // 切 tab
     val selectTab: (AppTab) -> Unit = { tab ->
-        if (tab != currentTab) currentTab = tab
+        if (tab != currentTab) {
+            isNavigatingBack = false
+            currentTab = tab
+        }
     }
 
     // 统一"打开内置 WebView"
@@ -139,8 +163,14 @@ fun AIHotApp() {
         Surface {
             Scaffold(
                 bottomBar = {
-                    // 仅根页显示底栏;二级页隐藏(沉浸)
-                    if (isRoot) {
+                    // 根页显示底栏;进入二级页时向下滑出(与页面转场同步),
+                    // 返回根页时从底滑入。AnimatedVisibility 高度变化会让
+                    // Scaffold 的 contentWindowInsets padding 平滑收起/展开。
+                    AnimatedVisibility(
+                        visible = isRoot,
+                        enter = slideInVertically(initialOffsetY = { it }),
+                        exit = slideOutVertically(targetOffsetY = { it })
+                    ) {
                         AppBottomBar(current = currentTab, onSelect = selectTab)
                     }
                 }
@@ -148,24 +178,13 @@ fun AIHotApp() {
                 AnimatedContent(
                     targetState = screen,
                     transitionSpec = {
-                        val targetDetail = (targetState as? Screen.Secondary)?.page as? Page.Detail
-                        val initialDetail = (initialState as? Screen.Secondary)?.page as? Page.Detail
-                        when {
-                            // tab 之间切换(根→根):crossfade
-                            initialState is Screen.Root && targetState is Screen.Root ->
-                                fadeIn(tween(280)) togetherWith fadeOut(tween(280))
-                            // 进入详情:scale + fade(向前推进感)
-                            targetDetail != null ->
-                                (fadeIn(tween(300)) + scaleIn(initialScale = 0.92f, animationSpec = tween(300))) togetherWith
-                                    (fadeOut(tween(180)) + scaleOut(targetScale = 1.05f, animationSpec = tween(180)))
-                            // 退出详情:反向 scale
-                            initialDetail != null && targetState is Screen.Root ->
-                                (fadeIn(tween(220)) + scaleIn(initialScale = 1.05f, animationSpec = tween(220))) togetherWith
-                                    (fadeOut(tween(180)) + scaleOut(targetScale = 0.92f, animationSpec = tween(180)))
-                            // 其余(根↔二级页 / 二级页↔二级页):横向推入
-                            else -> slideInHorizontally(initialOffsetX = { it / 3 }, animationSpec = tween(300)) + fadeIn(tween(300)) togetherWith
-                                slideOutHorizontally(targetOffsetX = { -it / 3 }, animationSpec = tween(300)) + fadeOut(tween(300))
-                        }
+                        // 转场策略由页面自身声明的 navStyle + 导航方向驱动,集中配置于 pageTransition()。
+                        // 加新页面时只需在该 Page 上标注 PageNavStyle,无需改这里。
+                        pageTransition(
+                            enter = targetState.navStyle,
+                            exit = initialState.navStyle,
+                            back = isNavigatingBack
+                        )
                     },
                     contentAlignment = androidx.compose.ui.Alignment.TopCenter,
                     label = "nav",
@@ -181,6 +200,7 @@ fun AIHotApp() {
                             onItemClick = { push(Page.Detail(it)) },
                             onOpenSearch = { push(Page.Search) },
                             onOpenArchive = { push(Page.DailyArchive) },
+                            onOpenHackerNews = { push(Page.HackerNews) },
                             onOpenUrl = openUrl,
                             onOpenSettings = { push(Page.Settings) },
                             onOpenAbout = { push(Page.About) }
@@ -192,6 +212,7 @@ fun AIHotApp() {
                             onBack = pop,
                             onItemClick = { push(Page.Detail(it)) },
                             onSelectDate = { push(Page.DailyDate(it)) },
+                            onOpenComments = { push(Page.HackerNewsComments(it)) },
                             onOpenUrl = openUrl
                         )
                     }
@@ -203,10 +224,19 @@ fun AIHotApp() {
 
 /**
  * 顶层屏幕标识:根(tab) 或 二级页。供 [AnimatedContent] 区分转场策略。
+ *
+ * [navStyle] 让 [transitionSpec] 直接查表,无需类型判断:
+ * 根页统一为 [PageNavStyle.NONE],二级页沿用其 [Page.navStyle]。
  */
 private sealed interface Screen {
-    data class Root(val tab: AppTab) : Screen
-    data class Secondary(val page: Page) : Screen
+    val navStyle: PageNavStyle
+
+    data class Root(val tab: AppTab) : Screen {
+        override val navStyle = PageNavStyle.NONE
+    }
+    data class Secondary(val page: Page) : Screen {
+        override val navStyle get() = page.navStyle
+    }
 }
 
 /** 渲染某个 tab 的根屏幕。 */
@@ -216,6 +246,7 @@ private fun TabRoot(
     onItemClick: (NewsItem) -> Unit,
     onOpenSearch: () -> Unit,
     onOpenArchive: () -> Unit,
+    onOpenHackerNews: () -> Unit,
     onOpenUrl: (String, String) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenAbout: () -> Unit
@@ -234,6 +265,7 @@ private fun TabRoot(
         AppTab.More -> MoreScreen(
             onOpenArchive = onOpenArchive,
             onOpenSearch = onOpenSearch,
+            onOpenHackerNews = onOpenHackerNews,
             onOpenSettings = onOpenSettings,
             onOpenAbout = onOpenAbout
         )
@@ -249,6 +281,7 @@ private fun PageView(
     onBack: () -> Unit,
     onItemClick: (NewsItem) -> Unit,
     onSelectDate: (String) -> Unit,
+    onOpenComments: (HackerNewsStory) -> Unit,
     onOpenUrl: (String, String) -> Unit
 ) {
     when (page) {
@@ -281,5 +314,14 @@ private fun PageView(
             onBack = onBack
         )
         Page.About -> AboutScreen(onBack = onBack)
+        Page.HackerNews -> HackerNewsScreen(
+            onBack = onBack,
+            onOpenComments = onOpenComments
+        )
+        is Page.HackerNewsComments -> HackerNewsCommentsScreen(
+            story = page.story,
+            onBack = onBack,
+            onOpenUrl = onOpenUrl
+        )
     }
 }

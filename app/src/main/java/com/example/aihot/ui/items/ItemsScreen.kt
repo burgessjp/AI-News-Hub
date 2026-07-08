@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import com.example.aihot.ui.anim.Motion
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -220,8 +221,10 @@ fun ItemsScreen(
         // 返回顶部 FAB(悬浮右下)
         AnimatedVisibility(
             visible = showBackToTop,
-            enter = scaleIn(initialScale = 0.5f, animationSpec = tween(200)) + fadeIn(),
-            exit = scaleOut(targetScale = 0.5f, animationSpec = tween(150)) + fadeOut(),
+            enter = scaleIn(initialScale = 0.5f, animationSpec = Motion.DefaultSpring) +
+                fadeIn(tween(Motion.SHORT, easing = Motion.EmphasizedDecel)),
+            exit = scaleOut(targetScale = 0.5f, animationSpec = Motion.DefaultSpring) +
+                fadeOut(tween(Motion.SHORT, easing = Motion.EmphasizedAccel)),
             modifier = Modifier.align(Alignment.BottomEnd)
         ) {
             FloatingActionButton(
