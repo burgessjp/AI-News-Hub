@@ -121,8 +121,18 @@ fun WebViewScreen(
                                 view: WebView,
                                 request: WebResourceRequest
                             ): Boolean {
-                                // 站内打开,不跳外部浏览器
-                                view.loadUrl(request.url.toString())
+                                // 按协议分流:http(s)/about:blank 留在站内;
+                                // 其余 scheme(intent://、weixin://、mailto:、tel:…)
+                                // 唤起外部 App,失败时优雅降级。
+                                val uri = request.url
+                                val scheme = uri.scheme?.lowercase()
+                                if (scheme == "http" || scheme == "https" ||
+                                    scheme == "about" || scheme == "javascript"
+                                ) {
+                                    view.loadUrl(uri.toString())
+                                    return true
+                                }
+                                handleExternalUri(view.context, uri)
                                 return true
                             }
 
@@ -378,6 +388,49 @@ private fun shareUrl(context: Context, title: String, url: String) {
         putExtra(Intent.EXTRA_TEXT, url)
     }
     context.startActivity(Intent.createChooser(intent, "分享"))
+}
+
+/**
+ * 唤起外部 App —— 处理网页发起的非 http(s) 协议链接。
+ *
+ * 分两类:
+ *  - intent:// URI:按 Chrome 规范解析 Intent。优先解析其中的 fallback URL
+ *    (S.browser_fallback_url),目标 App 不存在时用它(通常跳应用市场/网页)。
+ *  - 普通自定义 scheme(weixin://、mailto:、tel:…):直接构造 ACTION_VIEW 唤起。
+ *
+ * 任何无法解析 / 无 App 接收的异常都用 Toast 提示,绝不崩溃。
+ */
+private fun handleExternalUri(context: Context, uri: Uri) {
+    val scheme = uri.scheme?.lowercase()
+    try {
+        if (scheme == "intent") {
+            // Chrome intent:// 规范 —— Intent.parseUri 解析,带 fallback URL
+            val intent = Intent.parseUri(uri.toString(), Intent.URI_INTENT_SCHEME)
+                .addCategory(Intent.CATEGORY_BROWSABLE)
+            // 目标 App 未安装时,优先用网页声明的 fallback URL
+            val fallback = intent.getStringExtra("browser_fallback_url")
+            if (intent.resolveActivity(context.packageManager) != null) {
+                context.startActivity(intent)
+            } else if (!fallback.isNullOrBlank()) {
+                // fallback 一般是 http(s) 网址,交给系统浏览器/市场打开
+                context.startActivity(
+                    Intent(Intent.ACTION_VIEW, Uri.parse(fallback))
+                        .addCategory(Intent.CATEGORY_BROWSABLE)
+                )
+            } else {
+                Toast.makeText(context, "未找到可打开此链接的应用", Toast.LENGTH_SHORT).show()
+            }
+        } else {
+            // weixin://、mailto:、tel:、sms: 等普通自定义 scheme
+            context.startActivity(
+                Intent(Intent.ACTION_VIEW, uri).addCategory(Intent.CATEGORY_BROWSABLE)
+            )
+        }
+    } catch (e: android.content.ActivityNotFoundException) {
+        Toast.makeText(context, "未找到可打开此链接的应用", Toast.LENGTH_SHORT).show()
+    } catch (e: Exception) {
+        Toast.makeText(context, "无法打开此链接", Toast.LENGTH_SHORT).show()
+    }
 }
 
 /** 应用网页深色模式:优先用网页自带深色主题,无则算法深色(自动转深)。 */

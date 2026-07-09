@@ -6,6 +6,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import com.example.aihot.ui.anim.Motion
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -366,8 +367,10 @@ private fun CommentRow(
             // 子评论加载失败提示(展开后展示)
             AnimatedVisibility(
                 visible = flat.expanded && flat.childrenError != null,
-                enter = expandVertically(tween(150)) + fadeIn(tween(150)),
-                exit = shrinkVertically(tween(150)) + fadeOut(tween(150))
+                enter = expandVertically(tween(Motion.SHORT, easing = Motion.EmphasizedDecel)) +
+                    fadeIn(tween(Motion.SHORT, easing = Motion.EmphasizedDecel)),
+                exit = shrinkVertically(tween(Motion.SHORT, easing = Motion.EmphasizedAccel)) +
+                    fadeOut(tween(Motion.SHORT, easing = Motion.EmphasizedAccel))
             ) {
                 Text(
                     text = "加载回复失败:${flat.childrenError}",

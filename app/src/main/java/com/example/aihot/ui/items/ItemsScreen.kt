@@ -4,8 +4,8 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import com.example.aihot.ui.anim.Motion
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -81,7 +81,7 @@ private fun NewsRowDivider() {
  * 交互改进:
  *  - 加载时显示 shimmer 骨架(4 个),不显示裸 CircularProgressIndicator
  *  - 列表项用 Modifier.animateItem() — 切分类时自动淡入/移位(LazyItemScope 成员)
- *  - 滚下超过 1 屏时浮现"返回顶部"FAB(scaleIn/scaleOut)
+ *  - 滚下超过 1 屏时浮现"返回顶部"FAB(slideInVertically/slideOutVertically)
  */
 @OptIn(ExperimentalMaterial3Api::class, kotlinx.coroutines.FlowPreview::class)
 @Composable
@@ -218,13 +218,17 @@ fun ItemsScreen(
             }
         }
 
-        // 返回顶部 FAB(悬浮右下)
+        // 返回顶部 FAB(悬浮右下):从底部滑入/滑出 + 淡入淡出。无缩放,风格统一。
         AnimatedVisibility(
             visible = showBackToTop,
-            enter = scaleIn(initialScale = 0.5f, animationSpec = Motion.DefaultSpring) +
-                fadeIn(tween(Motion.SHORT, easing = Motion.EmphasizedDecel)),
-            exit = scaleOut(targetScale = 0.5f, animationSpec = Motion.DefaultSpring) +
-                fadeOut(tween(Motion.SHORT, easing = Motion.EmphasizedAccel)),
+            enter = slideInVertically(
+                initialOffsetY = { it },
+                animationSpec = tween(Motion.SHORT, easing = Motion.EmphasizedDecel)
+            ) + fadeIn(tween(Motion.SHORT, easing = Motion.EmphasizedDecel)),
+            exit = slideOutVertically(
+                targetOffsetY = { it },
+                animationSpec = tween(Motion.SHORT, easing = Motion.EmphasizedAccel)
+            ) + fadeOut(tween(Motion.SHORT, easing = Motion.EmphasizedAccel)),
             modifier = Modifier.align(Alignment.BottomEnd)
         ) {
             FloatingActionButton(

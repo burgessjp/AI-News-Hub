@@ -2,43 +2,27 @@ package com.example.aihot.ui.anim
 
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.core.CubicBezierEasing
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 
 /**
  * 集中定义动画规范,避免 magic number 散落。
- * 参考 material-3-skill motion 章节:MD3 emphasized 弹簧与缓动。
+ * 参考 material-3-skill motion 章节:MD3 emphasized 缓动。
+ *
+ * 本文件刻意只保留 [tween] 缓动体系——不用 spring,不用 scale。
+ * 页面转场一律位移或淡入淡出,风格统一、干脆、可预期。
  */
 object Motion {
-    // ===== 弹簧(MD3 emphasized 风格)=====
-    val DefaultSpring = spring<Float>(
-        dampingRatio = Spring.DampingRatioMediumBouncy,
-        stiffness = Spring.StiffnessMediumLow
-    )
-    val BouncySpring = spring<Float>(
-        dampingRatio = Spring.DampingRatioLowBouncy,
-        stiffness = Spring.StiffnessLow
-    )
-    val SnappySpring = spring<Float>(
-        dampingRatio = Spring.DampingRatioNoBouncy,
-        stiffness = Spring.StiffnessHigh
-    )
-
     // ===== Duration(毫秒)=====
     const val SHORT = 150
     const val MEDIUM = 300
-    const val LONG = 500
 
     // ===== Easing(MD3 emphasized cubic-bezier 近似)=====
-    val Emphasized = CubicBezierEasing(0.2f, 0f, 0f, 1f)
+    // Decel 用于"进入"(快起慢收);Accel 用于"退出"(慢起快收)。
     val EmphasizedDecel = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)
     val EmphasizedAccel = CubicBezierEasing(0.3f, 0f, 0.8f, 0.15f)
 }
@@ -47,15 +31,16 @@ object Motion {
  * 页面转场风格。每个页面在 [PageNavStyle] 枚举里声明一种风格,
  * [pageTransition] 据此统一产出一对进/出 [ContentTransform]。
  *
- * 这样添加新页面时只需标注风格,无需在 transitionSpec 里写 when 分支。
+ * 添加新页面时默认即 [PUSH](横向推入),绝大多数二级页无需单独声明。
  *
- * @property OVERLAY 覆盖型全屏页(Detail / Web 等):scale + fade 浮现。
- *  对含 AndroidView 的页面(WebView)安全——位移会撕裂,缩放不会。
- * @property PUSH 普通二级页(Search / Settings 等):纯横向位移推入,无 fade 无重影。
- *  作为 [Page.navStyle] 的默认值,新增二级页无需声明即可获得此风格。
- * @property NONE tab 根页之间切换。
+ * @property PUSH 普通二级页(Search / Settings / Detail 等):纯横向位移推入,
+ *  无 fade、无 scale——iOS 式实心推入,清晰干脆。
+ * @property FADE 含 AndroidView 的页(仅 Web):纯淡入淡出,永不位移。
+ *  WebView 对 translation 撕裂,但 alpha 安全。只要它参与转场(进或出),
+ *  整个转场走 fade,从根源杜绝撕裂。
+ * @property NONE tab 根页之间切换:带 stagger 的 crossfade(防中间变暗)。
  */
-enum class PageNavStyle { OVERLAY, PUSH, NONE }
+enum class PageNavStyle { PUSH, FADE, NONE }
 
 /**
  * 统一的页面转场工厂。
@@ -65,39 +50,33 @@ enum class PageNavStyle { OVERLAY, PUSH, NONE }
  *
  * ## 决策规则(按优先级,first match wins)
  *
- * 1. **任意一边是 OVERLAY → scale + fade,永不位移。**
- *    OVERLAY 页(Detail/Web,Web 含 AndroidView)对横向位移不安全——WebView
- *    会被撕裂。只要它参与转场(进或出),整个转场改用 scale/fade,从根源杜绝。
- *    - 进入 OVERLAY:新页从 0.96 scale up 浮现,下层页轻微缩放(被压感)但不消失。
- *    - 离开 OVERLAY:上层 OVERLAY scale down 退场,下层页 fade in 揭示。
- *    进入/离开各自独立判断,不受 [back] 干扰——OVERLAY 的进退形态本就不同。
+ * 1. **任意一边是 FADE → 双向 fade。**
+ *    仅 Web 含 AndroidView,位移会撕裂 WebView,但 alpha 安全。
+ *    进/出皆用 tween 缓动,不位移、不缩放——视觉上像一层纱揭起,而非滑动。
+ *    - 前进:新页 fade in,旧页 fade out 同步。
+ *    - 返回:同上(fade 自身对称)。
  *
- * 2. **两边都是 NONE(tab↔tab)→ crossfade。** 与栈内容无关,行为确定。
+ * 2. **两边都是 NONE(tab↔tab)→ 带 stagger 的 crossfade。**
+ *    旧页先退(160ms Accel)、新页稍迟后进(220ms Decel)——错峰避免两者在
+ *    ~50% 透明度时叠加成"中间变暗"。纯 fade,无位移。
  *
  * 3. **其余(NONE↔PUSH / PUSH↔PUSH)→ 横向推入,方向由 [back] 决定。**
- *    前进新页从右进、旧页左移 1/3 视差;返回方向镜像。
+ *    前进:新页从右进、旧页左移 1/3 视差;返回方向镜像。
+ *    纯位移,无 fade、无 scale——实心推入,所见即所得。
  *
  * @param back 是否为返回(pop)。仅影响 PUSH 的位移方向;
- *  OVERLAY 与 NONE(crossfade)自身对称,但 OVERLAY 的进/出形态不同(见规则 1)。
+ *  FADE 与 NONE 自身对称,但 stagger 的进退时长不同(见规则 2)。
  */
 fun pageTransition(enter: PageNavStyle, exit: PageNavStyle, back: Boolean = false): ContentTransform = when {
-    // ===== 规则 1:任意一边是 OVERLAY → scale/fade,绝不 slide =====
-    // 进入 OVERLAY:新页 scale up 浮现;下层页保持可见(仅极轻缩放"被压"),
-    // 不 fade——避免 Bug(下层页消失留空白闪烁)。
-    enter == PageNavStyle.OVERLAY ->
-        (fadeIn(tween(Motion.MEDIUM, easing = Motion.EmphasizedDecel)) +
-            scaleIn(initialScale = 0.96f, animationSpec = Motion.DefaultSpring)) togetherWith
-            scaleOut(targetScale = 0.98f, animationSpec = tween(Motion.MEDIUM, easing = Motion.EmphasizedAccel))
-    // 离开 OVERLAY(无论返回到 root 还是 PUSH 页)。上层 OVERLAY scale down 退场,
-    // 下层页 fade in 揭示。解决 Bug(Web→PUSH 页返回时 WebView 被 slide 撕裂)。
-    exit == PageNavStyle.OVERLAY ->
-        fadeIn(tween(Motion.SHORT, easing = Motion.EmphasizedDecel)) togetherWith
-            (fadeOut(tween(Motion.MEDIUM, easing = Motion.EmphasizedAccel)) +
-                scaleOut(targetScale = 0.96f, animationSpec = Motion.DefaultSpring))
+    // ===== 规则 1:任意一边是 FADE → 双向 fade(WebView 安全)=====
+    enter == PageNavStyle.FADE || exit == PageNavStyle.FADE ->
+        fadeIn(tween(Motion.MEDIUM, easing = Motion.EmphasizedDecel)) togetherWith
+            fadeOut(tween(Motion.MEDIUM, easing = Motion.EmphasizedAccel))
 
-    // ===== 规则 2:tab↔tab → crossfade =====
+    // ===== 规则 2:tab↔tab → 带 stagger 的 crossfade =====
     enter == PageNavStyle.NONE && exit == PageNavStyle.NONE ->
-        fadeIn(tween(Motion.SHORT, easing = Motion.EmphasizedDecel)) togetherWith
+        // 新页稍迟进入(避免与旧页同时半透明),用 startDelay 错峰。
+        fadeIn(tween(Motion.MEDIUM, delayMillis = 40, easing = Motion.EmphasizedDecel)) togetherWith
             fadeOut(tween(Motion.SHORT, easing = Motion.EmphasizedAccel))
 
     // ===== 规则 3:PUSH 类横向推入,方向由 back 决定 =====

@@ -71,15 +71,14 @@ private sealed interface Page {
      * 该页面的转场风格,由 [pageTransition] 统一消费。
      *
      * 默认 PUSH(横向推入),绝大多数二级页无需单独声明。
-     * 仅覆盖型全屏页(Detail / Web,内含 AndroidView)需 override 为 OVERLAY。
+     * 仅 Web 含 AndroidView(WebView),位移会撕裂 → override 为 FADE(纯淡入淡出)。
+     * 其余页(含 Detail)是纯 Compose,正常 PUSH 即可。
      */
     val navStyle: PageNavStyle get() = PageNavStyle.PUSH
 
-    data class Detail(val item: NewsItem) : Page {
-        override val navStyle = PageNavStyle.OVERLAY
-    }
+    data class Detail(val item: NewsItem) : Page
     data class Web(val url: String, val title: String = "加载中…") : Page {
-        override val navStyle = PageNavStyle.OVERLAY
+        override val navStyle = PageNavStyle.FADE
     }
     data object DailyArchive : Page
     data class DailyDate(val date: String) : Page
@@ -101,7 +100,7 @@ private sealed interface Page {
  *  - 点底栏切 tab:仅换 currentTab(各 tab 二级栈保留)
  *  - 进入二级页:push 到当前 tab 的栈
  *  - 返回:pop 当前 tab 栈;栈空时交系统默认退出 App
- *  - 底栏显隐:当前 tab 二级栈非空时隐藏底栏(MD3 规范)
+ *  - 底栏始终常驻(见 AIHotApp 内说明)
  */
 @Composable
 fun AIHotApp() {
@@ -172,9 +171,10 @@ fun AIHotApp() {
         Surface {
             Scaffold(
                 bottomBar = {
-                    // 根页显示底栏;进入二级页时向下滑出(与页面转场同步),
-                    // 返回根页时从底滑入。AnimatedVisibility 高度变化会让
-                    // Scaffold 的 contentWindowInsets padding 平滑收起/展开。
+                    // 根页显示底栏;进入二级页时向下滑出,返回时滑入。
+                    // 二级页不显示底栏(沉浸感)。底栏隐藏/显示期间 Scaffold 的
+                    // contentWindowInsets padding 会随之变化,转场期间内容高度会随之拉伸/收缩,
+                    // 与页面位移叠加产生轻微抖动——这是已知取舍,优先保证沉浸感与无留白。
                     AnimatedVisibility(
                         visible = isRoot,
                         enter = slideInVertically(initialOffsetY = { it }),
@@ -197,10 +197,8 @@ fun AIHotApp() {
                     },
                     contentAlignment = androidx.compose.ui.Alignment.TopCenter,
                     label = "nav",
-                    // 应用 Scaffold 的 padding(含底栏高度),避免内容被底栏遮挡。
-                    // 二级页时底栏隐藏,底部 padding 退化为 0,不影响沉浸效果。
-                    // consumeWindowInsets 防止内层各 Tab 的 Scaffold 重复读取系统底部 inset
-                    // (手势条),导致底部空白叠加。
+                    // 应用 Scaffold 的 padding(含底栏高度)。consumeWindowInsets 防止内层各 Tab 的
+                    // Scaffold 重复读取系统 inset(状态栏/手势条),导致空白叠加。
                     modifier = Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)
                 ) { s ->
                     when (s) {
