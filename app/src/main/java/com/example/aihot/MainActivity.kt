@@ -213,7 +213,8 @@ fun AIHotApp() {
                             onItemClick = { push(Page.Detail(it)) },
                             onSelectDate = { push(Page.DailyDate(it)) },
                             onOpenComments = { push(Page.HackerNewsComments(it)) },
-                            onOpenUrl = openUrl
+                            onOpenUrl = openUrl,
+                            darkTheme = darkTheme
                         )
                     }
                 }
@@ -282,7 +283,8 @@ private fun PageView(
     onItemClick: (NewsItem) -> Unit,
     onSelectDate: (String) -> Unit,
     onOpenComments: (HackerNewsStory) -> Unit,
-    onOpenUrl: (String, String) -> Unit
+    onOpenUrl: (String, String) -> Unit,
+    darkTheme: Boolean = false
 ) {
     when (page) {
         is Page.Detail -> NewsDetailScreen(
@@ -293,6 +295,7 @@ private fun PageView(
         is Page.Web -> WebViewScreen(
             url = page.url,
             title = page.title,
+            darkTheme = darkTheme,
             onBack = onBack
         )
         Page.DailyArchive -> DailyArchiveScreen(

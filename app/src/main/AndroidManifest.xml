@@ -1,5 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 网页下载:API<29 经 DownloadManager 写公共「下载」目录需要;API 29+ scoped storage 无需 -->
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
