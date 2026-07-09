@@ -35,6 +35,7 @@ import com.example.aihot.ui.items.SearchScreen
 import com.example.aihot.ui.more.AboutScreen
 import com.example.aihot.ui.more.MoreScreen
 import com.example.aihot.ui.more.SettingsScreen
+import com.example.aihot.ui.more.FontChoice
 import com.example.aihot.ui.more.ThemeMode
 import com.example.aihot.ui.tabs.AllTab
 import com.example.aihot.ui.tabs.DailyTab
@@ -112,6 +113,11 @@ fun AIHotApp() {
         ThemeMode.Dark -> true
     }
 
+    // 字体族:同样提升到顶层,设置页可修改。默认系统无衬线。
+    // System 时不向 AIHotTheme 传 fontFamily(沿用 Type.kt 默认 SansSerif),
+    // 仅 Serif/Mono 时传实际 FontFamily,触发全 App 字形切换。
+    var fontChoice by rememberSaveable { mutableStateOf(FontChoice.System) }
+
     // 当前 tab + 每个 tab 的二级页栈
     var currentTab by rememberSaveable { mutableStateOf(AppTab.Featured) }
     var pageStacks by remember {
@@ -159,7 +165,10 @@ fun AIHotApp() {
     // 当前屏幕:根(tab) 或 二级页。用作 AnimatedContent 的 key。
     val screen: Screen = if (isRoot) Screen.Root(currentTab) else Screen.Secondary(currentPages.last())
 
-    AIHotTheme(darkTheme = darkTheme) {
+    AIHotTheme(
+        darkTheme = darkTheme,
+        fontFamily = if (fontChoice == FontChoice.System) null else fontChoice.fontFamily
+    ) {
         Surface {
             Scaffold(
                 bottomBar = {
@@ -209,6 +218,8 @@ fun AIHotApp() {
                             page = s.page,
                             themeMode = themeMode,
                             onSelectTheme = { themeMode = it },
+                            fontChoice = fontChoice,
+                            onSelectFont = { fontChoice = it },
                             onBack = pop,
                             onItemClick = { push(Page.Detail(it)) },
                             onSelectDate = { push(Page.DailyDate(it)) },
@@ -279,6 +290,8 @@ private fun PageView(
     page: Page,
     themeMode: ThemeMode,
     onSelectTheme: (ThemeMode) -> Unit,
+    fontChoice: FontChoice,
+    onSelectFont: (FontChoice) -> Unit,
     onBack: () -> Unit,
     onItemClick: (NewsItem) -> Unit,
     onSelectDate: (String) -> Unit,
@@ -314,6 +327,8 @@ private fun PageView(
         Page.Settings -> SettingsScreen(
             themeMode = themeMode,
             onSelectTheme = onSelectTheme,
+            fontChoice = fontChoice,
+            onSelectFont = onSelectFont,
             onBack = onBack
         )
         Page.About -> AboutScreen(onBack = onBack)

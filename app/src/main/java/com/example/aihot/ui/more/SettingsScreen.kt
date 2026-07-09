@@ -1,37 +1,35 @@
 package com.example.aihot.ui.more
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.BrightnessAuto
+import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.TextFields
+import androidx.compose.material.icons.filled.Title
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
-import com.example.aihot.ui.components.AppCard
 import com.example.aihot.ui.components.AppTopBar
+import com.example.aihot.ui.components.SegmentedOption
+import com.example.aihot.ui.components.SegmentedOptionRow
+import com.example.aihot.ui.components.SettingsGroupHeader
+import com.example.aihot.ui.components.SettingsRow
 
 /**
- * 主题模式 —— 由 [AIHotApp] 持有,设置页通过回调修改。
+ * 主题模式 —— 由 [com.example.aihot.AIHotApp] 持有,设置页通过回调修改。
  */
 enum class ThemeMode(val label: String) {
     System("跟随系统"),
@@ -40,18 +38,50 @@ enum class ThemeMode(val label: String) {
 }
 
 /**
+ * 字体族 —— 同样提升到 [com.example.aihot.AIHotApp]。
+ *
+ * 仅用 Compose 内置 FontFamily,无需引入外部字体资源:
+ *  - System: SansSerif(系统默认无衬线,与 Type.kt 一致)
+ *  - Serif:  衬线体(阅读向)
+ *  - Mono:   等宽体(代码/技术向)
+ */
+enum class FontChoice(val label: String, val fontFamily: FontFamily) {
+    System("默认", FontFamily.SansSerif),
+    Serif("衬线", FontFamily.Serif),
+    Mono("等宽", FontFamily.Monospace)
+}
+
+/**
  * 设置页。
  *
- * 现阶段只有:
- *  - 外观:主题模式三选一(系统/亮/暗)
+ * 视觉与主列表页同构:章节条 + 扁平行 / 横向三段选择器。
+ *  - 外观:主题模式三选一(系统/亮/暗),横向三段式(图标 + 文字)
+ *  - 字体:字体族三选一(默认/衬线/等宽),横向三段式
  *  - 语言:占位项(当前仅简体中文)
  */
 @Composable
 fun SettingsScreen(
     themeMode: ThemeMode,
     onSelectTheme: (ThemeMode) -> Unit,
+    fontChoice: FontChoice,
+    onSelectFont: (FontChoice) -> Unit,
     onBack: () -> Unit
 ) {
+    val themeOptions = remember {
+        listOf(
+            SegmentedOption(icon = Icons.Filled.BrightnessAuto, label = ThemeMode.System.label),
+            SegmentedOption(icon = Icons.Filled.LightMode, label = ThemeMode.Light.label),
+            SegmentedOption(icon = Icons.Filled.DarkMode, label = ThemeMode.Dark.label)
+        )
+    }
+    val fontOptions = remember {
+        listOf(
+            SegmentedOption(icon = Icons.Filled.Title, label = FontChoice.System.label),
+            SegmentedOption(icon = Icons.Filled.TextFields, label = FontChoice.Serif.label),
+            SegmentedOption(icon = Icons.Filled.Code, label = FontChoice.Mono.label)
+        )
+    }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
@@ -66,91 +96,46 @@ fun SettingsScreen(
         }
     ) { padding ->
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+            modifier = Modifier.padding(padding),
+            contentPadding = PaddingValues(bottom = 24.dp)
         ) {
-            // 外观 section
-            item { SectionLabel("外观") }
+            // 外观 section —— 横向三段式主题选择器
+            item { SettingsGroupHeader("外观") }
             item {
-                AppCard(modifier = Modifier.fillMaxWidth()) {
-                    Column {
-                        ThemeMode.entries.forEach { mode ->
-                            ThemeRadioRow(
-                                label = mode.label,
-                                selected = themeMode == mode,
-                                onSelect = { onSelectTheme(mode) }
-                            )
-                        }
-                    }
-                }
+                SegmentedOptionRow(
+                    options = themeOptions,
+                    selectedIndex = themeMode.ordinal,
+                    onSelect = { idx -> onSelectTheme(ThemeMode.entries[idx]) }
+                )
+            }
+
+            // 字体 section —— 横向三段式字体族选择器
+            item { SettingsGroupHeader("字体") }
+            item {
+                SegmentedOptionRow(
+                    options = fontOptions,
+                    selectedIndex = fontChoice.ordinal,
+                    onSelect = { idx -> onSelectFont(FontChoice.entries[idx]) }
+                )
             }
 
             // 语言 section(占位)
+            item { SettingsGroupHeader("语言") }
             item {
-                Spacer(Modifier.height(4.dp))
-                SectionLabel("语言")
-            }
-            item {
-                AppCard(modifier = Modifier.fillMaxWidth()) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            Icons.Filled.Language,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(Modifier.width(12.dp))
-                        Text(
-                            text = "简体中文",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.weight(1f)
-                        )
+                SettingsRow(
+                    icon = Icons.Filled.Language,
+                    title = "简体中文",
+                    showDivider = false,
+                    trailing = {
                         Text(
                             text = "仅",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                    }
-                }
+                    },
+                    showChevron = false
+                )
             }
         }
-    }
-}
-
-@Composable
-private fun SectionLabel(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelLarge,
-        fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.primary
-    )
-}
-
-@Composable
-private fun ThemeRadioRow(
-    label: String,
-    selected: Boolean,
-    onSelect: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .selectable(selected = selected, onClick = onSelect)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        RadioButton(selected = selected, onClick = onSelect)
-        Spacer(Modifier.width(12.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface
-        )
     }
 }
