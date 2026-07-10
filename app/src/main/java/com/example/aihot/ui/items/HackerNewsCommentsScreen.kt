@@ -13,6 +13,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -23,7 +24,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Article
@@ -35,6 +36,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -136,7 +138,12 @@ fun HackerNewsCommentsScreen(
                                 )
                             }
                         } else {
-                            items(items = s.data, key = { it.key }) { flat ->
+                            itemsIndexed(items = s.data, key = { _, it -> it.key }) { index, flat ->
+                                // 一级评论之间加分割线:首条不加(避免与上方"评论"标题区
+                                // 分隔线重复),其余每条评论顶部一道细线。
+                                if (flat.depth == 0 && index > 0) {
+                                    CommentDivider()
+                                }
                                 CommentRow(
                                     flat = flat,
                                     onToggle = { vm.toggle(it) }
@@ -258,14 +265,18 @@ private fun LinkRow(
 }
 
 /**
- * 单条评论行:展开切换 + 按 depth 缩进(每层一道竖线)+ 作者 + 时间 + HTML 正文。
+ * 单条评论行 —— 作者 + 时间 + HTML 正文 + 「查看 N 条回复」按钮。
  *
- * - 有子评论([FlatComment.hasKids]):点击切换展开/折叠;展开时懒加载子层
- * - 加载中:右侧小转圈 + "加载中"
- * - 加载失败:显示错误文案,再次点击可重试(折叠后展开)
+ * 交互(Reddit/HN 风格):正文区**不可点**,避免正文里的链接和展开操作打架;
+ * 「查看回复」做成正文下方的独立按钮,点击它才展开/折叠子评论。按钮三态:
+ *  - 默认:「▾ 查看 N 条回复」(已展开则「收起」)
+ *  - 加载中:小转圈 + 「加载中」
+ *  - 失败:「加载失败,点击重试」
+ *
+ * 按 [FlatComment.depth] 缩进,每层一道竖线引导层级。
  *
  * @param flat 铺平后的评论节点(含层级与展开态)
- * @param onToggle 点击展开/折叠回调
+ * @param onToggle 点击「查看回复」按钮回调
  */
 @Composable
 private fun CommentRow(
@@ -274,18 +285,11 @@ private fun CommentRow(
 ) {
     val cs = MaterialTheme.colorScheme
     val node = flat.node
-    val clickable = flat.hasKids
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            // 仅"有子评论"的行整体可点(切换展开);普通评论行不可点(避免误触)
-            .then(
-                if (clickable) Modifier.clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = ripple(),
-                    onClick = { onToggle(node) }
-                ) else Modifier
-            )
+            // 正文区不挂 clickable —— 仅靠下方「查看回复」按钮触发展开,
+            // 避免点正文链接时误触展开/折叠。
             .padding(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 4.dp)
     ) {
         // 层级竖线:每层一道细竖线 + 间隙,直观表达父子关系
@@ -299,54 +303,8 @@ private fun CommentRow(
             )
         }
         Column(modifier = Modifier.weight(1f)) {
-            // 作者行:作者 · 时间 …… 展开箭头/加载状态
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                val header = buildString {
-                    if (node.comment.by.isNotBlank()) append(node.comment.by)
-                    if (node.comment.time > 0L) {
-                        if (isNotEmpty()) append(" · ")
-                        append(formatRelativeTime(node.comment.time))
-                    }
-                    if (node.comment.dead) {
-                        if (isNotEmpty()) append(" · ")
-                        append("[已折叠]")
-                    }
-                    // 子评论数提示(仅未展开时显示,展开后子评论已可见)
-                    if (flat.hasKids && !flat.expanded) {
-                        if (isNotEmpty()) append(" · ")
-                        append("${node.comment.kids.size} 回复")
-                    }
-                }
-                if (header.isNotEmpty()) {
-                    Text(
-                        text = header,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (node.comment.dead) cs.onSurfaceVariant else cs.primary,
-                        modifier = Modifier.weight(1f, fill = false)
-                    )
-                }
-                Spacer(Modifier.weight(1f))
-                // 右侧:展开切换指示(有子评论时)
-                if (flat.hasKids) {
-                    if (flat.childrenLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(14.dp),
-                            strokeWidth = 2.dp,
-                            color = cs.onSurfaceVariant
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                            contentDescription = if (flat.expanded) "收起" else "展开",
-                            tint = cs.onSurfaceVariant,
-                            modifier = Modifier
-                                .size(18.dp)
-                                .rotate(if (flat.expanded) 90f else 0f)
-                        )
-                    }
-                }
-            }
+            // 作者行:作者(主色加粗) · 时间(弱色),dead 评论挂一个 chip
+            CommentMeta(node = node)
             // HTML 正文(dead 评论弱化)
             if (node.comment.text.isNotBlank()) {
                 Spacer(Modifier.height(4.dp))
@@ -364,23 +322,145 @@ private fun CommentRow(
                     lineHeight = 21.sp
                 )
             }
-            // 子评论加载失败提示(展开后展示)
-            AnimatedVisibility(
-                visible = flat.expanded && flat.childrenError != null,
-                enter = expandVertically(tween(Motion.SHORT, easing = Motion.EmphasizedDecel)) +
-                    fadeIn(tween(Motion.SHORT, easing = Motion.EmphasizedDecel)),
-                exit = shrinkVertically(tween(Motion.SHORT, easing = Motion.EmphasizedAccel)) +
-                    fadeOut(tween(Motion.SHORT, easing = Motion.EmphasizedAccel))
-            ) {
-                Text(
-                    text = "加载回复失败:${flat.childrenError}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = cs.error,
-                    modifier = Modifier.padding(top = 4.dp)
+            // 「查看回复」按钮(有子评论时) —— 右对齐,紧贴正文下方,三态
+            if (flat.hasKids) {
+                RepliesToggleButton(
+                    expanded = flat.expanded,
+                    replyCount = node.comment.kids.size,
+                    loading = flat.childrenLoading,
+                    error = flat.childrenError,
+                    onClick = { onToggle(node) }
                 )
             }
         }
     }
+}
+
+/**
+ * 作者元信息行:作者名(主色 SemiBold) · 相对时间(弱色) · dead chip。
+ * 分行承载,避免 buildString 把信息层级糊在一起。
+ */
+@Composable
+private fun CommentMeta(node: Node) {
+    val cs = MaterialTheme.colorScheme
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        if (node.comment.by.isNotBlank()) {
+            Text(
+                text = node.comment.by,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = cs.primary
+            )
+        }
+        if (node.comment.time > 0L) {
+            if (node.comment.by.isNotBlank()) {
+                Text(
+                    text = " · ",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = cs.onSurfaceVariant
+                )
+            }
+            Text(
+                text = formatRelativeTime(node.comment.time),
+                style = MaterialTheme.typography.labelMedium,
+                color = cs.onSurfaceVariant
+            )
+        }
+        // dead/折叠评论:独立 chip,不再混进作者字符串
+        if (node.comment.dead) {
+            Spacer(Modifier.width(6.dp))
+            AssistChipPreview(text = "已折叠")
+        }
+    }
+}
+
+/**
+ * 「查看 N 条回复」按钮 —— 右对齐,紧贴正文下方,承载展开/加载/失败三态。
+ *
+ * 用 [TextButton] 而非裸 clickable:有明确的点击区与水波纹反馈,
+ * 且不占用正文区,避免点正文链接时误触。
+ *
+ * @param expanded   当前是否展开(展开后文案变「收起」)
+ * @param replyCount 直接子评论数
+ * @param loading    子评论加载中
+ * @param error      子评论加载失败信息(非 null 时显示「重试」)
+ * @param onClick    点击回调
+ */
+@Composable
+private fun ColumnScope.RepliesToggleButton(
+    expanded: Boolean,
+    replyCount: Int,
+    loading: Boolean,
+    error: String?,
+    onClick: () -> Unit
+) {
+    val cs = MaterialTheme.colorScheme
+    TextButton(
+        onClick = onClick,
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+        // 右对齐(贴近正文右侧)+ 收紧高度,减少与正文间的视觉空白
+        modifier = Modifier
+            .align(Alignment.End)
+            .height(28.dp)
+    ) {
+        // 加载中:小转圈(功能性状态反馈,保留);其余态仅靠文字「查看/收起」区分
+        if (loading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(14.dp),
+                strokeWidth = 2.dp,
+                color = cs.onSurfaceVariant
+            )
+            Spacer(Modifier.width(4.dp))
+        }
+        Text(
+            text = when {
+                loading -> "加载中"
+                error != null -> "加载失败,点击重试"
+                expanded -> "收起"
+                else -> "查看 $replyCount 条回复"
+            },
+            style = MaterialTheme.typography.labelMedium,
+            color = if (error != null) cs.error else cs.onSurfaceVariant
+        )
+    }
+}
+
+/** 不可点的小标签(用于 dead 评论「已折叠」等只读标记)。 */
+@Composable
+private fun AssistChipPreview(text: String) {
+    val cs = MaterialTheme.colorScheme
+    Box(
+        modifier = Modifier
+            .clip(MaterialTheme.shapes.small)
+            .background(cs.surfaceContainerHighest)
+            .padding(horizontal = 6.dp, vertical = 1.dp)
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            color = cs.onSurfaceVariant
+        )
+    }
+}
+
+/**
+ * 一级评论之间的分割条(Reddit 风格)。
+ *
+ * 关键:不要用「同色 surface 底 + 一根线」—— 线会融化在背景里看不见。
+ * 改成一整条**有色色带**([surfaceContainer]),它自身就和内容区([surface]
+ * 底)形成对比,一眼可辨。色带内不再画线,避免噪音。
+ *
+ * 高度按 Reddit 节奏取上下留白(约 9dp 量级),保证「这是一条新的一级评论」
+ * 的呼吸感。
+ */
+@Composable
+private fun CommentDivider() {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(8.dp)
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+    )
 }
 
 /** 把 Unix 秒级时间戳转成相对时间(如 "3 小时前")。与 HackerNewsScreen 同实现。 */

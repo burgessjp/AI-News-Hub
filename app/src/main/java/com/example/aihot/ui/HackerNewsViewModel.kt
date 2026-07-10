@@ -1,6 +1,7 @@
 package com.example.aihot.ui
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.aihot.data.HackerNewsRepository
 import com.example.aihot.data.HackerNewsStory
@@ -14,10 +15,13 @@ import kotlinx.coroutines.launch
  *
  * 与 [HotTopicsViewModel] 同构:精选 tab 顶部的装饰性模块,失败/为空时静默隐藏,
  * 不阻塞下方主列表的加载与展示。
+ *
+ * 继承 [AndroidViewModel] 以拿到 application.cacheDir 注入 [HackerNewsRepository],
+ * 启用 30 分钟文件缓存:进入页面命中缓存秒回,不打网络。
  */
-class HackerNewsViewModel : ViewModel() {
+class HackerNewsViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val repo = HackerNewsRepository()
+    private val repo = HackerNewsRepository(cacheDir = application.cacheDir)
 
     private val _state = MutableStateFlow<UiState<List<HackerNewsStory>>>(UiState.Loading)
     val state: StateFlow<UiState<List<HackerNewsStory>>> = _state.asStateFlow()
@@ -28,7 +32,7 @@ class HackerNewsViewModel : ViewModel() {
 
     fun refresh() {
         viewModelScope.launch {
-            runCatching { repo.fetchTopStories(limit = 10) }
+            runCatching { repo.fetchTopStories(limit = 20) }
                 .onSuccess { list ->
                     // 空结果视为「无内容」而非错误:模块整体隐藏。
                     _state.value =

@@ -4,11 +4,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
 import java.util.concurrent.TimeUnit
 
 /**
@@ -22,8 +25,15 @@ import java.util.concurrent.TimeUnit
  *  - 仅 HTTPS;cleartext 不需要(Firebase 默认 https)
  *  - topstories 最多 500 条,这里取前 [limit] 条
  *  - item 详情并发拉取,任一条失败则整体回退到错误态(由 ViewModel 处理)
+ *
+ * 缓存:[cacheDir] 非空时启用 Top Stories 文件缓存(见 [CACHE_TTL_MS]),
+ * 半小时内直接读缓存不打网络。网络失败时回退过期缓存兜底。
+ *
+ * @param cacheDir 缓存根目录,通常传 application.cacheDir;传 null 关闭缓存
  */
-class HackerNewsRepository {
+class HackerNewsRepository(
+    private val cacheDir: File? = null
+) {
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
@@ -33,15 +43,61 @@ class HackerNewsRepository {
 
     private val base = "https://hacker-news.firebaseio.com/v0"
 
+    /** 串行化 [fetchTopStories],避免短时间内并发刷新重复打网络。 */
+    private val refreshMutex = Mutex()
+
     /**
-     * HackerNews Top N(默认 10)。
+     * HackerNews Top N(默认 10),带文件缓存。
      *
-     * 流程:GET /topstories.json → 取前 [limit] 个 id → 并发 GET /item/<id>.json。
-     * id 数组已按 HN 首页排序,topstories 的顺序即排名,故直接按下标取前 N 即可。
+     * 缓存策略(仅在 [cacheDir] 非空时生效):
+     *  1. 缓存存在且未过 30 分钟 → 直接返回(不打网络)
+     *  2. 否则走网络;成功则更新缓存后返回
+     *  3. 网络失败但有缓存(无论是否过期)→ 回退缓存兜底,避免空报错
+     *  4. 网络失败且无缓存 → 抛出原异常,交由 UI 显示错误态
+     *
+     * [refreshMutex] 保证并发调用只触发一次真实网络请求,其余等待复用结果。
      *
      * @param limit 取前 N 条(1-100,默认 10)
      */
-    suspend fun fetchTopStories(limit: Int = 10): List<HackerNewsStory> = withContext(Dispatchers.IO) {
+    suspend fun fetchTopStories(limit: Int = 10): List<HackerNewsStory> {
+        // 无缓存目录:退化为原始直连网络行为。
+        if (cacheDir == null) return fetchTopStoriesFromNetwork(limit)
+
+        return refreshMutex.withLock {
+            val cached = readCache()
+            // 1) 命中新缓存:秒回,不打网络。
+            if (cached != null && !isStale(cached)) {
+                return@withLock cached.stories
+            }
+            // 2) 走网络刷新(仅一次)。
+            val result = runCatching { fetchTopStoriesFromNetwork(limit) }
+            if (result.isSuccess) {
+                val fresh = result.getOrThrow()
+                writeCache(HackerNewsStoriesCache(System.currentTimeMillis(), fresh))
+                return@withLock fresh
+            }
+            // 3) 网络失败:有过期缓存就兜底,优先保可用。
+            if (cached != null && cached.stories.isNotEmpty()) {
+                return@withLock cached.stories
+            }
+            // 4) 既没缓存又没网络:把原始失败抛出去,让 UI 显示重试。
+            throw result.exceptionOrNull() ?: RuntimeException("未知错误")
+        }
+    }
+
+    /**
+     * 强制忽略缓存重新拉取(下拉刷新等场景)。
+     * 拉取成功后仍会刷新缓存,使后续命中。
+     */
+    suspend fun forceRefresh(limit: Int = 10): List<HackerNewsStory> {
+        val fresh = fetchTopStoriesFromNetwork(limit)
+        if (cacheDir != null) {
+            writeCache(HackerNewsStoriesCache(System.currentTimeMillis(), fresh))
+        }
+        return fresh
+    }
+
+    private suspend fun fetchTopStoriesFromNetwork(limit: Int): List<HackerNewsStory> = withContext(Dispatchers.IO) {
         val n = limit.coerceIn(1, 100)
         val ids = fetchIds("$base/topstories.json").take(n)
         if (ids.isEmpty()) return@withContext emptyList()
@@ -112,7 +168,33 @@ class HackerNewsRepository {
     private companion object {
         /** 每个节点最多展开的子评论数(按 HN 排名截断)。 */
         private const val MAX_CHILDREN_PER_NODE = 15
+
+        /** Top Stories 缓存有效期:30 分钟。 */
+        const val CACHE_TTL_MS = 30L * 60 * 1000
+
+        /** 缓存文件名(放在 [cacheDir] 下)。 */
+        private const val CACHE_FILE = "hackernews_topstories.json"
     }
+
+    // ===== 缓存读写 =====
+
+    private fun cacheFile(): File = File(cacheDir, CACHE_FILE)
+
+    private fun readCache(): HackerNewsStoriesCache? {
+        val file = cacheFile()
+        if (!file.exists()) return null
+        val json = runCatching { JSONObject(file.readText()) }.getOrNull() ?: return null
+        return HackerNewsStoriesCache.fromJson(json)
+    }
+
+    private fun writeCache(cache: HackerNewsStoriesCache) {
+        val dir = cacheDir ?: return
+        if (!dir.exists()) dir.mkdirs()
+        runCatching { cacheFile().writeText(cache.toJson().toString()) }
+    }
+
+    private fun isStale(cache: HackerNewsStoriesCache): Boolean =
+        System.currentTimeMillis() - cache.fetchedAt > CACHE_TTL_MS
 
     // optString 在遇到 JSON null 时返回字面字符串 "null"(非空),需过滤。
     private fun String?.asClean(): String? = this?.takeIf { it.isNotBlank() && it != "null" }

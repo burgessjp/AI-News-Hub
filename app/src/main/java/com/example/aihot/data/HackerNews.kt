@@ -1,5 +1,6 @@
 package com.example.aihot.data
 
+import org.json.JSONArray
 import org.json.JSONObject
 
 /**
@@ -59,6 +60,56 @@ data class HackerNewsStory(
                 kids = kids
             )
         }
+    }
+}
+
+/**
+ * HackerNews Top Stories 列表缓存条目。
+ *
+ * 持久化为 cacheDir 下的 JSON 文件,带写入时刻 [fetchedAt],用于计算是否过期。
+ * 读取时按 30 分钟([HackerNewsRepository.CACHE_TTL_MS])判断新鲜度;
+ * 网络失败时回退到过期数据兜底(有总比报错强)。
+ *
+ * @param fetchedAt 缓存写入时刻(System.currentTimeMillis())
+ * @param stories   story 列表(已排序,按下标即排名)
+ */
+data class HackerNewsStoriesCache(
+    val fetchedAt: Long,
+    val stories: List<HackerNewsStory>
+) {
+    /** 序列化为可写入文件的 JSON(`{ fetchedAt, stories: [...] }`)。 */
+    fun toJson(): JSONObject {
+        val arr = JSONArray().apply {
+            stories.forEach { put(JSONObject().apply {
+                put("id", it.id)
+                put("title", it.title)
+                put("url", it.url)
+                put("by", it.by)
+                put("score", it.score)
+                put("descendants", it.descendants)
+                put("time", it.time)
+                put("kids", JSONArray().apply { it.kids.forEach { k -> put(k) } })
+            }) }
+        }
+        return JSONObject().apply {
+            put("fetchedAt", fetchedAt)
+            put("stories", arr)
+        }
+    }
+
+    companion object {
+        /** 从文件 JSON 反序列化;结构不符返回 null(调用方视为无缓存)。 */
+        fun fromJson(json: JSONObject): HackerNewsStoriesCache? = runCatching {
+            val arr = json.optJSONArray("stories") ?: return null
+            val stories = (0 until arr.length()).mapNotNull { i ->
+                val o = arr.optJSONObject(i) ?: return@mapNotNull null
+                HackerNewsStory.fromJson(o)
+            }
+            HackerNewsStoriesCache(
+                fetchedAt = json.optLong("fetchedAt", 0L),
+                stories = stories
+            )
+        }.getOrNull()
     }
 }
 
