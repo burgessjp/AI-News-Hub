@@ -32,6 +32,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -74,6 +75,19 @@ fun WebViewScreen(
     // 待下载任务:API<29 时等用户授予存储权限后再入队
     var pendingDownload by remember { mutableStateOf<DownloadParams?>(null) }
 
+    // factory 创建的 WebView 引用,供 DisposableEffect 在离开屏幕时 destroy,避免内存泄漏
+    val webViewRef = remember { mutableStateOf<WebView?>(null) }
+    DisposableEffect(webViewRef.value) {
+        onDispose {
+            webViewRef.value?.let { web ->
+                web.removeJavascriptInterface("AndroidBlobSaver")
+                (web.parent as? android.view.ViewGroup)?.removeView(web)
+                web.destroy()
+            }
+            webViewRef.value = null
+        }
+    }
+
     // 存储权限请求(API<29 下载需要)。授权回调里把暂存的任务入队 DownloadManager。
     val storagePermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -115,23 +129,30 @@ fun WebViewScreen(
             AndroidView(
                 factory = { ctx ->
                     WebView(ctx).apply {
+                        webViewRef.value = this
                         configureWebSettings(darkTheme)
                         webViewClient = object : WebViewClient() {
                             override fun shouldOverrideUrlLoading(
                                 view: WebView,
                                 request: WebResourceRequest
                             ): Boolean {
-                                // 按协议分流:http(s)/about:blank 留在站内;
+                                // 按协议分流:http(s)/about/data 留在站内;
+                                // blob: 由 DownloadListener 处理,这里直接忽略(避免落到 startActivity);
+                                // javascript: 拒绝执行(防注入,不在白名单 → 不 loadUrl);
                                 // 其余 scheme(intent://、weixin://、mailto:、tel:…)
                                 // 唤起外部 App,失败时优雅降级。
                                 val uri = request.url
                                 val scheme = uri.scheme?.lowercase()
                                 if (scheme == "http" || scheme == "https" ||
-                                    scheme == "about" || scheme == "javascript"
+                                    scheme == "about" || scheme == "data"
                                 ) {
                                     view.loadUrl(uri.toString())
                                     return true
                                 }
+                                // blob: 的下载已由 setDownloadListener 托管,导航层不处理
+                                if (scheme == "blob") return true
+                                // javascript: 不执行,直接拦截(防止任意网页注入 JS)
+                                if (scheme == "javascript") return true
                                 handleExternalUri(view.context, uri)
                                 return true
                             }
@@ -170,11 +191,13 @@ fun WebViewScreen(
                                     // 块级作用域函数不能用 JS 关键字做变量名,这里用 fn
                                     val fn = filename.replace("'", "\\'")
                                     val mt = (mimetype ?: "application/octet-stream").replace("'", "\\'")
+                                    // downloadUrl 来自网页,需同样转义单引号(与 fn/mt 一致),防 JS 字面量注入
+                                    val du = downloadUrl.replace("'", "\\'")
                                     // 用 fetch 拿到 blob 后转 base64 回传原生,避开 DownloadManager 对 blob 的限制
                                     val js = """
                                     (function(){
                                       try {
-                                        fetch('$downloadUrl').then(function(r){return r.blob();}).then(function(b){
+                                        fetch('$du').then(function(r){return r.blob();}).then(function(b){
                                           var fr = new FileReader();
                                           fr.onload = function(){
                                             var data = fr.result.split(',')[1];
@@ -409,10 +432,14 @@ private fun handleExternalUri(context: Context, uri: Uri) {
                 .addCategory(Intent.CATEGORY_BROWSABLE)
             // 目标 App 未安装时,优先用网页声明的 fallback URL
             val fallback = intent.getStringExtra("browser_fallback_url")
+            // fallback 仅允许 http(s):防止恶意页面用 file:///、content:// 作 fallback 泄漏本地文件
+            val fallbackScheme = fallback?.let { runCatching { Uri.parse(it).scheme?.lowercase() }.getOrNull() }
             if (intent.resolveActivity(context.packageManager) != null) {
                 context.startActivity(intent)
-            } else if (!fallback.isNullOrBlank()) {
-                // fallback 一般是 http(s) 网址,交给系统浏览器/市场打开
+            } else if (!fallback.isNullOrBlank() &&
+                (fallbackScheme == "http" || fallbackScheme == "https")
+            ) {
+                // 仅 http(s) 网址,交给系统浏览器/市场打开
                 context.startActivity(
                     Intent(Intent.ACTION_VIEW, Uri.parse(fallback))
                         .addCategory(Intent.CATEGORY_BROWSABLE)

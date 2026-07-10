@@ -1,5 +1,7 @@
 package com.example.aihot.data
 
+import android.os.Parcelable
+import kotlinx.parcelize.Parcelize
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -21,6 +23,7 @@ import org.json.JSONObject
  * - time:     Unix 秒级时间戳(非 ISO 8601)
  * - kids:     一级评论 id 列表(按 HN 排名顺序),用于拉取评论树
  */
+@Parcelize
 data class HackerNewsStory(
     val id: Long,
     val title: String = "",
@@ -30,7 +33,7 @@ data class HackerNewsStory(
     val descendants: Int = 0,
     val time: Long = 0,
     val kids: List<Long> = emptyList()
-) {
+) : Parcelable {
     /** 站内讨论页;无 url 的 Ask HN / 文本帖走此链接。 */
     val discussionUrl: String
         get() = "https://news.ycombinator.com/item?id=$id"

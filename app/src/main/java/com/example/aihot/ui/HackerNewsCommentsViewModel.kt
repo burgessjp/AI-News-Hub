@@ -69,6 +69,8 @@ class HackerNewsCommentsViewModel : ViewModel() {
             node.expanded = true
             emitFlattened()
         } else {
+            // 加载中重复点击直接忽略(节点级去重),避免并发发多个 fetchComments 乱序覆盖
+            if (node.childrenLoading) return
             node.childrenLoading = true
             node.expanded = true
             emitFlattened()
@@ -77,6 +79,8 @@ class HackerNewsCommentsViewModel : ViewModel() {
                     .onSuccess { list ->
                         node.children = list.map { Node(it) }
                         node.childrenLoading = false
+                        // 清除之前失败的残留错误,避免成功后错误文案仍显示
+                        node.childrenError = null
                         emitFlattened()
                     }
                     .onFailure {

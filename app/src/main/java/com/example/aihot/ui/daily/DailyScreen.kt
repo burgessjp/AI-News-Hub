@@ -209,7 +209,8 @@ private fun DailySummaryHeader(report: DailyReport) {
 private fun dateLabel(date: String): String {
     return runCatching {
         val d = java.time.LocalDate.parse(date)
-        val today = java.time.LocalDate.now()
+        // 日报 date 按 UTC 切日,基准也用 UTC,避免系统时区边缘用户把今天/昨天算错
+        val today = java.time.LocalDate.now(java.time.ZoneOffset.UTC)
         val days = java.time.temporal.ChronoUnit.DAYS.between(d, today)
         val base = when {
             days == 0L -> "今天"

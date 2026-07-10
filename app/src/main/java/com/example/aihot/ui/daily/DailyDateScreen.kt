@@ -31,7 +31,9 @@ fun DailyDateScreen(
     date: String,
     onBack: () -> Unit,
     onOpenUrl: (String, String) -> Unit = { _, _ -> },
-    vm: DailyViewModel = viewModel()
+    // 按日期独立持有 VM:避免与 DailyScreen/DailyArchiveScreen 共用同一 DailyViewModel
+    // 导致换日期时复用上次 Success 的 _selected,首帧闪现上一日期内容。
+    vm: DailyViewModel = viewModel(key = "daily-date-$date")
 ) {
     val state by vm.selected.collectAsStateWithLifecycle()
 

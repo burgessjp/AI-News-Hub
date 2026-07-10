@@ -59,8 +59,7 @@ class NewsRepository {
             since?.takeIf { it.isNotBlank() }?.let { add("since" to it) }
             cursor?.takeIf { it.isNotBlank() }?.let { add("cursor" to enc(it)) }
         }
-        val body = get("$base/items", params)
-        val root = JSONObject(body)
+        val root = getJson("$base/items", params) ?: throw RuntimeException("响应解析失败")
         val arr = root.optJSONArray("items") ?: JSONArray()
         val items = (0 until arr.length()).map { NewsItem.fromJson(arr.getJSONObject(it)) }
         NewsPage(
@@ -78,7 +77,8 @@ class NewsRepository {
      * 服务端按 latestAt 倒序返回,无分页。失败时返回空列表,不阻塞精选 tab 主列表。
      */
     suspend fun fetchHotTopics(): List<HotTopic> = withContext(Dispatchers.IO) {
-        val root = JSONObject(get("$base/hot-topics", emptyList()))
+        // 解析失败(非 JSON / 空响应)返回空列表,不阻塞精选 tab 主列表(兑现文档承诺)
+        val root = getJson("$base/hot-topics", emptyList()) ?: return@withContext emptyList()
         val arr = root.optJSONArray("items") ?: JSONArray()
         (0 until arr.length()).map { HotTopic.fromJson(arr.getJSONObject(it)) }
     }
@@ -88,13 +88,14 @@ class NewsRepository {
     /** 最新日报(date=null)或指定日期日报(YYYY-MM-DD)。 */
     suspend fun fetchDaily(date: String? = null): DailyReport = withContext(Dispatchers.IO) {
         val url = if (date.isNullOrBlank()) "$base/daily" else "$base/daily/${enc(date)}"
-        val root = JSONObject(get(url, emptyList()))
+        val root = getJson(url, emptyList()) ?: throw RuntimeException("响应解析失败")
         parseDaily(root)
     }
 
     /** 日报归档索引(默认 30 期,上限 180)。 */
     suspend fun fetchDailies(take: Int = 30): List<DailySummary> = withContext(Dispatchers.IO) {
-        val root = JSONObject(get("$base/dailies", listOf("take" to take.coerceIn(1, 180).toString())))
+        val root = getJson("$base/dailies", listOf("take" to take.coerceIn(1, 180).toString()))
+            ?: throw RuntimeException("响应解析失败")
         val arr = root.optJSONArray("items") ?: JSONArray()
         (0 until arr.length()).map { i ->
             val o = arr.getJSONObject(i)
@@ -175,6 +176,13 @@ class NewsRepository {
             return resp.body?.string() ?: throw RuntimeException("空响应")
         }
     }
+
+    /**
+     * 取 JSON 根对象。HTTP 失败抛 RuntimeException;HTTP 200 但 body 非 JSON
+     * (CDN 把 5xx 透传成 HTML、空 body 等)返回 null,由调用方决定走错误态还是空列表。
+     */
+    private fun getJson(path: String, params: List<Pair<String, String>>): JSONObject? =
+        runCatching { JSONObject(get(path, params)) }.getOrNull()
 
     private fun enc(s: String): String = URLEncoder.encode(s, "UTF-8")
 }

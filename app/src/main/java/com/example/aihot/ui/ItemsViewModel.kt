@@ -119,7 +119,11 @@ class ItemsViewModel : ViewModel() {
                     mode = f.mode, category = f.category, query = f.query,
                     cursor = cursor
                 )
-            }.onSuccess { page -> applyPage(page, replace = false) }
+            }.onSuccess { page ->
+                // 防竞态:加载期间若 filter 已变(切分类/改搜索),丢弃这批过期结果,
+                // 否则会把旧分类数据追加进已被清空的新列表,并覆盖新游标。
+                if (_filter.value == f) applyPage(page, replace = false)
+            }
             _isLoadingMore.value = false
         }
     }

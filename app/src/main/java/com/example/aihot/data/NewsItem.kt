@@ -1,5 +1,7 @@
 package com.example.aihot.data
 
+import android.os.Parcelable
+import kotlinx.parcelize.Parcelize
 import org.json.JSONObject
 
 /**
@@ -34,6 +36,7 @@ enum class Mode(val api: String) {
  *  - id 是 cuid(25 字符),不是数字
  *  - permalink 是站内中文翻译阅读页,深链优先用之;url 是第三方原文
  */
+@Parcelize
 data class NewsItem(
     val id: String,
     val title: String = "",
@@ -46,7 +49,7 @@ data class NewsItem(
     val category: String? = null,
     val score: Int = 0,
     val selected: Boolean = false
-) {
+) : Parcelable {
     /** 中文分类名;无法识别时回退原始 code。 */
     fun categoryLabel(): String = NewsCategory.fromApi(category)?.zh ?: category.orEmpty()
 
@@ -57,13 +60,13 @@ data class NewsItem(
             this?.takeIf { it.isNotBlank() && it != "null" }
 
         fun fromJson(json: JSONObject): NewsItem = NewsItem(
-            id = json.optString("id"),
-            title = json.optString("title"),
+            id = json.optString("id").asClean().orEmpty(),
+            title = json.optString("title").asClean().orEmpty(),
             titleEn = json.optString("title_en").asClean(),
             summary = json.optString("summary").asClean(),
-            url = json.optString("url"),
-            permalink = json.optString("permalink"),
-            source = json.optString("source"),
+            url = json.optString("url").asClean().orEmpty(),
+            permalink = json.optString("permalink").asClean().orEmpty(),
+            source = json.optString("source").asClean().orEmpty(),
             publishedAt = json.optString("publishedAt").asClean(),
             category = json.optString("category").asClean(),
             score = json.optInt("score", 0),

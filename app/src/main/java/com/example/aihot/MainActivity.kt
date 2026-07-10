@@ -90,6 +90,66 @@ private sealed interface Page {
 }
 
 /**
+ * 把单个 [Page] 写入 / 读出 [Bundle]。tag(键 "t")区分子类型;
+ * NewsItem / HackerNewsStory 已是 Parcelable,可直接 putParcelable。
+ */
+private fun Page.toBundle(): Bundle = Bundle().apply {
+    when (this@toBundle) {
+        is Page.Detail -> { putString("t", "Detail"); putParcelable("item", item) }
+        is Page.Web -> { putString("t", "Web"); putString("url", url); putString("title", title) }
+        is Page.DailyDate -> { putString("t", "DailyDate"); putString("date", date) }
+        is Page.HackerNewsComments -> { putString("t", "HNComments"); putParcelable("story", story) }
+        is Page.DailyArchive -> putString("t", "DailyArchive")
+        is Page.Search -> putString("t", "Search")
+        is Page.Settings -> putString("t", "Settings")
+        is Page.About -> putString("t", "About")
+        is Page.HackerNews -> putString("t", "HackerNews")
+    }
+}
+
+@Suppress("DEPRECATION")
+private fun pageFromBundle(b: Bundle): Page? {
+    return when (b.getString("t")) {
+        "Detail" -> b.getParcelable<NewsItem>("item")?.let { Page.Detail(it) }
+        "Web" -> Page.Web(b.getString("url") ?: "", b.getString("title") ?: "加载中…")
+        "DailyDate" -> b.getString("date")?.let { Page.DailyDate(it) }
+        "HNComments" -> b.getParcelable<HackerNewsStory>("story")?.let { Page.HackerNewsComments(it) }
+        "DailyArchive" -> Page.DailyArchive
+        "Search" -> Page.Search
+        "Settings" -> Page.Settings
+        "About" -> Page.About
+        "HackerNews" -> Page.HackerNews
+        else -> null
+    }
+}
+
+/**
+ * 导航栈持久化 Saver:把 Map<AppTab, List<Page>> 存进一个 Bundle(Parcelable,
+ * 可直接被 rememberSaveable 的 autoSaver 接管,避免 Serializable 容器混入
+ * Parcelable 元素的兼容问题)。每个 tab 一个 key,值为 ArrayList<Bundle>。
+ */
+private val pageStacksSaver = androidx.compose.runtime.saveable.Saver<
+    Map<AppTab, List<Page>>, Bundle
+>(
+    save = { stacks ->
+        Bundle().apply {
+            stacks.forEach { (tab, pages) ->
+                val arr = arrayListOf<Bundle>()
+                pages.forEach { arr += it.toBundle() }
+                putParcelableArrayList(tab.name, arr)
+            }
+        }
+    },
+    restore = { b ->
+        @Suppress("DEPRECATION")
+        AppTab.entries.mapNotNull { tab ->
+            val arr = b.getParcelableArrayList<Bundle>(tab.name) ?: return@mapNotNull null
+            tab to arr.mapNotNull { pageFromBundle(it) }
+        }.toMap()
+    }
+)
+
+/**
  * App 顶层路由 —— 多栈底部导航。
  *
  * 模型:
@@ -119,10 +179,10 @@ fun AIHotApp() {
 
     // 当前 tab + 每个 tab 的二级页栈
     var currentTab by rememberSaveable { mutableStateOf(AppTab.Featured) }
-    var pageStacks by remember {
-        mutableStateOf<Map<AppTab, List<Page>>>(
-            AppTab.entries.associateWith { emptyList() }
-        )
+    // 用 rememberSaveable 持久化导航栈,转屏/进程被杀后仍可恢复(需自定义 Saver,
+    // 因 Page 含业务对象、AppTab 是 enum,默认 Bundle 无法直接存 Map)。
+    var pageStacks by rememberSaveable(stateSaver = pageStacksSaver) {
+        mutableStateOf(emptyMap<AppTab, List<Page>>())
     }
     // 转场方向:push 时为 false(前进),pop 时为 true(返回)。
     // transitionSpec 据此决定 PUSH 类页面的位移方向(返回时方向镜像)。

@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    id("org.jetbrains.kotlin.plugin.parcelize")
 }
 
 // 读取签名配置（keystore.properties 不入库，避免密钥泄露）

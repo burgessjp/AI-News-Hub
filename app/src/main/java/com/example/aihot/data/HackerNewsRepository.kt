@@ -102,15 +102,10 @@ class HackerNewsRepository(
         val ids = fetchIds("$base/topstories.json").take(n)
         if (ids.isEmpty()) return@withContext emptyList()
 
-        // 并发拉取每条详情;awaitAll 保证全部成功或整体失败。
+        // 并发拉取每条详情,单条失败(返回 null)被跳过,不拖垮整体(与 fetchComments 一致)。
         coroutineScope {
-            ids.map { id ->
-                async {
-                    val body = getRaw("$base/item/$id.json")
-                    HackerNewsStory.fromJson(JSONObject(body))
-                }
-            }.awaitAll()
-        }
+            ids.map { id -> async { fetchItemJson(id) } }.awaitAll()
+        }.mapNotNull { obj -> obj?.let { HackerNewsStory.fromJson(it) } }
     }
 
     /** 拉取一个仅含 id 的 JSON 数组端点(topstories / newstories / beststories 等)。 */
