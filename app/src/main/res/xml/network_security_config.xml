@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 网络安全策略:全域名禁明文(cleartext)流量,仅信任系统 CA。
+     targetSdk 35 默认已是此行为,此处显式声明让策略可见,防止后续 SDK 调整回退。 -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

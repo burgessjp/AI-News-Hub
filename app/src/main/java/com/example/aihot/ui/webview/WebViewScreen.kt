@@ -75,16 +75,18 @@ fun WebViewScreen(
     // 待下载任务:API<29 时等用户授予存储权限后再入队
     var pendingDownload by remember { mutableStateOf<DownloadParams?>(null) }
 
-    // factory 创建的 WebView 引用,供 DisposableEffect 在离开屏幕时 destroy,避免内存泄漏
-    val webViewRef = remember { mutableStateOf<WebView?>(null) }
-    DisposableEffect(webViewRef.value) {
+    // factory 创建的 WebView 引用,供 DisposableEffect 在离开屏幕时 destroy,避免内存泄漏。
+    // 注意:必须用普通 Ref(非 mutableStateOf)捕获 —— 若用 State 作 DisposableEffect 的 key,
+    // factory 里赋值会触发 key 变化 → dispose 循环 → WebView 被提前 destroy → 页面加载中断。
+    // 这里 key 用 Unit,仅在离开 composition 时执行一次 onDispose。
+    val webViewRef = remember { object { var web: WebView? = null } }
+    DisposableEffect(Unit) {
         onDispose {
-            webViewRef.value?.let { web ->
+            webViewRef.web?.let { web ->
                 web.removeJavascriptInterface("AndroidBlobSaver")
                 (web.parent as? android.view.ViewGroup)?.removeView(web)
                 web.destroy()
             }
-            webViewRef.value = null
         }
     }
 
@@ -129,7 +131,7 @@ fun WebViewScreen(
             AndroidView(
                 factory = { ctx ->
                     WebView(ctx).apply {
-                        webViewRef.value = this
+                        webViewRef.web = this
                         configureWebSettings(darkTheme)
                         webViewClient = object : WebViewClient() {
                             override fun shouldOverrideUrlLoading(
@@ -482,6 +484,10 @@ private fun WebView.configureWebSettings(darkTheme: Boolean) {
         builtInZoomControls = true
         displayZoomControls = false
         cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
+        // 安全加固:显式关闭文件/内容访问(默认 false,此处声明防后续误开)
+        allowFileAccess = false          // 禁止 file:// 内容访问
+        allowContentAccess = false       // 禁止 content:// 访问(本 App 无需)
+        mediaPlaybackRequiresUserGesture = true  // 禁止页面自动播放音视频
         // User-Agent 用默认浏览器 UA,避免被网站黑名单挡
         userAgentString = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
     }
