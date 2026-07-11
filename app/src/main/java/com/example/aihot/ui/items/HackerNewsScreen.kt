@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -30,8 +31,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -140,7 +144,12 @@ private fun HackerNewsList(
 }
 
 /**
- * 单条 story 行:序号徽章 + 标题 + 得票/评论数。
+ * 单条 story 行:序号徽章 + 标题 + 作者/时间 + 得票/评论/来源域名(HN 原生风)。
+ *
+ * 三层信息:
+ *  1. 标题(最多两行)
+ *  2. 作者 · 相对时间(作者主色强调)
+ *  3. 得票 ▲ · 评论 💬 · 来源域名 🌐(三栏均匀分布,icon + 文字)
  *
  * @param rank 1 起的序号;1-3 用 primary 强调,其余低对比。
  */
@@ -161,7 +170,7 @@ private fun HackerNewsRow(
                 onClick = onClick
             )
             .padding(horizontal = 18.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         // 序号徽章:1-3 实心 primary,其余描边低对比
@@ -181,9 +190,19 @@ private fun HackerNewsRow(
         }
 
         Column(modifier = Modifier.weight(1f)) {
-            // 标题
+            // ① 标题 + 内联来源域名 (host) —— HN 原生风,域名弱色括注在末尾
+            val host = storyHost(story)
+            val titleAnnotated = remember(story.title, host, cs.onSurfaceVariant) {
+                buildAnnotatedString {
+                    append(story.title.ifBlank { "(无标题)" })
+                    append("  ")
+                    withStyle(SpanStyle(color = cs.onSurfaceVariant, fontSize = 12.sp)) {
+                        append("($host)")
+                    }
+                }
+            }
             Text(
-                text = story.title.ifBlank { "(无标题)" },
+                text = titleAnnotated,
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
                 color = cs.onSurface,
@@ -191,26 +210,52 @@ private fun HackerNewsRow(
                 overflow = TextOverflow.Ellipsis,
                 lineHeight = 20.sp
             )
-            // 得票 · 评论数 · 发布时间
-            val meta = buildString {
-                append("${story.score} 赞")
-                if (story.descendants > 0) append(" · ${story.descendants} 评论")
-                if (story.time > 0L) {
-                    append(" · ${formatRelativeTime(story.time)}")
+            // ② 作者 · 相对时间 · 得票 · 评论(单行,作者主色强调,其余弱色)
+            Spacer(Modifier.height(6.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (story.by.isNotBlank()) {
+                    Text(
+                        text = story.by,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = cs.primary,
+                        maxLines = 1
+                    )
+                    // 作者与时间之间留一点呼吸间隔(其余项间用 · 分隔)
+                    Spacer(Modifier.width(8.dp))
                 }
-            }
-            if (meta.isNotEmpty()) {
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = meta,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = cs.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                val rest = buildString {
+                    if (story.time > 0L) {
+                        append(formatRelativeTime(story.time))
+                    }
+                    append(" · ${story.score} 赞")
+                    if (story.descendants > 0) append(" · ${story.descendants} 评论")
+                }
+                if (rest.isNotEmpty()) {
+                    Text(
+                        text = rest,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = cs.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
         }
     }
+}
+
+/**
+ * 提取 story 的来源域名(去掉 www. 前缀)。
+ * 无 url 的站内帖(Ask HN 等)显示 HN 自身域名。
+ */
+private fun storyHost(story: HackerNewsStory): String {
+    val raw = if (story.url.isNotBlank()) story.url else story.discussionUrl
+    return runCatching {
+        android.net.Uri.parse(raw).host
+            ?.removePrefix("www.")
+            ?: "news.ycombinator.com"
+    }.getOrDefault("news.ycombinator.com")
 }
 
 /** 把 Unix 秒级时间戳转成相对时间(如 "3 小时前")。 */

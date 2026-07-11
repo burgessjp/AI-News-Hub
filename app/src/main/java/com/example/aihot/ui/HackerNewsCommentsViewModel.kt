@@ -111,11 +111,9 @@ class HackerNewsCommentsViewModel : ViewModel() {
             }
         }
         walk(roots, 0)
-        _state.value = if (flat.isEmpty() && roots.isEmpty()) {
-            UiState.Error("暂无评论")
-        } else {
-            UiState.Success(flat)
-        }
+        // 空列表(无评论)是正常态,不是错误 —— 走 Success 让 UI 显示 EmptyState。
+        // 真正的加载失败已在 load()/toggle() 的 onFailure 中发出 UiState.Error。
+        _state.value = UiState.Success(flat)
     }
 }
 

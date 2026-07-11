@@ -19,9 +19,14 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import android.annotation.SuppressLint
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -39,10 +44,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import com.example.aihot.ui.anim.Motion
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
 import com.example.aihot.ui.components.AppTopBar
@@ -246,17 +255,45 @@ fun WebViewScreen(
                 modifier = Modifier.fillMaxSize()
             )
 
-            // 顶部线性进度条(细条贴顶)
-            if (loading) {
-                LinearProgressIndicator(
-                    progress = { progress / 100f },
-                    modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth(),
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    strokeCap = androidx.compose.ui.graphics.StrokeCap.Round
-                )
-            }
+            // 顶部加载进度条(2dp 细线,加载完成淡出,无背景轨道)
+            TopProgressBar(loading = loading, progress = { progress / 100f })
         }
+    }
+}
+
+/**
+ * 顶部加载进度条 —— Safari/Chrome 风格的细线进度。
+ *
+ * 与默认 [LinearProgressIndicator] 的差异:
+ *  1. 更细(2dp),贴顶精致,不抢视觉
+ *  2. 无背景轨道(trackColor = transparent),加载区是干净的细线,
+ *     不再铺满整条灰轨显得笨重
+ *  3. [AnimatedVisibility] 包裹,加载完成时平滑淡出,而非硬切消失
+ *
+ * @param loading  是否加载中(控制显隐)
+ * @param progress 0f..1f 加载进度
+ */
+@Composable
+private fun TopProgressBar(
+    loading: Boolean,
+    progress: () -> Float
+) {
+    AnimatedVisibility(
+        visible = loading,
+        enter = fadeIn(tween(Motion.SHORT)),
+        exit = fadeOut(tween(Motion.MEDIUM))
+    ) {
+        LinearProgressIndicator(
+            progress = progress,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(2.dp),
+            color = MaterialTheme.colorScheme.primary,
+            trackColor = Color.Transparent,
+            strokeCap = StrokeCap.Round,
+            gapSize = 0.dp,
+            drawStopIndicator = {}
+        )
     }
 }
 
