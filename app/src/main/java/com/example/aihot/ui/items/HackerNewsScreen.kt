@@ -24,10 +24,17 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,9 +48,11 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.aihot.data.HackerNewsStory
+import com.example.aihot.data.TranslationConfig
 import com.example.aihot.ui.EmptyState
 import com.example.aihot.ui.ErrorState
 import com.example.aihot.ui.HackerNewsViewModel
+import com.example.aihot.ui.TranslationState
 import com.example.aihot.ui.UiState
 import com.example.aihot.ui.components.AppTopBar
 import com.example.aihot.ui.components.NewsCardSkeletonList
@@ -61,20 +70,39 @@ import java.util.Locale
  * 交互:
  *  - 点击单条 → 打开该 story 的评论树页面
  *  - 加载中:shimmer 骨架;失败:错误态 + 重试;空:空状态
+ *  - 标题翻译:翻译开关开且配置就绪时,每行标题下出现「译」按钮(见 [TitleTranslationBlock])
  *
  * @param onBack 返回回调
  * @param onOpenComments 点击 story 打开其评论树页面
+ * @param onOpenSettings 配置未就绪时点「译」引导跳设置
  */
 @Composable
 fun HackerNewsScreen(
     onBack: () -> Unit,
     onOpenComments: (HackerNewsStory) -> Unit,
+    onOpenSettings: () -> Unit,
     vm: HackerNewsViewModel = viewModel(key = "hackernews")
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
+    val titleStates by vm.titleStates.collectAsStateWithLifecycle()
+    val config by vm.configFlow.collectAsStateWithLifecycle(initialValue = TranslationConfig())
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // 配置未就绪提示:点「译」后若 state 变成 CONFIG_MISSING,弹一次引导
+    LaunchedEffect(titleStates) {
+        titleStates.values.firstOrNull { it is TranslationState.Error && it.message == TranslationState.CONFIG_MISSING }
+            ?.let {
+                val r = snackbarHostState.showSnackbar(
+                    message = "请先在 设置 → 翻译 中配置 API",
+                    actionLabel = "去设置"
+                )
+                if (r == SnackbarResult.ActionPerformed) onOpenSettings()
+            }
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             AppTopBar(
                 title = "HackerNews",
@@ -103,7 +131,10 @@ fun HackerNewsScreen(
                     } else {
                         HackerNewsList(
                             stories = stories,
-                            onClick = onOpenComments
+                            titleStates = titleStates,
+                            translateEnabled = config.enabled,
+                            onClick = onOpenComments,
+                            onTranslate = { vm.translateTitle(it) }
                         )
                     }
                 }
@@ -115,7 +146,10 @@ fun HackerNewsScreen(
 @Composable
 private fun HackerNewsList(
     stories: List<HackerNewsStory>,
-    onClick: (HackerNewsStory) -> Unit
+    titleStates: Map<Long, TranslationState>,
+    translateEnabled: Boolean,
+    onClick: (HackerNewsStory) -> Unit,
+    onTranslate: (HackerNewsStory) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -128,7 +162,10 @@ private fun HackerNewsList(
             HackerNewsRow(
                 rank = index + 1,
                 story = story,
-                onClick = { onClick(story) }
+                translateEnabled = translateEnabled,
+                translationState = titleStates[story.id] ?: TranslationState.Idle,
+                onClick = { onClick(story) },
+                onTranslate = { onTranslate(story) }
             )
             if (index != stories.lastIndex) {
                 Spacer(
@@ -147,7 +184,7 @@ private fun HackerNewsList(
  * 单条 story 行:序号徽章 + 标题 + 作者/时间 + 得票/评论/来源域名(HN 原生风)。
  *
  * 三层信息:
- *  1. 标题(最多两行)
+ *  1. 标题(最多两行)+ 可选的「译」按钮与译文
  *  2. 作者 · 相对时间(作者主色强调)
  *  3. 得票 ▲ · 评论 💬 · 来源域名 🌐(三栏均匀分布,icon + 文字)
  *
@@ -157,10 +194,14 @@ private fun HackerNewsList(
 private fun HackerNewsRow(
     rank: Int,
     story: HackerNewsStory,
-    onClick: () -> Unit
+    translateEnabled: Boolean,
+    translationState: TranslationState,
+    onClick: () -> Unit,
+    onTranslate: () -> Unit
 ) {
     val cs = MaterialTheme.colorScheme
     val topRank = rank <= 3
+    var titleCollapsed by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -201,15 +242,35 @@ private fun HackerNewsRow(
                     }
                 }
             }
-            Text(
-                text = titleAnnotated,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = cs.onSurface,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                lineHeight = 20.sp
-            )
+            Row(verticalAlignment = Alignment.Top) {
+                Text(
+                    text = titleAnnotated,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = cs.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    lineHeight = 20.sp,
+                    modifier = Modifier.weight(1f)
+                )
+                // 「译」按钮内联在标题行末(域名后),翻译开关开时显示
+                if (translateEnabled) {
+                    Spacer(Modifier.width(6.dp))
+                    InlineTranslateButton(
+                        state = translationState,
+                        collapsed = titleCollapsed,
+                        onToggleCollapse = { titleCollapsed = !titleCollapsed },
+                        onTranslate = onTranslate
+                    )
+                }
+            }
+
+            // ①.5 标题译文(仅翻译开关开且已翻译且未折叠时):弱色小字,显示在标题下方
+            if (translateEnabled && translationState is TranslationState.Success && !titleCollapsed) {
+                Spacer(Modifier.height(4.dp))
+                TranslatedText(translated = translationState.translated)
+            }
+
             // ② 作者 · 相对时间 · 得票 · 评论(单行,作者主色强调,其余弱色)
             Spacer(Modifier.height(6.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -243,6 +304,67 @@ private fun HackerNewsRow(
             }
         }
     }
+}
+
+/**
+ * 内联「译」按钮 —— 跟在标题行末/meta 信息后,不占独立行。
+ *
+ * 文案随 [state] 变化:Idle→「译」;Loading→「翻译中…」;Success→「收起/显示译文」
+ * (由 [collapsed] 决定);Error→「内容过短 / 翻译失败,重试」。CONFIG_MISSING 不渲染
+ * (由调用方 snackbar 引导)。折叠态由调用方持有,使译文 Text 与按钮文案共享。
+ *
+ * @param collapsed 当前译文是否已折叠(Success 态用)
+ * @param onToggleCollapse 切换折叠(Success 态点按钮)
+ * @param onTranslate 触发翻译(Idle / Error 重试)
+ */
+@Composable
+internal fun InlineTranslateButton(
+    state: TranslationState,
+    collapsed: Boolean,
+    onToggleCollapse: () -> Unit,
+    onTranslate: () -> Unit
+) {
+    val cs = MaterialTheme.colorScheme
+    val text = when (state) {
+        TranslationState.Idle -> "译"
+        TranslationState.Loading -> "翻译中…"
+        is TranslationState.Success -> if (collapsed) "显示译文" else "收起译文"
+        is TranslationState.Error -> when (state.message) {
+            TranslationState.TOO_SHORT -> "内容过短"
+            TranslationState.CONFIG_MISSING -> return // 由 snackbar 引导,不渲染按钮
+            else -> "翻译失败,重试"
+        }
+    }
+    val enabled = state !is TranslationState.Loading
+    val onClick: () -> Unit = when (state) {
+        is TranslationState.Success -> onToggleCollapse
+        else -> onTranslate
+    }
+    TextButton(
+        onClick = onClick,
+        enabled = enabled,
+        contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp),
+        modifier = Modifier.height(20.dp)
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            color = if (enabled) cs.primary.copy(alpha = 0.85f) else cs.onSurfaceVariant
+        )
+    }
+}
+
+/** 译文纯文本(弱色小字),供标题/评论译文区复用。 */
+@Composable
+internal fun TranslatedText(translated: String, modifier: Modifier = Modifier) {
+    val cs = MaterialTheme.colorScheme
+    Text(
+        text = translated,
+        style = MaterialTheme.typography.bodySmall,
+        color = cs.onSurfaceVariant,
+        lineHeight = 18.sp,
+        modifier = modifier.fillMaxWidth()
+    )
 }
 
 /**

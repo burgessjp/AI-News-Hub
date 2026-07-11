@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.activity.compose.BackHandler
 import com.example.aihot.data.HackerNewsStory
 import com.example.aihot.data.NewsItem
+import com.example.aihot.data.TranslationConfigStore
 import com.example.aihot.ui.NewsDetailScreen
 import com.example.aihot.ui.components.AppBottomBar
 import com.example.aihot.ui.components.AppTab
@@ -179,6 +180,10 @@ fun AIHotApp() {
 
     // 当前 tab + 每个 tab 的二级页栈
     var currentTab by rememberSaveable { mutableStateOf(AppTab.Featured) }
+    // 翻译配置存储(进程级单例,基于 applicationContext)。设置页读写,
+    // HN 列表/评论页订阅以决定是否显示「译」按钮。
+    val appContext = androidx.compose.ui.platform.LocalContext.current.applicationContext
+    val configStore = remember { TranslationConfigStore(appContext) }
     // 用 rememberSaveable 持久化导航栈,转屏/进程被杀后仍可恢复(需自定义 Saver,
     // 因 Page 含业务对象、AppTab 是 enum,默认 Bundle 无法直接存 Map)。
     var pageStacks by rememberSaveable(stateSaver = pageStacksSaver) {
@@ -283,6 +288,8 @@ fun AIHotApp() {
                             onSelectDate = { push(Page.DailyDate(it)) },
                             onOpenComments = { push(Page.HackerNewsComments(it)) },
                             onOpenUrl = openUrl,
+                            onOpenSettings = { push(Page.Settings) },
+                            configStore = configStore,
                             darkTheme = darkTheme
                         )
                     }
@@ -355,6 +362,8 @@ private fun PageView(
     onSelectDate: (String) -> Unit,
     onOpenComments: (HackerNewsStory) -> Unit,
     onOpenUrl: (String, String) -> Unit,
+    onOpenSettings: () -> Unit,
+    configStore: TranslationConfigStore,
     darkTheme: Boolean = false
 ) {
     when (page) {
@@ -387,17 +396,20 @@ private fun PageView(
             onSelectTheme = onSelectTheme,
             fontChoice = fontChoice,
             onSelectFont = onSelectFont,
+            configStore = configStore,
             onBack = onBack
         )
         Page.About -> AboutScreen(onBack = onBack)
         Page.HackerNews -> HackerNewsScreen(
             onBack = onBack,
-            onOpenComments = onOpenComments
+            onOpenComments = onOpenComments,
+            onOpenSettings = onOpenSettings
         )
         is Page.HackerNewsComments -> HackerNewsCommentsScreen(
             story = page.story,
             onBack = onBack,
-            onOpenUrl = onOpenUrl
+            onOpenUrl = onOpenUrl,
+            onOpenSettings = onOpenSettings
         )
     }
 }

@@ -1,14 +1,40 @@
 package com.example.aihot.ui
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.aihot.data.HackerNewsComment
 import com.example.aihot.data.HackerNewsRepository
 import com.example.aihot.data.HackerNewsStory
+import com.example.aihot.data.ShortContentException
+import com.example.aihot.data.TranslationConfigStore
+import com.example.aihot.data.TranslationRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+
+/**
+ * 单条内容(标题 / 评论)的翻译状态机 —— 与 [UiState] 同文件风格。
+ *
+ * - [Idle]: 未翻译,UI 显示「译」按钮
+ * - [Loading]: 请求中(仅未命中缓存时短暂出现)
+ * - [Success]: 已翻译,[translated] 为译文,UI 切换「收起/显示译文」
+ * - [Error]: 失败,[message] 为原因。特殊值 [CONFIG_MISSING] / [TOO_SHORT]
+ *   由 UI 分别走「引导去设置」「提示内容过短」,不显示通用错误文案
+ */
+sealed interface TranslationState {
+    data object Idle : TranslationState
+    data object Loading : TranslationState
+    data class Success(val translated: String) : TranslationState
+    data class Error(val message: String) : TranslationState
+
+    companion object {
+        const val CONFIG_MISSING = "config_missing"
+        const val TOO_SHORT = "too_short"
+    }
+}
 
 /**
  * HackerNews 评论树 ViewModel —— 懒加载(按需展开)。
@@ -19,13 +45,25 @@ import kotlinx.coroutines.launch
  *
  * 展开状态([Node.expanded])独立于数据;[flatten] 仅把「已展开」节点的子节点
  * 递归铺平(带 [FlatComment.depth])供 LazyColumn 渲染。
+ *
+ * 继承 [AndroidViewModel] 以拿 application.cacheDir 注入翻译缓存,
+ * 以及构造 [TranslationConfigStore] / [TranslationRepository]。
  */
-class HackerNewsCommentsViewModel : ViewModel() {
+class HackerNewsCommentsViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repo = HackerNewsRepository()
+    private val translationRepo = TranslationRepository(application.cacheDir)
+    private val configStore = TranslationConfigStore(application)
 
     private val _state = MutableStateFlow<UiState<List<FlatComment>>>(UiState.Loading)
     val state: StateFlow<UiState<List<FlatComment>>> = _state.asStateFlow()
+
+    /** 翻译配置流(UI 订阅以决定是否显示「译」按钮)。 */
+    val configFlow = configStore.configFlow
+
+    /** story 标题翻译状态(storyId → state)。标题不在评论 Node 树内,单独管理。 */
+    private val _titleStates = MutableStateFlow<Map<Long, TranslationState>>(emptyMap())
+    val titleStates: StateFlow<Map<Long, TranslationState>> = _titleStates.asStateFlow()
 
     /** 顶层评论节点(story 的一级评论)。展开/折叠通过修改节点树后重新 flatten 实现。 */
     private val roots = mutableListOf<Node>()
@@ -92,6 +130,52 @@ class HackerNewsCommentsViewModel : ViewModel() {
         }
     }
 
+    /** 翻译某条评论正文。状态机类比 [toggle]。 */
+    fun translateComment(node: Node) {
+        if (node.translationState is TranslationState.Loading) return
+        val text = node.comment.text
+        if (text.isBlank()) return
+        node.translationState = TranslationState.Loading
+        emitFlattened()
+        viewModelScope.launch {
+            val outcome = doTranslate(text)
+            node.translationState = outcome
+            emitFlattened()
+        }
+    }
+
+    /** 翻译 story 标题。 */
+    fun translateTitle(story: HackerNewsStory) {
+        val current = _titleStates.value[story.id]
+        if (current is TranslationState.Loading) return
+        if (story.title.isBlank()) return
+        _titleStates.value = _titleStates.value + (story.id to TranslationState.Loading)
+        viewModelScope.launch {
+            val outcome = doTranslate(story.title)
+            _titleStates.value = _titleStates.value + (story.id to outcome)
+        }
+    }
+
+    /**
+     * 实际翻译流程:校验配置 → 调 [TranslationRepository](内部带缓存)。
+     * 返回供 UI 直接写入的状态。
+     */
+    private suspend fun doTranslate(text: String): TranslationState {
+        val config = configStore.configFlow.first()
+        if (!config.isReady) return TranslationState.Error(TranslationState.CONFIG_MISSING)
+        return runCatching { translationRepo.translate(text, config).getOrThrow() }
+            .fold(
+                onSuccess = { TranslationState.Success(it) },
+                onFailure = {
+                    if (it is ShortContentException) {
+                        TranslationState.Error(TranslationState.TOO_SHORT)
+                    } else {
+                        TranslationState.Error(it.message ?: "翻译失败")
+                    }
+                }
+            )
+    }
+
     /** 把节点树按展开状态铺平为带层级的列表(供 LazyColumn 渲染)。 */
     private fun emitFlattened() {
         val flat = mutableListOf<FlatComment>()
@@ -104,7 +188,8 @@ class HackerNewsCommentsViewModel : ViewModel() {
                         hasKids = node.comment.kids.isNotEmpty(),
                         expanded = node.expanded,
                         childrenLoading = node.childrenLoading,
-                        childrenError = node.childrenError
+                        childrenError = node.childrenError,
+                        translationState = node.translationState
                     )
                 )
                 if (node.expanded) walk(node.children, depth + 1)
@@ -128,6 +213,8 @@ class Node(val comment: HackerNewsComment) {
     var children: List<Node> = emptyList()
     var childrenLoading: Boolean = false
     var childrenError: String? = null
+    /** 该评论正文的翻译状态(运行时,不持久化;译文本身由 Repository 缓存)。 */
+    var translationState: TranslationState = TranslationState.Idle
 }
 
 /**
@@ -141,7 +228,8 @@ data class FlatComment(
     val hasKids: Boolean,
     val expanded: Boolean,
     val childrenLoading: Boolean,
-    val childrenError: String?
+    val childrenError: String?,
+    val translationState: TranslationState
 ) {
     /** LazyColumn key —— 同一条评论唯一。 */
     val key: String get() = "${node.comment.id}-${depth}"

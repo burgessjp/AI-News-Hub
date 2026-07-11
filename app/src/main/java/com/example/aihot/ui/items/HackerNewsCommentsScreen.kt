@@ -41,7 +41,9 @@ import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -61,6 +63,7 @@ import com.example.aihot.ui.ErrorState
 import com.example.aihot.ui.FlatComment
 import com.example.aihot.ui.HackerNewsCommentsViewModel
 import com.example.aihot.ui.Node
+import com.example.aihot.ui.TranslationState
 import com.example.aihot.ui.UiState
 import com.example.aihot.ui.components.AppTopBar
 import com.example.aihot.ui.components.NewsCardSkeletonList
@@ -87,14 +90,38 @@ fun HackerNewsCommentsScreen(
     story: HackerNewsStory,
     onBack: () -> Unit,
     onOpenUrl: (String, String) -> Unit,
+    onOpenSettings: () -> Unit,
     vm: HackerNewsCommentsViewModel = viewModel(key = "hn-comments-${story.id}")
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
+    val config by vm.configFlow.collectAsStateWithLifecycle(initialValue = com.example.aihot.data.TranslationConfig())
+    val titleStates by vm.titleStates.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { androidx.compose.material3.SnackbarHostState() }
 
     // 进入页面时触发首次加载(仅一级评论)。
     LaunchedEffect(story.id) { vm.load(story) }
 
+    // 配置未就绪提示:标题或任一评论翻译触发 CONFIG_MISSING 时,弹一次引导。
+    // 用 remember 记住「已提示过」,避免评论列表重组时反复弹。
+    var configMissingNotified by remember { mutableStateOf(false) }
+    LaunchedEffect(titleStates, state) {
+        if (configMissingNotified) return@LaunchedEffect
+        val titleMissing = (titleStates[story.id] as? TranslationState.Error)?.message == TranslationState.CONFIG_MISSING
+        val commentMissing = (state as? UiState.Success)?.data
+            ?.any { (it.translationState as? TranslationState.Error)?.message == TranslationState.CONFIG_MISSING }
+            ?: false
+        if (titleMissing || commentMissing) {
+            configMissingNotified = true
+            val r = snackbarHostState.showSnackbar(
+                message = "请先在 设置 → 翻译 中配置 API",
+                actionLabel = "去设置"
+            )
+            if (r == androidx.compose.material3.SnackbarResult.ActionPerformed) onOpenSettings()
+        }
+    }
+
     Scaffold(
+        snackbarHost = { androidx.compose.material3.SnackbarHost(snackbarHostState) },
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             AppTopBar(
@@ -118,7 +145,13 @@ fun HackerNewsCommentsScreen(
             ) {
                 // ① header:story 标题 + meta + 查看原文链接
                 item(key = "story-header") {
-                    StoryHeader(story = story, onOpenUrl = onOpenUrl)
+                    StoryHeader(
+                        story = story,
+                        translateEnabled = config.enabled,
+                        translationState = titleStates[story.id] ?: TranslationState.Idle,
+                        onTranslate = { vm.translateTitle(story) },
+                        onOpenUrl = onOpenUrl
+                    )
                 }
 
                 // ② 评论列表(状态驱动)
@@ -146,7 +179,9 @@ fun HackerNewsCommentsScreen(
                                 }
                                 CommentRow(
                                     flat = flat,
-                                    onToggle = { vm.toggle(it) }
+                                    translateEnabled = config.enabled,
+                                    onToggle = { vm.toggle(it) },
+                                    onTranslate = { vm.translateComment(it) }
                                 )
                             }
                         }
@@ -163,9 +198,13 @@ fun HackerNewsCommentsScreen(
 @Composable
 private fun StoryHeader(
     story: HackerNewsStory,
+    translateEnabled: Boolean,
+    translationState: TranslationState,
+    onTranslate: () -> Unit,
     onOpenUrl: (String, String) -> Unit
 ) {
     val cs = MaterialTheme.colorScheme
+    var titleCollapsed by remember { mutableStateOf(false) }
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
         Spacer(Modifier.height(16.dp))
         // 标题
@@ -179,19 +218,39 @@ private fun StoryHeader(
                 lineHeight = 26.sp
             )
         }
-        // meta:赞 · 评论数 · 相对时间
+        // meta:赞 · 评论数 · 相对时间(+ 翻译开关开时的「译」按钮内联在末尾)
         val meta = buildString {
             append("${story.score} 赞")
             if (story.descendants > 0) append(" · ${story.descendants} 评论")
             if (story.time > 0L) append(" · ${formatRelativeTime(story.time)}")
         }
-        if (meta.isNotEmpty()) {
+        if (meta.isNotEmpty() || translateEnabled) {
             Spacer(Modifier.height(8.dp))
-            Text(
-                text = meta,
-                style = MaterialTheme.typography.labelSmall,
-                color = cs.onSurfaceVariant
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (meta.isNotEmpty()) {
+                    Text(
+                        text = meta,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = cs.onSurfaceVariant
+                    )
+                }
+                if (translateEnabled && story.title.isNotBlank()) {
+                    if (meta.isNotEmpty()) Spacer(Modifier.width(10.dp))
+                    InlineTranslateButton(
+                        state = translationState,
+                        collapsed = titleCollapsed,
+                        onToggleCollapse = { titleCollapsed = !titleCollapsed },
+                        onTranslate = onTranslate
+                    )
+                }
+            }
+        }
+        // 标题译文(已翻译且未折叠时):弱色小字,显示在 meta 下方
+        if (translateEnabled && story.title.isNotBlank() &&
+            translationState is TranslationState.Success && !titleCollapsed
+        ) {
+            Spacer(Modifier.height(4.dp))
+            TranslatedText(translated = translationState.translated)
         }
         // 查看原文链接行(url 为空时是 Ask HN 等站内帖,展示讨论页)
         Spacer(Modifier.height(14.dp))
@@ -276,15 +335,20 @@ private fun LinkRow(
  * 按 [FlatComment.depth] 缩进,每层一道竖线引导层级。
  *
  * @param flat 铺平后的评论节点(含层级与展开态)
+ * @param translateEnabled 翻译开关是否开(控制译块是否渲染)
  * @param onToggle 点击「查看回复」按钮回调
+ * @param onTranslate 点击「译」按钮回调,翻译本条评论
  */
 @Composable
 private fun CommentRow(
     flat: FlatComment,
-    onToggle: (Node) -> Unit
+    translateEnabled: Boolean,
+    onToggle: (Node) -> Unit,
+    onTranslate: (Node) -> Unit
 ) {
     val cs = MaterialTheme.colorScheme
     val node = flat.node
+    var commentCollapsed by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -303,10 +367,17 @@ private fun CommentRow(
             )
         }
         Column(modifier = Modifier.weight(1f)) {
-            // 作者行:作者(主色加粗) · 时间(弱色),dead 评论挂一个 chip
-            CommentMeta(node = node)
+            // 作者行:作者(主色加粗) · 时间(弱色) · dead chip ·(可选)译按钮
+            val hasText = node.comment.text.isNotBlank()
+            CommentMeta(
+                node = node,
+                translateState = if (translateEnabled && hasText) flat.translationState else null,
+                collapsed = commentCollapsed,
+                onToggleCollapse = { commentCollapsed = !commentCollapsed },
+                onTranslate = { onTranslate(node) }
+            )
             // HTML 正文(dead 评论弱化)
-            if (node.comment.text.isNotBlank()) {
+            if (hasText) {
                 Spacer(Modifier.height(4.dp))
                 val linkColor = cs.primary
                 val annotated = remember(node.comment.text, linkColor) {
@@ -321,6 +392,11 @@ private fun CommentRow(
                     color = if (node.comment.dead) cs.onSurfaceVariant else cs.onSurface,
                     lineHeight = 21.sp
                 )
+                // 译文(已翻译且未折叠时):纯文本追加在原文 HTML 下方,原文链接/格式完整保留
+                if (translateEnabled && flat.translationState is TranslationState.Success && !commentCollapsed) {
+                    Spacer(Modifier.height(4.dp))
+                    TranslatedText(translated = flat.translationState.translated)
+                }
             }
             // 「查看回复」按钮(有子评论时) —— 右对齐,紧贴正文下方,三态
             if (flat.hasKids) {
@@ -337,11 +413,22 @@ private fun CommentRow(
 }
 
 /**
- * 作者元信息行:作者名(主色 SemiBold) · 相对时间(弱色) · dead chip。
- * 分行承载,避免 buildString 把信息层级糊在一起。
+ * 作者元信息行:作者名(主色 SemiBold) · 相对时间(弱色) · dead chip ·(可选)译按钮。
+ * 分行承载,避免 buildString 把信息层级糊在一起。「译」按钮内联在时间后,
+ * 与列表页/评论页标题的「译」按钮位置风格统一。
+ *
+ * @param translateState 翻译状态;null 表示不渲染译按钮(翻译开关关)
+ * @param collapsed 译文折叠态(Success 时切「收起/显示译文」)
+ * @param onToggleCollapse / [onTranslate] 按钮回调
  */
 @Composable
-private fun CommentMeta(node: Node) {
+private fun CommentMeta(
+    node: Node,
+    translateState: TranslationState? = null,
+    collapsed: Boolean = false,
+    onToggleCollapse: () -> Unit = {},
+    onTranslate: () -> Unit = {}
+) {
     val cs = MaterialTheme.colorScheme
     Row(verticalAlignment = Alignment.CenterVertically) {
         if (node.comment.by.isNotBlank()) {
@@ -370,6 +457,16 @@ private fun CommentMeta(node: Node) {
         if (node.comment.dead) {
             Spacer(Modifier.width(6.dp))
             AssistChipPreview(text = "已折叠")
+        }
+        // 「译」按钮内联在时间后(翻译开关开时)
+        if (translateState != null) {
+            Spacer(Modifier.width(10.dp))
+            InlineTranslateButton(
+                state = translateState,
+                collapsed = collapsed,
+                onToggleCollapse = onToggleCollapse,
+                onTranslate = onTranslate
+            )
         }
     }
 }
