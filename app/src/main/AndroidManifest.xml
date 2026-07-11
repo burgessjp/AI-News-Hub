@@ -51,5 +51,20 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- 系统选中菜单「译」:声明 PROCESS_TEXT 后,系统 ActionMode 自动把 label「译」
+             作为菜单项加入;点击时通过 EXTRA_PROCESS_TEXT 传入选中文本。
+             exported=true 必须(系统跨进程拉起);透明主题避免闪全屏白底。 -->
+        <activity
+            android:name=".ui.translate.TranslateSelectionActivity"
+            android:exported="true"
+            android:label="译"
+            android:theme="@style/AppTheme.Translucent">
+            <intent-filter>
+                <action android:name="android.intent.action.PROCESS_TEXT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity>
     </application>
 </manifest>

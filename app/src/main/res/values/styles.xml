@@ -1,3 +1,12 @@
 <resources>
     <style name="AppTheme" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <!-- 选中翻译 Activity 用:透明背景 + 无标题 + 关闭转场动画,
+         让 ModalBottomSheet 看起来像浮在原页面上而非独立全屏页。 -->
+    <style name="AppTheme.Translucent" parent="AppTheme">
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
 </resources>
