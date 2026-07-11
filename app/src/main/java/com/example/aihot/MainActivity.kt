@@ -18,12 +18,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.activity.compose.BackHandler
 import com.example.aihot.data.HackerNewsStory
 import com.example.aihot.data.NewsItem
+import com.example.aihot.data.TranslationConfigStore
+import com.example.aihot.ui.more.SettingsStore
 import com.example.aihot.ui.NewsDetailScreen
 import com.example.aihot.ui.components.AppBottomBar
 import com.example.aihot.ui.components.AppTab
@@ -44,6 +47,8 @@ import com.example.aihot.ui.anim.PageNavStyle
 import com.example.aihot.ui.anim.pageTransition
 import com.example.aihot.ui.theme.AIHotTheme
 import com.example.aihot.ui.webview.WebViewScreen
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -164,18 +169,27 @@ private val pageStacksSaver = androidx.compose.runtime.saveable.Saver<
  */
 @Composable
 fun AIHotApp() {
-    // 主题模式:提升到顶层,设置页可修改。默认跟随系统。
-    var themeMode by rememberSaveable { mutableStateOf(ThemeMode.System) }
+    val appContext = androidx.compose.ui.platform.LocalContext.current.applicationContext
+    val scope = rememberCoroutineScope()
+    // 偏好存储(进程级单例):显示偏好(主题/字体) + 翻译配置,均基于 DataStore 持久化。
+    val settingsStore = remember { SettingsStore(appContext) }
+    val configStore = remember { TranslationConfigStore(appContext) }
+
+    // 主题模式 + 字体族:订阅持久化 Flow。Flow 首帧前用默认值(System),
+    // 读到持久化值后自动切换。设置页改值时写入 store,Flow 回推新值刷新。
+    val displayPrefs by settingsStore.prefsFlow.collectAsStateWithLifecycle(
+        initialValue = SettingsStore.DisplayPrefs()
+    )
+    val themeMode = displayPrefs.themeMode
+    val fontChoice = displayPrefs.fontChoice
+    val onSelectTheme: (ThemeMode) -> Unit = { scope.launch { settingsStore.updateTheme(it) } }
+    val onSelectFont: (FontChoice) -> Unit = { scope.launch { settingsStore.updateFont(it) } }
+
     val darkTheme = when (themeMode) {
         ThemeMode.System -> isSystemInDarkTheme()
         ThemeMode.Light -> false
         ThemeMode.Dark -> true
     }
-
-    // 字体族:同样提升到顶层,设置页可修改。默认系统无衬线。
-    // System 时不向 AIHotTheme 传 fontFamily(沿用 Type.kt 默认 SansSerif),
-    // 仅 Serif/Mono 时传实际 FontFamily,触发全 App 字形切换。
-    var fontChoice by rememberSaveable { mutableStateOf(FontChoice.System) }
 
     // 当前 tab + 每个 tab 的二级页栈
     var currentTab by rememberSaveable { mutableStateOf(AppTab.Featured) }
@@ -275,14 +289,16 @@ fun AIHotApp() {
                         is Screen.Secondary -> PageView(
                             page = s.page,
                             themeMode = themeMode,
-                            onSelectTheme = { themeMode = it },
+                            onSelectTheme = onSelectTheme,
                             fontChoice = fontChoice,
-                            onSelectFont = { fontChoice = it },
+                            onSelectFont = onSelectFont,
                             onBack = pop,
                             onItemClick = { push(Page.Detail(it)) },
                             onSelectDate = { push(Page.DailyDate(it)) },
                             onOpenComments = { push(Page.HackerNewsComments(it)) },
                             onOpenUrl = openUrl,
+                            onOpenSettings = { push(Page.Settings) },
+                            configStore = configStore,
                             darkTheme = darkTheme
                         )
                     }
@@ -355,6 +371,8 @@ private fun PageView(
     onSelectDate: (String) -> Unit,
     onOpenComments: (HackerNewsStory) -> Unit,
     onOpenUrl: (String, String) -> Unit,
+    onOpenSettings: () -> Unit,
+    configStore: TranslationConfigStore,
     darkTheme: Boolean = false
 ) {
     when (page) {
@@ -387,17 +405,20 @@ private fun PageView(
             onSelectTheme = onSelectTheme,
             fontChoice = fontChoice,
             onSelectFont = onSelectFont,
+            configStore = configStore,
             onBack = onBack
         )
         Page.About -> AboutScreen(onBack = onBack)
         Page.HackerNews -> HackerNewsScreen(
             onBack = onBack,
-            onOpenComments = onOpenComments
+            onOpenComments = onOpenComments,
+            onOpenSettings = onOpenSettings
         )
         is Page.HackerNewsComments -> HackerNewsCommentsScreen(
             story = page.story,
             onBack = onBack,
-            onOpenUrl = onOpenUrl
+            onOpenUrl = onOpenUrl,
+            onOpenSettings = onOpenSettings
         )
     }
 }

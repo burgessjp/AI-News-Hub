@@ -1,6 +1,7 @@
 package com.example.aihot.ui.more
 
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
@@ -8,25 +9,45 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.Title
+import androidx.compose.material.icons.filled.Translate
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.aihot.data.TranslationConfig
+import com.example.aihot.data.TranslationConfigStore
 import com.example.aihot.ui.components.AppTopBar
 import com.example.aihot.ui.components.SegmentedOption
 import com.example.aihot.ui.components.SegmentedOptionRow
 import com.example.aihot.ui.components.SettingsGroupHeader
 import com.example.aihot.ui.components.SettingsRow
+import kotlinx.coroutines.launch
 
 /**
  * 主题模式 —— 由 [com.example.aihot.AIHotApp] 持有,设置页通过回调修改。
@@ -58,6 +79,9 @@ enum class FontChoice(val label: String, val fontFamily: FontFamily) {
  *  - 外观:主题模式三选一(系统/亮/暗),横向三段式(图标 + 文字)
  *  - 字体:字体族三选一(默认/衬线/等宽),横向三段式
  *  - 语言:占位项(当前仅简体中文)
+ *  - 翻译:HackerNews 标题/评论翻译开关 + 用户自填的 LLM API 配置
+ *
+ * 翻译配置通过 [TranslationConfigStore] 持久化(DataStore),关 App 后保留。
  */
 @Composable
 fun SettingsScreen(
@@ -65,6 +89,7 @@ fun SettingsScreen(
     onSelectTheme: (ThemeMode) -> Unit,
     fontChoice: FontChoice,
     onSelectFont: (FontChoice) -> Unit,
+    configStore: TranslationConfigStore,
     onBack: () -> Unit
 ) {
     val themeOptions = remember {
@@ -81,6 +106,10 @@ fun SettingsScreen(
             SegmentedOption(icon = Icons.Filled.Code, label = FontChoice.Mono.label)
         )
     }
+
+    val config by configStore.configFlow.collectAsStateWithLifecycle(
+        initialValue = TranslationConfig()
+    )
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
@@ -136,6 +165,134 @@ fun SettingsScreen(
                     showChevron = false
                 )
             }
+
+            // 翻译 section —— 开关 + 三项 LLM API 配置
+            item { SettingsGroupHeader("翻译") }
+            item {
+                TranslationSection(config = config, configStore = configStore)
+            }
         }
     }
+}
+
+/**
+ * 翻译配置区块:总开关 + API 地址 / API Key / 模型 三项(点按弹输入对话框)。
+ *
+ * - 开关关时三项配置仍可填写(填好后再打开开关即可用);
+ * - API Key 对话框默认密码态输入,带显隐切换(避免肩窥)。
+ */
+@Composable
+private fun TranslationSection(
+    config: TranslationConfig,
+    configStore: TranslationConfigStore
+) {
+    val scope = rememberCoroutineScope()
+    // 当前正在编辑的字段:null=未弹窗;非空=对应字段对话框打开
+    var editingField by rememberSaveable { mutableStateOf<String?>(null) }
+
+    SettingsRow(
+        icon = Icons.Filled.Translate,
+        title = "启用翻译",
+        subtitle = "翻译 HackerNews 的标题与评论",
+        showDivider = true,
+        trailing = {
+            Switch(
+                checked = config.enabled,
+                onCheckedChange = { enabled ->
+                    scope.launch { configStore.update(config.copy(enabled = enabled)) }
+                }
+            )
+        },
+        showChevron = false
+    )
+
+    SettingsRow(
+        icon = Icons.Filled.Language,
+        title = "API 地址",
+        subtitle = config.baseUrl.ifBlank { "未设置" },
+        onClick = { editingField = "base" }
+    )
+    SettingsRow(
+        icon = Icons.Filled.Key,
+        title = "API Key",
+        subtitle = if (config.apiKey.isBlank()) "未设置" else "已设置",
+        onClick = { editingField = "key" }
+    )
+    SettingsRow(
+        icon = Icons.Filled.Memory,
+        title = "模型",
+        subtitle = config.model.ifBlank { "未设置" },
+        showDivider = false,
+        onClick = { editingField = "model" }
+    )
+
+    editingField?.let { field ->
+        val (label, initial, isSecret) = when (field) {
+            "base" -> Triple("API 地址", config.baseUrl, false)
+            "key" -> Triple("API Key", config.apiKey, true)
+            else -> Triple("模型", config.model, false)
+        }
+        EditDialog(
+            title = label,
+            initial = initial,
+            isSecret = isSecret,
+            onDismiss = { editingField = null },
+            onConfirm = { newValue ->
+                val updated = when (field) {
+                    "base" -> config.copy(baseUrl = newValue)
+                    "key" -> config.copy(apiKey = newValue)
+                    else -> config.copy(model = newValue)
+                }
+                scope.launch { configStore.update(updated) }
+                editingField = null
+            }
+        )
+    }
+}
+
+/** 单行文本输入对话框。保存时回写 [TranslationConfigStore]。 */
+@Composable
+private fun EditDialog(
+    title: String,
+    initial: String,
+    isSecret: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    var text by rememberSaveable { mutableStateOf(initial) }
+    var visible by rememberSaveable { mutableStateOf(!isSecret) }
+    // 每次重新打开时把内容重置为当前已保存值(rememberSaveable 会跨重组保留,
+    // 故用 LaunchedEffect(title, initial) 在初值变化时同步)
+    LaunchedEffect(initial) { text = initial }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                singleLine = true,
+                visualTransformation = if (isSecret && !visible) PasswordVisualTransformation()
+                else androidx.compose.ui.text.input.VisualTransformation.None,
+                trailingIcon = if (isSecret) {
+                    {
+                        TextButton(onClick = { visible = !visible }) {
+                            Text(if (visible) "隐藏" else "显示")
+                        }
+                    }
+                } else null,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = if (isSecret) KeyboardType.Password else KeyboardType.Uri
+                ),
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(text.trim()) }) { Text("保存") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("取消") }
+        }
+    )
 }
