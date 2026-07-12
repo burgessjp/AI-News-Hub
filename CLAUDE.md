@@ -39,6 +39,8 @@ AIHot — Android  AI 资讯聚合客户端。Kotlin + Jetpack Compose + Materia
 - `Screen` sealed interface 区分根/二级页，驱动 `AnimatedContent` 转场：PUSH（横向推入）用于普通页，FADE 用于含 WebView 的页（AndroidView 位移会撕裂）
 - Tab 根页：`FeaturedTab` / `AllTab` / `DailyTab` / `MoreScreen`
 
+**浮动药丸底栏架构**:不再用 `Scaffold(bottomBar=...)` 槽,改为 `Box` 叠层 —— 内容区 edge-to-edge 全屏,`AppBottomBar`(浮动药丸,90% 宽 + max 400dp + rounded-full + 玻璃质感)作为 overlay 在 `BottomCenter` 对齐(`navigationBarsPadding` + 16dp 距底),二级页时 `AnimatedVisibility` 滑出隐藏(沉浸感)。列表 `contentPadding` 用 `BottomBarReservedHeight`(120dp)预留底部空间避免末项被遮挡。各 tab/二级页自身 `Scaffold` 负责系统 inset(状态栏/手势栏)。
+
 ### 数据层（`data/`）
 
 所有网络请求用 `OkHttpClient`，**不引入 Retrofit**。JSON 解析用 `org.json`（内置），**不引入 Gson/Moshi**。`NewsItem` 和 `HackerNewsStory` 用 `@Parcelize` 实现 Parcelable。
@@ -61,12 +63,16 @@ AIHot — Android  AI 资讯聚合客户端。Kotlin + Jetpack Compose + Materia
 
 ### 主题系统（`ui/theme/`）
 
-两层设计：
+两层设计，遵循 "Synthetic Intelligence News" 设计系统（Future Blue + Intelligence Purple 双色品牌）：
 
-1. **MD3 规范层**（`Color.kt` / `Type.kt` / `Shape.kt` / `Theme.kt`）：Light/Dark 双色板（cyan 主色 `#0098A2`），固定品牌色不跟随系统 dynamic color
-2. **语义层**（`AppText.kt` / `AppAlpha.kt`）：`AppText.titleHero` / `body` / `caption` 等 9 个语义档，组件统一用 `style = AppText.xxx` 而非散落 sp 字面量；`AppAlpha` 同理收口透明度
+1. **MD3 规范层**（`Color.kt` / `Type.kt` / `Shape.kt` / `Theme.kt`）：Light/Dark 双色板
+   - **品牌色**:primary Future Blue `#003EC7`(light)/`#B7C4FF`(dark),secondary Intelligence Purple `#6B38D4`(light)/`#D0BCFF`(dark)。蓝→紫渐变保留给 AI 特性(热点聚合、Hero 卡片等),不滥用
+   - 固定品牌色不跟随系统 dynamic color
+2. **语义层**（`AppText.kt` / `AppAlpha.kt`）：`AppText.titleHero` / `body` / `caption` 等 9 个语义档,组件统一用 `style = AppText.xxx` 而非散落 sp 字面量；`AppAlpha` 同理收口透明度
 
-`AIHotTheme` 接收 `darkTheme: Boolean` + `fontFamily: FontFamily?`，字体切换通过 `Typography.withFontFamily()` 全文替换。
+**字体**:Inter(SIL OFL 1.1 开源,本地 4 字重 `res/font/inter_*.ttf`,许可证 `assets/fonts/inter_font_license.txt`)。`InterFontFamily` 定义在 `InterFont.kt`,`Type.kt` / `AppText.kt` 全档统一用 Inter;headline 档带紧字距(-0.5sp)。
+
+`AIHotTheme` 接收 `darkTheme: Boolean` + `fontFamily: FontFamily?`,字体切换(设置页衬线/等宽)通过 `Typography.withFontFamily()` 全文替换;默认 null 沿用 Inter。
 
 ### 持久化
 
@@ -80,14 +86,14 @@ AIHot — Android  AI 资讯聚合客户端。Kotlin + Jetpack Compose + Materia
 
 ### 组件（`ui/components/`）
 
-`AppTopBar`、`AppBottomBar`（4 tab NavigationBar）、`Card`、`SettingsRow`、`Skeleton`、`HotTopicsSection`、`StateViews`（Loading/Error 通用组件）、`NewsCard`
+`AppTopBar`（半透明玻璃质感顶栏）、`AppBottomBar`（浮动药丸底栏，4 tab）、`Card`、`SettingsRow`（含 `SettingsGroupHeader` 带 accentColor 双色分组、`SegmentedOptionRow`）、`Skeleton`、`HotTopicsSection`（蓝→紫渐变标题栏）、`StateViews`（Loading/Error 通用组件）、`NewsCard`（扁平行）+ `FeaturedHeroCard`（精选 Hero 卡片，左侧 primary 竖条 + 大标题，精选 tab 顶部强调展示）
 
 ### 页面（`ui/` 下按功能分包）
 
-- `ui/tabs/` — 三个内容 tab 的根页
-- `ui/items/` — ItemsScreen（带分类/搜索的列表）、SearchScreen、HackerNewsScreen、HackerNewsCommentsScreen
+- `ui/tabs/` — 三个内容 tab 的根页(FeaturedTab 注入 Hero 卡片 + 今日热点)
+- `ui/items/` — ItemsScreen(带分类/搜索的列表，支持 `heroItem` 参数把第一条提升为 Hero 卡)、SearchScreen、HackerNewsScreen、HackerNewsCommentsScreen
 - `ui/daily/` — DailyScreen、DailyDateScreen、DailyArchiveScreen
-- `ui/more/` — MoreScreen、SettingsScreen、AboutScreen、SettingsStore
+- `ui/more/` — MoreScreen(Hub 页：Profile 玻璃卡 + 统计格子 + 彩色图标块菜单 + 双色分组)、SettingsScreen、AboutScreen、SettingsStore
 - `ui/webview/` — WebViewScreen（内置 WebView）
 - `NewsDetailScreen.kt` — 新闻详情（中文翻译页 + 原文链接）
 

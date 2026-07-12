@@ -14,12 +14,12 @@ import androidx.compose.ui.text.font.FontFamily
 /**
  * App 主题入口。
  *
- * 默认 `dynamicColor = false` —— 优先保证 cyan 品牌色稳定。
+ * 默认 `dynamicColor = false` —— 优先保证 Future Blue + Intelligence Purple 品牌色稳定。
  * Android 12+ 用户可在调用处显式传 `dynamicColor = true` 启用壁纸派生色。
  * 始终跟随系统深/浅色设置。
  *
- * @param fontFamily 字体族覆盖。默认 null 沿用 [AppTypography] 的 SansSerif;
- *        传 Serif/Monospace 等可将全 App 文字统一切换。
+ * @param fontFamily 字体族覆盖。默认 null 沿用 [AppTypography] 的 Inter;
+ *        设置页"衬线/等宽"选项传 Serif/Monospace 将全 App 文字统一切换。
  */
 @Composable
 fun AIHotTheme(

@@ -5,102 +5,104 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
 
 /**
- * 配色方案 — 对齐 aihot.virxact.com 网站的视觉风格。
+ * 配色方案 — "Synthetic Intelligence News" 设计系统(参考 stitch_ai_news_hub)。
  *
- * 主色板提取自网站 CSS:
- *  - 强调色 accent: #22d3ee (cyan-400) — 网站主要 accent
- *  - 浅色背景: #fafbfc / #f8fafc
- *  - 深色背景: #060814 (近黑)
+ * 品牌由两色锚定:
+ *  - Future Blue (primary #003ec7):信任、权威、链接
+ *  - Intelligence Purple (secondary #6b38d4):AI、智能、洞察
  *
- * 经 Material Theme Builder 用 cyan 种子色生成完整 MD3 色调阶梯,
- * 严格遵循 tonal pairing(on-X 与对应容器色成对使用)。
+ * 蓝→紫渐变保留给 AI 特性(翻译、热点聚合等),不滥用。
+ * 调性:冷调淡蓝白背景 + 深炭文字,Modern Corporate 精度 + 大留白。
+ *
+ * Light 令牌直接取自设计系统 frontmatter;Dark 由 fixed-dim / fixed-variant
+ * 及 on-surface 系反推,保证深色下蓝紫主色依然可辨。
  */
 
-// ===== Light(网站浅色版,#fafbfc 背景 + cyan accent)=====
+// ===== Light(淡蓝白背景 #f9f9ff + Future Blue primary)=====
 
-val LightPrimary = Color(0xFF006A6B)
+val LightPrimary = Color(0xFF003EC7)
 val LightOnPrimary = Color(0xFFFFFFFF)
-val LightPrimaryContainer = Color(0xFF6FF7F8)
-val LightOnPrimaryContainer = Color(0xFF002020)
+val LightPrimaryContainer = Color(0xFF0052FF)
+val LightOnPrimaryContainer = Color(0xFFDFE3FF)
 
-val LightSecondary = Color(0xFF4A6367)        // slate 偏冷中性
+val LightSecondary = Color(0xFF6B38D4)            // Intelligence Purple — 独立副色,不再复用 primary
 val LightOnSecondary = Color(0xFFFFFFFF)
-val LightSecondaryContainer = Color(0xFFCDE8EC)
-val LightOnSecondaryContainer = Color(0xFF051F23)
+val LightSecondaryContainer = Color(0xFF8455EF)
+val LightOnSecondaryContainer = Color(0xFFFFFBFF)
 
-val LightTertiary = Color(0xFF006A6B)         // 与 primary 同源,用于"精选"等强调
+val LightTertiary = Color(0xFF952200)             // 暖色第三色,火焰分数/热度强调
 val LightOnTertiary = Color(0xFFFFFFFF)
-val LightTertiaryContainer = Color(0xFF6FF7F8)
-val LightOnTertiaryContainer = Color(0xFF002020)
+val LightTertiaryContainer = Color(0xFFBF3003)
+val LightOnTertiaryContainer = Color(0xFFFFDDD5)
 
 val LightError = Color(0xFFBA1A1A)
 val LightOnError = Color(0xFFFFFFFF)
 val LightErrorContainer = Color(0xFFFFDAD6)
-val LightOnErrorContainer = Color(0xFF410002)
+val LightOnErrorContainer = Color(0xFF93000A)
 
-val LightBackground = Color(0xFFFAFBFC)        // 对齐网站
-val LightOnBackground = Color(0xFF191C1D)
-val LightSurface = Color(0xFFFAFBFC)
-val LightOnSurface = Color(0xFF191C1D)
-val LightSurfaceVariant = Color(0xFFDAE4E5)
-val LightOnSurfaceVariant = Color(0xFF3F494A)
-val LightOutline = Color(0xFF6F797A)
-val LightOutlineVariant = Color(0xFFE5E7EB)         // 卡片描边(github light 边框色)
+val LightBackground = Color(0xFFF9F9FF)            // 淡蓝白,设计系统基准背景
+val LightOnBackground = Color(0xFF141B2B)
+val LightSurface = Color(0xFFF9F9FF)
+val LightOnSurface = Color(0xFF141B2B)
+val LightSurfaceVariant = Color(0xFFDCE2F7)
+val LightOnSurfaceVariant = Color(0xFF434656)
+val LightOutline = Color(0xFF737688)
+val LightOutlineVariant = Color(0xFFC3C5D9)        // 卡片描边
 
-val LightSurfaceDim = Color(0xFFD9DBDC)
-val LightSurfaceBright = Color(0xFFFAFBFC)
+val LightSurfaceDim = Color(0xFFD3DAEF)
+val LightSurfaceBright = Color(0xFFF9F9FF)
 val LightSurfaceContainerLowest = Color(0xFFFFFFFF)
-val LightSurfaceContainerLow = Color(0xFFFFFFFF)        // 卡片白底(靠描边分层)
-val LightSurfaceContainer = Color(0xFFF1F5F9)           // slate-100
-val LightSurfaceContainerHigh = Color(0xFFE8EDF1)
-val LightSurfaceContainerHighest = Color(0xFFDDE3E8)
+val LightSurfaceContainerLow = Color(0xFFF1F3FF)
+val LightSurfaceContainer = Color(0xFFE9EDFF)
+val LightSurfaceContainerHigh = Color(0xFFE1E8FD)
+val LightSurfaceContainerHighest = Color(0xFFDCE2F7)
 
-val LightInverseSurface = Color(0xFF2D3132)
-val LightInverseOnSurface = Color(0xFFEFF1F1)
-val LightInversePrimary = Color(0xFF4ADADA)
+val LightInverseSurface = Color(0xFF293040)
+val LightInverseOnSurface = Color(0xFFEDF0FF)
+val LightInversePrimary = Color(0xFFB7C4FF)
 
-// ===== Dark(网站深色版,#060814 背景 + cyan accent)=====
+// ===== Dark(深炭背景 + 蓝/紫主色变亮以保证对比)=====
 
-val DarkPrimary = Color(0xFF4ADADA)            // cyan accent 主色
-val DarkOnPrimary = Color(0xFF003738)
-val DarkPrimaryContainer = Color(0xFF004F50)
-val DarkOnPrimaryContainer = Color(0xFF6FF7F8)
+val DarkPrimary = Color(0xFFB7C4FF)                // primary-fixed-dim:深色下蓝主色
+val DarkOnPrimary = Color(0xFF002C9A)
+val DarkPrimaryContainer = Color(0xFF003EC7)
+val DarkOnPrimaryContainer = Color(0xFFDFE3FF)
 
-val DarkSecondary = Color(0xFFB1CCD0)
-val DarkOnSecondary = Color(0xFF1B3438)
-val DarkSecondaryContainer = Color(0xFF324B4E)
-val DarkOnSecondaryContainer = Color(0xFFCDE8EC)
+val DarkSecondary = Color(0xFFD0BCFF)              // secondary-fixed-dim:深色下紫主色
+val DarkOnSecondary = Color(0xFF3C1A8E)
+val DarkSecondaryContainer = Color(0xFF5516BE)
+val DarkOnSecondaryContainer = Color(0xFFE9DDFF)
 
-val DarkTertiary = Color(0xFF4ADADA)
-val DarkOnTertiary = Color(0xFF003738)
-val DarkTertiaryContainer = Color(0xFF004F50)
-val DarkOnTertiaryContainer = Color(0xFF6FF7F8)
+val DarkTertiary = Color(0xFFFFB4A1)               // tertiary-fixed-dim
+val DarkOnTertiary = Color(0xFF5D1800)
+val DarkTertiaryContainer = Color(0xFF891E00)
+val DarkOnTertiaryContainer = Color(0xFFFFDBD2)
 
 val DarkError = Color(0xFFFFB4AB)
 val DarkOnError = Color(0xFF690005)
 val DarkErrorContainer = Color(0xFF93000A)
 val DarkOnErrorContainer = Color(0xFFFFDAD6)
 
-val DarkBackground = Color(0xFF0E1117)         // 抬高亮度,避免 OLED 纯黑洞
-val DarkOnBackground = Color(0xFFE6EDF3)       // github 文字色,更亮
-val DarkSurface = Color(0xFF0E1117)
-val DarkOnSurface = Color(0xFFE6EDF3)
-val DarkSurfaceVariant = Color(0xFF3F494A)
-val DarkOnSurfaceVariant = Color(0xFFB1BAC4)   // 次级文字更易读
-val DarkOutline = Color(0xFF8B949E)
-val DarkOutlineVariant = Color(0xFF30363D)        // 卡片描边(github dark 边框色)
+val DarkBackground = Color(0xFF11132A)             // 深炭蓝,避免 OLED 纯黑
+val DarkOnBackground = Color(0xFFEDF0FF)
+val DarkSurface = Color(0xFF11132A)
+val DarkOnSurface = Color(0xFFEDF0FF)
+val DarkSurfaceVariant = Color(0xFF434656)
+val DarkOnSurfaceVariant = Color(0xFFC3C5D9)
+val DarkOutline = Color(0xFF8D92AB)
+val DarkOutlineVariant = Color(0xFF434656)         // 卡片描边
 
-val DarkSurfaceDim = Color(0xFF0E1117)
-val DarkSurfaceBright = Color(0xFF2C3031)
-val DarkSurfaceContainerLowest = Color(0xFF0E1117)
-val DarkSurfaceContainerLow = Color(0xFF161B22)    // 卡片层(与 bg 拉开亮度差)
-val DarkSurfaceContainer = Color(0xFF1C2128)
-val DarkSurfaceContainerHigh = Color(0xFF21262D)
-val DarkSurfaceContainerHighest = Color(0xFF2D333B)
+val DarkSurfaceDim = Color(0xFF11132A)
+val DarkSurfaceBright = Color(0xFF373A55)
+val DarkSurfaceContainerLowest = Color(0xFF0C0E22)
+val DarkSurfaceContainerLow = Color(0xFF191C36)
+val DarkSurfaceContainer = Color(0xFF1D2040)
+val DarkSurfaceContainerHigh = Color(0xFF282B4A)
+val DarkSurfaceContainerHighest = Color(0xFF33365A)
 
-val DarkInverseSurface = Color(0xFFE0E3E3)
-val DarkInverseOnSurface = Color(0xFF2D3132)
-val DarkInversePrimary = Color(0xFF006A6B)
+val DarkInverseSurface = Color(0xFFEDF0FF)
+val DarkInverseOnSurface = Color(0xFF293040)
+val DarkInversePrimary = Color(0xFF003EC7)
 
 val LightColors = lightColorScheme(
     primary = LightPrimary, onPrimary = LightOnPrimary,
@@ -130,7 +132,7 @@ val DarkColors = darkColorScheme(
     primaryContainer = DarkPrimaryContainer, onPrimaryContainer = DarkOnPrimaryContainer,
     secondary = DarkSecondary, onSecondary = DarkOnSecondary,
     secondaryContainer = DarkSecondaryContainer, onSecondaryContainer = DarkOnSecondaryContainer,
-    tertiary = DarkTertiary, onTertiary = DarkOnTertiary,
+    tertiary = DarkTertiary, onTertiary = DarkTertiary,
     tertiaryContainer = DarkTertiaryContainer, onTertiaryContainer = DarkOnTertiaryContainer,
     error = DarkError, onError = DarkOnError,
     errorContainer = DarkErrorContainer, onErrorContainer = DarkOnErrorContainer,

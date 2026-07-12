@@ -13,6 +13,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -20,6 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.aihot.R
 import com.example.aihot.data.Mode
@@ -49,6 +51,10 @@ fun FeaturedTab(
     val vm: ItemsViewModel = viewModel(key = "featured")
     // 进入精选 tab 时强制 mode=SELECTED(防止从其它 tab 切来时 mode 残留)
     LaunchedEffect(Unit) { vm.setMode(Mode.SELECTED) }
+
+    // 第一条作为 Hero 卡片(精选 tab 顶部强调展示)。仅取一条,空则不显示 hero。
+    val items by vm.items.collectAsStateWithLifecycle()
+    val heroItem = items.firstOrNull()
 
     // 实时日期「月日 · 周几」(中文区域格式)
     val dateText = remember {
@@ -90,6 +96,7 @@ fun FeaturedTab(
         ItemsScreen(
             onItemClick = onItemClick,
             vm = vm,
+            heroItem = heroItem,
             header = {
                 Column(modifier = Modifier.fillMaxWidth()) {
                     // 今日热点卡片

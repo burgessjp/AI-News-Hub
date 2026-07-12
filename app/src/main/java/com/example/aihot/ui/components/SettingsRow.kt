@@ -46,14 +46,20 @@ import androidx.compose.ui.unit.sp
 /**
  * 章节标题条 —— 与 [com.example.aihot.ui.DateGroupHeader] 同构。
  *
- * 视觉:surfaceContainerHigh 背景 + cyan 左竖条(4dp×16dp) + cyan 加粗文字。
+ * 视觉:surfaceContainerHigh 背景 + 左竖条(1.5dp×24dp,默认 primary)+ 加粗文字。
+ *
+ * @param accentColor 竖条与文字的强调色。默认 primary(浏览组);
+ *        Hub 页偏好组传 secondary(紫),与浏览组的蓝形成双色分组对照。
  */
 @Composable
 fun SettingsGroupHeader(
     text: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    accentColor: androidx.compose.ui.graphics.Color = androidx.compose.ui.graphics.Color.Unspecified
 ) {
     val cs = MaterialTheme.colorScheme
+    // 默认 unspecified → 用 primary;调用方可显式传 secondary 等。
+    val barColor = if (accentColor == androidx.compose.ui.graphics.Color.Unspecified) cs.primary else accentColor
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -61,17 +67,17 @@ fun SettingsGroupHeader(
             .padding(horizontal = 18.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // cyan 左竖条 —— 与正文/Daily 页一致。
+        // 左竖条 —— 章节强调锚点。
         Box(
             modifier = Modifier
                 .size(width = 4.dp, height = 16.dp)
-                .background(cs.primary)
+                .background(barColor)
         )
         Spacer(Modifier.width(10.dp))
         Text(
             text = text,
             style = MaterialTheme.typography.labelLarge,
-            color = cs.primary,
+            color = barColor,
             fontWeight = FontWeight.Bold,
             // 章节条专用字距:5 处 labelLarge 有 3 种字距(0.5/1.0/默认),此值不进 Type.kt 以免误伤
             letterSpacing = 0.5.sp

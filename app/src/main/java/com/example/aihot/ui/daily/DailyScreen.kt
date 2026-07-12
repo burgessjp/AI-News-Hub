@@ -45,6 +45,7 @@ import com.example.aihot.ui.UiState
 import com.example.aihot.ui.DailyViewModel
 import com.example.aihot.ui.components.AppTopBar
 import com.example.aihot.ui.components.AppTopBarDefaults
+import com.example.aihot.ui.components.BottomBarReservedHeight
 import com.example.aihot.ui.theme.AppText
 
 /**
@@ -91,7 +92,8 @@ fun DailyScreen(
 @Composable
 internal fun DailyContent(report: DailyReport, onOpen: (String) -> Unit) {
     LazyColumn(
-        contentPadding = PaddingValues(vertical = 4.dp),
+        // 底部预留浮动药丸底栏高度(DailyTab 是根 tab,底栏悬浮)
+        contentPadding = PaddingValues(top = 4.dp, bottom = BottomBarReservedHeight),
         modifier = Modifier.fillMaxSize()
     ) {
         // 顶部汇总:日期 + 头条 + 统计(扁平无卡片,与精选列表风格一致)

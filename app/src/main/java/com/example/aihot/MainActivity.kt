@@ -9,10 +9,12 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -21,7 +23,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.activity.compose.BackHandler
 import com.example.aihot.data.HackerNewsStory
 import com.example.aihot.data.NewsItem
@@ -242,22 +246,13 @@ fun AIHotApp() {
         darkTheme = darkTheme,
         fontFamily = if (fontChoice == FontChoice.System) null else fontChoice.fontFamily
     ) {
+        // 浮动药丸底栏架构:不再用 Scaffold bottomBar 槽,改用 Box 叠层。
+        //  - 内容区 edge-to-edge 全屏,内层各 Tab 的 Scaffold 负责自己的状态栏 inset;
+        //    这里只补 statusBarsPadding 防止 AnimatedContent 与系统栏重叠错位。
+        //  - 底栏作为 overlay 浮在内容上(BottomCenter + navigationBarsPadding + 16dp 距底),
+        //    由调用方在列表 contentPadding 留出空间避免末项被遮挡。
         Surface {
-            Scaffold(
-                bottomBar = {
-                    // 根页显示底栏;进入二级页时向下滑出,返回时滑入。
-                    // 二级页不显示底栏(沉浸感)。底栏隐藏/显示期间 Scaffold 的
-                    // contentWindowInsets padding 会随之变化,转场期间内容高度会随之拉伸/收缩,
-                    // 与页面位移叠加产生轻微抖动——这是已知取舍,优先保证沉浸感与无留白。
-                    AnimatedVisibility(
-                        visible = isRoot,
-                        enter = slideInVertically(initialOffsetY = { it }),
-                        exit = slideOutVertically(targetOffsetY = { it })
-                    ) {
-                        AppBottomBar(current = currentTab, onSelect = selectTab)
-                    }
-                }
-            ) { padding ->
+            Box(modifier = Modifier.fillMaxSize()) {
                 AnimatedContent(
                     targetState = screen,
                     transitionSpec = {
@@ -269,11 +264,9 @@ fun AIHotApp() {
                             back = isNavigatingBack
                         )
                     },
-                    contentAlignment = androidx.compose.ui.Alignment.TopCenter,
+                    contentAlignment = Alignment.TopCenter,
                     label = "nav",
-                    // 应用 Scaffold 的 padding(含底栏高度)。consumeWindowInsets 防止内层各 Tab 的
-                    // Scaffold 重复读取系统 inset(状态栏/手势条),导致空白叠加。
-                    modifier = Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)
+                    modifier = Modifier.fillMaxSize()
                 ) { s ->
                     when (s) {
                         is Screen.Root -> TabRoot(
@@ -302,6 +295,20 @@ fun AIHotApp() {
                             darkTheme = darkTheme
                         )
                     }
+                }
+
+                // 浮动药丸底栏:根页显示,进入二级页时向下滑出。
+                // 二级页不显示底栏(沉浸感)。
+                AnimatedVisibility(
+                    visible = isRoot,
+                    enter = slideInVertically(initialOffsetY = { it }),
+                    exit = slideOutVertically(targetOffsetY = { it }),
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
+                        .padding(bottom = 16.dp)
+                ) {
+                    AppBottomBar(current = currentTab, onSelect = selectTab)
                 }
             }
         }
@@ -342,7 +349,10 @@ private fun TabRoot(
             onItemClick = onItemClick,
             onOpenUrl = onOpenUrl
         )
-        AppTab.All -> AllTab(onItemClick = onItemClick)
+        AppTab.All -> AllTab(
+            onItemClick = onItemClick,
+            onOpenSearch = onOpenSearch
+        )
         AppTab.Daily -> DailyTab(
             onItemClick = onItemClick,
             onOpenArchive = onOpenArchive,
@@ -350,7 +360,6 @@ private fun TabRoot(
         )
         AppTab.More -> MoreScreen(
             onOpenArchive = onOpenArchive,
-            onOpenSearch = onOpenSearch,
             onOpenHackerNews = onOpenHackerNews,
             onOpenSettings = onOpenSettings,
             onOpenAbout = onOpenAbout
