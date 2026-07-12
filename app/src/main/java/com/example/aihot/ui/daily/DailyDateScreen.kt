@@ -23,6 +23,7 @@ import com.example.aihot.ui.LoadingState
 import com.example.aihot.ui.UiState
 import com.example.aihot.ui.DailyViewModel
 import com.example.aihot.ui.components.AppTopBar
+import com.example.aihot.ui.components.AppTopBarDefaults
 
 /** 指定日期的日报屏幕。 */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -44,6 +45,7 @@ fun DailyDateScreen(
         topBar = {
             AppTopBar(
                 title = "$date 日报",
+                titleFontSize = AppTopBarDefaults.secondaryTitleFontSize,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")

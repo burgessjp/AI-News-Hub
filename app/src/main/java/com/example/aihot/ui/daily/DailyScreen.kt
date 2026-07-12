@@ -44,6 +44,8 @@ import com.example.aihot.ui.ErrorState
 import com.example.aihot.ui.UiState
 import com.example.aihot.ui.DailyViewModel
 import com.example.aihot.ui.components.AppTopBar
+import com.example.aihot.ui.components.AppTopBarDefaults
+import com.example.aihot.ui.theme.AppText
 
 /**
  * 日报屏幕:展示最新日报,顶部入口进入归档。
@@ -65,6 +67,7 @@ fun DailyScreen(
         topBar = {
             AppTopBar(
                 title = "AI 日报",
+                titleFontSize = AppTopBarDefaults.secondaryTitleFontSize,
                 actions = {
                     Text(
                         text = "每早八时",
@@ -174,6 +177,7 @@ private fun DailySummaryHeader(report: DailyReport) {
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
                 color = accent,
+                // 日报日期标签专用大字距,非 labelLarge 通用属性,不进 Type.kt
                 letterSpacing = 1.sp
             )
             report.lead?.let { lead ->
@@ -193,8 +197,7 @@ private fun DailySummaryHeader(report: DailyReport) {
                         Text(
                             text = p,
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            lineHeight = 22.sp
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -353,10 +356,9 @@ private fun FlashTimelineRow(flash: Flash, onOpen: (String) -> Unit, isLast: Boo
         Column(modifier = Modifier.weight(1f).padding(bottom = 10.dp)) {
             Text(
                 text = flash.title,
-                style = MaterialTheme.typography.bodyMedium,
+                style = AppText.bodyCompact,
                 fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface,
-                lineHeight = 21.sp
+                color = MaterialTheme.colorScheme.onSurface
             )
             if (flash.sourceName.isNotBlank()) {
                 Spacer(Modifier.height(2.dp))
@@ -397,8 +399,7 @@ private fun DailyEntryRow(entry: DailyEntry, onOpen: (String) -> Unit) {
                 fontWeight = FontWeight.SemiBold,
                 color = cs.onSurface,
                 maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                lineHeight = 20.sp
+                overflow = TextOverflow.Ellipsis
             )
         }
         entry.summary?.let { sum ->
@@ -406,11 +407,10 @@ private fun DailyEntryRow(entry: DailyEntry, onOpen: (String) -> Unit) {
                 Spacer(Modifier.height(4.dp))
                 Text(
                     text = sum,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = AppText.bodySmall,
                     color = cs.onSurfaceVariant,
                     maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    lineHeight = 18.sp
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }

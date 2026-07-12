@@ -34,6 +34,7 @@ import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
+import com.example.aihot.ui.theme.AppText
 
 /**
  * 新闻列表行 —— 扁平无卡片风格(参考新设计)。
@@ -92,7 +93,6 @@ fun NewsCard(
                         color = cs.onSurface,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
-                        lineHeight = 20.sp,
                         modifier = Modifier.weight(1f)
                     )
                     if (item.score > 0) {
@@ -106,11 +106,10 @@ fun NewsCard(
                 Spacer(Modifier.height(4.dp))
                 Text(
                     text = item.summary,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = AppText.bodySmall,
                     color = cs.onSurfaceVariant,
                     maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    lineHeight = 18.sp
+                    overflow = TextOverflow.Ellipsis
                 )
             }
 
@@ -292,6 +291,7 @@ fun DateGroupHeader(dayKey: String, modifier: Modifier = Modifier) {
             style = MaterialTheme.typography.labelLarge,
             color = cs.primary,
             fontWeight = FontWeight.Bold,
+            // 章节条专用字距:5 处 labelLarge 有 3 种字距(0.5/1.0/默认),此值不进 Type.kt 以免误伤
             letterSpacing = 0.5.sp
         )
     }

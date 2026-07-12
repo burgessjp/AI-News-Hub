@@ -27,12 +27,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.aihot.data.HotTopic
 import com.example.aihot.ui.HotTopicsViewModel
 import com.example.aihot.ui.UiState
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.aihot.ui.theme.AppAlpha
 
 /**
  * 今日热点模块 —— 精选 tab 顶部的卡片式聚合模块。
@@ -102,7 +102,7 @@ private fun HotTopicsHeader(count: Int) {
                 Brush.linearGradient(
                     colors = listOf(
                         cs.primary,
-                        cs.primary.copy(alpha = 0.82f)
+                        cs.primary.copy(alpha = AppAlpha.primaryEmphasis)
                     )
                 )
             )
@@ -121,7 +121,7 @@ private fun HotTopicsHeader(count: Int) {
         Box(
             modifier = Modifier
                 .clip(RoundedCornerShape(50))
-                .background(cs.onPrimary.copy(alpha = 0.18f))
+                .background(cs.onPrimary.copy(alpha = AppAlpha.onPrimaryOverlay))
                 .padding(horizontal = 8.dp, vertical = 2.dp)
         ) {
             Text(
@@ -185,8 +185,7 @@ private fun HotTopicRow(
                 fontWeight = FontWeight.SemiBold,
                 color = cs.onSurface,
                 maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                lineHeight = 20.sp
+                overflow = TextOverflow.Ellipsis
             )
             // 来源 · 聚合数
             val meta = buildString {

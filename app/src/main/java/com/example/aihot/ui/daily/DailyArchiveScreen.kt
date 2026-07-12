@@ -30,7 +30,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.aihot.data.DailySummary
@@ -38,6 +37,7 @@ import com.example.aihot.ui.ErrorState
 import com.example.aihot.ui.UiState
 import com.example.aihot.ui.DailyViewModel
 import com.example.aihot.ui.components.AppTopBar
+import com.example.aihot.ui.components.AppTopBarDefaults
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
@@ -61,6 +61,7 @@ fun DailyArchiveScreen(
         topBar = {
             AppTopBar(
                 title = "历史日报",
+                titleFontSize = AppTopBarDefaults.secondaryTitleFontSize,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
@@ -128,8 +129,7 @@ private fun DailySummaryRow(summary: DailySummary, onClick: () -> Unit) {
                 fontWeight = FontWeight.SemiBold,
                 color = cs.onSurface,
                 maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                lineHeight = 20.sp
+                overflow = TextOverflow.Ellipsis
             )
         }
     }

@@ -36,9 +36,11 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.aihot.data.NewsItem
 import com.example.aihot.ui.components.AppTopBar
+import com.example.aihot.ui.components.AppTopBarDefaults
+import com.example.aihot.ui.theme.AppAlpha
+import com.example.aihot.ui.theme.AppText
 
 /**
  * 新闻详情屏幕。
@@ -64,6 +66,7 @@ fun NewsDetailScreen(
         topBar = {
             AppTopBar(
                 title = "详情",
+                titleFontSize = AppTopBarDefaults.secondaryTitleFontSize,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
@@ -85,11 +88,9 @@ fun NewsDetailScreen(
             if (item.title.isNotBlank()) {
                 Text(
                     text = item.title,
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontSize = 20.sp,
+                    style = AppText.titleSection,
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    lineHeight = 26.sp
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
 
@@ -103,8 +104,7 @@ fun NewsDetailScreen(
                 Text(
                     text = item.summary,
                     style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    lineHeight = 24.sp
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
 
@@ -207,7 +207,7 @@ private fun ScorePill(score: Int) {
         else -> cs.outline
     }
     Surface(
-        color = color.copy(alpha = 0.12f),
+        color = color.copy(alpha = AppAlpha.badgeOverlay),
         shape = MaterialTheme.shapes.small
     ) {
         Text(
@@ -246,9 +246,8 @@ private fun EnTitleBlock(text: String) {
             Spacer(Modifier.height(2.dp))
             Text(
                 text = text,
-                style = MaterialTheme.typography.bodyMedium,
-                color = cs.onSurfaceVariant,
-                lineHeight = 20.sp
+                style = AppText.bodyTight,
+                color = cs.onSurfaceVariant
             )
         }
     }

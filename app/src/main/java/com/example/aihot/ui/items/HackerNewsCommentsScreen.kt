@@ -54,7 +54,6 @@ import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.fromHtml
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.aihot.data.HackerNewsStory
@@ -66,10 +65,12 @@ import com.example.aihot.ui.Node
 import com.example.aihot.ui.TranslationState
 import com.example.aihot.ui.UiState
 import com.example.aihot.ui.components.AppTopBar
+import com.example.aihot.ui.components.AppTopBarDefaults
 import com.example.aihot.ui.components.NewsCardSkeletonList
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.example.aihot.ui.theme.AppText
 
 /**
  * HackerNews 评论页 —— 点击某条 story 后进入。
@@ -126,7 +127,7 @@ fun HackerNewsCommentsScreen(
         topBar = {
             AppTopBar(
                 title = "评论",
-                titleFontSize = 20.sp,
+                titleFontSize = AppTopBarDefaults.secondaryTitleFontSize,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
@@ -211,11 +212,9 @@ private fun StoryHeader(
         if (story.title.isNotBlank()) {
             Text(
                 text = story.title,
-                style = MaterialTheme.typography.headlineSmall,
-                fontSize = 20.sp,
+                style = AppText.titleSection,
                 fontWeight = FontWeight.SemiBold,
-                color = cs.onSurface,
-                lineHeight = 26.sp
+                color = cs.onSurface
             )
         }
         // meta:赞 · 评论数 · 相对时间(+ 翻译开关开时的「译」按钮内联在末尾)
@@ -388,9 +387,8 @@ private fun CommentRow(
                 }
                 Text(
                     text = annotated,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (node.comment.dead) cs.onSurfaceVariant else cs.onSurface,
-                    lineHeight = 21.sp
+                    style = AppText.bodyCompact,
+                    color = if (node.comment.dead) cs.onSurfaceVariant else cs.onSurface
                 )
                 // 译文(已翻译且未折叠时):纯文本追加在原文 HTML 下方,原文链接/格式完整保留
                 if (translateEnabled && flat.translationState is TranslationState.Success && !commentCollapsed) {

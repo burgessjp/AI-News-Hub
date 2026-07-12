@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.example.aihot.ui.theme.AppAlpha
 
 /**
  * 通用空状态 / 错误状态 / 加载状态 —— "精致低对比"美化版。
@@ -126,7 +127,7 @@ private fun StateIconBadge(icon: ImageVector) {
             modifier = Modifier
                 .size(72.dp)
                 .clip(CircleShape)
-                .background(cs.primary.copy(alpha = 0.10f))
+                .background(cs.primary.copy(alpha = AppAlpha.badgeOverlay))
         )
         Icon(
             imageVector = icon,

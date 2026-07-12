@@ -20,7 +20,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.example.aihot.ui.theme.AppText
 
 /**
  * 统一顶栏 —— 全 App 标题字号/字重/分隔线一致。
@@ -37,6 +37,21 @@ import androidx.compose.ui.unit.sp
  *        默认 4dp 沿用 MD3 TopAppBar 内置留白;需要与列表内容对齐时(如精选 tab
  *        下方卡片用 18dp 边距)传入对应值,使 Logo / 日期与卡片左右边对齐。
  */
+/**
+ * 顶栏标题字号标准值 —— 全 App 顶栏字号统一在此调整。
+ *
+ * - [titleFontSize]: 一级 tab 顶栏(精选 AIHot / 全部动态 / 更多 / 日报),对齐 [AppText.titleHero](24sp)
+ * - [secondaryTitleFontSize]: 二级页面顶栏(详情 / 设置 / 关于 / HackerNews 等),对齐 [AppText.titleSection](20sp)
+ *
+ * 设计意图:二级页标题不应与一级 tab 抢视觉权重。新增二级页时传
+ * `titleFontSize = AppTopBarDefaults.secondaryTitleFontSize`,无需手填魔法数字;
+ * 字号单一定义在 [AppText],改一处全局生效。
+ */
+object AppTopBarDefaults {
+    val titleFontSize: TextUnit = AppText.titleHero.fontSize
+    val secondaryTitleFontSize: TextUnit = AppText.titleSection.fontSize
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppTopBar(
@@ -44,7 +59,7 @@ fun AppTopBar(
     modifier: Modifier = Modifier,
     navigationIcon: @Composable (() -> Unit)? = null,
     applyTopInset: Boolean = true,
-    titleFontSize: TextUnit = TextUnit.Unspecified,
+    titleFontSize: TextUnit = AppTopBarDefaults.titleFontSize,
     horizontalPadding: Dp = 4.dp,
     actions: @Composable RowScope.() -> Unit = {}
 ) {

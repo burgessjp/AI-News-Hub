@@ -43,6 +43,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.aihot.data.TranslationConfig
 import com.example.aihot.data.TranslationConfigStore
 import com.example.aihot.ui.components.AppTopBar
+import com.example.aihot.ui.components.AppTopBarDefaults
 import com.example.aihot.ui.components.SegmentedOption
 import com.example.aihot.ui.components.SegmentedOptionRow
 import com.example.aihot.ui.components.SettingsGroupHeader
@@ -116,6 +117,7 @@ fun SettingsScreen(
         topBar = {
             AppTopBar(
                 title = "设置",
+                titleFontSize = AppTopBarDefaults.secondaryTitleFontSize,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")

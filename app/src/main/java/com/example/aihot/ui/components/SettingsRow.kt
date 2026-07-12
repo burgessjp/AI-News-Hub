@@ -73,6 +73,7 @@ fun SettingsGroupHeader(
             style = MaterialTheme.typography.labelLarge,
             color = cs.primary,
             fontWeight = FontWeight.Bold,
+            // 章节条专用字距:5 处 labelLarge 有 3 种字距(0.5/1.0/默认),此值不进 Type.kt 以免误伤
             letterSpacing = 0.5.sp
         )
     }

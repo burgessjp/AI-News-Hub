@@ -28,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.aihot.ui.components.AppCard
 import com.example.aihot.ui.components.AppTopBar
+import com.example.aihot.ui.components.AppTopBarDefaults
 import com.example.aihot.ui.components.SettingsGroupHeader
 import com.example.aihot.ui.components.SettingsRow
 
@@ -45,6 +46,7 @@ fun AboutScreen(onBack: () -> Unit) {
         topBar = {
             AppTopBar(
                 title = "关于",
+                titleFontSize = AppTopBarDefaults.secondaryTitleFontSize,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")

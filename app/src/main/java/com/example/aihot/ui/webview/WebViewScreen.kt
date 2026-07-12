@@ -55,6 +55,7 @@ import com.example.aihot.ui.anim.Motion
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
 import com.example.aihot.ui.components.AppTopBar
+import com.example.aihot.ui.components.AppTopBarDefaults
 
 /**
  * 内置 WebView 屏幕 — 不跳出 App。
@@ -117,7 +118,7 @@ fun WebViewScreen(
         topBar = {
             AppTopBar(
                 title = pageTitle.ifBlank { "加载中…" },
-                titleFontSize = 20.sp,
+                titleFontSize = AppTopBarDefaults.secondaryTitleFontSize,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
