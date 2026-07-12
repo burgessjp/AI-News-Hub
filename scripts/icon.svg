@@ -1,24 +1,24 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
-    <!-- 圆角方形背景：深 teal → 近黑，对角渐变 -->
+    <!-- 圆角方形背景：深蓝紫 → 近黑，对角渐变（对齐 App dark theme 背景） -->
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#103742"/>
-      <stop offset="0.55" stop-color="#0A1B22"/>
-      <stop offset="1" stop-color="#05080D"/>
+      <stop offset="0" stop-color="#1D2040"/>
+      <stop offset="0.55" stop-color="#11132A"/>
+      <stop offset="1" stop-color="#060818"/>
     </linearGradient>
 
-    <!-- 主弧：cyan 亮 → teal 深 -->
+    <!-- 主弧：Future Blue 亮 → Intelligence Purple 深（品牌双色渐变） -->
     <linearGradient id="arc" x1="0.2" y1="0" x2="0.8" y2="1">
-      <stop offset="0" stop-color="#CFFAFE"/>
-      <stop offset="0.45" stop-color="#22D3EE"/>
-      <stop offset="1" stop-color="#0891B2"/>
+      <stop offset="0" stop-color="#DDE1FF"/>
+      <stop offset="0.45" stop-color="#003EC7"/>
+      <stop offset="1" stop-color="#5516BE"/>
     </linearGradient>
 
-    <!-- 中心核：白 → cyan 径向 -->
+    <!-- 中心核：白 → 蓝 径向 -->
     <radialGradient id="dot" cx="0.4" cy="0.4" r="0.6">
       <stop offset="0" stop-color="#FFFFFF"/>
-      <stop offset="0.5" stop-color="#A5F3FC"/>
-      <stop offset="1" stop-color="#22D3EE"/>
+      <stop offset="0.5" stop-color="#B7C4FF"/>
+      <stop offset="1" stop-color="#003EC7"/>
     </radialGradient>
   </defs>
 
@@ -32,13 +32,13 @@
   -->
 
   <!-- 外层柔光晕 -->
-  <circle cx="256" cy="256" r="214" fill="#22D3EE" opacity="0.035"/>
-  <circle cx="256" cy="256" r="184" fill="#22D3EE" opacity="0.06"/>
-  <circle cx="256" cy="256" r="156" fill="#22D3EE" opacity="0.085"/>
+  <circle cx="256" cy="256" r="214" fill="#003EC7" opacity="0.035"/>
+  <circle cx="256" cy="256" r="184" fill="#003EC7" opacity="0.06"/>
+  <circle cx="256" cy="256" r="156" fill="#003EC7" opacity="0.085"/>
 
   <!-- 内层强辉光 (紧贴主弧) -->
-  <circle cx="256" cy="256" r="142" fill="#67E8F9" opacity="0.14"/>
-  <circle cx="256" cy="256" r="132" fill="#67E8F9" opacity="0.18"/>
+  <circle cx="256" cy="256" r="142" fill="#8AB0FF" opacity="0.14"/>
+  <circle cx="256" cy="256" r="132" fill="#8AB0FF" opacity="0.18"/>
 
   <!--
     主弧：开口圆环
@@ -65,13 +65,13 @@
        θ=-60°:  cos=0.5    sin=-0.866 → (317.0, 150.3)
        large-arc=0 sweep=1 -->
   <path d="M 141.3 214.3 A 122 122 0 0 1 317.0 150.3"
-        fill="none" stroke="#ECFEFF" stroke-width="7" stroke-linecap="round" opacity="0.9"/>
+        fill="none" stroke="#EDF0FF" stroke-width="7" stroke-linecap="round" opacity="0.9"/>
 
   <!-- 中心发光核 -->
   <circle cx="256" cy="256" r="52" fill="url(#dot)"/>
 
   <!-- 核心柔光晕 (白) -->
-  <circle cx="256" cy="256" r="70" fill="#A5F3FC" opacity="0.18"/>
+  <circle cx="256" cy="256" r="70" fill="#B7C4FF" opacity="0.18"/>
 
   <!-- 中心核高光点 (左上偏移，立体感) -->
   <circle cx="240" cy="240" r="15" fill="#FFFFFF" opacity="0.92"/>
