@@ -55,10 +55,15 @@ import com.example.aihot.ui.HackerNewsViewModel
 import com.example.aihot.ui.TranslationState
 import com.example.aihot.ui.UiState
 import com.example.aihot.ui.components.AppTopBar
+import com.example.aihot.ui.components.AppTopBarDefaults
 import com.example.aihot.ui.components.NewsCardSkeletonList
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.example.aihot.ui.theme.AppAlpha
+import com.example.aihot.ui.theme.AppText
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 
 /**
  * HackerNews 全屏页面(「更多」tab 二级页)。
@@ -76,6 +81,7 @@ import java.util.Locale
  * @param onOpenComments 点击 story 打开其评论树页面
  * @param onOpenSettings 配置未就绪时点「译」引导跳设置
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HackerNewsScreen(
     onBack: () -> Unit,
@@ -84,6 +90,8 @@ fun HackerNewsScreen(
     vm: HackerNewsViewModel = viewModel(key = "hackernews")
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
+    val lastRefreshAt by vm.lastRefreshAt.collectAsStateWithLifecycle()
+    val isRefreshing by vm.isRefreshing.collectAsStateWithLifecycle()
     val titleStates by vm.titleStates.collectAsStateWithLifecycle()
     val config by vm.configFlow.collectAsStateWithLifecycle(initialValue = TranslationConfig())
     val snackbarHostState = remember { SnackbarHostState() }
@@ -106,11 +114,23 @@ fun HackerNewsScreen(
         topBar = {
             AppTopBar(
                 title = "HackerNews",
+                titleFontSize = AppTopBarDefaults.secondaryTitleFontSize,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "返回"
+                        )
+                    }
+                },
+                actions = {
+                    // 右上角「上次刷新 N 分钟前」:与 4 小时缓存策略配套,
+                    // 让用户知道列表数据有多旧。尚未成功刷新过(lastRefreshAt=null)时不显示。
+                    lastRefreshAt?.let { ts ->
+                        Text(
+                            text = "上次刷新 ${formatRefreshAgo(ts)}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -122,20 +142,25 @@ fun HackerNewsScreen(
                 is UiState.Loading -> NewsCardSkeletonList(count = 8)
                 is UiState.Error -> ErrorState(
                     message = s.message,
-                    onRetry = { vm.refresh() }
+                    onRetry = { vm.forceRefresh() }
                 )
                 is UiState.Success -> {
                     val stories = s.data
                     if (stories.isEmpty()) {
                         EmptyState(title = "暂无内容")
                     } else {
-                        HackerNewsList(
-                            stories = stories,
-                            titleStates = titleStates,
-                            translateEnabled = config.enabled,
-                            onClick = onOpenComments,
-                            onTranslate = { vm.translateTitle(it) }
-                        )
+                        PullToRefreshBox(
+                            isRefreshing = isRefreshing,
+                            onRefresh = { vm.forceRefresh() },
+                        ) {
+                            HackerNewsList(
+                                stories = stories,
+                                titleStates = titleStates,
+                                translateEnabled = config.enabled,
+                                onClick = onOpenComments,
+                                onTranslate = { vm.translateTitle(it) }
+                            )
+                        }
                     }
                 }
             }
@@ -237,6 +262,7 @@ private fun HackerNewsRow(
                 buildAnnotatedString {
                     append(story.title.ifBlank { "(无标题)" })
                     append("  ")
+                    // 域名括注局部 SpanStyle:刻意比 titleSmall(14sp)小一档做弱化,局部样式不抽 token
                     withStyle(SpanStyle(color = cs.onSurfaceVariant, fontSize = 12.sp)) {
                         append("($host)")
                     }
@@ -250,7 +276,6 @@ private fun HackerNewsRow(
                     color = cs.onSurface,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
-                    lineHeight = 20.sp,
                     modifier = Modifier.weight(1f)
                 )
                 // 「译」按钮内联在标题行末(域名后),翻译开关开时显示
@@ -349,7 +374,7 @@ internal fun InlineTranslateButton(
         Text(
             text = text,
             style = MaterialTheme.typography.labelSmall,
-            color = if (enabled) cs.primary.copy(alpha = 0.85f) else cs.onSurfaceVariant
+            color = if (enabled) cs.primary.copy(alpha = AppAlpha.primaryEmphasis) else cs.onSurfaceVariant
         )
     }
 }
@@ -360,9 +385,8 @@ internal fun TranslatedText(translated: String, modifier: Modifier = Modifier) {
     val cs = MaterialTheme.colorScheme
     Text(
         text = translated,
-        style = MaterialTheme.typography.bodySmall,
+        style = AppText.bodySmall,
         color = cs.onSurfaceVariant,
-        lineHeight = 18.sp,
         modifier = modifier.fillMaxWidth()
     )
 }
@@ -391,5 +415,25 @@ private fun formatRelativeTime(unixSeconds: Long): String {
         minutes < 60 * 24 -> "${minutes / 60} 小时前"
         minutes < 60 * 24 * 30 -> "${minutes / (60 * 24)} 天前"
         else -> SimpleDateFormat("yyyy-MM-dd", Locale.CHINA).format(Date(unixSeconds * 1000L))
+    }
+}
+
+/**
+ * 把「上次刷新时刻」(毫秒)转成相对时间,供顶栏显示。
+ *
+ * 与 [formatRelativeTime] 同源,但入参是 System.currentTimeMillis() 级毫秒
+ * (来自缓存 fetchedAt)。缓存 TTL 4 小时内通常显示「刚刚/N 分钟前」;
+ * 出现「N 小时前」意味着网络长期失败、靠过期缓存兜底,恰好提示用户数据已旧。
+ * 超过 7 天直接显示日期,避免「30 天前」这种无意义长串。
+ */
+private fun formatRefreshAgo(fetchedAtMillis: Long): String {
+    val diff = System.currentTimeMillis() - fetchedAtMillis
+    val minutes = diff / 60_000L
+    return when {
+        minutes < 1 -> "刚刚"
+        minutes < 60 -> "${minutes} 分钟前"
+        minutes < 60 * 24 -> "${minutes / 60} 小时前"
+        minutes < 60 * 24 * 7 -> "${minutes / (60 * 24)} 天前"
+        else -> SimpleDateFormat("MM-dd HH:mm", Locale.CHINA).format(Date(fetchedAtMillis))
     }
 }

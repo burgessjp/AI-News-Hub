@@ -67,6 +67,24 @@ data class HackerNewsStory(
 }
 
 /**
+ * HackerNews Top Stories 拉取结果(带数据新鲜度)。
+ *
+ * [fetchedAt] 是这批 stories 实际从网络落盘的时刻(System.currentTimeMillis()):
+ *  - 命中缓存秒回 → 是缓存写入时刻(可能已过去若干分钟,正是「上次刷新时间」)
+ *  - 走网络刷新 → 是刚才
+ *
+ * UI 据此在顶栏显示「上次刷新 N 分钟前」,与 30 分钟缓存策略语义一致:
+ * 用户关心的是「这份数据有多旧」,而非「ViewModel 何刻拿到数据」。
+ *
+ * @param fetchedAt 数据落盘时刻(缓存写入或刚抓取)
+ * @param stories   story 列表(已排序,按下标即排名)
+ */
+data class HackerNewsTopStories(
+    val fetchedAt: Long,
+    val stories: List<HackerNewsStory>
+)
+
+/**
  * HackerNews Top Stories 列表缓存条目。
  *
  * 持久化为 cacheDir 下的 JSON 文件,带写入时刻 [fetchedAt],用于计算是否过期。

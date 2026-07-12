@@ -27,7 +27,7 @@ import java.util.concurrent.TimeUnit
  *  - item 详情并发拉取,任一条失败则整体回退到错误态(由 ViewModel 处理)
  *
  * 缓存:[cacheDir] 非空时启用 Top Stories 文件缓存(见 [CACHE_TTL_MS]),
- * 半小时内直接读缓存不打网络。网络失败时回退过期缓存兜底。
+ * 4 小时内直接读缓存不打网络。网络失败时回退过期缓存兜底。
  *
  * @param cacheDir 缓存根目录,通常传 application.cacheDir;传 null 关闭缓存
  */
@@ -50,35 +50,42 @@ class HackerNewsRepository(
      * HackerNews Top N(默认 10),带文件缓存。
      *
      * 缓存策略(仅在 [cacheDir] 非空时生效):
-     *  1. 缓存存在且未过 30 分钟 → 直接返回(不打网络)
+     *  1. 缓存存在且未过 4 小时 → 直接返回(不打网络)
      *  2. 否则走网络;成功则更新缓存后返回
      *  3. 网络失败但有缓存(无论是否过期)→ 回退缓存兜底,避免空报错
      *  4. 网络失败且无缓存 → 抛出原异常,交由 UI 显示错误态
      *
      * [refreshMutex] 保证并发调用只触发一次真实网络请求,其余等待复用结果。
      *
+     * 返回值带 [HackerNewsTopStories.fetchedAt]:命中缓存时是缓存写入时刻
+     * (即「上次刷新时间」),走网络时是当前时刻。UI 据此显示数据新鲜度。
+     *
      * @param limit 取前 N 条(1-100,默认 10)
      */
-    suspend fun fetchTopStories(limit: Int = 10): List<HackerNewsStory> {
-        // 无缓存目录:退化为原始直连网络行为。
-        if (cacheDir == null) return fetchTopStoriesFromNetwork(limit)
+    suspend fun fetchTopStories(limit: Int = 10): HackerNewsTopStories {
+        // 无缓存目录:退化为原始直连网络行为,fetchedAt 取当前时刻。
+        if (cacheDir == null) {
+            return HackerNewsTopStories(System.currentTimeMillis(), fetchTopStoriesFromNetwork(limit))
+        }
 
         return refreshMutex.withLock {
             val cached = readCache()
-            // 1) 命中新缓存:秒回,不打网络。
+            // 1) 命中新缓存:秒回,不打网络。fetchedAt 用缓存写入时刻。
             if (cached != null && !isStale(cached)) {
-                return@withLock cached.stories
+                return@withLock HackerNewsTopStories(cached.fetchedAt, cached.stories)
             }
             // 2) 走网络刷新(仅一次)。
             val result = runCatching { fetchTopStoriesFromNetwork(limit) }
             if (result.isSuccess) {
                 val fresh = result.getOrThrow()
-                writeCache(HackerNewsStoriesCache(System.currentTimeMillis(), fresh))
-                return@withLock fresh
+                val now = System.currentTimeMillis()
+                writeCache(HackerNewsStoriesCache(now, fresh))
+                return@withLock HackerNewsTopStories(now, fresh)
             }
-            // 3) 网络失败:有过期缓存就兜底,优先保可用。
+            // 3) 网络失败:有过期缓存就兜底,优先保可用。fetchedAt 仍用缓存时刻,
+            //    让用户知道「这份数据其实已经过期 N 分钟」。
             if (cached != null && cached.stories.isNotEmpty()) {
-                return@withLock cached.stories
+                return@withLock HackerNewsTopStories(cached.fetchedAt, cached.stories)
             }
             // 4) 既没缓存又没网络:把原始失败抛出去,让 UI 显示重试。
             throw result.exceptionOrNull() ?: RuntimeException("未知错误")
@@ -87,14 +94,15 @@ class HackerNewsRepository(
 
     /**
      * 强制忽略缓存重新拉取(下拉刷新等场景)。
-     * 拉取成功后仍会刷新缓存,使后续命中。
+     * 拉取成功后仍会刷新缓存,使后续命中。fetchedAt 取当前时刻。
      */
-    suspend fun forceRefresh(limit: Int = 10): List<HackerNewsStory> {
+    suspend fun forceRefresh(limit: Int = 10): HackerNewsTopStories {
         val fresh = fetchTopStoriesFromNetwork(limit)
+        val now = System.currentTimeMillis()
         if (cacheDir != null) {
-            writeCache(HackerNewsStoriesCache(System.currentTimeMillis(), fresh))
+            writeCache(HackerNewsStoriesCache(now, fresh))
         }
-        return fresh
+        return HackerNewsTopStories(now, fresh)
     }
 
     private suspend fun fetchTopStoriesFromNetwork(limit: Int): List<HackerNewsStory> = withContext(Dispatchers.IO) {
@@ -164,8 +172,8 @@ class HackerNewsRepository(
         /** 每个节点最多展开的子评论数(按 HN 排名截断)。 */
         private const val MAX_CHILDREN_PER_NODE = 15
 
-        /** Top Stories 缓存有效期:30 分钟。 */
-        const val CACHE_TTL_MS = 30L * 60 * 1000
+        /** Top Stories 缓存有效期:4 小时。 */
+        const val CACHE_TTL_MS = 4L * 60 * 60 * 1000
 
         /** 缓存文件名(放在 [cacheDir] 下)。 */
         private const val CACHE_FILE = "hackernews_topstories.json"

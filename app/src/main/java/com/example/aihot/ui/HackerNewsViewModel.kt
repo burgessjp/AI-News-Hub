@@ -21,7 +21,7 @@ import kotlinx.coroutines.launch
  * 不阻塞下方主列表的加载与展示。
  *
  * 继承 [AndroidViewModel] 以拿到 application.cacheDir 注入 [HackerNewsRepository],
- * 启用 30 分钟文件缓存:进入页面命中缓存秒回,不打网络。
+ * 启用 4 小时文件缓存:进入页面命中缓存秒回,不打网络。
  */
 class HackerNewsViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -31,6 +31,23 @@ class HackerNewsViewModel(application: Application) : AndroidViewModel(applicati
 
     private val _state = MutableStateFlow<UiState<List<HackerNewsStory>>>(UiState.Loading)
     val state: StateFlow<UiState<List<HackerNewsStory>>> = _state.asStateFlow()
+
+    /**
+     * 上次成功拿到数据时的「数据落盘时刻」(缓存写入或刚抓取)。
+     *
+     * 命中缓存秒回时也会更新为缓存写入时刻 —— 这正是「上次刷新时间」的语义:
+     * 让用户知道这份数据有多旧,而非 ViewModel 何刻拿到。null 表示尚未成功过。
+     */
+    private val _lastRefreshAt = MutableStateFlow<Long?>(null)
+    val lastRefreshAt: StateFlow<Long?> = _lastRefreshAt.asStateFlow()
+
+    /**
+     * 手动刷新进行中(顶栏刷新按钮转圈 + 防重复点击)。
+     *
+     * 仅 [forceRefresh] 置 true;[refresh](走缓存)不触发,避免进入页面就转圈。
+     */
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
     /** 翻译配置流(UI 订阅以决定是否显示「译」按钮)。 */
     val configFlow = configStore.configFlow
@@ -46,12 +63,43 @@ class HackerNewsViewModel(application: Application) : AndroidViewModel(applicati
     fun refresh() {
         viewModelScope.launch {
             runCatching { repo.fetchTopStories(limit = 20) }
-                .onSuccess { list ->
+                .onSuccess { result ->
                     // 空结果视为「无内容」而非错误:模块整体隐藏。
                     _state.value =
-                        if (list.isEmpty()) UiState.Error("无内容") else UiState.Success(list)
+                        if (result.stories.isEmpty()) UiState.Error("无内容") else UiState.Success(result.stories)
+                    // 记录数据落盘时刻(缓存命中也会更新),供顶栏显示「上次刷新」。
+                    _lastRefreshAt.value = result.fetchedAt
                 }
                 .onFailure { _state.value = UiState.Error(it.message ?: "未知错误") }
+        }
+    }
+
+    /**
+     * 强制刷新:忽略缓存真打网络(用户点顶栏刷新按钮)。
+     *
+     * 与 [refresh] 的区别:[refresh] 命中缓存秒回不打网络,适合进入页面;
+     * 本方法一定走网络,拉取成功后刷新缓存使后续命中。
+     *
+     * 失败处理:若当前已有数据(Success),保留旧数据不切 Error,用户至少能看旧列表;
+     * 若当前无数据,则与 [refresh] 一样设 Error 态。刷新中([isRefreshing]为 true)忽略重复点击。
+     */
+    fun forceRefresh() {
+        if (_isRefreshing.value) return
+        _isRefreshing.value = true
+        viewModelScope.launch {
+            runCatching { repo.forceRefresh(limit = 20) }
+                .onSuccess { result ->
+                    _state.value =
+                        if (result.stories.isEmpty()) UiState.Error("无内容") else UiState.Success(result.stories)
+                    _lastRefreshAt.value = result.fetchedAt
+                }
+                .onFailure {
+                    // 有旧数据就保留(保可用),无数据才显示错误。
+                    if (_state.value !is UiState.Success) {
+                        _state.value = UiState.Error(it.message ?: "未知错误")
+                    }
+                }
+            _isRefreshing.value = false
         }
     }
 
