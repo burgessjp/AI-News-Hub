@@ -23,6 +23,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -55,10 +56,12 @@ import com.example.aihot.data.NewsItem
 import com.example.aihot.ui.DateGroupHeader
 import com.example.aihot.ui.EmptyState
 import com.example.aihot.ui.ErrorState
+import com.example.aihot.ui.FeaturedHeroCard
 import com.example.aihot.ui.ItemsViewModel
 import com.example.aihot.ui.NewsCard
 import com.example.aihot.ui.UiState
 import com.example.aihot.ui.dayKeyOf
+import com.example.aihot.ui.components.BottomBarReservedHeight
 import com.example.aihot.ui.components.NewsCardSkeletonList
 import kotlinx.coroutines.launch
 
@@ -89,7 +92,8 @@ fun ItemsScreen(
     onItemClick: (NewsItem) -> Unit,
     modifier: Modifier = Modifier,
     vm: ItemsViewModel = viewModel(),
-    header: (@Composable () -> Unit)? = null
+    header: (@Composable () -> Unit)? = null,
+    heroItem: NewsItem? = null
 ) {
     val filter by vm.filter.collectAsStateWithLifecycle()
     val state by vm.state.collectAsStateWithLifecycle()
@@ -152,25 +156,48 @@ fun ItemsScreen(
                                 subtitle = if (filter.isSearching) "试试换个关键词" else null
                             )
                         } else {
+                            // Hero 卡片:精选 tab 顶部用 FeaturedHeroCard 强调第一条。
+                            // 仅在非搜索态且有 hero 时启用;hero 从分组数据中剔除避免重复。
+                            val showHero = !filter.isSearching && heroItem != null
                             // 按天分组(本地时区),保持原列表顺序。
                             // 仅当未在搜索状态时分组 —— 搜索结果跨天聚合意义不大,且更紧凑。
-                            val grouped = remember(data, filter.isSearching) {
-                                if (filter.isSearching) {
-                                    listOf(GroupedDay("", data))
+                            val grouped = remember(data, filter.isSearching, showHero, heroItem) {
+                                val heroId = heroItem?.id
+                                val effective = if (showHero && heroId != null) {
+                                    data.filter { it.id != heroId }
                                 } else {
-                                    data.groupBy { dayKeyOf(it.publishedAt) }
+                                    data
+                                }
+                                if (filter.isSearching) {
+                                    listOf(GroupedDay("", effective))
+                                } else {
+                                    effective.groupBy { dayKeyOf(it.publishedAt) }
                                         .map { (k, items) -> GroupedDay(k, items) }
                                 }
                             }
                             LazyColumn(
                                 state = listState,
-                                contentPadding = PaddingValues(vertical = 4.dp),
+                                // 底部预留浮动药丸底栏的高度,避免末项被遮挡;
+                                // 顶部留 4dp 与顶栏发丝线拉开间距。
+                                contentPadding = PaddingValues(top = 4.dp, bottom = BottomBarReservedHeight),
                                 modifier = Modifier.fillMaxSize()
                             ) {
                                 // 顶部装饰区(如「今日热点」卡片 + 区块标题)。仅非搜索时
                                 // 显示 —— 搜索态应聚焦结果,不宜插入热点等装饰模块。
                                 if (header != null && !filter.isSearching) {
                                     item(key = "screen-header") { header() }
+                                }
+                                // Hero 卡片 —— 紧贴顶部装饰区下方,在分类 chips 之前
+                                // showHero 已保证 heroItem 非空(!isSearching && heroItem != null),
+                                // 此处用 !! 取值;若未来 showHero 定义变更需同步调整。
+                                if (showHero) {
+                                    item(key = "hero-card") {
+                                        FeaturedHeroCard(
+                                            item = heroItem!!,
+                                            onClick = { onItemClick(heroItem) },
+                                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp)
+                                        )
+                                    }
                                 }
                                 // 分类 chips(搜索态隐藏)。随列表滚动,不再钉在顶部。
                                 if (!filter.isSearching) {
@@ -237,7 +264,12 @@ fun ItemsScreen(
                 },
                 containerColor = MaterialTheme.colorScheme.primaryContainer,
                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.padding(18.dp)
+                // 底部留白避开浮动药丸底栏(BottomBarReservedHeight 含药丸高度 +
+                // 距底 margin + 手势栏 inset);左右 18dp 维持与列表内容对齐。
+                modifier = Modifier.padding(
+                    end = 18.dp,
+                    bottom = BottomBarReservedHeight
+                )
             ) {
                 Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "返回顶部")
             }
@@ -305,15 +337,16 @@ private fun CategoryChips(
                 selected = selected == null,
                 onClick = { onSelect(null) },
                 label = { Text("全部") },
-                shape = MaterialTheme.shapes.small,
+                // 完全圆角(药丸),对齐设计系统的 pill 形标签
+                shape = RoundedCornerShape(50),
                 border = androidx.compose.foundation.BorderStroke(
                     1.dp,
                     if (selected == null) androidx.compose.ui.graphics.Color.Transparent
                     else MaterialTheme.colorScheme.outlineVariant
                 ),
                 colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    selectedContainerColor = MaterialTheme.colorScheme.primary,
+                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
                     containerColor = MaterialTheme.colorScheme.surface
                 )
             )
@@ -322,15 +355,15 @@ private fun CategoryChips(
                     selected = selected == cat,
                     onClick = { onSelect(cat) },
                     label = { Text(cat.zh) },
-                    shape = MaterialTheme.shapes.small,
+                    shape = RoundedCornerShape(50),
                     border = androidx.compose.foundation.BorderStroke(
                         1.dp,
                         if (selected == cat) androidx.compose.ui.graphics.Color.Transparent
                         else MaterialTheme.colorScheme.outlineVariant
                     ),
                     colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
                         containerColor = MaterialTheme.colorScheme.surface
                     )
                 )

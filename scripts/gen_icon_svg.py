@@ -3,8 +3,9 @@
 AIHot launcher icon generator (SVG-based, hand-crafted design).
 
 Design: "光环 + 核" (open energy ring + glowing core)
-  - 圆角方形深色 teal→近黑 背景
-  - cyan 渐变开口能量环 (右下留开口，破除靶心感)
+  - 圆角方形深蓝紫→近黑 背景（对齐 App dark theme）
+  - 品牌双色渐变开口能量环：Future Blue #003EC7 → Intelligence Purple #5516BE
+    （右下留开口，破除靶心感）
   - 中心发光核 + 高光点
 
 Source of truth: scripts/icon.svg  (hand-authored)
@@ -66,9 +67,9 @@ def make_background_layer(size):
     svg_bg = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#103742"/>
-      <stop offset="0.55" stop-color="#0A1B22"/>
-      <stop offset="1" stop-color="#05080D"/>
+      <stop offset="0" stop-color="#1D2040"/>
+      <stop offset="0.55" stop-color="#11132A"/>
+      <stop offset="1" stop-color="#060818"/>
     </linearGradient>
   </defs>
   <rect x="0" y="0" width="512" height="512" fill="url(#bg)"/>
@@ -106,26 +107,26 @@ def _make_fg_transparent(size):
     svg_fg = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
     <linearGradient id="arc" x1="0.2" y1="0" x2="0.8" y2="1">
-      <stop offset="0" stop-color="#CFFAFE"/>
-      <stop offset="0.45" stop-color="#22D3EE"/>
-      <stop offset="1" stop-color="#0891B2"/>
+      <stop offset="0" stop-color="#DDE1FF"/>
+      <stop offset="0.45" stop-color="#003EC7"/>
+      <stop offset="1" stop-color="#5516BE"/>
     </linearGradient>
     <radialGradient id="dot" cx="0.4" cy="0.4" r="0.6">
       <stop offset="0" stop-color="#FFFFFF"/>
-      <stop offset="0.5" stop-color="#A5F3FC"/>
-      <stop offset="1" stop-color="#22D3EE"/>
+      <stop offset="0.5" stop-color="#B7C4FF"/>
+      <stop offset="1" stop-color="#003EC7"/>
     </radialGradient>
   </defs>
-  <circle cx="256" cy="256" r="214" fill="#22D3EE" opacity="0.035"/>
-  <circle cx="256" cy="256" r="184" fill="#22D3EE" opacity="0.06"/>
-  <circle cx="256" cy="256" r="156" fill="#22D3EE" opacity="0.085"/>
-  <circle cx="256" cy="256" r="142" fill="#67E8F9" opacity="0.14"/>
-  <circle cx="256" cy="256" r="132" fill="#67E8F9" opacity="0.18"/>
+  <circle cx="256" cy="256" r="214" fill="#003EC7" opacity="0.035"/>
+  <circle cx="256" cy="256" r="184" fill="#003EC7" opacity="0.06"/>
+  <circle cx="256" cy="256" r="156" fill="#003EC7" opacity="0.085"/>
+  <circle cx="256" cy="256" r="142" fill="#8AB0FF" opacity="0.14"/>
+  <circle cx="256" cy="256" r="132" fill="#8AB0FF" opacity="0.18"/>
   <path d="M 214.3 141.3 A 122 122 0 1 1 177.5 349.5"
         fill="none" stroke="url(#arc)" stroke-width="22" stroke-linecap="round"/>
   <path d="M 141.3 214.3 A 122 122 0 0 1 317.0 150.3"
-        fill="none" stroke="#ECFEFF" stroke-width="7" stroke-linecap="round" opacity="0.9"/>
-  <circle cx="256" cy="256" r="70" fill="#A5F3FC" opacity="0.18"/>
+        fill="none" stroke="#EDF0FF" stroke-width="7" stroke-linecap="round" opacity="0.9"/>
+  <circle cx="256" cy="256" r="70" fill="#B7C4FF" opacity="0.18"/>
   <circle cx="256" cy="256" r="52" fill="url(#dot)"/>
   <circle cx="240" cy="240" r="15" fill="#FFFFFF" opacity="0.92"/>
 </svg>"""

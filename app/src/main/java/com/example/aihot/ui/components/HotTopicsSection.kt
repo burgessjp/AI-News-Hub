@@ -99,11 +99,10 @@ private fun HotTopicsHeader(count: Int) {
         modifier = Modifier
             .fillMaxWidth()
             .background(
+                // 蓝→紫渐变:Future Blue → Intelligence Purple。
+                // 设计系统原则:渐变保留给 AI 特性(热点聚合是 AI 编辑产出),不滥用。
                 Brush.linearGradient(
-                    colors = listOf(
-                        cs.primary,
-                        cs.primary.copy(alpha = AppAlpha.primaryEmphasis)
-                    )
+                    colors = listOf(cs.primary, cs.secondary)
                 )
             )
             .padding(horizontal = 16.dp, vertical = 12.dp),

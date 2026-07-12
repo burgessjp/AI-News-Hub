@@ -1,6 +1,10 @@
 package com.example.aihot.ui.more
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -10,99 +14,98 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Whatshot
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.aihot.ui.components.AppCard
 import com.example.aihot.ui.components.AppTopBar
+import com.example.aihot.ui.components.BottomBarReservedHeight
 import com.example.aihot.ui.components.SettingsGroupHeader
-import com.example.aihot.ui.components.SettingsRow
+import com.example.aihot.ui.theme.AppText
 
 /**
- * 更多 tab —— 聚合次要入口。
+ * 更多/Hub tab —— 聚合次要入口,对齐 "Synthetic Intelligence News" 设计系统的
+ * user_hub_profile 原型。
  *
- * 视觉与主列表页(Featured/All/Daily)同构:弃用逐行浮动卡片,改为
- * 「品牌头卡片 + 分组章节条 + 扁平行 + hairline 发丝分隔线」。
+ * 结构(自顶向下,简洁直入):
+ *  - 浏览组(primary 强调):历史日报 / HackerNews —— 彩色图标块行
+ *  - 偏好组(secondary 强调):设置 / 关于 —— 彩色图标块行
  *
- * 分组:
- *  - 浏览:历史日报 / HackerNews / 搜索
- *  - 偏好:设置 / 关于
+ * 搜索入口已移至「全部」tab 顶栏(全部动态是搜索主场景,放顶栏更触手可及)。
  */
 @Composable
 fun MoreScreen(
     onOpenArchive: () -> Unit,
     onOpenHackerNews: () -> Unit,
-    onOpenSearch: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenAbout: () -> Unit
 ) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
-        topBar = { AppTopBar(title = "更多") }
+        topBar = { AppTopBar(title = "Hub") }
     ) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxWidth().padding(padding),
-            // 顶/底留白,横向沿用全 App 统一的 18dp。章节条自身满宽,靠左右负边距无关。
-            contentPadding = PaddingValues(bottom = 24.dp)
+            // 底部预留浮动药丸底栏高度(MoreTab 是根 tab,底栏悬浮)
+            contentPadding = PaddingValues(bottom = BottomBarReservedHeight)
         ) {
-            // 品牌头 —— 全页唯一保留卡片,赋予页面身份。
-            item { BrandHeader() }
-
+            // 浏览组
             item { SettingsGroupHeader("浏览") }
             item {
-                SettingsRow(
+                IconTileRow(
                     icon = Icons.AutoMirrored.Filled.MenuBook,
+                    iconColor = IconAccent.Primary,
                     title = "历史日报",
                     subtitle = "查看往期 AI 日报",
                     onClick = onOpenArchive
                 )
             }
             item {
-                SettingsRow(
+                IconTileRow(
                     icon = Icons.Filled.Whatshot,
+                    iconColor = IconAccent.Secondary,
                     title = "HackerNews",
                     subtitle = "HackerNews 热门榜单",
+                    // 搜索入口已移至「全部」tab 顶栏,本组末行不再画发丝线,
+                    // 与下方「偏好」组章节条之间留出干净间隔。
+                    showDivider = false,
                     onClick = onOpenHackerNews
                 )
             }
-            item {
-                SettingsRow(
-                    icon = Icons.Filled.Search,
-                    title = "搜索",
-                    subtitle = "按关键词查找 AI 动态",
-                    showDivider = false, // 组内最后一行,组间靠下一条章节条自然分隔
-                    onClick = onOpenSearch
-                )
-            }
 
-            item { SettingsGroupHeader("偏好") }
+            // 偏好组(secondary 强调)—— 图标块用浅灰底 + 中性图标,
+            // 与浏览组的彩色图标块拉开层次:内容入口彩色、设置项低调
+            item { SettingsGroupHeader("偏好", accentColor = MaterialTheme.colorScheme.secondary) }
             item {
-                SettingsRow(
+                IconTileRow(
                     icon = Icons.Filled.Settings,
+                    iconColor = IconAccent.Neutral,
                     title = "设置",
                     subtitle = "主题、显示偏好",
                     onClick = onOpenSettings
                 )
             }
             item {
-                SettingsRow(
+                IconTileRow(
                     icon = Icons.Filled.Info,
+                    iconColor = IconAccent.Neutral,
                     title = "关于",
                     subtitle = "版本、数据源、开源依赖",
                     showDivider = false,
@@ -113,49 +116,94 @@ fun MoreScreen(
     }
 }
 
+/** 图标块强调色档位 —— 决定 IconTileRow 的图标底色与着色。
+ *  - Primary / Secondary:浏览组的内容入口,用品牌色强调
+ *  - Neutral:偏好组的设置/关于,用浅灰底 + 中性图标,与浏览组拉开层次
+ */
+private enum class IconAccent { Primary, Secondary, Neutral }
+
 /**
- * 品牌头卡片 —— cyan 圆形 logo + 名称 + slogan。
+ * 彩色图标块菜单行 —— 对齐 user_hub_profile 原型的 Browse/Preferences 项。
  *
- * 全页唯一保留的 [AppCard],作为视觉锚点;其余入口走扁平行。
+ * 视觉:
+ *  - 左侧 48dp 圆角块(rounded-xl),底色 = 强调色 10% alpha,图标 = 强调色
+ *  - 标题(titleMedium/SemiBold)+ 副标题(caption/onSurfaceVariant)
+ *  - 右侧 chevron
+ *  - 行间 hairline 发丝线(左侧缩进对齐图标块右侧)
  */
 @Composable
-private fun BrandHeader() {
+private fun IconTileRow(
+    icon: ImageVector,
+    iconColor: IconAccent,
+    title: String,
+    subtitle: String,
+    modifier: Modifier = Modifier,
+    showDivider: Boolean = true,
+    onClick: () -> Unit
+) {
     val cs = MaterialTheme.colorScheme
-    AppCard(modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 14.dp)) {
+    // 每档给出 (底色, 图标色, 底色 alpha)。Neutral 用更高的 alpha(0.20)
+    // 让浅灰块明显可见——彩色强调色饱和度高 0.12 即够,中性灰需要更实才不显寡淡。
+    val (tileBg, tileFg, bgAlpha) = when (iconColor) {
+        IconAccent.Primary -> Triple(cs.primary, cs.primary, 0.12f)
+        IconAccent.Secondary -> Triple(cs.secondary, cs.secondary, 0.12f)
+        IconAccent.Neutral -> Triple(cs.outline, cs.onSurfaceVariant, 0.20f)
+    }
+    Column(modifier = modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = androidx.compose.material3.ripple(),
+                    onClick = onClick
+                )
+                .padding(horizontal = 18.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // cyan 圆形 logo 块
-            Surface(
-                color = cs.primaryContainer,
-                shape = CircleShape,
-                modifier = Modifier.size(48.dp)
+            // 48dp 图标块(彩色档为强调色,Neutral 档为浅灰)
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(tileBg.copy(alpha = bgAlpha)),
+                contentAlignment = Alignment.Center
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        text = "AI",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = cs.onPrimaryContainer
-                    )
-                }
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = tileFg,
+                    modifier = Modifier.size(24.dp)
+                )
             }
-            Spacer(Modifier.width(16.dp))
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "AIHot",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
                     color = cs.onSurface
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
-                    text = "精选每日 AI 资讯聚合客户端",
-                    style = MaterialTheme.typography.bodySmall,
+                    text = subtitle,
+                    style = AppText.caption,
                     color = cs.onSurfaceVariant
                 )
             }
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = cs.outlineVariant
+            )
+        }
+        if (showDivider) {
+            // 左缩进对齐图标块右侧(18 + 48 + 16 gap)
+            androidx.compose.material3.HorizontalDivider(
+                thickness = 0.5.dp,
+                color = cs.outlineVariant,
+                modifier = Modifier.padding(start = 82.dp, end = 18.dp)
+            )
         }
     }
 }

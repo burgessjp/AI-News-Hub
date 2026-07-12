@@ -27,8 +27,9 @@ import com.example.aihot.ui.theme.AppText
  *
  * 精修点:
  *  - 标题统一 titleLarge(默认 24sp SemiBold),详情/Web 页通过 titleFontSize 调小
- *  - 底部 hairline 分隔线(outlineVariant),解决"顶栏飘"的问题
- *  - 容器色与屏幕背景一致(surface),纯扁平
+ *  - 半透明玻璃质感:容器 72% surface 透明 + 底部发丝线,传达"浮在内容上"的现代感
+ *    (Compose 无原生 backdrop-blur,半透明 + 发丝线是零依赖近似方案)
+ *  - 底部 hairline 分隔线(outlineVariant 50% 透明),比实色更柔和
  *
  * @param applyTopInset 是否消费状态栏 inset。嵌入到已有顶部 Tab/顶栏的容器
  *        (如 HomeScreen 的 TabRow)时传 false,避免状态栏空白堆叠。
@@ -98,14 +99,17 @@ fun AppTopBar(
                 }
             },
             colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = MaterialTheme.colorScheme.surface
+                // 半透明玻璃质感:72% surface 透明度,内容滚动时透出底层,传达"浮起"感。
+                // Compose 无原生 backdrop-blur,半透明 + 下方发丝线是零依赖近似方案。
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f)
             ),
             windowInsets = if (applyTopInset) TopAppBarDefaults.windowInsets else WindowInsets(0),
             modifier = modifier
         )
         HorizontalDivider(
             thickness = 1.dp,
-            color = MaterialTheme.colorScheme.outlineVariant
+            // 发丝线 50% 透明,比实色更柔和,符合设计系统"低对比分层"
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
         )
     }
 }

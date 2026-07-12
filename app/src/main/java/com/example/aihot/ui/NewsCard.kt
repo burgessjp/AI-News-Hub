@@ -1,9 +1,11 @@
 package com.example.aihot.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,29 +14,32 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Article
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.aihot.data.NewsItem
+import com.example.aihot.ui.theme.AppText
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
-import com.example.aihot.ui.theme.AppText
 
 /**
  * 新闻列表行 —— 扁平无卡片风格(参考新设计)。
@@ -146,6 +151,144 @@ fun NewsCard(
                         color = cs.onSurfaceVariant,
                         maxLines = 1
                     )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 精选 Hero 卡片 —— 精选 tab 列表顶部的强调卡片,对齐 "Synthetic Intelligence News"
+ * 设计系统的 Featured Section(参考 system_stream_editorial 原型)。
+ *
+ * 视觉:
+ *  - 白底(surfaceContainerLowest)+ 1px outlineVariant 描边 + 24dp 大圆角
+ *  - 左侧 6dp primary 竖条贯穿,作为"精选/头条"的视觉锚点
+ *  - 顶部:「精选」小徽章(error-container 底)+ 发布时间
+ *  - 大标题(titleSection 20sp SemiBold,2 行,紧字距)
+ *  - 摘要(bodySmall 2 行,onSurfaceVariant)
+ *  - 底行:star + 来源 · 分类 + 火焰分数
+ *
+ * 与 [NewsCard] 的区别:Hero 是"卡片"形态(有描边/圆角/留白),NewsCard 是"扁平行"
+ * (靠发丝线分隔);Hero 赋予头条新闻视觉重量。
+ */
+@Composable
+fun FeaturedHeroCard(
+    item: NewsItem,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val cs = MaterialTheme.colorScheme
+    Surface(
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        color = cs.surfaceContainerLowest,
+        contentColor = cs.onSurface,
+        border = BorderStroke(1.dp, cs.outlineVariant.copy(alpha = 0.6f)),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp
+    ) {
+        Box(modifier = Modifier.fillMaxWidth()) {
+            // 左侧 primary 竖条 —— 头条/精选的视觉锚点
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .width(6.dp)
+                    .height(112.dp)
+                    .background(cs.primary)
+            )
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 22.dp, end = 20.dp, top = 20.dp, bottom = 18.dp)
+            ) {
+                // 顶部:精选徽章 + 时间
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(cs.errorContainer)
+                            .padding(horizontal = 8.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "精选",
+                            style = AppText.caption,
+                            color = cs.onErrorContainer,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    val time = absoluteTime(item.publishedAt)
+                    if (time.isNotEmpty()) {
+                        Text(
+                            text = time,
+                            style = AppText.caption,
+                            color = cs.onSurfaceVariant
+                        )
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+                // 大标题
+                if (item.title.isNotBlank()) {
+                    Text(
+                        text = item.title,
+                        style = AppText.titleSection,
+                        color = cs.onSurface,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                // 摘要
+                if (!item.summary.isNullOrBlank()) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = item.summary,
+                        style = AppText.bodySmall,
+                        color = cs.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                // 底行:来源/分类 + 分数
+                Spacer(Modifier.height(14.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    if (item.selected) {
+                        Icon(
+                            Icons.Filled.Star,
+                            contentDescription = null,
+                            tint = cs.primary,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                    val meta = buildString {
+                        if (item.source.isNotBlank()) append(item.source)
+                        if (!item.category.isNullOrBlank()) {
+                            if (isNotEmpty()) append(" · ")
+                            append(item.categoryLabel())
+                        }
+                    }
+                    if (meta.isNotEmpty()) {
+                        Text(
+                            text = meta,
+                            style = AppText.caption,
+                            color = cs.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+                    } else {
+                        Spacer(Modifier.weight(1f))
+                    }
+                    if (item.score > 0) {
+                        ScoreBadge(score = item.score)
+                    }
                 }
             }
         }
