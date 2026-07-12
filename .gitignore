@@ -11,6 +11,9 @@ captures/
 # Kotlin 编译缓存
 .kotlin/
 
+# ZCode 会话产物(plans / .DS_Store 等本地工具私有文件)
+.zcode/
+
 # 构建产物
 *.apk
 *.aab
