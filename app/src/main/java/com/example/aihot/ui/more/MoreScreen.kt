@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Forum
+import androidx.compose.material.icons.filled.Newspaper
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -59,6 +60,7 @@ fun MoreScreen(
     onOpenHackerNews: () -> Unit,
     onOpenGitHubTrending: () -> Unit,
     onOpenLinuxDo: () -> Unit,
+    onOpenStormzhangAiNews: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenAbout: () -> Unit
 ) {
@@ -102,9 +104,18 @@ fun MoreScreen(
                     iconColor = IconAccent.Secondary,
                     title = "LinuxDo 热榜",
                     subtitle = "L 站热门话题",
+                    onClick = onOpenLinuxDo
+                )
+            }
+            item {
+                IconTileRow(
+                    icon = Icons.Filled.Newspaper,
+                    iconColor = IconAccent.Tertiary,
+                    title = "stormzhang AI 资讯",
+                    subtitle = "每日 AI 资讯聚合",
                     // 浏览组末行不画发丝线,与下方「偏好」组章节条留出干净间隔。
                     showDivider = false,
-                    onClick = onOpenLinuxDo
+                    onClick = onOpenStormzhangAiNews
                 )
             }
 
