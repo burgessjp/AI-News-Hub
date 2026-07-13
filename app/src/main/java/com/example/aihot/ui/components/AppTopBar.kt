@@ -91,9 +91,12 @@ fun AppTopBar(
             actions = {
                 // 用 Row 包一层以提供 RowScope 并统一施加 end 边距,使操作区
                 // (如日期文字)与下方内容右边对齐。
+                // verticalAlignment = CenterVertically:当 actions 内同时含 IconButton
+                // (48dp)与 Text(单行)时,让二者竖直居中对齐,避免 Text 贴顶错位。
                 Row(
                     modifier = Modifier.padding(end = extra),
-                    horizontalArrangement = Arrangement.End
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
                 ) {
                     actions()
                 }

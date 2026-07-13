@@ -18,7 +18,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Whatshot
@@ -38,6 +37,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.aihot.ui.components.AppTopBar
+import com.example.aihot.ui.components.ArchiveIconButton
 import com.example.aihot.ui.components.BottomBarReservedHeight
 import com.example.aihot.ui.components.SettingsGroupHeader
 import com.example.aihot.ui.theme.AppText
@@ -47,10 +47,11 @@ import com.example.aihot.ui.theme.AppText
  * user_hub_profile 原型。
  *
  * 结构(自顶向下,简洁直入):
- *  - 浏览组(primary 强调):历史日报 / HackerNews —— 彩色图标块行
+ *  - 浏览组(primary 强调):HackerNews / GitHub Trending / LinuxDo —— 彩色图标块行
  *  - 偏好组(secondary 强调):设置 / 关于 —— 彩色图标块行
  *
- * 搜索入口已移至「全部」tab 顶栏(全部动态是搜索主场景,放顶栏更触手可及)。
+ * 历史日报入口已统一移到全 App 各 tab 顶栏右上角(见顶栏 actions 的 ArchiveIconButton)。
+ * 搜索入口亦已移至「全部」tab 顶栏(全部动态是搜索主场景,放顶栏更触手可及)。
  */
 @Composable
 fun MoreScreen(
@@ -63,7 +64,12 @@ fun MoreScreen(
 ) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
-        topBar = { AppTopBar(title = "Hub") }
+        topBar = {
+            AppTopBar(
+                title = "Hub",
+                actions = { ArchiveIconButton(onClick = onOpenArchive) }
+            )
+        }
     ) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxWidth().padding(padding),
@@ -74,17 +80,8 @@ fun MoreScreen(
             item { SettingsGroupHeader("浏览") }
             item {
                 IconTileRow(
-                    icon = Icons.AutoMirrored.Filled.MenuBook,
-                    iconColor = IconAccent.Primary,
-                    title = "历史日报",
-                    subtitle = "查看往期 AI 日报",
-                    onClick = onOpenArchive
-                )
-            }
-            item {
-                IconTileRow(
                     icon = Icons.Filled.Whatshot,
-                    iconColor = IconAccent.Secondary,
+                    iconColor = IconAccent.Primary,
                     title = "HackerNews",
                     subtitle = "HackerNews 热门榜单",
                     onClick = onOpenHackerNews

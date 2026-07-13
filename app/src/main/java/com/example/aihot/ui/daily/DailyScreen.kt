@@ -45,6 +45,7 @@ import com.example.aihot.ui.UiState
 import com.example.aihot.ui.DailyViewModel
 import com.example.aihot.ui.components.AppTopBar
 import com.example.aihot.ui.components.AppTopBarDefaults
+import com.example.aihot.ui.components.ArchiveIconButton
 import com.example.aihot.ui.components.BottomBarReservedHeight
 import com.example.aihot.ui.theme.AppText
 
@@ -70,6 +71,7 @@ fun DailyScreen(
                 title = "AI 日报",
                 titleFontSize = AppTopBarDefaults.secondaryTitleFontSize,
                 actions = {
+                    ArchiveIconButton(onClick = onOpenArchive)
                     Text(
                         text = "每早八时",
                         style = MaterialTheme.typography.bodyMedium,
