@@ -27,6 +27,10 @@
 -keep class coil.** { *; }
 -dontwarn coil.**
 
+# ---- jsoup (HTML 解析,解析 github.com/trending) ----
+-keep class org.jsoup.** { *; }
+-dontwarn org.jsoup.**
+
 # ---- Lifecycle / ViewModel ----
 -keep class * extends androidx.lifecycle.ViewModel { *; }
 -keep class * extends androidx.lifecycle.AndroidViewModel { *; }

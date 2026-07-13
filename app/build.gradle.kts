@@ -76,4 +76,5 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.androidx.webkit)
     implementation(libs.androidx.datastore.preferences)
+    implementation(libs.jsoup)
 }

@@ -22,6 +22,7 @@ import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Whatshot
+import androidx.compose.material.icons.filled.Code
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -54,6 +55,7 @@ import com.example.aihot.ui.theme.AppText
 fun MoreScreen(
     onOpenArchive: () -> Unit,
     onOpenHackerNews: () -> Unit,
+    onOpenGitHubTrending: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenAbout: () -> Unit
 ) {
@@ -83,10 +85,18 @@ fun MoreScreen(
                     iconColor = IconAccent.Secondary,
                     title = "HackerNews",
                     subtitle = "HackerNews 热门榜单",
-                    // 搜索入口已移至「全部」tab 顶栏,本组末行不再画发丝线,
-                    // 与下方「偏好」组章节条之间留出干净间隔。
-                    showDivider = false,
                     onClick = onOpenHackerNews
+                )
+            }
+            item {
+                IconTileRow(
+                    icon = Icons.Filled.Code,
+                    iconColor = IconAccent.Tertiary,
+                    title = "GitHub Trending",
+                    subtitle = "GitHub 热门仓库",
+                    // 浏览组末行不画发丝线,与下方「偏好」组章节条留出干净间隔。
+                    showDivider = false,
+                    onClick = onOpenGitHubTrending
                 )
             }
 
@@ -117,10 +127,10 @@ fun MoreScreen(
 }
 
 /** 图标块强调色档位 —— 决定 IconTileRow 的图标底色与着色。
- *  - Primary / Secondary:浏览组的内容入口,用品牌色强调
+ *  - Primary / Secondary / Tertiary:浏览组的内容入口,用品牌色三档强调
  *  - Neutral:偏好组的设置/关于,用浅灰底 + 中性图标,与浏览组拉开层次
  */
-private enum class IconAccent { Primary, Secondary, Neutral }
+private enum class IconAccent { Primary, Secondary, Tertiary, Neutral }
 
 /**
  * 彩色图标块菜单行 —— 对齐 user_hub_profile 原型的 Browse/Preferences 项。
@@ -147,6 +157,7 @@ private fun IconTileRow(
     val (tileBg, tileFg, bgAlpha) = when (iconColor) {
         IconAccent.Primary -> Triple(cs.primary, cs.primary, 0.12f)
         IconAccent.Secondary -> Triple(cs.secondary, cs.secondary, 0.12f)
+        IconAccent.Tertiary -> Triple(cs.tertiary, cs.tertiary, 0.12f)
         IconAccent.Neutral -> Triple(cs.outline, cs.onSurfaceVariant, 0.20f)
     }
     Column(modifier = modifier.fillMaxWidth()) {
