@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -56,6 +57,7 @@ fun MoreScreen(
     onOpenArchive: () -> Unit,
     onOpenHackerNews: () -> Unit,
     onOpenGitHubTrending: () -> Unit,
+    onOpenLinuxDo: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenAbout: () -> Unit
 ) {
@@ -94,9 +96,18 @@ fun MoreScreen(
                     iconColor = IconAccent.Tertiary,
                     title = "GitHub Trending",
                     subtitle = "GitHub 热门仓库",
+                    onClick = onOpenGitHubTrending
+                )
+            }
+            item {
+                IconTileRow(
+                    icon = Icons.Filled.Forum,
+                    iconColor = IconAccent.Secondary,
+                    title = "LinuxDo 热榜",
+                    subtitle = "L 站热门话题",
                     // 浏览组末行不画发丝线,与下方「偏好」组章节条留出干净间隔。
                     showDivider = false,
-                    onClick = onOpenGitHubTrending
+                    onClick = onOpenLinuxDo
                 )
             }
 

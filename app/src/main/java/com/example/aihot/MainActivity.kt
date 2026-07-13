@@ -39,6 +39,7 @@ import com.example.aihot.ui.daily.DailyDateScreen
 import com.example.aihot.ui.items.HackerNewsCommentsScreen
 import com.example.aihot.ui.items.HackerNewsScreen
 import com.example.aihot.ui.items.GitHubTrendingScreen
+import com.example.aihot.ui.items.LinuxDoHotScreen
 import com.example.aihot.ui.items.SearchScreen
 import com.example.aihot.ui.more.AboutScreen
 import com.example.aihot.ui.more.MoreScreen
@@ -98,6 +99,7 @@ private sealed interface Page {
     data object HackerNews : Page
     data class HackerNewsComments(val story: HackerNewsStory) : Page
     data object GitHubTrending : Page
+    data object LinuxDo : Page
 }
 
 /**
@@ -116,6 +118,7 @@ private fun Page.toBundle(): Bundle = Bundle().apply {
         is Page.About -> putString("t", "About")
         is Page.HackerNews -> putString("t", "HackerNews")
         is Page.GitHubTrending -> putString("t", "GitHubTrending")
+        is Page.LinuxDo -> putString("t", "LinuxDo")
     }
 }
 
@@ -132,6 +135,7 @@ private fun pageFromBundle(b: Bundle): Page? {
         "About" -> Page.About
         "HackerNews" -> Page.HackerNews
         "GitHubTrending" -> Page.GitHubTrending
+        "LinuxDo" -> Page.LinuxDo
         else -> null
     }
 }
@@ -280,6 +284,7 @@ fun AIHotApp() {
                             onOpenArchive = { push(Page.DailyArchive) },
                             onOpenHackerNews = { push(Page.HackerNews) },
                             onOpenGitHubTrending = { push(Page.GitHubTrending) },
+                            onOpenLinuxDo = { push(Page.LinuxDo) },
                             onOpenUrl = openUrl,
                             onOpenSettings = { push(Page.Settings) },
                             onOpenAbout = { push(Page.About) }
@@ -346,6 +351,7 @@ private fun TabRoot(
     onOpenArchive: () -> Unit,
     onOpenHackerNews: () -> Unit,
     onOpenGitHubTrending: () -> Unit,
+    onOpenLinuxDo: () -> Unit,
     onOpenUrl: (String, String) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenAbout: () -> Unit
@@ -368,6 +374,7 @@ private fun TabRoot(
             onOpenArchive = onOpenArchive,
             onOpenHackerNews = onOpenHackerNews,
             onOpenGitHubTrending = onOpenGitHubTrending,
+            onOpenLinuxDo = onOpenLinuxDo,
             onOpenSettings = onOpenSettings,
             onOpenAbout = onOpenAbout
         )
@@ -440,6 +447,10 @@ private fun PageView(
             onBack = onBack,
             onOpenUrl = onOpenUrl,
             onOpenSettings = onOpenSettings
+        )
+        Page.LinuxDo -> LinuxDoHotScreen(
+            onBack = onBack,
+            onOpenUrl = onOpenUrl
         )
     }
 }
