@@ -124,7 +124,7 @@ private fun BrandHeader() {
             Column {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "AIHot",
+                        text = "AI News Hub",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = cs.onSurface

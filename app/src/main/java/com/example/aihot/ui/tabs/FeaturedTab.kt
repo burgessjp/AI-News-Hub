@@ -59,7 +59,7 @@ fun FeaturedTab(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             AppTopBar(
-                title = "AIHot",
+                title = "AI News Hub",
                 horizontalPadding = 18.dp,
                 navigationIcon = {
                     // 左侧 App Logo:直接显示启动器前景图(ic_launcher_foreground)。
@@ -70,7 +70,7 @@ fun FeaturedTab(
                     // Compose painterResource 不支持,会抛 IllegalArgumentException。
                     Image(
                         painter = painterResource(id = R.drawable.ic_launcher_foreground),
-                        contentDescription = "AIHot",
+                        contentDescription = "AI News Hub",
                         contentScale = androidx.compose.ui.layout.ContentScale.Crop,
                         modifier = Modifier
                             .size(34.dp)

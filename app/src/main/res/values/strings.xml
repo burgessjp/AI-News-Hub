@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">AIHot</string>
+    <string name="app_name">AI News Hub</string>
 
     <!-- 底部导航 tab -->
     <string name="tab_featured">精选</string>
