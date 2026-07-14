@@ -74,7 +74,8 @@ fun WebViewScreen(
     url: String,
     title: String = "加载中…",
     darkTheme: Boolean = false,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onTitleResolved: (url: String, title: String) -> Unit = { _, _ -> }
 ) {
     val context = LocalContext.current
     var pageTitle by remember { mutableStateOf(title) }
@@ -173,6 +174,10 @@ fun WebViewScreen(
                                 pageTitle = view.title ?: title
                                 currentUrl = url ?: currentUrl
                                 loading = false
+                                // 回写真实标题到浏览历史(用最终落地 URL,跟随重定向)
+                                val resolvedUrl = url ?: currentUrl
+                                val resolvedTitle = view.title?.takeIf { it.isNotBlank() }
+                                if (resolvedTitle != null) onTitleResolved(resolvedUrl, resolvedTitle)
                             }
                         }
                         webChromeClient = object : WebChromeClient() {
@@ -182,7 +187,12 @@ fun WebViewScreen(
                             }
 
                             override fun onReceivedTitle(view: WebView?, title: String?) {
-                                if (!title.isNullOrBlank()) pageTitle = title
+                                if (!title.isNullOrBlank()) {
+                                    pageTitle = title
+                                    // 部分站点在 onPageFinished 之前/之后才设标题,
+                                    // 这里也回写一次,保证历史标题最终是真实标题
+                                    onTitleResolved(currentUrl, title)
+                                }
                             }
                         }
                         // 网页发起的下载处理。

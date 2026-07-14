@@ -27,11 +27,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.activity.compose.BackHandler
+import com.example.aihot.data.AppDatabase
+import com.example.aihot.data.BrowseHistoryRepository
 import com.example.aihot.data.HackerNewsStory
 import com.example.aihot.data.NewsItem
 import com.example.aihot.data.TranslationConfigStore
 import com.example.aihot.ui.more.SettingsStore
 import com.example.aihot.ui.NewsDetailScreen
+import com.example.aihot.ui.BrowseHistoryViewModel
 import com.example.aihot.ui.components.AppBottomBar
 import com.example.aihot.ui.components.AppTab
 import com.example.aihot.ui.daily.DailyArchiveScreen
@@ -39,6 +42,7 @@ import com.example.aihot.ui.daily.DailyDateScreen
 import com.example.aihot.ui.items.HackerNewsCommentsScreen
 import com.example.aihot.ui.items.HackerNewsScreen
 import com.example.aihot.ui.items.GitHubTrendingScreen
+import com.example.aihot.ui.items.BrowseHistoryScreen
 import com.example.aihot.ui.items.HuggingFacePapersScreen
 import com.example.aihot.ui.items.LinuxDoHotScreen
 import com.example.aihot.ui.items.StormzhangAiNewsScreen
@@ -104,6 +108,7 @@ private sealed interface Page {
     data object LinuxDo : Page
     data object StormzhangAiNews : Page
     data object HuggingFacePapers : Page
+    data object BrowseHistory : Page
 }
 
 /**
@@ -125,6 +130,7 @@ private fun Page.toBundle(): Bundle = Bundle().apply {
         is Page.LinuxDo -> putString("t", "LinuxDo")
         is Page.StormzhangAiNews -> putString("t", "StormzhangAiNews")
         is Page.HuggingFacePapers -> putString("t", "HuggingFacePapers")
+        is Page.BrowseHistory -> putString("t", "BrowseHistory")
     }
 }
 
@@ -144,6 +150,7 @@ private fun pageFromBundle(b: Bundle): Page? {
         "LinuxDo" -> Page.LinuxDo
         "StormzhangAiNews" -> Page.StormzhangAiNews
         "HuggingFacePapers" -> Page.HuggingFacePapers
+        "BrowseHistory" -> Page.BrowseHistory
         else -> null
     }
 }
@@ -194,6 +201,11 @@ fun AIHotApp() {
     // 偏好存储(进程级单例):显示偏好(主题/字体) + 翻译配置,均基于 DataStore 持久化。
     val settingsStore = remember { SettingsStore(appContext) }
     val configStore = remember { TranslationConfigStore(appContext) }
+
+    // 浏览历史仓库(进程级单例):基于 Room,记录所有通过 openUrl 打开的网页。
+    val browseHistoryRepo = remember {
+        BrowseHistoryRepository(AppDatabase.get(appContext).browseHistoryDao())
+    }
 
     // 主题模式 + 字体族:订阅持久化 Flow。Flow 首帧前用默认值(System),
     // 读到持久化值后自动切换。设置页改值时写入 store,Flow 回推新值刷新。
@@ -249,8 +261,20 @@ fun AIHotApp() {
         }
     }
 
-    // 统一"打开内置 WebView"
-    val openUrl: (String, String) -> Unit = { url, title -> push(Page.Web(url, title)) }
+    // 统一"打开内置 WebView"。
+    //
+    // 记录浏览历史:在此唯一入口拦截,全 App 覆盖。source 为来源标签
+    // ("GitHub Trending"/"日报"/"AI HOT"…),由各调用点显式传入,可空。
+    val openUrl: (String, String, String?) -> Unit = { url, title, source ->
+        scope.launch { browseHistoryRepo.record(url, title, source) }
+        push(Page.Web(url, title))
+    }
+
+    // 网页标题回写:WebView 加载完成后拿到真实标题,更新历史记录(而非占位"加载中…")。
+    // 不更新 visitedAt,避免回写把条目顶到最前。
+    val onTitleResolved: (String, String) -> Unit = { url, resolvedTitle ->
+        scope.launch { browseHistoryRepo.updateTitle(url, resolvedTitle) }
+    }
 
     // 系统返回键:当前 tab 栈非空时 pop
     BackHandler(enabled = !isRoot) { pop() }
@@ -295,6 +319,7 @@ fun AIHotApp() {
                             onOpenLinuxDo = { push(Page.LinuxDo) },
                             onOpenStormzhangAiNews = { push(Page.StormzhangAiNews) },
                             onOpenHuggingFacePapers = { push(Page.HuggingFacePapers) },
+                            onOpenBrowseHistory = { push(Page.BrowseHistory) },
                             onOpenUrl = openUrl,
                             onOpenSettings = { push(Page.Settings) },
                             onOpenAbout = { push(Page.About) }
@@ -310,8 +335,10 @@ fun AIHotApp() {
                             onSelectDate = { push(Page.DailyDate(it)) },
                             onOpenComments = { push(Page.HackerNewsComments(it)) },
                             onOpenUrl = openUrl,
+                            onTitleResolved = onTitleResolved,
                             onOpenSettings = { push(Page.Settings) },
                             configStore = configStore,
+                            browseHistoryRepo = browseHistoryRepo,
                             darkTheme = darkTheme
                         )
                     }
@@ -364,14 +391,16 @@ private fun TabRoot(
     onOpenLinuxDo: () -> Unit,
     onOpenStormzhangAiNews: () -> Unit,
     onOpenHuggingFacePapers: () -> Unit,
-    onOpenUrl: (String, String) -> Unit,
+    onOpenBrowseHistory: () -> Unit,
+    onOpenUrl: (String, String, String?) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenAbout: () -> Unit
 ) {
     when (tab) {
         AppTab.Featured -> FeaturedTab(
             onItemClick = onItemClick,
-            onOpenUrl = onOpenUrl
+            // 今日热点卡片链接到 AI HOT 阅读页,标注来源 "AI HOT"
+            onOpenUrl = { url, title -> onOpenUrl(url, title, "AI HOT") }
         )
         AppTab.All -> AllTab(
             onItemClick = onItemClick,
@@ -380,7 +409,8 @@ private fun TabRoot(
         AppTab.Daily -> DailyTab(
             onItemClick = onItemClick,
             onOpenArchive = onOpenArchive,
-            onOpenUrl = onOpenUrl
+            // 日报条目/快讯链接标注来源 "日报"
+            onOpenUrl = { url, title -> onOpenUrl(url, title, "日报") }
         )
         AppTab.More -> MoreScreen(
             onOpenArchive = onOpenArchive,
@@ -389,6 +419,7 @@ private fun TabRoot(
             onOpenLinuxDo = onOpenLinuxDo,
             onOpenStormzhangAiNews = onOpenStormzhangAiNews,
             onOpenHuggingFacePapers = onOpenHuggingFacePapers,
+            onOpenBrowseHistory = onOpenBrowseHistory,
             onOpenSettings = onOpenSettings,
             onOpenAbout = onOpenAbout
         )
@@ -407,22 +438,26 @@ private fun PageView(
     onItemClick: (NewsItem) -> Unit,
     onSelectDate: (String) -> Unit,
     onOpenComments: (HackerNewsStory) -> Unit,
-    onOpenUrl: (String, String) -> Unit,
+    onOpenUrl: (String, String, String?) -> Unit,
+    onTitleResolved: (String, String) -> Unit,
     onOpenSettings: () -> Unit,
     configStore: TranslationConfigStore,
+    browseHistoryRepo: BrowseHistoryRepository,
     darkTheme: Boolean = false
 ) {
     when (page) {
         is Page.Detail -> NewsDetailScreen(
             item = page.item,
             onBack = onBack,
-            onOpenUrl = onOpenUrl
+            // 适配:Detail 页打开的链接来自 AI HOT 详情,标注 "AI HOT"
+            onOpenUrl = { url, title -> onOpenUrl(url, title, "AI HOT") }
         )
         is Page.Web -> WebViewScreen(
             url = page.url,
             title = page.title,
             darkTheme = darkTheme,
-            onBack = onBack
+            onBack = onBack,
+            onTitleResolved = onTitleResolved
         )
         Page.DailyArchive -> DailyArchiveScreen(
             onSelectDate = onSelectDate,
@@ -431,7 +466,7 @@ private fun PageView(
         is Page.DailyDate -> DailyDateScreen(
             date = page.date,
             onBack = onBack,
-            onOpenUrl = onOpenUrl
+            onOpenUrl = { url, title -> onOpenUrl(url, title, "日报") }
         )
         Page.Search -> SearchScreen(
             onBack = onBack,
@@ -454,26 +489,31 @@ private fun PageView(
         is Page.HackerNewsComments -> HackerNewsCommentsScreen(
             story = page.story,
             onBack = onBack,
-            onOpenUrl = onOpenUrl,
+            onOpenUrl = { url, title -> onOpenUrl(url, title, "HackerNews") },
             onOpenSettings = onOpenSettings
         )
         Page.GitHubTrending -> GitHubTrendingScreen(
             onBack = onBack,
-            onOpenUrl = onOpenUrl,
+            onOpenUrl = { url, title -> onOpenUrl(url, title, "GitHub Trending") },
             onOpenSettings = onOpenSettings
         )
         Page.LinuxDo -> LinuxDoHotScreen(
             onBack = onBack,
-            onOpenUrl = onOpenUrl
+            onOpenUrl = { url, title -> onOpenUrl(url, title, "LinuxDo") }
         )
         Page.StormzhangAiNews -> StormzhangAiNewsScreen(
             onBack = onBack,
-            onOpenUrl = onOpenUrl
+            onOpenUrl = { url, title -> onOpenUrl(url, title, "stormzhang AI") }
         )
         Page.HuggingFacePapers -> HuggingFacePapersScreen(
             onBack = onBack,
-            onOpenUrl = onOpenUrl,
+            onOpenUrl = { url, title -> onOpenUrl(url, title, "HuggingFace") },
             onOpenSettings = onOpenSettings
+        )
+        Page.BrowseHistory -> BrowseHistoryScreen(
+            repo = browseHistoryRepo,
+            onBack = onBack,
+            onOpenUrl = { url, title, source -> onOpenUrl(url, title, source) }
         )
     }
 }

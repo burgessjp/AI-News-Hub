@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.ksp)
     id("org.jetbrains.kotlin.plugin.parcelize")
 }
 
@@ -77,4 +78,8 @@ dependencies {
     implementation(libs.androidx.webkit)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.jsoup)
+
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
 }

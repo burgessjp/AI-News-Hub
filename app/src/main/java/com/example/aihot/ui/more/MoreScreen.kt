@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Newspaper
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -63,6 +64,7 @@ fun MoreScreen(
     onOpenLinuxDo: () -> Unit,
     onOpenStormzhangAiNews: () -> Unit,
     onOpenHuggingFacePapers: () -> Unit,
+    onOpenBrowseHistory: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenAbout: () -> Unit
 ) {
@@ -124,9 +126,22 @@ fun MoreScreen(
                     iconColor = IconAccent.Secondary,
                     title = "HuggingFace Paper Trending",
                     subtitle = "热门 AI 论文榜单",
-                    // 浏览组末行不画发丝线,与下方「偏好」组章节条留出干净间隔。
+                    // 浏览组末行不画发丝线,与下方「历史」组章节条留出干净间隔。
                     showDivider = false,
                     onClick = onOpenHuggingFacePapers
+                )
+            }
+
+            // 历史组 —— 浏览历史的独立入口
+            item { SettingsGroupHeader("历史", accentColor = MaterialTheme.colorScheme.tertiary) }
+            item {
+                IconTileRow(
+                    icon = Icons.Filled.History,
+                    iconColor = IconAccent.Primary,
+                    title = "浏览历史",
+                    subtitle = "打开过的网页",
+                    showDivider = false,
+                    onClick = onOpenBrowseHistory
                 )
             }
 
