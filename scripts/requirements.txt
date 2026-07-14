@@ -1,5 +1,9 @@
 # 数据抓取脚本依赖(fetch_data.py)
 # 与 scripts/gen_icon.py 不同 —— 后者只用 PIL/NumPy 跑本地图像生成;
 # 本脚本需要 requests 做 HTTP,beautifulsoup4 解析 HTML(对齐 App 端 jsoup)。
+# playwright 仅 LinuxDo 源需要:linux.do 套 Cloudflare 强挑战,普通 HTTP 库
+# 被秒拦(实测 curl_cffi 各指纹变种都 403),必须用真 Chromium 过 CF。
+# 其余 4 个源不需要 playwright,装了也不会拖慢(按需 import)。
 requests>=2.31
 beautifulsoup4>=4.12
+playwright>=1.40

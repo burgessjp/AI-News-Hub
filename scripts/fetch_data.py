@@ -235,6 +235,60 @@ def fetch_github_trending():
 
 
 # ===== 数据源 3:LinuxDo 热榜 =====
+# 特殊:linux.do 套 Cloudflare 强挑战(带 Turnstile 的 cf-mitigated: challenge),
+# 普通.requests/curl_cffi 都会被 403(实测所有 Chrome 指纹变种均被拦,首页都进不去)。
+# 这里用 Playwright 跑真 Chromium 内核过 CF:先访问首页让 CF 认它是真浏览器,
+# 再用页面内 fetch 请求 API(自动带 _cfuvid 等 cookie)。本地实测能直接 200 拿到 JSON。
+# Playwright 没装时 _fetch_linuxdo_raw 抛 RuntimeError,被主流程当单源失败跳过,
+# 不影响其余 4 个源。
+
+def _fetch_linuxdo_raw():
+    """用 Playwright(真 Chromium)过 CF 拿 linux.do hot.json 原文。
+    返回 JSON 字符串。Playwright/浏览器未就绪时抛 RuntimeError。"""
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError as e:
+        raise RuntimeError("LinuxDo 需要 Playwright 过 CF,但未安装(见 requirements.txt)") from e
+
+    api_url = "https://linux.do/c/develop/4/l/hot.json"
+    with sync_playwright() as p:
+        try:
+            browser = p.chromium.launch(headless=True)
+        except Exception as e:
+            raise RuntimeError(
+                "Playwright Chromium 未下载,请先跑 `python -m playwright install chromium`"
+            ) from e
+        try:
+            context = browser.new_context(
+                user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                           "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+                locale="zh-CN",
+            )
+            page = context.new_page()
+            # 1) 先访问首页:让 CF 跑完挑战 JS、认它是真浏览器,落地 _cfuvid cookie。
+            page.goto("https://linux.do/", wait_until="domcontentloaded", timeout=30000)
+            # 等"Just a moment..."挑战页(若有)自动跳转完成,最多等 20s。
+            for _ in range(20):
+                time.sleep(1)
+                if "just a moment" not in page.title().lower():
+                    break
+            # 2) 用页面内 fetch 请求 API:自动复用浏览器 cookie + 指纹,过 CF。
+            result = page.evaluate("""async (url) => {
+                const r = await fetch(url, {headers: {'Accept': 'application/json'}});
+                return {status: r.status, ct: r.headers.get('content-type'), text: await r.text()};
+            }""", api_url)
+            status = result.get("status")
+            ct = result.get("ct") or ""
+            text = result.get("text") or ""
+            if status != 200 or "json" not in ct:
+                raise RuntimeError(
+                    f"LinuxDo 仍被 CF 拦截(HTTP {status}, {ct});"
+                    f"body 前 80 字符: {text[:80]!r}"
+                )
+            return text
+        finally:
+            browser.close()
+
 
 def _resolve_avatar(template):
     """补全头像 URL(对齐 LinuxDoTopic.resolveAvatar)。
@@ -255,15 +309,10 @@ def fetch_linuxdo():
     """
     Discourse JSON(对齐 LinuxDoHotRepository + LinuxDoTopic.fromJson)。
     users[] 建索引,topic_list.topics[] 解析。置顶帖 rank=0。
+
+    数据获取走 Playwright 过 CF(见 _fetch_linuxdo_raw);字段解析逻辑与 App 端一致。
     """
-    raw = fetch_text(
-        "https://linux.do/c/develop/4/l/hot.json",
-        extra_headers={
-            "Accept": "application/json",
-            "Accept-Language": "zh-CN,zh;q=0.9",
-        },
-        expect_json=True,
-    )
+    raw = _fetch_linuxdo_raw()
     root = json.loads(raw)
     users = root.get("users") or []
     users_by_id = {u.get("id"): u for u in users if isinstance(u, dict)}
