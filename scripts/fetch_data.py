@@ -551,6 +551,77 @@ def write_snapshot(out_dir, source_name, items, meta, now):
     return file_path
 
 
+def _scan_latest(out_dir, source_name):
+    """
+    扫描某源目录下所有 <YYYY-MM-DD>/<HH-MM>-data.json,返回最新的相对路径
+    (相对于源目录,如 "2026-07-15/00-44-data.json")。没有任何文件返回 None。
+
+    用于 index.json 的 latest 指针:跨天也能正确取到最新成功快照
+    (即使今天这次失败,昨天的仍是最新的)。
+
+    date / time 都用字典序排:YYYY-MM-DD 与 HH-MM 定宽格式下,字典序 == 时间序。
+    """
+    src_root = os.path.join(out_dir, source_name)
+    if not os.path.isdir(src_root):
+        return None
+    best = None  # (date, time) 元组,取最大
+    for date_dir in os.listdir(src_root):
+        full_date_dir = os.path.join(src_root, date_dir)
+        if not os.path.isdir(full_date_dir):
+            continue
+        # 日期目录名形如 2026-07-15,只接受这种格式
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date_dir):
+            continue
+        for fname in os.listdir(full_date_dir):
+            # 文件名形如 08-00-data.json,只接受这种格式
+            m = re.fullmatch(r"(\d{2}-\d{2})-data\.json", fname)
+            if not m:
+                continue
+            time_str = m.group(1)
+            key = (date_dir, time_str)
+            if best is None or key > best:
+                best = key
+    if best is None:
+        return None
+    return f"{best[0]}/{best[1]}-data.json"
+
+
+def write_index(out_dir, now, results):
+    """
+    写根目录 index.json:记录每个源最新成功快照的相对路径。
+
+    结构:
+      {
+        "updated_at": "2026-07-15T00:44:02+0800",
+        "updated_at_ms": 1784047442756,
+        "latest": {
+          "github-trending": "2026-07-15/00-44-data.json",
+          ...
+        }
+      }
+
+    latest 的相对路径是「相对于源目录」的(如 2026-07-15/00-44-data.json),
+    客户端拼上 <source>/ 前缀即得完整路径。
+
+    实现上扫描全量已有文件取最新(而非只记本次):本次失败的源仍保留上次成功的指向,
+    避免一次失败让 index 指空。每次跑都整文件重写。
+    """
+    latest = {}
+    for name in SOURCES:
+        rel = _scan_latest(out_dir, name)
+        if rel:
+            latest[name] = rel
+    index = {
+        "updated_at": now.strftime("%Y-%m-%dT%H:%M:%S%z"),
+        "updated_at_ms": int(now.timestamp() * 1000),
+        "latest": latest,
+    }
+    index_path = os.path.join(out_dir, "index.json")
+    with open(index_path, "w", encoding="utf-8") as f:
+        json.dump(index, f, ensure_ascii=False, indent=2)
+    return index_path
+
+
 def main():
     parser = argparse.ArgumentParser(description="AIHot Hub 浏览区域数据抓取")
     parser.add_argument("--out-dir", default="out", help="输出根目录(默认 ./out)")
@@ -596,8 +667,11 @@ def main():
     with open(manifest_path, "w", encoding="utf-8") as f:
         json.dump(manifest, f, ensure_ascii=False, indent=2)
 
+    # index.json:每个源最新成功快照的相对路径(扫描全量取最新,失败源保留旧指向)
+    index_path = write_index(args.out_dir, now, results)
+
     ok_count = sum(1 for r in results.values() if r["status"] == "ok")
-    print(f"\n汇总: {ok_count}/{len(results)} 源成功;manifest → {manifest_path}")
+    print(f"\n汇总: {ok_count}/{len(results)} 源成功;manifest → {manifest_path};index → {index_path}")
     return 0 if ok_count > 0 else 1
 
 
