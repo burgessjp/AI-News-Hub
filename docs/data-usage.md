@@ -1,0 +1,268 @@
+# AI-News-Hub-Data 数据用法
+
+数据仓库:[gitcode.com/peng1818/AI-News-Hub-Data](https://gitcode.com/peng1818/AI-News-Hub-Data)
+分支:`news-hub-data`
+
+本仓库定时抓取 [AI News Hub](../) App「Hub」tab 浏览区域的 5 个数据源,解析成 JSON 后按日期归档。本文档说明数据结构、获取方式与消费示例。
+
+## 更新频率
+
+- **定时**:每天北京时间 08:00 由 GitHub Action 自动抓取并提交(GitHub cron 不保证准点,通常 ±15 分钟内)
+- **手动**:workflow 支持 `workflow_dispatch`,可随时手动触发补抓
+- 任何源抓取失败(如 Cloudflare 拦截)会被自动跳过,不影响其余源
+
+## 仓库结构
+
+```
+news-hub-data 分支/
+├── index.json                          ← 入口:各源最新快照路径
+├── manifest.json                       ← 最近一次运行总览(成功/失败状态)
+├── hackernews/
+│   ├── 2026-07-14/
+│   │   └── 08-00-data.json
+│   └── 2026-07-15/
+│       └── 08-00-data.json
+├── github-trending/
+│   └── 2026-07-15/
+│       └── 08-00-data.json
+├── linuxdo/                            ← CI 上可能因 CF 拦截缺失
+│   └── 2026-07-15/
+│       └── 08-00-data.json
+├── stormzhang-ai/
+│   └── 2026-07-15/
+│       └── 08-00-data.json
+└── huggingface-papers/
+    └── 2026-07-15/
+        └── 08-00-data.json
+```
+
+路径规则:`<源名>/<YYYY-MM-DD>/<HH-MM>-data.json`,日期与时间均为**北京时间(UTC+8)**。
+
+## 快速开始:拉最新数据
+
+**第一步:读 `index.json` 拿到各源最新路径。**
+
+```json
+{
+  "updated_at": "2026-07-15T08:00:12+0800",
+  "updated_at_ms": 1784073612000,
+  "latest": {
+    "hackernews": "2026-07-15/08-00-data.json",
+    "github-trending": "2026-07-15/08-00-data.json",
+    "linuxdo": "2026-07-14/08-00-data.json",
+    "stormzhang-ai": "2026-07-15/08-00-data.json",
+    "huggingface-papers": "2026-07-15/08-00-data.json"
+  }
+}
+```
+
+`latest` 里的路径是**相对于源目录**的。注意上例中 linuxdo 指向了前一天 —— 这是设计行为:某源当天抓取失败时,`index.json` 会保留它最后一次成功的指向,客户端永远能拿到有效数据。
+
+**第二步:拼完整路径拉数据。** `index.latest.<源>` 前面加上 `<源>/` 即得完整路径。
+
+### 原始文件直链(URL 模板)
+
+gitcode 的 raw 文件直链格式:
+
+```
+https://raw.gitcode.com/peng1818/AI-News-Hub-Data/raw/news-hub-data/<完整路径>
+```
+
+例如拉 2026-07-15 的 hackernews:
+
+```
+https://raw.gitcode.com/peng1818/AI-News-Hub-Data/raw/news-hub-data/hackernews/2026-07-15/08-00-data.json
+```
+
+> 📌 **两个实测注意事项:**
+> - **Content-Type 是 `text/plain`**:gitcode raw 服务对 `.json` 也返回纯文本类型。用严格类型检查的客户端(如某些 fetch 封装)可能拒绝解析,需显式按 JSON 解析,别依赖响应头。
+> - **偶发限流(HTTP 403)**:gitcode raw 服务对短时间高频请求会限流。消费方建议加重试(指数退避)和结果缓存,不要无脑轮询。
+
+### 消费示例
+
+**JavaScript / 浏览器:**
+
+```javascript
+const BASE = 'https://raw.gitcode.com/peng1818/AI-News-Hub-Data/raw/news-hub-data'
+
+// 1. 读 index(注意:gitcode raw 返回 text/plain,需显式 .json() 解析)
+const index = await fetch(`${BASE}/index.json`).then(r => r.json())
+
+// 2. 拼完整路径拉某源最新数据
+async function getLatest(source) {
+  const rel = index.latest[source]            // "2026-07-15/08-00-data.json"
+  const r = await fetch(`${BASE}/${source}/${rel}`)
+  return r.json()                             // gitcode 返回 text/plain,.json() 仍能解析
+}
+
+const hn = await getLatest('hackernews')
+console.log(hn.items[0].title)
+```
+
+> gitcode raw 偶发 403 限流。生产环境建议加指数退避重试(如 3 次,间隔 1s/2s/4s)。
+
+**Python:**
+
+```python
+import requests
+
+BASE = 'https://raw.gitcode.com/peng1818/AI-News-Hub-Data/raw/news-hub-data'
+
+# gitcode raw 返回 text/plain;requests.json() 按内容解析,不依赖响应头,无需特殊处理
+index = requests.get(f'{BASE}/index.json', timeout=15).json()
+
+def get_latest(source):
+    rel = index['latest'][source]
+    return requests.get(f'{BASE}/{source}/{rel}', timeout=15).json()
+
+hn = get_latest('hackernews')
+print(hn['items'][0]['title'])
+```
+
+## 单个数据文件的通用结构
+
+每个 `<HH-MM>-data.json` 顶层结构相同:
+
+```json
+{
+  "source": "github-trending",
+  "fetched_at": "2026-07-15T08:00:12+0800",
+  "fetched_at_ms": 1784073612000,
+  "count": 25,
+  "items": [ ... ]
+}
+```
+
+| 字段 | 说明 |
+|------|------|
+| `source` | 源标识,同目录名 |
+| `fetched_at` | 抓取时刻,ISO 8601 带时区(北京时间) |
+| `fetched_at_ms` | 抓取时刻,Unix 毫秒时间戳 |
+| `count` | `items` 数组长度 |
+| `items` | 该源的条目数组,结构因源而异(见下) |
+
+部分源会有额外顶层字段(如 stormzhang-ai 带 `pageDate`)。
+
+## 各源 items 字段说明
+
+### hackernews(HackerNews Top Stories)
+
+HackerNews 热门榜,取前 20 条。两步拉取:先取 topstories id 数组,再并发拉每条详情。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `id` | int | 故事 id |
+| `title` | string | 标题 |
+| `url` | string | 外链原文地址;Ask HN 等文本帖为空 |
+| `by` | string | 作者 |
+| `score` | int | 得分 |
+| `descendants` | int | 评论数 |
+| `time` | int | 发布时刻,Unix 秒 |
+| `time_iso` | string | 发布时刻,ISO 8601(UTC) |
+| `discussion_url` | string | HN 讨论页 `https://news.ycombinator.com/item?id=<id>` |
+| `target_url` | string | `url` 非空时为 `url`,否则为 `discussion_url`(点击落地页) |
+
+### github-trending(GitHub Trending 仓库)
+
+GitHub Trending 日榜,默认 daily 窗口。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `rank` | int | 排名(1 起,由页面位置决定) |
+| `owner` | string | 仓库所有者 |
+| `name` | string | 仓库名 |
+| `url` | string | 仓库完整地址 `https://github.com/<owner>/<name>` |
+| `description` | string | 一句话描述 |
+| `language` | string | 主语言;无则为空 |
+| `languageColor` | string | 语言色点十六进制(如 `#3178c6`);无则为空 |
+| `totalStars` | int | 累计 star 数 |
+| `forks` | int | fork 数 |
+| `starsToday` | int | 今日新增 star 数(daily 窗口) |
+
+### linuxdo(LinuxDo 热榜)
+
+LinuxDo「开发调优」分类热榜(Discourse)。
+
+> ⚠️ **此源可能缺失**:linux.do 套 Cloudflare 强挑战,GitHub Actions 的数据中心 IP 经常被拦。`index.json` 在它失败时会保留历史指向;若仓库里完全没有 `linuxdo/` 目录,说明从未成功过。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `rank` | int | 热度排名(1 起);置顶帖为 0 不参与编号 |
+| `title` | string | 话题标题 |
+| `url` | string | 话题地址 `https://linux.do/t/topic/<id>` |
+| `excerpt` | string | 首帖摘要(已去 HTML 标签);可能为空 |
+| `authorName` | string | 原始发帖人显示名 |
+| `avatarUrl` | string | 作者头像完整 URL |
+| `views` | int | 浏览数 |
+| `replyCount` | int | 回复数 |
+| `likeCount` | int | 点赞数 |
+| `tags` | string[] | 标签(取前 2 个) |
+| `createdAtMs` | int | 话题创建时刻,Unix 毫秒 |
+| `pinned` | bool | 是否全局置顶 |
+| `closed` | bool | 是否已关闭 |
+
+### stormzhang-ai(stormzhang AI 资讯)
+
+stormzhang AI Daily 每日资讯聚合(中文摘要 + 英文原文),聚合 Hacker News / Reddit / Product Hunt / The Rundown AI / TLDR AI 等信源。
+
+顶层额外字段:`pageDate`(string,页面声明的资讯日期,如 `2026.07.15`,取自页面 title,可能为空)。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `rank` | int | 排名(取自页面 `.item-index`) |
+| `url` | string | 资讯原文完整 HTTPS 地址 |
+| `summary` | string | 中文摘要(AI 生成,主标题) |
+| `english` | string | 英文原文一句话;部分条目为空 |
+| `source` | string | 来源信源名,如 `Hacker News` / `Reddit` / `Product Hunt` / `The Rundown AI` / `TLDR AI` |
+| `time` | string | 发布时间原文,如 `2026-07-15 20:00` |
+
+### huggingface-papers(HuggingFace Trending Papers)
+
+HuggingFace Trending Papers(AK 每日精选 arXiv 论文,按社区 upvote 排序)。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `rank` | int | 排名(1 起,由列表位置决定) |
+| `id` | string | 论文 id,即 arXiv 编号,如 `2403.08299` |
+| `url` | string | 论文页地址 `https://huggingface.co/papers/<id>` |
+| `title` | string | 论文标题 |
+| `summary` | string | 一句话摘要;可能为空 |
+| `upvotes` | int | 社区 upvote 数(热度主指标) |
+| `published` | string | 发布日期原文,如 `Jul 8, 2026` |
+| `authors` | string | 作者信息,如 `5 authors`;取不到则为空 |
+| `githubUrl` | string | 关联 GitHub 仓库地址;无则为空 |
+
+## 辅助文件
+
+### `manifest.json`
+
+最近一次抓取运行的总览,用于排查问题:
+
+```json
+{
+  "run_at": "2026-07-15T08:00:12+0800",
+  "run_at_ms": 1784073612000,
+  "sources": {
+    "hackernews": {"status": "ok", "count": 20, "file": "..."},
+    "linuxdo": {"status": "fail", "error": "HTTPError: 403 ..."}
+  }
+}
+```
+
+`status` 取值:`ok`(成功,带 count/file)/ `fail`(失败,带 error)。每天会被覆盖,只保留最近一次。
+
+## 限制与注意事项
+
+1. **LinuxDo 源不稳定**:受 Cloudflare 拦截影响,CI 上可能长期失败。消费方应对 `index.latest.linuxdo` 缺失或指向旧日期有容忍。
+
+2. **无历史数据保证**:数据从 workflow 首次成功运行起开始积累。某源若从未成功过,对应目录不会存在。
+
+3. **频率与配额**:每天 1 次定时 + 偶发手动触发。不要高频轮询 raw URL,gitcode 有访问频率限制。客户端建议缓存 `index.json` 的 `updated_at` 判断是否需要刷新。
+
+4. **字段可能变化**:各源抓自第三方页面(GitHub Trending / HuggingFace / linux.do 等),若对方改版导致字段缺失,会在 `manifest.json` 的 error 中体现。字段语义遵循上述文档,新增字段不破坏旧消费者。
+
+5. **时区**:所有时间戳与文件名路径均为北京时间(UTC+8)。`fetched_at` / `run_at` 带显式 `+0800` 偏移,`_ms` 为 UTC Unix 毫秒(与时区无关)。
+
+6. **gitcode raw 服务特性**(实测):
+   - **Content-Type 为 `text/plain`**:`.json` 文件也按纯文本返回。`fetch().json()` / `requests.json()` 按响应体内容解析,不受影响;但若用严格按响应头判断类型的封装,需手动覆盖类型。
+   - **偶发 403 限流**:短时间高频请求会被限流。建议消费方加重试 + 缓存 `index.json` 的 `updated_at` 做增量判断,避免无脑轮询。
