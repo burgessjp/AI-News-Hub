@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Newspaper
+import androidx.compose.material.icons.filled.School
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -48,7 +49,7 @@ import com.example.aihot.ui.theme.AppText
  * user_hub_profile 原型。
  *
  * 结构(自顶向下,简洁直入):
- *  - 浏览组(primary 强调):HackerNews / GitHub Trending / LinuxDo —— 彩色图标块行
+ *  - 浏览组(primary 强调):HackerNews / GitHub Trending / LinuxDo / stormzhang AI / HuggingFace —— 彩色图标块行
  *  - 偏好组(secondary 强调):设置 / 关于 —— 彩色图标块行
  *
  * 历史日报入口已统一移到全 App 各 tab 顶栏右上角(见顶栏 actions 的 ArchiveIconButton)。
@@ -61,6 +62,7 @@ fun MoreScreen(
     onOpenGitHubTrending: () -> Unit,
     onOpenLinuxDo: () -> Unit,
     onOpenStormzhangAiNews: () -> Unit,
+    onOpenHuggingFacePapers: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenAbout: () -> Unit
 ) {
@@ -113,9 +115,18 @@ fun MoreScreen(
                     iconColor = IconAccent.Tertiary,
                     title = "stormzhang AI 资讯",
                     subtitle = "每日 AI 资讯聚合",
+                    onClick = onOpenStormzhangAiNews
+                )
+            }
+            item {
+                IconTileRow(
+                    icon = Icons.Filled.School,
+                    iconColor = IconAccent.Secondary,
+                    title = "HuggingFace Paper Trending",
+                    subtitle = "热门 AI 论文榜单",
                     // 浏览组末行不画发丝线,与下方「偏好」组章节条留出干净间隔。
                     showDivider = false,
-                    onClick = onOpenStormzhangAiNews
+                    onClick = onOpenHuggingFacePapers
                 )
             }
 

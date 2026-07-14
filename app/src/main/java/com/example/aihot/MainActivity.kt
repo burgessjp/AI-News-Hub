@@ -39,6 +39,7 @@ import com.example.aihot.ui.daily.DailyDateScreen
 import com.example.aihot.ui.items.HackerNewsCommentsScreen
 import com.example.aihot.ui.items.HackerNewsScreen
 import com.example.aihot.ui.items.GitHubTrendingScreen
+import com.example.aihot.ui.items.HuggingFacePapersScreen
 import com.example.aihot.ui.items.LinuxDoHotScreen
 import com.example.aihot.ui.items.StormzhangAiNewsScreen
 import com.example.aihot.ui.items.SearchScreen
@@ -102,6 +103,7 @@ private sealed interface Page {
     data object GitHubTrending : Page
     data object LinuxDo : Page
     data object StormzhangAiNews : Page
+    data object HuggingFacePapers : Page
 }
 
 /**
@@ -122,6 +124,7 @@ private fun Page.toBundle(): Bundle = Bundle().apply {
         is Page.GitHubTrending -> putString("t", "GitHubTrending")
         is Page.LinuxDo -> putString("t", "LinuxDo")
         is Page.StormzhangAiNews -> putString("t", "StormzhangAiNews")
+        is Page.HuggingFacePapers -> putString("t", "HuggingFacePapers")
     }
 }
 
@@ -140,6 +143,7 @@ private fun pageFromBundle(b: Bundle): Page? {
         "GitHubTrending" -> Page.GitHubTrending
         "LinuxDo" -> Page.LinuxDo
         "StormzhangAiNews" -> Page.StormzhangAiNews
+        "HuggingFacePapers" -> Page.HuggingFacePapers
         else -> null
     }
 }
@@ -290,6 +294,7 @@ fun AIHotApp() {
                             onOpenGitHubTrending = { push(Page.GitHubTrending) },
                             onOpenLinuxDo = { push(Page.LinuxDo) },
                             onOpenStormzhangAiNews = { push(Page.StormzhangAiNews) },
+                            onOpenHuggingFacePapers = { push(Page.HuggingFacePapers) },
                             onOpenUrl = openUrl,
                             onOpenSettings = { push(Page.Settings) },
                             onOpenAbout = { push(Page.About) }
@@ -358,6 +363,7 @@ private fun TabRoot(
     onOpenGitHubTrending: () -> Unit,
     onOpenLinuxDo: () -> Unit,
     onOpenStormzhangAiNews: () -> Unit,
+    onOpenHuggingFacePapers: () -> Unit,
     onOpenUrl: (String, String) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenAbout: () -> Unit
@@ -382,6 +388,7 @@ private fun TabRoot(
             onOpenGitHubTrending = onOpenGitHubTrending,
             onOpenLinuxDo = onOpenLinuxDo,
             onOpenStormzhangAiNews = onOpenStormzhangAiNews,
+            onOpenHuggingFacePapers = onOpenHuggingFacePapers,
             onOpenSettings = onOpenSettings,
             onOpenAbout = onOpenAbout
         )
@@ -462,6 +469,11 @@ private fun PageView(
         Page.StormzhangAiNews -> StormzhangAiNewsScreen(
             onBack = onBack,
             onOpenUrl = onOpenUrl
+        )
+        Page.HuggingFacePapers -> HuggingFacePapersScreen(
+            onBack = onBack,
+            onOpenUrl = onOpenUrl,
+            onOpenSettings = onOpenSettings
         )
     }
 }
