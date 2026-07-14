@@ -32,3 +32,10 @@ keystore.properties
 # 操作系统
 .DS_Store
 Thumbs.db
+
+# 数据抓取本地输出(scripts/fetch_data.py 的 --out-dir 产物,不入库)
+out/
+
+# Python 字节码缓存(本地运行脚本产生,不入库)
+__pycache__/
+*.pyc

@@ -1,0 +1,59 @@
+name: Fetch Hub Data
+
+# 每天 08:00 北京时间抓取「Hub」tab 浏览区域的 5 个数据源,解析成 JSON 后
+# 提交到 gitcode 数据仓库的 news-hub-data 分支。
+#
+# cron 用 UTC:0 0 * * *(UTC 00:00 = 北京 08:00)。GitHub cron 不保证准点,
+# 脚本内部按 TZ=Asia/Shanghai 取「真正执行时」的北京时间生成文件名日期/时间,
+# 因此即便延迟到 08:15 才跑,目录名仍是当天的 08-15,不会错位。
+#
+# 失败策略(对齐 scripts/fetch_data.py):单源失败(如 Cloudflare 拦截)被跳过,
+# 成功源照常提交;全部失败时 fetch 步骤退出码非 0,workflow 标红便于发现。
+
+on:
+  schedule:
+    - cron: '0 0 * * *'   # UTC 00:00 = 北京 08:00
+  workflow_dispatch:       # 支持手动触发,便于首次验证 / 临时补抓
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    env:
+      TZ: Asia/Shanghai    # 脚本据此把文件名日期/时间统一成北京时间
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+          cache: pip
+          cache-dependency-path: scripts/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r scripts/requirements.txt
+
+      - name: Fetch all sources into ./out
+        run: python3 scripts/fetch_data.py --out-dir out
+
+      - name: Push snapshot to gitcode (news-hub-data branch)
+        env:
+          GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
+        run: |
+          set -e
+          # 克隆目标数据仓库的 news-hub-data 分支(浅克隆,只要最新一次提交)
+          git clone --depth 1 --branch news-hub-data \
+            "https://x-access-token:${GITCODE_TOKEN}@gitcode.com/peng1818/AI-News-Hub-Data.git" repo
+          # 把本次产物覆盖进仓库(manifest.json + 各源目录),保留仓库既有历史快照
+          cp -r out/. repo/
+          cd repo
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore(data): hub snapshot $(date +%Y-%m-%d_%H:%M) CST"
+            git push origin news-hub-data
+          fi

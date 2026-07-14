@@ -1,0 +1,5 @@
+# 数据抓取脚本依赖(fetch_data.py)
+# 与 scripts/gen_icon.py 不同 —— 后者只用 PIL/NumPy 跑本地图像生成;
+# 本脚本需要 requests 做 HTTP,beautifulsoup4 解析 HTML(对齐 App 端 jsoup)。
+requests>=2.31
+beautifulsoup4>=4.12
