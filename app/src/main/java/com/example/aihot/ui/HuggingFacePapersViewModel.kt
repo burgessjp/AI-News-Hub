@@ -8,10 +8,15 @@ import com.example.aihot.data.HuggingFacePapersRepository
 import com.example.aihot.data.ShortContentException
 import com.example.aihot.data.TranslationConfigStore
 import com.example.aihot.data.TranslationRepository
+import com.example.aihot.data.source.HuggingFacePapersArchiveRepository
+import com.example.aihot.data.source.HuggingFacePapersSource
+import com.example.aihot.data.source.SourceMode
+import com.example.aihot.ui.more.SettingsStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
@@ -27,10 +32,28 @@ import kotlinx.coroutines.launch
  * 单按钮整体翻译:标题与摘要合并为一段文本,一次 API 调用拿到整体译文,
  * UI 把译文块整体显示在摘要之后(无摘要时紧跟标题)。合并而非分开两次请求,
  * 既省一次网络往返,译文也天然连贯。
+ *
+ * 数据源模式([SourceMode]):订阅 [SettingsStore].prefsFlow,实时跟随设置变化
+ * (设置页切换后下拉刷新立即用新模式)。LIVE → [liveRepo](实时,带缓存);
+ * ARCHIVE → [archiveRepo](gitcode 归档,无缓存)。[currentRepo] 按当前 sourceMode 取。
  */
 class HuggingFacePapersViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val repo = HuggingFacePapersRepository(cacheDir = application.cacheDir)
+    private val settingsStore = SettingsStore(application)
+
+    // 两个 Repository 都持有,按当前 sourceMode 动态选用(避免切换后旧 repo 固化)。
+    private val liveRepo: HuggingFacePapersRepository = HuggingFacePapersRepository(cacheDir = application.cacheDir)
+    private val archiveRepo: HuggingFacePapersSource = HuggingFacePapersArchiveRepository()
+
+    private val _sourceMode = MutableStateFlow(
+        runCatching { settingsStore.currentSourceModeSync() }.getOrDefault(SourceMode.LIVE)
+    )
+    val sourceMode: StateFlow<SourceMode> = _sourceMode.asStateFlow()
+
+    /** 按当前 sourceMode 取对应 Repository。 */
+    private fun currentRepo(): HuggingFacePapersSource =
+        if (_sourceMode.value == SourceMode.ARCHIVE) archiveRepo else liveRepo
+
     private val translationRepo = TranslationRepository(application.cacheDir)
     private val configStore = TranslationConfigStore(application)
 
@@ -59,12 +82,16 @@ class HuggingFacePapersViewModel(application: Application) : AndroidViewModel(ap
     val translationStates: StateFlow<Map<String, TranslationState>> = _translationStates.asStateFlow()
 
     init {
+        // 订阅数据源设置:设置页一改即更新,后续 refresh 自动用新源(不自动重抓)。
+        viewModelScope.launch {
+            settingsStore.prefsFlow.map { it.sourceMode }.collect { _sourceMode.value = it }
+        }
         refresh()
     }
 
     fun refresh() {
         viewModelScope.launch {
-            runCatching { repo.fetch() }
+            runCatching { currentRepo().fetch() }
                 .onSuccess { result ->
                     _state.value =
                         if (result.papers.isEmpty()) UiState.Error("无内容") else UiState.Success(result.papers)
@@ -85,7 +112,7 @@ class HuggingFacePapersViewModel(application: Application) : AndroidViewModel(ap
         if (_isRefreshing.value) return
         _isRefreshing.value = true
         viewModelScope.launch {
-            runCatching { repo.forceRefresh() }
+            runCatching { currentRepo().forceRefresh() }
                 .onSuccess { result ->
                     _state.value =
                         if (result.papers.isEmpty()) UiState.Error("无内容") else UiState.Success(result.papers)

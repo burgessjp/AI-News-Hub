@@ -27,7 +27,7 @@ import java.util.concurrent.TimeUnit
  */
 class StormzhangAiNewsRepository(
     private val cacheDir: File? = null
-) {
+) : com.example.aihot.data.source.StormzhangAiNewsSource {
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
@@ -55,7 +55,7 @@ class StormzhangAiNewsRepository(
      *
      * @return 带数据落盘时刻的结果(含页面日期)
      */
-    suspend fun fetch(): StormzhangAiNewsResult {
+    override suspend fun fetch(): StormzhangAiNewsResult {
         // 无缓存目录:退化为直连,fetchedAt 取当前时刻。
         if (cacheDir == null) {
             val parsed = fetchFromNetwork()
@@ -91,7 +91,7 @@ class StormzhangAiNewsRepository(
      * 强制忽略缓存重新抓取(下拉刷新等场景)。
      * 抓取成功后刷新缓存,fetchedAt 取当前时刻。
      */
-    suspend fun forceRefresh(): StormzhangAiNewsResult {
+    override suspend fun forceRefresh(): StormzhangAiNewsResult {
         val (fresh, date) = fetchFromNetwork()
         val now = System.currentTimeMillis()
         if (cacheDir != null) {

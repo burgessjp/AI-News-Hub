@@ -28,7 +28,7 @@ import java.util.concurrent.TimeUnit
  */
 class GitHubTrendingRepository(
     private val cacheDir: File? = null
-) {
+) : com.example.aihot.data.source.GitHubTrendingSource {
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
@@ -56,7 +56,7 @@ class GitHubTrendingRepository(
      *
      * @return 带数据落盘时刻的 trending 结果
      */
-    suspend fun fetch(): TrendingResult {
+    override suspend fun fetch(): TrendingResult {
         // 无缓存目录:退化为直连,fetchedAt 取当前时刻。
         if (cacheDir == null) {
             val repos = fetchFromNetwork()
@@ -92,7 +92,7 @@ class GitHubTrendingRepository(
      * 强制忽略缓存重新抓取(下拉刷新等场景)。
      * 抓取成功后刷新缓存,fetchedAt 取当前时刻。
      */
-    suspend fun forceRefresh(): TrendingResult {
+    override suspend fun forceRefresh(): TrendingResult {
         val fresh = fetchFromNetwork()
         val now = System.currentTimeMillis()
         if (cacheDir != null) {

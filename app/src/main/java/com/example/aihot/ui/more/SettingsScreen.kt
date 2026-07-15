@@ -7,12 +7,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.BrightnessAuto
+import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Memory
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.Title
 import androidx.compose.material.icons.filled.Translate
@@ -42,6 +44,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.aihot.data.TranslationConfig
 import com.example.aihot.data.TranslationConfigStore
+import com.example.aihot.data.source.SourceMode
 import com.example.aihot.ui.components.AppTopBar
 import com.example.aihot.ui.components.AppTopBarDefaults
 import com.example.aihot.ui.components.SegmentedOption
@@ -79,10 +82,12 @@ enum class FontChoice(val label: String, val fontFamily: FontFamily) {
  * 视觉与主列表页同构:章节条 + 扁平行 / 横向三段选择器。
  *  - 外观:主题模式三选一(系统/亮/暗),横向三段式(图标 + 文字)
  *  - 字体:字体族三选一(默认/衬线/等宽),横向三段式
+ *  - 数据源:Hub 4 源从实时抓取还是 gitcode 归档取数,横向二段式
  *  - 语言:占位项(当前仅简体中文)
  *  - 翻译:HackerNews 标题/评论翻译开关 + 用户自填的 LLM API 配置
  *
  * 翻译配置通过 [TranslationConfigStore] 持久化(DataStore),关 App 后保留。
+ * 数据源模式与主题/字体同存于 display_prefs([com.example.aihot.ui.more.SettingsStore])。
  */
 @Composable
 fun SettingsScreen(
@@ -90,6 +95,8 @@ fun SettingsScreen(
     onSelectTheme: (ThemeMode) -> Unit,
     fontChoice: FontChoice,
     onSelectFont: (FontChoice) -> Unit,
+    sourceMode: SourceMode,
+    onSelectSource: (SourceMode) -> Unit,
     configStore: TranslationConfigStore,
     onBack: () -> Unit
 ) {
@@ -105,6 +112,12 @@ fun SettingsScreen(
             SegmentedOption(icon = Icons.Filled.Title, label = FontChoice.System.label),
             SegmentedOption(icon = Icons.Filled.TextFields, label = FontChoice.Serif.label),
             SegmentedOption(icon = Icons.Filled.Code, label = FontChoice.Mono.label)
+        )
+    }
+    val sourceOptions = remember {
+        listOf(
+            SegmentedOption(icon = Icons.Filled.Sync, label = SourceMode.LIVE.label),
+            SegmentedOption(icon = Icons.Filled.CloudDownload, label = SourceMode.ARCHIVE.label)
         )
     }
 
@@ -147,6 +160,18 @@ fun SettingsScreen(
                     options = fontOptions,
                     selectedIndex = fontChoice.ordinal,
                     onSelect = { idx -> onSelectFont(FontChoice.entries[idx]) }
+                )
+            }
+
+            // 数据源 section —— Hub 4 个稳定源从实时抓取还是 gitcode 归档取数
+            // 实时:直连第三方站点(默认,数据最新);归档:读 gitcode 历史快照(稳定不受反爬影响)
+            // 切换后需重进对应页面生效(ViewModel 是 keyed 单例)。
+            item { SettingsGroupHeader("数据源") }
+            item {
+                SegmentedOptionRow(
+                    options = sourceOptions,
+                    selectedIndex = sourceMode.ordinal,
+                    onSelect = { idx -> onSelectSource(SourceMode.entries[idx]) }
                 )
             }
 

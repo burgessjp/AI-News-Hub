@@ -28,7 +28,7 @@ import java.util.concurrent.TimeUnit
  */
 class HuggingFacePapersRepository(
     private val cacheDir: File? = null
-) {
+) : com.example.aihot.data.source.HuggingFacePapersSource {
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
@@ -56,7 +56,7 @@ class HuggingFacePapersRepository(
      *
      * @return 带数据落盘时刻的结果
      */
-    suspend fun fetch(): HuggingFacePapersResult {
+    override suspend fun fetch(): HuggingFacePapersResult {
         // 无缓存目录:退化为直连,fetchedAt 取当前时刻。
         if (cacheDir == null) {
             val papers = fetchFromNetwork()
@@ -90,7 +90,7 @@ class HuggingFacePapersRepository(
      * 强制忽略缓存重新抓取(下拉刷新等场景)。
      * 抓取成功后刷新缓存,fetchedAt 取当前时刻。
      */
-    suspend fun forceRefresh(): HuggingFacePapersResult {
+    override suspend fun forceRefresh(): HuggingFacePapersResult {
         val fresh = fetchFromNetwork()
         val now = System.currentTimeMillis()
         if (cacheDir != null) {

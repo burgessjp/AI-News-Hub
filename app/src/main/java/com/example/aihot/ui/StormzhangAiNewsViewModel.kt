@@ -5,9 +5,14 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.aihot.data.StormzhangAiNews
 import com.example.aihot.data.StormzhangAiNewsRepository
+import com.example.aihot.data.source.SourceMode
+import com.example.aihot.data.source.StormzhangAiNewsArchiveRepository
+import com.example.aihot.data.source.StormzhangAiNewsSource
+import com.example.aihot.ui.more.SettingsStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
@@ -20,12 +25,27 @@ import kotlinx.coroutines.launch
  *
  * 额外暴露 [pageDate]:页面声明的资讯日期(如 "2026.07.13"),取自 title,
  * 供 UI 在顶栏展示「AI Daily · 2026.07.13」副标题,让用户知道看的是哪一天。
+ *
+ * 数据源模式([SourceMode]):订阅 [SettingsStore].prefsFlow,实时跟随设置变化
+ * (设置页切换后下拉刷新立即用新模式)。LIVE → [liveRepo](实时,带缓存);
+ * ARCHIVE → [archiveRepo](gitcode 归档,无缓存)。[currentRepo] 按当前 sourceMode 取。
  */
 class StormzhangAiNewsViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val repo = StormzhangAiNewsRepository(
-        cacheDir = application.cacheDir
+    private val settingsStore = SettingsStore(application)
+
+    // 两个 Repository 都持有,按当前 sourceMode 动态选用(避免切换后旧 repo 固化)。
+    private val liveRepo: StormzhangAiNewsRepository = StormzhangAiNewsRepository(cacheDir = application.cacheDir)
+    private val archiveRepo: StormzhangAiNewsSource = StormzhangAiNewsArchiveRepository()
+
+    private val _sourceMode = MutableStateFlow(
+        runCatching { settingsStore.currentSourceModeSync() }.getOrDefault(SourceMode.LIVE)
     )
+    val sourceMode: StateFlow<SourceMode> = _sourceMode.asStateFlow()
+
+    /** 按当前 sourceMode 取对应 Repository。 */
+    private fun currentRepo(): StormzhangAiNewsSource =
+        if (_sourceMode.value == SourceMode.ARCHIVE) archiveRepo else liveRepo
 
     private val _state = MutableStateFlow<UiState<List<StormzhangAiNews>>>(UiState.Loading)
     val state: StateFlow<UiState<List<StormzhangAiNews>>> = _state.asStateFlow()
@@ -46,12 +66,16 @@ class StormzhangAiNewsViewModel(application: Application) : AndroidViewModel(app
     val pageDate: StateFlow<String> = _pageDate.asStateFlow()
 
     init {
+        // 订阅数据源设置:设置页一改即更新,后续 refresh 自动用新源(不自动重抓)。
+        viewModelScope.launch {
+            settingsStore.prefsFlow.map { it.sourceMode }.collect { _sourceMode.value = it }
+        }
         refresh()
     }
 
     fun refresh() {
         viewModelScope.launch {
-            runCatching { repo.fetch() }
+            runCatching { currentRepo().fetch() }
                 .onSuccess { result ->
                     _state.value =
                         if (result.news.isEmpty()) UiState.Error("无内容") else UiState.Success(result.news)
@@ -73,7 +97,7 @@ class StormzhangAiNewsViewModel(application: Application) : AndroidViewModel(app
         if (_isRefreshing.value) return
         _isRefreshing.value = true
         viewModelScope.launch {
-            runCatching { repo.forceRefresh() }
+            runCatching { currentRepo().forceRefresh() }
                 .onSuccess { result ->
                     _state.value =
                         if (result.news.isEmpty()) UiState.Error("无内容") else UiState.Success(result.news)

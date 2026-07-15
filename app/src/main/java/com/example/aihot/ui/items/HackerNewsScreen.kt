@@ -3,6 +3,7 @@ package com.example.aihot.ui.items
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import com.example.aihot.data.source.SourceMode
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,6 +42,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
@@ -56,6 +58,7 @@ import com.example.aihot.ui.TranslationState
 import com.example.aihot.ui.UiState
 import com.example.aihot.ui.components.AppTopBar
 import com.example.aihot.ui.components.AppTopBarDefaults
+import com.example.aihot.ui.components.ListUpdateTimeHeader
 import com.example.aihot.ui.components.NewsCardSkeletonList
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -91,6 +94,7 @@ fun HackerNewsScreen(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val lastRefreshAt by vm.lastRefreshAt.collectAsStateWithLifecycle()
+    val sourceMode by vm.sourceMode.collectAsStateWithLifecycle()
     val isRefreshing by vm.isRefreshing.collectAsStateWithLifecycle()
     val titleStates by vm.titleStates.collectAsStateWithLifecycle()
     val config by vm.configFlow.collectAsStateWithLifecycle(initialValue = TranslationConfig())
@@ -124,15 +128,7 @@ fun HackerNewsScreen(
                     }
                 },
                 actions = {
-                    // 右上角「上次刷新 N 分钟前」:与 4 小时缓存策略配套,
-                    // 让用户知道列表数据有多旧。尚未成功刷新过(lastRefreshAt=null)时不显示。
-                    lastRefreshAt?.let { ts ->
-                        Text(
-                            text = "上次刷新 ${formatRefreshAgo(ts)}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    // 「上次刷新」已移到列表顶部居中(见 ListUpdateTimeHeader),顶栏不再显示。
                 }
             )
         }
@@ -157,6 +153,8 @@ fun HackerNewsScreen(
                                 stories = stories,
                                 titleStates = titleStates,
                                 translateEnabled = config.enabled,
+                                sourceMode = sourceMode,
+                                fetchedAtMillis = lastRefreshAt,
                                 onClick = onOpenComments,
                                 onTranslate = { vm.translateTitle(it) }
                             )
@@ -173,6 +171,8 @@ private fun HackerNewsList(
     stories: List<HackerNewsStory>,
     titleStates: Map<Long, TranslationState>,
     translateEnabled: Boolean,
+    sourceMode: SourceMode,
+    fetchedAtMillis: Long?,
     onClick: (HackerNewsStory) -> Unit,
     onTranslate: (HackerNewsStory) -> Unit
 ) {
@@ -180,6 +180,9 @@ private fun HackerNewsList(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(vertical = 8.dp)
     ) {
+        // 列表顶部居中显示数据时间(实时:上次刷新 N 分钟前;归档:数据更新时间绝对值)。
+        // 顶栏右上角不再显示,统一到这里,两种模式同一位置。
+        item { ListUpdateTimeHeader(sourceMode, fetchedAtMillis) }
         itemsIndexed(
             items = stories,
             key = { _, story -> story.id }
@@ -415,25 +418,5 @@ private fun formatRelativeTime(unixSeconds: Long): String {
         minutes < 60 * 24 -> "${minutes / 60} 小时前"
         minutes < 60 * 24 * 30 -> "${minutes / (60 * 24)} 天前"
         else -> SimpleDateFormat("yyyy-MM-dd", Locale.CHINA).format(Date(unixSeconds * 1000L))
-    }
-}
-
-/**
- * 把「上次刷新时刻」(毫秒)转成相对时间,供顶栏显示。
- *
- * 与 [formatRelativeTime] 同源,但入参是 System.currentTimeMillis() 级毫秒
- * (来自缓存 fetchedAt)。缓存 TTL 4 小时内通常显示「刚刚/N 分钟前」;
- * 出现「N 小时前」意味着网络长期失败、靠过期缓存兜底,恰好提示用户数据已旧。
- * 超过 7 天直接显示日期,避免「30 天前」这种无意义长串。
- */
-private fun formatRefreshAgo(fetchedAtMillis: Long): String {
-    val diff = System.currentTimeMillis() - fetchedAtMillis
-    val minutes = diff / 60_000L
-    return when {
-        minutes < 1 -> "刚刚"
-        minutes < 60 -> "${minutes} 分钟前"
-        minutes < 60 * 24 -> "${minutes / 60} 小时前"
-        minutes < 60 * 24 * 7 -> "${minutes / (60 * 24)} 天前"
-        else -> SimpleDateFormat("MM-dd HH:mm", Locale.CHINA).format(Date(fetchedAtMillis))
     }
 }

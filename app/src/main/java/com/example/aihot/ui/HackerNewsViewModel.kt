@@ -8,10 +8,15 @@ import com.example.aihot.data.HackerNewsStory
 import com.example.aihot.data.ShortContentException
 import com.example.aihot.data.TranslationConfigStore
 import com.example.aihot.data.TranslationRepository
+import com.example.aihot.data.source.HackerNewsArchiveRepository
+import com.example.aihot.data.source.HackerNewsSource
+import com.example.aihot.data.source.SourceMode
+import com.example.aihot.ui.more.SettingsStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
@@ -22,10 +27,29 @@ import kotlinx.coroutines.launch
  *
  * 继承 [AndroidViewModel] 以拿到 application.cacheDir 注入 [HackerNewsRepository],
  * 启用 4 小时文件缓存:进入页面命中缓存秒回,不打网络。
+ *
+ * 数据源模式([SourceMode]):订阅 [SettingsStore].prefsFlow,实时跟随设置变化
+ * (设置页切换数据源后,本页下拉刷新立即用新模式,无需重进页面)。LIVE →
+ * [liveRepo](实时,带缓存);ARCHIVE → [archiveRepo](gitcode 归档,无缓存)。
+ * [currentRepo] 按当前 sourceMode 取,refresh/forceRefresh 调它。
  */
 class HackerNewsViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val repo = HackerNewsRepository(cacheDir = application.cacheDir)
+    private val settingsStore = SettingsStore(application)
+
+    // 两个 Repository 都持有,按当前 sourceMode 动态选用(避免切换后旧 repo 固化)。
+    private val liveRepo: HackerNewsRepository = HackerNewsRepository(cacheDir = application.cacheDir)
+    private val archiveRepo: HackerNewsSource = HackerNewsArchiveRepository()
+
+    private val _sourceMode = MutableStateFlow(
+        runCatching { settingsStore.currentSourceModeSync() }.getOrDefault(SourceMode.LIVE)
+    )
+    val sourceMode: StateFlow<SourceMode> = _sourceMode.asStateFlow()
+
+    /** 按当前 sourceMode 取对应 Repository。 */
+    private fun currentRepo(): HackerNewsSource =
+        if (_sourceMode.value == SourceMode.ARCHIVE) archiveRepo else liveRepo
+
     private val translationRepo = TranslationRepository(application.cacheDir)
     private val configStore = TranslationConfigStore(application)
 
@@ -57,12 +81,16 @@ class HackerNewsViewModel(application: Application) : AndroidViewModel(applicati
     val titleStates: StateFlow<Map<Long, TranslationState>> = _titleStates.asStateFlow()
 
     init {
+        // 订阅数据源设置:设置页一改即更新,后续 refresh 自动用新源(不自动重抓)。
+        viewModelScope.launch {
+            settingsStore.prefsFlow.map { it.sourceMode }.collect { _sourceMode.value = it }
+        }
         refresh()
     }
 
     fun refresh() {
         viewModelScope.launch {
-            runCatching { repo.fetchTopStories(limit = 20) }
+            runCatching { currentRepo().fetch(limit = 20) }
                 .onSuccess { result ->
                     // 空结果视为「无内容」而非错误:模块整体隐藏。
                     _state.value =
@@ -87,7 +115,7 @@ class HackerNewsViewModel(application: Application) : AndroidViewModel(applicati
         if (_isRefreshing.value) return
         _isRefreshing.value = true
         viewModelScope.launch {
-            runCatching { repo.forceRefresh(limit = 20) }
+            runCatching { currentRepo().forceRefresh(limit = 20) }
                 .onSuccess { result ->
                     _state.value =
                         if (result.stories.isEmpty()) UiState.Error("无内容") else UiState.Success(result.stories)

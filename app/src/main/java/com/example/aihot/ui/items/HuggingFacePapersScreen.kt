@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import com.example.aihot.data.source.SourceMode
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -56,6 +57,7 @@ import com.example.aihot.ui.TranslationState
 import com.example.aihot.ui.UiState
 import com.example.aihot.ui.components.AppTopBar
 import com.example.aihot.ui.components.AppTopBarDefaults
+import com.example.aihot.ui.components.ListUpdateTimeHeader
 import com.example.aihot.ui.components.NewsCardSkeletonList
 import com.example.aihot.ui.theme.AppText
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -92,6 +94,7 @@ fun HuggingFacePapersScreen(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val lastRefreshAt by vm.lastRefreshAt.collectAsStateWithLifecycle()
+    val sourceMode by vm.sourceMode.collectAsStateWithLifecycle()
     val isRefreshing by vm.isRefreshing.collectAsStateWithLifecycle()
     val translationStates by vm.translationStates.collectAsStateWithLifecycle()
     val config by vm.configFlow.collectAsStateWithLifecycle(initialValue = TranslationConfig())
@@ -125,14 +128,7 @@ fun HuggingFacePapersScreen(
                     }
                 },
                 actions = {
-                    // 「上次刷新 N 分钟前」:与 4 小时缓存策略配套,让用户知道数据有多旧。
-                    lastRefreshAt?.let { ts ->
-                        Text(
-                            text = "上次刷新 ${formatRefreshAgo(ts)}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    // 「上次刷新」已移到列表顶部居中(见 ListUpdateTimeHeader),顶栏不再显示。
                 }
             )
         }
@@ -157,6 +153,8 @@ fun HuggingFacePapersScreen(
                                 papers = papers,
                                 translationStates = translationStates,
                                 translateEnabled = config.enabled,
+                                sourceMode = sourceMode,
+                                fetchedAtMillis = lastRefreshAt,
                                 onClick = { paper -> onOpenUrl(paper.url, paper.title) },
                                 onTranslate = { vm.translatePaper(it) }
                             )
@@ -173,6 +171,8 @@ private fun PapersList(
     papers: List<HuggingFacePaper>,
     translationStates: Map<String, TranslationState>,
     translateEnabled: Boolean,
+    sourceMode: SourceMode,
+    fetchedAtMillis: Long?,
     onClick: (HuggingFacePaper) -> Unit,
     onTranslate: (HuggingFacePaper) -> Unit
 ) {
@@ -180,6 +180,8 @@ private fun PapersList(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(vertical = 8.dp)
     ) {
+        // 列表顶部居中显示数据时间(实时/归档统一位置,文案不同)
+        item { ListUpdateTimeHeader(sourceMode, fetchedAtMillis) }
         itemsIndexed(
             items = papers,
             key = { _, paper -> paper.id }
@@ -361,21 +363,4 @@ private fun formatCount(n: Int): String = when {
         else "${n / 1000}k"
     }
     else -> "${"%.1f".format(n / 1_000_000.0)}m"
-}
-
-/**
- * 把「上次刷新时刻」(毫秒)转成相对时间,供顶栏显示(与 GitHubTrendingScreen 同源)。
- * 缓存 TTL 4 小时内通常显示「刚刚/N 分钟前」;出现「N 小时前」意味着网络长期失败、
- * 靠过期缓存兜底,恰好提示用户数据已旧。超过 7 天直接显示日期。
- */
-private fun formatRefreshAgo(fetchedAtMillis: Long): String {
-    val diff = System.currentTimeMillis() - fetchedAtMillis
-    val minutes = diff / 60_000L
-    return when {
-        minutes < 1 -> "刚刚"
-        minutes < 60 -> "${minutes} 分钟前"
-        minutes < 60 * 24 -> "${minutes / 60} 小时前"
-        minutes < 60 * 24 * 7 -> "${minutes / (60 * 24)} 天前"
-        else -> SimpleDateFormat("MM-dd HH:mm", Locale.CHINA).format(Date(fetchedAtMillis))
-    }
 }

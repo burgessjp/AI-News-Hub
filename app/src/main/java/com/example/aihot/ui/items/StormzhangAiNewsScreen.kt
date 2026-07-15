@@ -3,6 +3,7 @@ package com.example.aihot.ui.items
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import com.example.aihot.data.source.SourceMode
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -45,6 +46,7 @@ import com.example.aihot.ui.StormzhangAiNewsViewModel
 import com.example.aihot.ui.UiState
 import com.example.aihot.ui.components.AppTopBar
 import com.example.aihot.ui.components.AppTopBarDefaults
+import com.example.aihot.ui.components.ListUpdateTimeHeader
 import com.example.aihot.ui.components.NewsCardSkeletonList
 import com.example.aihot.ui.theme.AppText
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -77,6 +79,7 @@ fun StormzhangAiNewsScreen(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val lastRefreshAt by vm.lastRefreshAt.collectAsStateWithLifecycle()
+    val sourceMode by vm.sourceMode.collectAsStateWithLifecycle()
     val isRefreshing by vm.isRefreshing.collectAsStateWithLifecycle()
     val pageDate by vm.pageDate.collectAsStateWithLifecycle()
 
@@ -95,23 +98,11 @@ fun StormzhangAiNewsScreen(
                     }
                 },
                 actions = {
-                    // 右侧 actions:页面日期(左)+ 刷新时间(右),弱色小字,
-                    // 日期让用户知道看的是哪天,刷新时间与 4 小时缓存策略配套提示数据新旧。
+                    // 右侧 actions 仅保留「页面日期」(资讯当天日期,如 2026.07.15)。
+                    // 「上次刷新」已移到列表顶部居中(见 ListUpdateTimeHeader),顶栏不再显示。
                     if (pageDate.isNotBlank()) {
                         Text(
                             text = pageDate,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = " · ",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    lastRefreshAt?.let { ts ->
-                        Text(
-                            text = "上次刷新 ${formatRefreshAgo(ts)}",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -138,6 +129,8 @@ fun StormzhangAiNewsScreen(
                         ) {
                             AiNewsList(
                                 news = news,
+                                sourceMode = sourceMode,
+                                fetchedAtMillis = lastRefreshAt,
                                 onClick = { item -> onOpenUrl(item.url, item.summary) }
                             )
                         }
@@ -151,12 +144,16 @@ fun StormzhangAiNewsScreen(
 @Composable
 private fun AiNewsList(
     news: List<StormzhangAiNews>,
+    sourceMode: SourceMode,
+    fetchedAtMillis: Long?,
     onClick: (StormzhangAiNews) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(vertical = 8.dp)
     ) {
+        // 列表顶部居中显示数据时间(实时/归档统一位置,文案不同)
+        item { ListUpdateTimeHeader(sourceMode, fetchedAtMillis) }
         itemsIndexed(
             items = news,
             key = { _, item -> item.url }
@@ -303,22 +300,5 @@ private fun SourceBadge(source: String) {
             color = color,
             maxLines = 1
         )
-    }
-}
-
-/**
- * 把「上次刷新时刻」(毫秒)转成相对时间,供顶栏显示(与 GitHubTrendingScreen 同源)。
- * 缓存 TTL 4 小时内通常显示「刚刚/N 分钟前」;出现「N 小时前」意味着网络长期失败、
- * 靠过期缓存兜底,恰好提示用户数据已旧。超过 7 天直接显示日期。
- */
-private fun formatRefreshAgo(fetchedAtMillis: Long): String {
-    val diff = System.currentTimeMillis() - fetchedAtMillis
-    val minutes = diff / 60_000L
-    return when {
-        minutes < 1 -> "刚刚"
-        minutes < 60 -> "${minutes} 分钟前"
-        minutes < 60 * 24 -> "${minutes / 60} 小时前"
-        minutes < 60 * 24 * 7 -> "${minutes / (60 * 24)} 天前"
-        else -> SimpleDateFormat("MM-dd HH:mm", Locale.CHINA).format(Date(fetchedAtMillis))
     }
 }

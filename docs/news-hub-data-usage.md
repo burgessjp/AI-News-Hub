@@ -60,60 +60,59 @@ news-hub-data 分支/
 
 **第二步:拼完整路径拉数据。** `index.latest.<源>` 前面加上 `<源>/` 即得完整路径。
 
-### 原始文件直链(URL 模板)
+### 文件直链(URL 模板)
 
-gitcode 的 raw 文件直链格式:
+**推荐用 gitcode 官方 REST API**(稳定,公开仓库匿名可读):
 
 ```
-https://raw.gitcode.com/peng1818/AI-News-Hub-Data/raw/news-hub-data/<完整路径>
+https://api.gitcode.com/api/v5/repos/peng1818/AI-News-Hub-Data/raw/<完整路径>?ref=news-hub-data
 ```
 
 例如拉 2026-07-15 的 hackernews:
 
 ```
-https://raw.gitcode.com/peng1818/AI-News-Hub-Data/raw/news-hub-data/hackernews/2026-07-15/08-00-data.json
+https://api.gitcode.com/api/v5/repos/peng1818/AI-News-Hub-Data/raw/hackernews/2026-07-15/08-00-data.json?ref=news-hub-data
 ```
 
-> 📌 **两个实测注意事项:**
-> - **Content-Type 是 `text/plain`**:gitcode raw 服务对 `.json` 也返回纯文本类型。用严格类型检查的客户端(如某些 fetch 封装)可能拒绝解析,需显式按 JSON 解析,别依赖响应头。
-> - **偶发限流(HTTP 403)**:gitcode raw 服务对短时间高频请求会限流。消费方建议加重试(指数退避)和结果缓存,不要无脑轮询。
+也支持 raw 直链 `https://raw.gitcode.com/peng1818/AI-News-Hub-Data/raw/news-hub-data/<路径>`,但 raw 背后是华为云 WAF,部分网络环境(数据中心 IP)会被拦 403,**优先用 API 端点**。
+
+> 📌 **API 返回 Content-Type 为 `application/octet-stream`**(非 `application/json`)。多数客户端按响应体内容解析 JSON 不受影响;若用严格按响应头判断类型的封装,需手动按 JSON 解析。
 
 ### 消费示例
 
 **JavaScript / 浏览器:**
 
 ```javascript
-const BASE = 'https://raw.gitcode.com/peng1818/AI-News-Hub-Data/raw/news-hub-data'
+const BASE = 'https://api.gitcode.com/api/v5/repos/peng1818/AI-News-Hub-Data/raw'
+const REF = 'news-hub-data'
 
-// 1. 读 index(注意:gitcode raw 返回 text/plain,需显式 .json() 解析)
-const index = await fetch(`${BASE}/index.json`).then(r => r.json())
+// 1. 读 index(API 返回 application/octet-stream,.json() 按内容解析无碍)
+const index = await fetch(`${BASE}/index.json?ref=${REF}`).then(r => r.json())
 
 // 2. 拼完整路径拉某源最新数据
 async function getLatest(source) {
   const rel = index.latest[source]            // "2026-07-15/08-00-data.json"
-  const r = await fetch(`${BASE}/${source}/${rel}`)
-  return r.json()                             // gitcode 返回 text/plain,.json() 仍能解析
+  const r = await fetch(`${BASE}/${source}/${rel}?ref=${REF}`)
+  return r.json()
 }
 
 const hn = await getLatest('hackernews')
 console.log(hn.items[0].title)
 ```
 
-> gitcode raw 偶发 403 限流。生产环境建议加指数退避重试(如 3 次,间隔 1s/2s/4s)。
-
 **Python:**
 
 ```python
 import requests
 
-BASE = 'https://raw.gitcode.com/peng1818/AI-News-Hub-Data/raw/news-hub-data'
+BASE = 'https://api.gitcode.com/api/v5/repos/peng1818/AI-News-Hub-Data/raw'
+REF = 'news-hub-data'
 
-# gitcode raw 返回 text/plain;requests.json() 按内容解析,不依赖响应头,无需特殊处理
-index = requests.get(f'{BASE}/index.json', timeout=15).json()
+index = requests.get(f'{BASE}/index.json', params={'ref': REF}, timeout=15).json()
 
 def get_latest(source):
     rel = index['latest'][source]
-    return requests.get(f'{BASE}/{source}/{rel}', timeout=15).json()
+    return requests.get(f'{BASE}/{source}/{rel}', params={'ref': REF}, timeout=15).json()
 
 hn = get_latest('hackernews')
 print(hn['items'][0]['title'])
@@ -263,6 +262,7 @@ HuggingFace Trending Papers(AK 每日精选 arXiv 论文,按社区 upvote 排序
 
 5. **时区**:所有时间戳与文件名路径均为北京时间(UTC+8)。`fetched_at` / `run_at` 带显式 `+0800` 偏移,`_ms` 为 UTC Unix 毫秒(与时区无关)。
 
-6. **gitcode raw 服务特性**(实测):
-   - **Content-Type 为 `text/plain`**:`.json` 文件也按纯文本返回。`fetch().json()` / `requests.json()` 按响应体内容解析,不受影响;但若用严格按响应头判断类型的封装,需手动覆盖类型。
-   - **偶发 403 限流**:短时间高频请求会被限流。建议消费方加重试 + 缓存 `index.json` 的 `updated_at` 做增量判断,避免无脑轮询。
+6. **gitcode 访问特性**(实测):
+   - **优先用官方 API**(`api.gitcode.com/api/v5/.../raw/?ref=news-hub-data`):公开仓库匿名可读,稳定。`raw.gitcode.com` 直链背后是华为云 WAF,部分网络环境(数据中心 IP)会被拦 403。
+   - **Content-Type 为 `application/octet-stream`**(API)/ `text/plain`(raw 直链):非 `application/json`。`fetch().json()` / `requests.json()` 按响应体内容解析不受影响;若用严格按响应头判断类型的封装,需手动覆盖类型。
+   - **建议缓存**:客户端可缓存 `index.json` 的 `updated_at` 做增量判断,避免无脑轮询。

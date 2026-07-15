@@ -33,7 +33,7 @@ import java.util.concurrent.TimeUnit
  */
 class HackerNewsRepository(
     private val cacheDir: File? = null
-) {
+) : com.example.aihot.data.source.HackerNewsSource {
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
@@ -45,6 +45,15 @@ class HackerNewsRepository(
 
     /** 串行化 [fetchTopStories],避免短时间内并发刷新重复打网络。 */
     private val refreshMutex = Mutex()
+
+    /**
+     * 接口 [HackerNewsSource.fetch] 的桥接实现 —— 转调既有 [fetchTopStories]。
+     *
+     * HN 历史 API 方法名是 fetchTopStories(带 limit),与其余 4 个源的 fetch() 不同。
+     * 为让 ViewModel 统一依赖 [HackerNewsSource] 接口,这里提供一个同义的 fetch(),
+     * 默认 limit=20(对齐 HackerNewsViewModel 既有的 20 条约定,而非 Repository 原默认 10)。
+     */
+    override suspend fun fetch(limit: Int): HackerNewsTopStories = fetchTopStories(limit)
 
     /**
      * HackerNews Top N(默认 10),带文件缓存。
@@ -96,7 +105,9 @@ class HackerNewsRepository(
      * 强制忽略缓存重新拉取(下拉刷新等场景)。
      * 拉取成功后仍会刷新缓存,使后续命中。fetchedAt 取当前时刻。
      */
-    suspend fun forceRefresh(limit: Int = 10): HackerNewsTopStories {
+    // 注:这里加 override 是为满足 [HackerNewsSource] 接口(forceRefresh(limit))。
+    // 既有调用方(如 HackerNewsCommentsViewModel)直接调本方法,签名不变,零影响。
+    override suspend fun forceRefresh(limit: Int): HackerNewsTopStories {
         val fresh = fetchTopStoriesFromNetwork(limit)
         val now = System.currentTimeMillis()
         if (cacheDir != null) {

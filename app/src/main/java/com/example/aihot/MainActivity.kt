@@ -32,6 +32,7 @@ import com.example.aihot.data.BrowseHistoryRepository
 import com.example.aihot.data.HackerNewsStory
 import com.example.aihot.data.NewsItem
 import com.example.aihot.data.TranslationConfigStore
+import com.example.aihot.data.source.SourceMode
 import com.example.aihot.ui.more.SettingsStore
 import com.example.aihot.ui.NewsDetailScreen
 import com.example.aihot.ui.BrowseHistoryViewModel
@@ -214,8 +215,10 @@ fun AIHotApp() {
     )
     val themeMode = displayPrefs.themeMode
     val fontChoice = displayPrefs.fontChoice
+    val sourceMode = displayPrefs.sourceMode
     val onSelectTheme: (ThemeMode) -> Unit = { scope.launch { settingsStore.updateTheme(it) } }
     val onSelectFont: (FontChoice) -> Unit = { scope.launch { settingsStore.updateFont(it) } }
+    val onSelectSource: (SourceMode) -> Unit = { scope.launch { settingsStore.updateSourceMode(it) } }
 
     val darkTheme = when (themeMode) {
         ThemeMode.System -> isSystemInDarkTheme()
@@ -330,6 +333,8 @@ fun AIHotApp() {
                             onSelectTheme = onSelectTheme,
                             fontChoice = fontChoice,
                             onSelectFont = onSelectFont,
+                            sourceMode = sourceMode,
+                            onSelectSource = onSelectSource,
                             onBack = pop,
                             onItemClick = { push(Page.Detail(it)) },
                             onSelectDate = { push(Page.DailyDate(it)) },
@@ -434,6 +439,8 @@ private fun PageView(
     onSelectTheme: (ThemeMode) -> Unit,
     fontChoice: FontChoice,
     onSelectFont: (FontChoice) -> Unit,
+    sourceMode: SourceMode,
+    onSelectSource: (SourceMode) -> Unit,
     onBack: () -> Unit,
     onItemClick: (NewsItem) -> Unit,
     onSelectDate: (String) -> Unit,
@@ -477,6 +484,8 @@ private fun PageView(
             onSelectTheme = onSelectTheme,
             fontChoice = fontChoice,
             onSelectFont = onSelectFont,
+            sourceMode = sourceMode,
+            onSelectSource = onSelectSource,
             configStore = configStore,
             onBack = onBack
         )
