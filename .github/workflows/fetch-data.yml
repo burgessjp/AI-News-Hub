@@ -1,11 +1,11 @@
 name: Fetch Hub Data
 
-# 每天 08:00 北京时间抓取「Hub」tab 浏览区域的 5 个数据源,解析成 JSON 后
-# 提交到 gitcode 数据仓库的 news-hub-data 分支。
+# 每天北京时间 06:00 与 14:00 各抓一次「Hub」tab 浏览区域的 5 个数据源,解析成
+# JSON 后提交到 gitcode 数据仓库的 news-hub-data 分支。
 #
-# cron 用 UTC:0 0 * * *(UTC 00:00 = 北京 08:00)。GitHub cron 不保证准点,
-# 脚本内部按 TZ=Asia/Shanghai 取「真正执行时」的北京时间生成文件名日期/时间,
-# 因此即便延迟到 08:15 才跑,目录名仍是当天的 08-15,不会错位。
+# cron 用 UTC:北京 06:00 = UTC 22:00(前一日的),北京 14:00 = UTC 06:00。
+# GitHub cron 不保证准点,脚本内部按 TZ=Asia/Shanghai 取「真正执行时」的北京时间
+# 生成文件名日期/时间,因此即便延迟到 06:15 才跑,目录名仍是当天的 06-15,不会错位。
 #
 # 失败策略(对齐 scripts/fetch_data.py):单源失败被跳过,成功源照常提交;
 # 全部失败时 fetch 步骤退出码非 0,workflow 标红便于发现。
@@ -15,7 +15,8 @@ name: Fetch Hub Data
 
 on:
   schedule:
-    - cron: '0 0 * * *'   # UTC 00:00 = 北京 08:00
+    - cron: '0 22 * * *'  # UTC 22:00 = 北京 次日 06:00
+    - cron: '0 6 * * *'   # UTC 06:00 = 北京 14:00
   workflow_dispatch:       # 支持手动触发,便于首次验证 / 临时补抓
 
 jobs:
