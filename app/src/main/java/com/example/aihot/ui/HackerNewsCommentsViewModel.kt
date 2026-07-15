@@ -72,7 +72,12 @@ class HackerNewsCommentsViewModel(application: Application) : AndroidViewModel(a
         if (roots.isNotEmpty()) return // 已加载过,不重复
         _state.value = UiState.Loading
         viewModelScope.launch {
-            runCatching { repo.fetchComments(story.kids) }
+            runCatching {
+                // 归档模式下列表项没有 kids(归档快照未存评论树):先实时补拉 story 的一级评论 id,
+                // 再拉评论详情。Firebase API 匿名免费,这步几乎不会失败。
+                val kids = if (story.kids.isEmpty()) repo.fetchStoryKids(story.id) else story.kids
+                repo.fetchComments(kids)
+            }
                 .onSuccess { list ->
                     roots.clear()
                     roots.addAll(list.map { Node(it) })

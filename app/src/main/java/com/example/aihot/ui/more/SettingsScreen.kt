@@ -165,7 +165,7 @@ fun SettingsScreen(
 
             // 数据源 section —— Hub 4 个稳定源从实时抓取还是 gitcode 归档取数
             // 实时:直连第三方站点(默认,数据最新);归档:读 gitcode 历史快照(稳定不受反爬影响)
-            // 切换后需重进对应页面生效(ViewModel 是 keyed 单例)。
+            // 切换后下拉刷新即用新源,无需重进页面(ViewModel 订阅 prefsFlow 动态选 repo)。
             item { SettingsGroupHeader("数据源") }
             item {
                 SegmentedOptionRow(

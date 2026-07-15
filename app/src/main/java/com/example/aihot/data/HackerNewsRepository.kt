@@ -174,6 +174,20 @@ class HackerNewsRepository(
         }
     }
 
+    /**
+     * 按 story id 实时拉取其一级评论 id 列表(kids)。
+     *
+     * 用途:归档模式下列表项没有 kids(归档快照未存评论树),进入评论页时用它补全,
+     * 再走 [fetchComments] 拉评论详情。Firebase API 匿名免费不限速,几乎不会失败。
+     *
+     * @return kids 列表;item 不存在或无评论时返回空列表
+     */
+    suspend fun fetchStoryKids(storyId: Long): List<Long> = withContext(Dispatchers.IO) {
+        val obj = fetchItemJson(storyId) ?: return@withContext emptyList()
+        val arr = obj.optJSONArray("kids") ?: return@withContext emptyList()
+        (0 until arr.length()).map { arr.optLong(it) }
+    }
+
     /** 拉取单个 item 的 JSON;失败/404 返回 null(调用方跳过该条)。 */
     private fun fetchItemJson(id: Long): JSONObject? = runCatching {
         JSONObject(getRaw("$base/item/$id.json"))

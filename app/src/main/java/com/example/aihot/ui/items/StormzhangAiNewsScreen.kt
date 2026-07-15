@@ -51,9 +51,6 @@ import com.example.aihot.ui.components.NewsCardSkeletonList
 import com.example.aihot.ui.theme.AppText
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 /**
  * stormzhang AI Daily 全屏页面(「更多」tab 二级页)。

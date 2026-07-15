@@ -1,6 +1,8 @@
 package com.example.aihot.data.source
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okhttp3.Cookie
 import okhttp3.CookieJar
@@ -50,6 +52,9 @@ object ArchiveHttpClient {
 
     private const val INDEX_URL = "$API_BASE/index.json?ref=$REF"
 
+    /** index.json 内存缓存有效期:2 分钟(index 实际几小时才更新一次,短 TTL 足够)。 */
+    private const val INDEX_TTL_MS = 2L * 60 * 1000
+
     private const val UA =
         "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
 
@@ -65,6 +70,40 @@ object ArchiveHttpClient {
             .build()
     }
 
+    // ===== index.json 并发去重 + 短 TTL 缓存 =====
+    // 4 个归档源同时加载时,各自都要先读 index.json 拿最新路径。若无去重,会发 4 次
+    // 完全相同的 index 请求(文档明确建议「不要高频轮询」)。这里用 Mutex + 内存缓存:
+    //  1. 命中未过期缓存 → 直接复用,不打网络(4 个源共享一份)
+    //  2. 否则进 Mutex,串行化网络刷新(并发调用只触发 1 次真实请求,其余等待复用)
+    // 对齐 App 现有实时 Repository 的 Mutex.withLock 套路。TTL 2 分钟(index 几小时才更新一次)。
+
+    /** index.json 缓存:解析后的 JSON + 落盘时刻(毫秒)。null 表示无缓存。 */
+    private var indexCache: JSONObject? = null
+    private var indexCacheAt: Long = 0L
+
+    /** 串行化 index 刷新,避免并发重复打网络。 */
+    private val indexMutex = Mutex()
+
+    /**
+     * 拉 index.json(带 2 分钟缓存 + 并发去重)。
+     *
+     * @return 解析后的 index JSON;读取或解析失败抛 RuntimeException
+     */
+    private suspend fun fetchIndex(): JSONObject = indexMutex.withLock {
+        // 1) 命中未过期缓存:秒回(4 个源共享同一份,只打 1 次网络)
+        val cached = indexCache
+        if (cached != null && System.currentTimeMillis() - indexCacheAt < INDEX_TTL_MS) {
+            return@withLock cached
+        }
+        // 2) 走网络刷新(仅一次,并发其余调用在此等待后复用结果)
+        val text = getRaw(INDEX_URL, "读取归档索引失败")
+        val parsed = runCatching { JSONObject(text) }
+            .getOrElse { throw RuntimeException("归档 index.json 解析失败") }
+        indexCache = parsed
+        indexCacheAt = System.currentTimeMillis()
+        parsed
+    }
+
     /**
      * 拉某源的归档快照,返回解析后的顶层 JSON(含 fetched_at_ms / items 等)。
      *
@@ -73,10 +112,8 @@ object ArchiveHttpClient {
      * @return 该源最新快照的 JSON 对象;index 无该源或快照缺失抛 RuntimeException
      */
     suspend fun fetchLatestSnapshot(source: String): JSONObject = withContext(Dispatchers.IO) {
-        // 1) 读 index.json 拿最新路径
-        val indexText = getRaw(INDEX_URL, "读取归档索引失败")
-        val index = runCatching { JSONObject(indexText) }
-            .getOrElse { throw RuntimeException("归档 index.json 解析失败") }
+        // 1) 读 index.json(带 2 分钟缓存 + 并发去重,见 fetchIndex)拿最新路径
+        val index = fetchIndex()
         val latest = index.optJSONObject("latest")
             ?: throw RuntimeException("归档 index.json 无 latest 字段")
         val relPath = latest.optString(source).takeIf { it.isNotBlank() }
