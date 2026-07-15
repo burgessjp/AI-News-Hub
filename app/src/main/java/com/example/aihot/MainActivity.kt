@@ -40,6 +40,7 @@ import com.example.aihot.ui.components.AppBottomBar
 import com.example.aihot.ui.components.AppTab
 import com.example.aihot.ui.daily.DailyArchiveScreen
 import com.example.aihot.ui.daily.DailyDateScreen
+import com.example.aihot.ui.daily.DailyScreen
 import com.example.aihot.ui.items.HackerNewsCommentsScreen
 import com.example.aihot.ui.items.HackerNewsScreen
 import com.example.aihot.ui.items.GitHubTrendingScreen
@@ -53,8 +54,8 @@ import com.example.aihot.ui.more.MoreScreen
 import com.example.aihot.ui.more.SettingsScreen
 import com.example.aihot.ui.more.FontChoice
 import com.example.aihot.ui.more.ThemeMode
+import com.example.aihot.ui.summary.SummaryScreen
 import com.example.aihot.ui.tabs.AllTab
-import com.example.aihot.ui.tabs.DailyTab
 import com.example.aihot.ui.tabs.FeaturedTab
 import com.example.aihot.ui.anim.PageNavStyle
 import com.example.aihot.ui.anim.pageTransition
@@ -100,6 +101,10 @@ private sealed interface Page {
     }
     data object DailyArchive : Page
     data class DailyDate(val date: String) : Page
+    /** 全部动态 —— 原为独立 tab,现改为从精选页 push 进入的二级页。 */
+    data object All : Page
+    /** AI 日报 —— 原为独立 tab,现改为从「全部」页 push 进入的二级页。 */
+    data object Daily : Page
     data object Search : Page
     data object Settings : Page
     data object About : Page
@@ -123,6 +128,8 @@ private fun Page.toBundle(): Bundle = Bundle().apply {
         is Page.DailyDate -> { putString("t", "DailyDate"); putString("date", date) }
         is Page.HackerNewsComments -> { putString("t", "HNComments"); putParcelable("story", story) }
         is Page.DailyArchive -> putString("t", "DailyArchive")
+        is Page.All -> putString("t", "All")
+        is Page.Daily -> putString("t", "Daily")
         is Page.Search -> putString("t", "Search")
         is Page.Settings -> putString("t", "Settings")
         is Page.About -> putString("t", "About")
@@ -143,6 +150,8 @@ private fun pageFromBundle(b: Bundle): Page? {
         "DailyDate" -> b.getString("date")?.let { Page.DailyDate(it) }
         "HNComments" -> b.getParcelable<HackerNewsStory>("story")?.let { Page.HackerNewsComments(it) }
         "DailyArchive" -> Page.DailyArchive
+        "All" -> Page.All
+        "Daily" -> Page.Daily
         "Search" -> Page.Search
         "Settings" -> Page.Settings
         "About" -> Page.About
@@ -227,7 +236,7 @@ fun AIHotApp() {
     }
 
     // 当前 tab + 每个 tab 的二级页栈
-    var currentTab by rememberSaveable { mutableStateOf(AppTab.Featured) }
+    var currentTab by rememberSaveable { mutableStateOf(AppTab.Summary) }
     // 用 rememberSaveable 持久化导航栈,转屏/进程被杀后仍可恢复(需自定义 Saver,
     // 因 Page 含业务对象、AppTab 是 enum,默认 Bundle 无法直接存 Map)。
     var pageStacks by rememberSaveable(stateSaver = pageStacksSaver) {
@@ -315,8 +324,7 @@ fun AIHotApp() {
                         is Screen.Root -> TabRoot(
                             tab = s.tab,
                             onItemClick = { push(Page.Detail(it)) },
-                            onOpenSearch = { push(Page.Search) },
-                            onOpenArchive = { push(Page.DailyArchive) },
+                            onOpenAll = { push(Page.All) },
                             onOpenHackerNews = { push(Page.HackerNews) },
                             onOpenGitHubTrending = { push(Page.GitHubTrending) },
                             onOpenLinuxDo = { push(Page.LinuxDo) },
@@ -337,7 +345,10 @@ fun AIHotApp() {
                             onSelectSource = onSelectSource,
                             onBack = pop,
                             onItemClick = { push(Page.Detail(it)) },
+                            onOpenDaily = { push(Page.Daily) },
+                            onOpenSearch = { push(Page.Search) },
                             onSelectDate = { push(Page.DailyDate(it)) },
+                            onOpenArchive = { push(Page.DailyArchive) },
                             onOpenComments = { push(Page.HackerNewsComments(it)) },
                             onOpenUrl = openUrl,
                             onTitleResolved = onTitleResolved,
@@ -389,8 +400,7 @@ private sealed interface Screen {
 private fun TabRoot(
     tab: AppTab,
     onItemClick: (NewsItem) -> Unit,
-    onOpenSearch: () -> Unit,
-    onOpenArchive: () -> Unit,
+    onOpenAll: () -> Unit,
     onOpenHackerNews: () -> Unit,
     onOpenGitHubTrending: () -> Unit,
     onOpenLinuxDo: () -> Unit,
@@ -404,21 +414,19 @@ private fun TabRoot(
     when (tab) {
         AppTab.Featured -> FeaturedTab(
             onItemClick = onItemClick,
+            // 「全部 ›」入口:跳转到全部动态二级页
+            onOpenAll = onOpenAll,
             // 今日热点卡片链接到 AI HOT 阅读页,标注来源 "AI HOT"
             onOpenUrl = { url, title -> onOpenUrl(url, title, "AI HOT") }
         )
-        AppTab.All -> AllTab(
-            onItemClick = onItemClick,
-            onOpenSearch = onOpenSearch
-        )
-        AppTab.Daily -> DailyTab(
-            onItemClick = onItemClick,
-            onOpenArchive = onOpenArchive,
-            // 日报条目/快讯链接标注来源 "日报"
-            onOpenUrl = { url, title -> onOpenUrl(url, title, "日报") }
+        AppTab.Summary -> SummaryScreen(
+            onOpenHackerNews = onOpenHackerNews,
+            onOpenGitHubTrending = onOpenGitHubTrending,
+            onOpenHuggingFacePapers = onOpenHuggingFacePapers,
+            onOpenStormzhangAiNews = onOpenStormzhangAiNews,
+            onOpenSettings = onOpenSettings
         )
         AppTab.More -> MoreScreen(
-            onOpenArchive = onOpenArchive,
             onOpenHackerNews = onOpenHackerNews,
             onOpenGitHubTrending = onOpenGitHubTrending,
             onOpenLinuxDo = onOpenLinuxDo,
@@ -443,7 +451,10 @@ private fun PageView(
     onSelectSource: (SourceMode) -> Unit,
     onBack: () -> Unit,
     onItemClick: (NewsItem) -> Unit,
+    onOpenDaily: () -> Unit,
+    onOpenSearch: () -> Unit,
     onSelectDate: (String) -> Unit,
+    onOpenArchive: () -> Unit,
     onOpenComments: (HackerNewsStory) -> Unit,
     onOpenUrl: (String, String, String?) -> Unit,
     onTitleResolved: (String, String) -> Unit,
@@ -465,6 +476,18 @@ private fun PageView(
             darkTheme = darkTheme,
             onBack = onBack,
             onTitleResolved = onTitleResolved
+        )
+        Page.All -> AllTab(
+            onItemClick = onItemClick,
+            onBack = onBack,
+            onOpenDaily = onOpenDaily,
+            onOpenSearch = onOpenSearch
+        )
+        Page.Daily -> DailyScreen(
+            onItemClick = onItemClick,
+            onOpenArchive = onOpenArchive,
+            onBack = onBack,
+            onOpenUrl = { url, title -> onOpenUrl(url, title, "日报") }
         )
         Page.DailyArchive -> DailyArchiveScreen(
             onSelectDate = onSelectDate,

@@ -40,7 +40,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.aihot.ui.components.AppTopBar
-import com.example.aihot.ui.components.ArchiveIconButton
 import com.example.aihot.ui.components.BottomBarReservedHeight
 import com.example.aihot.ui.components.SettingsGroupHeader
 import com.example.aihot.ui.theme.AppText
@@ -53,12 +52,11 @@ import com.example.aihot.ui.theme.AppText
  *  - 浏览组(primary 强调):HackerNews / GitHub Trending / LinuxDo / stormzhang AI / HuggingFace —— 彩色图标块行
  *  - 偏好组(secondary 强调):设置 / 关于 —— 彩色图标块行
  *
- * 历史日报入口已统一移到全 App 各 tab 顶栏右上角(见顶栏 actions 的 ArchiveIconButton)。
- * 搜索入口亦已移至「全部」tab 顶栏(全部动态是搜索主场景,放顶栏更触手可及)。
+ * 日报及其历史归档入口已移至「全部动态」页(精选 → 全部 → 日报,日报页内含历史归档按钮)。
+ * 搜索入口亦在「全部动态」页顶栏(全部动态是搜索主场景)。
  */
 @Composable
 fun MoreScreen(
-    onOpenArchive: () -> Unit,
     onOpenHackerNews: () -> Unit,
     onOpenGitHubTrending: () -> Unit,
     onOpenLinuxDo: () -> Unit,
@@ -71,10 +69,7 @@ fun MoreScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
-            AppTopBar(
-                title = "Hub",
-                actions = { ArchiveIconButton(onClick = onOpenArchive) }
-            )
+            AppTopBar(title = "Hub")
         }
     ) { padding ->
         LazyColumn(

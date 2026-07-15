@@ -1,6 +1,8 @@
 package com.example.aihot.ui.tabs
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -44,7 +46,8 @@ import java.util.Locale
 @Composable
 fun FeaturedTab(
     onItemClick: (NewsItem) -> Unit,
-    onOpenUrl: (String, String) -> Unit
+    onOpenUrl: (String, String) -> Unit,
+    onOpenAll: () -> Unit
 ) {
     val vm: ItemsViewModel = viewModel(key = "featured")
     // 进入精选 tab 时强制 mode=SELECTED(防止从其它 tab 切来时 mode 残留)
@@ -97,11 +100,12 @@ fun FeaturedTab(
                         onOpen = onOpenUrl,
                         modifier = Modifier.padding(horizontal = 18.dp, vertical = 6.dp)
                     )
-                    // 「最新精选」区块标题
+                    // 「最新精选」区块标题 + 右侧「全部」入口(跳转到全部动态页)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 18.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
@@ -109,6 +113,12 @@ fun FeaturedTab(
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "全部 ›",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.clickable { onOpenAll() }
                         )
                     }
                 }

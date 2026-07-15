@@ -33,11 +33,11 @@ AIHot — Android  AI 资讯聚合客户端。Kotlin + Jetpack Compose + Materia
 
 `MainActivity.kt` 自实现多栈导航，**不依赖 Navigation Compose**。
 
-- `currentTab`（4 个 tab）+ `pageStacks: Map<AppTab, List<Page>>` 为每个 tab 维护独立的二级页栈
+- `currentTab`（3 个 tab：摘要/精选/更多）+ `pageStacks: Map<AppTab, List<Page>>` 为每个 tab 维护独立的二级页栈
 - 切 tab 保留各自二级栈；push/pop 只操作当前 tab 栈
 - `Page` 是 sealed interface，通过 `toBundle()`/`pageFromBundle()` 序列化到 `Bundle`，经 `pageStacksSaver` (Saver) 绑定 `rememberSaveable` 实现跨进程重启恢复
 - `Screen` sealed interface 区分根/二级页，驱动 `AnimatedContent` 转场：PUSH（横向推入）用于普通页，FADE 用于含 WebView 的页（AndroidView 位移会撕裂）
-- Tab 根页：`FeaturedTab` / `AllTab` / `DailyTab` / `MoreScreen`
+- Tab 根页：`SummaryScreen` / `FeaturedTab` / `MoreScreen`。全部动态与 AI 日报不再是 tab,而是二级页:精选页「最新精选」行右侧「全部 ›」→ `Page.All`(顶栏带「日报」「搜索」入口)→ `Page.Daily`
 
 **浮动药丸底栏架构**:不再用 `Scaffold(bottomBar=...)` 槽,改为 `Box` 叠层 —— 内容区 edge-to-edge 全屏,`AppBottomBar`(浮动药丸,90% 宽 + max 400dp + rounded-full + 玻璃质感)作为 overlay 在 `BottomCenter` 对齐(`navigationBarsPadding` + 16dp 距底),二级页时 `AnimatedVisibility` 滑出隐藏(沉浸感)。列表 `contentPadding` 用 `BottomBarReservedHeight`(120dp)预留底部空间避免末项被遮挡。各 tab/二级页自身 `Scaffold` 负责系统 inset(状态栏/手势栏)。
 
@@ -50,6 +50,7 @@ AIHot — Android  AI 资讯聚合客户端。Kotlin + Jetpack Compose + Materia
 | `NewsRepository` | `/items`（分页）、`/hot-topics`、`/daily`、`/dailies` |
 | `HackerNewsRepository` | HN Firebase API — top stories（4h 文件缓存 + forceRefresh）、评论（懒加载逐层拉取） |
 | `TranslationRepository` | OpenAI 兼容 `/v1/chat/completions`，SHA256 缓存到文件，Mutex 按 key 防并发重复请求 |
+| `SummaryRepository` | AI 摘要（摘要 Tab）—— 取各源 gitcode 归档当日快照 → 按源定制 system prompt → OpenAI 兼容 `/v1/chat/completions` 生成中文要点。复用翻译配置；缓存 key = `<source>\|<fetchedAtMs>\|<model>` 的 SHA256，同日同模型命中秒回。独立于 `TranslationRepository`（温度 0.5、prompt 与缓存维度不同） |
 
 数据模型都在 `NewsItem.kt`（NewsItem、DailyReport、HotTopic 等）和 `HackerNews.kt`（HackerNewsStory、HackerNewsComment、缓存包装类）。
 
@@ -60,6 +61,7 @@ AIHot — Android  AI 资讯聚合客户端。Kotlin + Jetpack Compose + Materia
 - `DailyViewModel` — 日报/归档
 - `HackerNewsViewModel` — HN 列表（翻译状态管理、缓存新鲜度展示）
 - `HackerNewsCommentsViewModel` — HN 评论树懒加载 + 逐条翻译
+- `SummaryViewModel` — AI 摘要 Tab：4 源各一个 `StateFlow<UiState<SourceSummary>>`，并发生成互不影响；复用翻译配置，未配置时引导去设置
 
 ### 主题系统（`ui/theme/`）
 
@@ -80,17 +82,22 @@ AIHot — Android  AI 资讯聚合客户端。Kotlin + Jetpack Compose + Materia
 - `TranslationConfigStore` — DataStore `translation_prefs`：翻译服务配置（baseUrl/apiKey/model/enabled）
 - HN 缓存和翻译缓存分别写 `cacheDir` 下的 JSON 文件
 
-### 翻译功能（`ui/translate/`）
+### AI 服务配置与调用（共享 `TranslationConfigStore`）
 
-`TranslateSelectionActivity` 响应 `ACTION_PROCESS_TEXT`，在系统选中菜单注册"译"。走 `TranslationRepository`，复用 HN 评论翻译的缓存/Mutex 机制。
+`TranslationConfigStore`（DataStore `translation_prefs`：enabled/baseUrl/apiKey/model）是全 App 唯一的 OpenAI 兼容服务配置层，**翻译与摘要共用同一套配置**：
+- `TranslationRepository` — 翻译（HN/论文标题摘要/系统选中菜单"译"，温度 0.3）
+- `SummaryRepository` — AI 摘要 Tab 的各源每日要点生成（温度 0.5，独立缓存文件 `source_summaries.json`）
+
+`TranslateSelectionActivity` 响应 `ACTION_PROCESS_TEXT`，在系统选中菜单注册"译"。
 
 ### 组件（`ui/components/`）
 
-`AppTopBar`（半透明玻璃质感顶栏）、`AppBottomBar`（浮动药丸底栏，4 tab）、`Card`、`SettingsRow`（含 `SettingsGroupHeader` 带 accentColor 双色分组、`SegmentedOptionRow`）、`Skeleton`、`HotTopicsSection`（蓝→紫渐变标题栏）、`StateViews`（Loading/Error 通用组件）、`NewsCard`（扁平行）+ `FeaturedHeroCard`（精选 Hero 卡片，左侧 primary 竖条 + 大标题，精选 tab 顶部强调展示）
+`AppTopBar`（半透明玻璃质感顶栏）、`AppBottomBar`（浮动药丸底栏，3 tab：摘要/精选/更多）、`Card`、`SettingsRow`（含 `SettingsGroupHeader` 带 accentColor 双色分组、`SegmentedOptionRow`）、`Skeleton`、`HotTopicsSection`（蓝→紫渐变标题栏）、`StateViews`（Loading/Error 通用组件）、`NewsCard`（扁平行）+ `FeaturedHeroCard`（精选 Hero 卡片，左侧 primary 竖条 + 大标题，精选 tab 顶部强调展示）
 
 ### 页面（`ui/` 下按功能分包）
 
-- `ui/tabs/` — 三个内容 tab 的根页(FeaturedTab 注入 Hero 卡片 + 今日热点)
+- `ui/tabs/` — 内容 tab 的根页(FeaturedTab 注入 Hero 卡片 + 今日热点)
+- `ui/summary/` — SummaryScreen（AI 摘要 Tab：4 张源卡片，每张显示该源当日归档的 AI 中文要点，点卡片进对应列表页）
 - `ui/items/` — ItemsScreen(带分类/搜索的列表，支持 `heroItem` 参数把第一条提升为 Hero 卡)、SearchScreen、HackerNewsScreen、HackerNewsCommentsScreen
 - `ui/daily/` — DailyScreen、DailyDateScreen、DailyArchiveScreen
 - `ui/more/` — MoreScreen(Hub 页：Profile 玻璃卡 + 统计格子 + 彩色图标块菜单 + 双色分组)、SettingsScreen、AboutScreen、SettingsStore

@@ -18,10 +18,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Thunderstorm
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -46,13 +48,14 @@ import com.example.aihot.ui.DailyViewModel
 import com.example.aihot.ui.components.AppTopBar
 import com.example.aihot.ui.components.AppTopBarDefaults
 import com.example.aihot.ui.components.ArchiveIconButton
-import com.example.aihot.ui.components.BottomBarReservedHeight
 import com.example.aihot.ui.theme.AppText
 
 /**
  * 日报屏幕:展示最新日报,顶部入口进入归档。
  *
- * 顶部 AppTopBar 带历史归档按钮,作为日报 tab 的根使用。
+ * 顶部 AppTopBar 带历史归档按钮。
+ * [onBack] 非 null 时左侧显示返回箭头(作为从「全部」页 push 进入的二级页使用);
+ * 为 null 时无返回箭头(保留兼容旧调用方)。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -60,6 +63,7 @@ fun DailyScreen(
     onItemClick: (NewsItem) -> Unit,
     onOpenArchive: () -> Unit = {},
     onOpenUrl: (String, String) -> Unit = { _, _ -> },
+    onBack: (() -> Unit)? = null,
     vm: DailyViewModel = viewModel()
 ) {
     val state by vm.latest.collectAsStateWithLifecycle()
@@ -70,6 +74,16 @@ fun DailyScreen(
             AppTopBar(
                 title = "AI 日报",
                 titleFontSize = AppTopBarDefaults.secondaryTitleFontSize,
+                navigationIcon = if (onBack != null) {
+                    {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "返回"
+                            )
+                        }
+                    }
+                } else null,
                 actions = {
                     ArchiveIconButton(onClick = onOpenArchive)
                     Text(
@@ -94,8 +108,8 @@ fun DailyScreen(
 @Composable
 internal fun DailyContent(report: DailyReport, onOpen: (String) -> Unit) {
     LazyColumn(
-        // 底部预留浮动药丸底栏高度(DailyTab 是根 tab,底栏悬浮)
-        contentPadding = PaddingValues(top = 4.dp, bottom = BottomBarReservedHeight),
+        // 现作为二级页(底栏隐藏),底部只需常规留白,不再预留浮动底栏高度
+        contentPadding = PaddingValues(top = 4.dp, bottom = 24.dp),
         modifier = Modifier.fillMaxSize()
     ) {
         // 顶部汇总:日期 + 头条 + 统计(扁平无卡片,与精选列表风格一致)

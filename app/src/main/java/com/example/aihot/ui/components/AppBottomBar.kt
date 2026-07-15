@@ -14,12 +14,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.MenuBook
-import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
-import androidx.compose.material.icons.automirrored.outlined.FormatListBulleted
-import androidx.compose.material.icons.automirrored.outlined.MenuBook
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Whatshot
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.Whatshot
 import androidx.compose.material3.Icon
@@ -39,7 +37,7 @@ import com.example.aihot.R
 import com.example.aihot.ui.theme.AppText
 
 /**
- * 4 个根 tab。
+ * 根 tab 集合(精选 / 全部 / 日报 / 摘要 / 更多)。
  *
  * 设计稿(参考 system_stream_editorial)用图标 FILL 区分选中态:
  *  - 选中:[selectedIcon] 实心(Filled)变体
@@ -54,20 +52,15 @@ enum class AppTab(
     val icon: ImageVector,
     val selectedIcon: ImageVector
 ) {
+    Summary(
+        R.string.tab_summary,
+        Icons.Outlined.AutoAwesome,
+        Icons.Filled.AutoAwesome
+    ),
     Featured(
         R.string.tab_featured,
         Icons.Outlined.Whatshot,
         Icons.Filled.Whatshot
-    ),
-    All(
-        R.string.tab_all,
-        Icons.AutoMirrored.Outlined.FormatListBulleted,
-        Icons.AutoMirrored.Filled.FormatListBulleted
-    ),
-    Daily(
-        R.string.tab_daily,
-        Icons.AutoMirrored.Outlined.MenuBook,
-        Icons.AutoMirrored.Filled.MenuBook
     ),
     More(
         R.string.tab_more,
