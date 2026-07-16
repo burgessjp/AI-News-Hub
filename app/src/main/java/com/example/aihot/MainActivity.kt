@@ -423,8 +423,7 @@ private fun TabRoot(
             onOpenHackerNews = onOpenHackerNews,
             onOpenGitHubTrending = onOpenGitHubTrending,
             onOpenHuggingFacePapers = onOpenHuggingFacePapers,
-            onOpenStormzhangAiNews = onOpenStormzhangAiNews,
-            onOpenSettings = onOpenSettings
+            onOpenStormzhangAiNews = onOpenStormzhangAiNews
         )
         AppTab.More -> MoreScreen(
             onOpenHackerNews = onOpenHackerNews,

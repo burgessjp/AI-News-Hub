@@ -66,7 +66,8 @@ import java.util.Locale
  * 每页是一张全高卡片:顶部源标题(图标 + 名),中部摘要正文(可滚动),底部「查看完整列表 →」。
  * 顶部小圆点指示当前页 / 总页数。点底部按钮进对应源列表页。
  *
- * 数据来自 gitcode 每日归档(08:00 快照),AI 生成复用用户的翻译服务配置。
+ * 数据来自 gitcode 每日归档快照顶层的 `ai_summary` 字段(由数据流水线预生成),App 端直接读取,
+ * 不再运行时调用 AI API。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -75,12 +76,10 @@ fun SummaryScreen(
     onOpenGitHubTrending: () -> Unit,
     onOpenHuggingFacePapers: () -> Unit,
     onOpenStormzhangAiNews: () -> Unit,
-    onOpenSettings: () -> Unit,
     vm: SummaryViewModel = viewModel()
 ) {
     val states by vm.states.collectAsStateWithLifecycle()
     val isRefreshing by vm.isRefreshing.collectAsStateWithLifecycle()
-    val configReady by vm.configReady.collectAsStateWithLifecycle()
 
     // 卡片配置:key → (标题 / 图标 / 进入列表的回调)
     val cards = listOf(
@@ -130,8 +129,6 @@ fun SummaryScreen(
         ) {
             // 顶部:数据来源提示 + 页面指示点
             SummaryHeaderRow(
-                configReady = configReady,
-                onOpenSettings = onOpenSettings,
                 currentPage = pagerState.currentPage,
                 pageCount = cards.size
             )
@@ -148,8 +145,7 @@ fun SummaryScreen(
                 SummaryCardPage(
                     spec = spec,
                     state = states[spec.source] ?: UiState.Loading,
-                    onRetry = { vm.retry(spec.source) },
-                    onOpenSettings = onOpenSettings
+                    onRetry = { vm.retry(spec.source) }
                 )
             }
         }
@@ -164,12 +160,10 @@ private data class SummaryCardSpec(
 )
 
 /**
- * 顶部行:左 = 数据来源 + 配置入口;右 = 页面指示圆点(当前页实心 accent,其余空心)。
+ * 顶部行:左 = 数据来源提示;右 = 页面指示圆点(当前页实心 accent,其余空心)。
  */
 @Composable
 private fun SummaryHeaderRow(
-    configReady: Boolean,
-    onOpenSettings: () -> Unit,
     currentPage: Int,
     pageCount: Int
 ) {
@@ -186,19 +180,6 @@ private fun SummaryHeaderRow(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f)
         )
-        if (!configReady) {
-            TextButton(
-                onClick = onOpenSettings,
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
-            ) {
-                Text(
-                    "配置 AI 服务",
-                    style = AppText.caption,
-                    fontWeight = FontWeight.SemiBold,
-                    color = accent
-                )
-            }
-        }
         Spacer(Modifier.size(8.dp))
         // 页面指示点
         Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -230,8 +211,7 @@ private fun SummaryHeaderRow(
 private fun SummaryCardPage(
     spec: SummaryCardSpec,
     state: UiState<SourceSummary>,
-    onRetry: () -> Unit,
-    onOpenSettings: () -> Unit
+    onRetry: () -> Unit
 ) {
     val cs = MaterialTheme.colorScheme
     val accent = cs.primary
@@ -294,9 +274,7 @@ private fun SummaryCardPage(
                     is UiState.Loading -> SummarySkeleton()
                     is UiState.Error -> SummaryError(
                         message = state.message,
-                        isConfigMissing = state.message == SummaryRepository.CONFIG_MISSING,
-                        onRetry = onRetry,
-                        onOpenSettings = onOpenSettings
+                        onRetry = onRetry
                     )
                     is UiState.Success -> SummaryBody(text = state.data.text)
                 }
@@ -400,33 +378,21 @@ private fun SummarySkeleton() {
 @Composable
 private fun SummaryError(
     message: String,
-    isConfigMissing: Boolean,
-    onRetry: () -> Unit,
-    onOpenSettings: () -> Unit
+    onRetry: () -> Unit
 ) {
-    val display = when {
-        isConfigMissing -> "尚未配置 AI 服务,无法生成摘要"
-        else -> message
-    }
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = display,
+            text = message,
             style = AppText.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(Modifier.size(8.dp))
-        if (isConfigMissing) {
-            TextButton(onClick = onOpenSettings) {
-                Text("去配置", style = AppText.bodySmall, fontWeight = FontWeight.SemiBold)
-            }
-        } else {
-            TextButton(onClick = onRetry) {
-                Text("重试", style = AppText.bodySmall, fontWeight = FontWeight.SemiBold)
-            }
+        TextButton(onClick = onRetry) {
+            Text("重试", style = AppText.bodySmall, fontWeight = FontWeight.SemiBold)
         }
     }
 }
