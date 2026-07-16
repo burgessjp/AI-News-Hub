@@ -69,7 +69,7 @@ fun MoreScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
-            AppTopBar(title = "Hub")
+            AppTopBar(title = "AI News Hub")
         }
     ) { padding ->
         LazyColumn(

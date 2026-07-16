@@ -2,7 +2,7 @@
     <string name="app_name">AI News Hub</string>
 
     <!-- 底部导航 tab -->
-    <string name="tab_featured">精选</string>
+    <string name="tab_featured">AIHot 精选</string>
     <string name="tab_summary">摘要</string>
     <string name="tab_more">更多</string>
 </resources>
