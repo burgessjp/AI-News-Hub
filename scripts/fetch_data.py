@@ -16,12 +16,23 @@ Repository 与对应 model 类),把 5 个数据源解析成 JSON 落盘:
 
 日期/时间统一用北京时间(UTC+8);CI 里设 TZ=Asia/Shanghai 即可。
 
-失败策略:每个源独立 try/except,单源失败(如 Cloudflare 拦截)记错误日志并跳过,
-其余源照常落盘。只要 ≥1 个源成功,退出码 0;全部失败才非 0。
+失败策略(需求 a):
+  - 每个源独立重试,最多 3 次(间隔 2s/4s);3 次全败才记失败、跳过,其余源照常落盘。
+  - 失败源的 index.json latest 指针从上一次 index.json 继承(--previous-index-url,
+    默认 gitcode 数据仓库),保证客户端永远拿到有效数据。可加 --no-previous-index 关闭。
+  - 只要 ≥1 个源成功,退出码 0;全部失败才非 0。
+
+AI 总结(需求 c):
+  - 每源抓完调 ai_summary.summarize_source 生成简体中文要点,写入快照顶层 `ai_summary`。
+  - 只总结 4 个稳定源(hackernews/github-trending/huggingface-papers/stormzhang-ai),
+    linuxdo 不做(对齐 App)。AI 调用失败仅 warn,不阻断落盘。
+  - 需 3 个 AI 环境变量(AI_NEWS_HUB_AI_BASE_URL/_MODEL/_API_KEY)齐全;缺失则跳过总结。
+    加 --no-summary 可显式跳过(本地调试用)。
 
 用法:
   python3 scripts/fetch_data.py --out-dir /tmp/aihot-data-test
   python3 scripts/fetch_data.py --out-dir out --only hackernews,linuxdo
+  python3 scripts/fetch_data.py --out-dir out --no-summary --no-previous-index  # 本地干跑
 """
 
 import argparse
@@ -36,6 +47,9 @@ from datetime import datetime, timezone, timedelta
 
 import requests
 from bs4 import BeautifulSoup
+
+# AI 总结:每源抓完调一次,失败不阻断(对齐 App SummaryRepository)
+import ai_summary
 
 
 # ===== 全局:对齐 App 端 OkHttp 配置 + 浏览器 UA(避免被 nginx/CF 403) =====
@@ -525,11 +539,42 @@ SOURCES = {
     "huggingface-papers": fetch_huggingface_papers,
 }
 
+# 单源抓取最大重试次数(需求 a:失败重试,最多 3 次)。首次 + 2 次重试。
+FETCH_MAX_ATTEMPTS = 3
 
-def write_snapshot(out_dir, source_name, items, meta, now):
+
+def fetch_with_retry(name, fn, limit_hn=None):
+    """
+    包装单源抓取,失败重试最多 FETCH_MAX_ATTEMPTS 次(需求 a)。
+
+    每次失败间指数退避:2s / 4s。全 3 次都败才抛最后一个异常
+    (交给 main 的 try/except 记 fail,并触发「保留旧 latest」逻辑)。
+
+    HackerNews 签名带 limit,其余源无参,这里按 name 分派。
+    """
+    last_exc = None
+    for attempt in range(1, FETCH_MAX_ATTEMPTS + 1):
+        try:
+            if name == "hackernews" and limit_hn is not None:
+                return fn(limit=limit_hn)
+            return fn()
+        except Exception as e:
+            last_exc = e
+            if attempt < FETCH_MAX_ATTEMPTS:
+                wait = 2 ** attempt  # 2s, 4s
+                print(f"[RETRY] {name:<20} 第 {attempt}/{FETCH_MAX_ATTEMPTS} 次失败,"
+                      f"{wait}s 后重试:{type(e).__name__}: {e}", file=sys.stderr)
+                time.sleep(wait)
+    raise last_exc
+
+
+def write_snapshot(out_dir, source_name, items, meta, now, ai_summary=None):
     """
     落盘单源快照:<out-dir>/<source>/<YYYY-MM-DD>/<HH-MM>-data.json。
-    顶层结构:source / fetched_at(ISO CST)/ fetched_at_ms / count / items / meta。
+    顶层结构:source / fetched_at(ISO CST)/ fetched_at_ms / count / items / meta / ai_summary?。
+
+    ai_summary(需求 c):非空时写入顶层 `ai_summary` 字段(简体中文要点)。
+    调用 AI 失败或源不支持(linuxdo)时传 None,该字段直接省略。
     """
     date_str = now.strftime("%Y-%m-%d")
     time_str = now.strftime("%H-%M")
@@ -546,6 +591,9 @@ def write_snapshot(out_dir, source_name, items, meta, now):
     # 把抓取附带元信息(如 stormzhang 的 pageDate)拍扁进顶层,方便消费
     for k, v in (meta or {}).items():
         payload.setdefault(k, v)
+    # AI 总结(需求 c):非空才写,保持与无总结时的结构兼容
+    if ai_summary:
+        payload["ai_summary"] = ai_summary
     with open(file_path, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2)
     return file_path
@@ -586,7 +634,45 @@ def _scan_latest(out_dir, source_name):
     return f"{best[0]}/{best[1]}-data.json"
 
 
-def write_index(out_dir, now, results):
+# 上一次 index.json 的拉取地址(需求 a:失败源继承旧 latest 指针)。
+# 用 gitcode 官方 API(公开仓库匿名可读,稳定;raw 直链背后华为云 WAF 易 403)。
+DEFAULT_PREVIOUS_INDEX_URL = (
+    "https://api.gitcode.com/api/v5/repos/peng1818/AI-News-Hub-Data"
+    "/raw/index.json?ref=news-hub-data"
+)
+
+
+def load_previous_latest(url):
+    """
+    拉取上一次的 index.json,返回 latest 字典(source → 相对路径)。失败返回 {}。
+
+    需求 a:CI 是干净跑(每次只有本次产物),某源本次抓取失败时本地目录不存在,
+    _scan_latest 会返回 None,导致 index.json 丢掉该源 —— 与 docs 承诺的
+    「保留旧指向」不符。这里从 gitcode 拉上一次 index.json,失败源继承其指针,
+    让客户端永远能拿到有效数据。拉取本身失败(HTTP/解析)时优雅降级,等同于无旧 index。
+
+    与 App 的 ArchiveHttpClient.fetchIndex 同源(都是 gitcode API raw),匿名公开读。
+    """
+    if not url:
+        return {}
+    try:
+        text = fetch_text(
+            url,
+            extra_headers={"Accept": "application/json"},
+            expect_json=True,
+        )
+        data = json.loads(text)
+        latest = data.get("latest") or {}
+        if isinstance(latest, dict):
+            print(f"[INDEX] 拉到上次 index.json,{len(latest)} 个源旧指向")
+            return {k: v for k, v in latest.items() if isinstance(v, str) and v}
+    except Exception as e:
+        print(f"[INDEX] 拉上次 index.json 失败,失败源将无法保留旧指向:"
+              f"{type(e).__name__}: {e}", file=sys.stderr)
+    return {}
+
+
+def write_index(out_dir, now, results, previous_latest=None):
     """
     写根目录 index.json:记录每个源最新成功快照的相对路径。
 
@@ -603,14 +689,22 @@ def write_index(out_dir, now, results):
     latest 的相对路径是「相对于源目录」的(如 2026-07-15/00-44-data.json),
     客户端拼上 <source>/ 前缀即得完整路径。
 
-    实现上扫描全量已有文件取最新(而非只记本次):本次失败的源仍保留上次成功的指向,
-    避免一次失败让 index 指空。每次跑都整文件重写。
+    指针来源(需求 a 修复):
+      1) 优先扫本地 out/ 取最新成功快照(_scan_latest)—— 本次成功的源。
+      2) 本地扫不到的源(本次抓取失败 → out/<source>/ 不存在),从 previous_latest
+         (上一次 index.json 的 latest)继承旧指针 —— 让客户端永远拿到有效数据。
+         previous_latest 为空(未拉到 / --no-previous-index)时该源直接缺省。
     """
+    previous_latest = previous_latest or {}
     latest = {}
     for name in SOURCES:
         rel = _scan_latest(out_dir, name)
         if rel:
             latest[name] = rel
+        elif name in previous_latest:
+            # 本次失败:继承上次成功指向(需求 a)
+            latest[name] = previous_latest[name]
+            print(f"[INDEX] {name:<20} 本次失败,保留旧指向 {previous_latest[name]}")
     index = {
         "updated_at": now.strftime("%Y-%m-%dT%H:%M:%S%z"),
         "updated_at_ms": int(now.timestamp() * 1000),
@@ -627,6 +721,18 @@ def main():
     parser.add_argument("--out-dir", default="out", help="输出根目录(默认 ./out)")
     parser.add_argument("--only", default="", help="逗号分隔的源名,只跑指定源(调试用)")
     parser.add_argument("--limit-hn", type=int, default=20, help="HackerNews 取前 N 条(默认 20)")
+    parser.add_argument(
+        "--no-summary", action="store_true",
+        help="跳过 AI 总结(本地调试 / 无 AI key 时用)",
+    )
+    parser.add_argument(
+        "--previous-index-url", default=DEFAULT_PREVIOUS_INDEX_URL,
+        help="上一次 index.json 的 URL(失败源继承其 latest 指针);空串关闭",
+    )
+    parser.add_argument(
+        "--no-previous-index", action="store_true",
+        help="不拉上一次 index.json(失败源在本次 index 中直接缺省)",
+    )
     args = parser.parse_args()
 
     os.makedirs(args.out_dir, exist_ok=True)
@@ -642,19 +748,38 @@ def main():
     else:
         targets = list(SOURCES.items())
 
+    # 需求 a:拉上一次 index.json,失败源将继承其 latest 指针(见 write_index)。
+    previous_latest = {}
+    if args.previous_index_url and not args.no_previous_index:
+        previous_latest = load_previous_latest(args.previous_index_url)
+
+    do_summary = not args.no_summary
+    if do_summary and not ai_summary.config_ready():
+        missing = [k for k in (
+            ai_summary.ENV_BASE_URL, ai_summary.ENV_MODEL, ai_summary.ENV_API_KEY
+        ) if not os.getenv(k)]
+        print(f"[AI] 未配置 {missing},本次跳过 AI 总结(可加 --no-summary 显式关闭)",
+              file=sys.stderr)
+
     results = {}  # source -> {"status": "ok"|"fail"|"skipped", ...}
     for name, fn in targets:
         try:
-            if name == "hackernews":
-                items, meta = fn(limit=args.limit_hn)
-            else:
-                items, meta = fn()
-            file_path = write_snapshot(args.out_dir, name, items, meta, now)
-            print(f"[OK]   {name:<20} {len(items):>4} 条 → {file_path}")
+            # 需求 a:失败重试最多 3 次
+            items, meta = fetch_with_retry(name, fn, limit_hn=args.limit_hn)
+
+            # 需求 c:每源抓完做 AI 总结(失败仅 warn,不阻断落盘)
+            ai_text = None
+            if do_summary:
+                ai_text = ai_summary.summarize_source(name, items)
+
+            file_path = write_snapshot(args.out_dir, name, items, meta, now, ai_summary=ai_text)
+            extra = "(含 AI 摘要)" if ai_text else ""
+            print(f"[OK]   {name:<20} {len(items):>4} 条{extra} → {file_path}")
             results[name] = {"status": "ok", "count": len(items), "file": file_path}
         except Exception as e:
-            # 单源失败不拖垮其余:记错误、跳过、继续
-            print(f"[FAIL] {name:<20} {type(e).__name__}: {e}", file=sys.stderr)
+            # 单源 3 次重试全败:记错误、跳过、继续(需求 a:由 previous_latest 兜底 index)
+            print(f"[FAIL] {name:<20} 重试 {FETCH_MAX_ATTEMPTS} 次仍失败:"
+                  f"{type(e).__name__}: {e}", file=sys.stderr)
             results[name] = {"status": "fail", "error": f"{type(e).__name__}: {e}"}
 
     # manifest:本次运行总览(放输出根,便于 CI 提交后回溯)
@@ -667,8 +792,8 @@ def main():
     with open(manifest_path, "w", encoding="utf-8") as f:
         json.dump(manifest, f, ensure_ascii=False, indent=2)
 
-    # index.json:每个源最新成功快照的相对路径(扫描全量取最新,失败源保留旧指向)
-    index_path = write_index(args.out_dir, now, results)
+    # index.json:每个源最新成功快照的相对路径(本地扫最新;失败源继承 previous_latest)
+    index_path = write_index(args.out_dir, now, results, previous_latest=previous_latest)
 
     ok_count = sum(1 for r in results.values() if r["status"] == "ok")
     print(f"\n汇总: {ok_count}/{len(results)} 源成功;manifest → {manifest_path};index → {index_path}")

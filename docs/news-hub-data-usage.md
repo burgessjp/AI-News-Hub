@@ -7,9 +7,10 @@
 
 ## 更新频率
 
-- **定时**:每天北京时间 08:00 由 GitHub Action 自动抓取并提交(GitHub cron 不保证准点,通常 ±15 分钟内)
+- **定时**:每天北京时间 06:00 与 14:00 各抓一次(GitHub cron 不保证准点,通常 ±15 分钟内)
 - **手动**:workflow 支持 `workflow_dispatch`,可随时手动触发补抓
-- 任何源抓取失败(如 Cloudflare 拦截)会被自动跳过,不影响其余源
+- 任何源抓取失败会自动重试最多 3 次(间隔 2s/4s);3 次全败才跳过,不影响其余源
+- 失败源的 `index.json` latest 指针会保留上一次成功的指向(见下「失败保留机制」)
 
 ## 仓库结构
 
@@ -128,7 +129,8 @@ print(hn['items'][0]['title'])
   "fetched_at": "2026-07-15T08:00:12+0800",
   "fetched_at_ms": 1784073612000,
   "count": 25,
-  "items": [ ... ]
+  "items": [ ... ],
+  "ai_summary": "• **owner/name（价值定位）**：... 中文 AI 要点 ..."
 }
 ```
 
@@ -139,6 +141,7 @@ print(hn['items'][0]['title'])
 | `fetched_at_ms` | 抓取时刻,Unix 毫秒时间戳 |
 | `count` | `items` 数组长度 |
 | `items` | 该源的条目数组,结构因源而异(见下) |
+| `ai_summary` | 本次数据的简体中文 AI 要点(6-10 条加粗小标题形式)。仅 4 个稳定源有(hackernews / github-trending / huggingface-papers / stormzhang-ai);linuxdo 不做,AI 调用失败时该字段缺省 |
 
 部分源会有额外顶层字段(如 stormzhang-ai 带 `pageDate`)。
 
@@ -248,11 +251,22 @@ HuggingFace Trending Papers(AK 每日精选 arXiv 论文,按社区 upvote 排序
 }
 ```
 
-`status` 取值:`ok`(成功,带 count/file)/ `fail`(失败,带 error)。每天会被覆盖,只保留最近一次。
+`status` 取值:`ok`(成功,带 count/file)/ `fail`(失败,带 error,此时该源 3 次重试已全败)。每天会被覆盖,只保留最近一次。
+
+## 失败保留机制
+
+某源本次抓取失败(3 次重试后仍失败,如 Cloudflare 拦截)时:
+
+1. **快照不落盘** —— 本次没有该源的新文件,仓库里保留它最后一次成功的快照。
+2. **`index.json` 继承旧指向** —— `fetch_data.py` 会在抓取前拉一次上一次的 `index.json`,把失败源的 `latest` 指针原样保留到本次 `index.json`,客户端读到的永远是有效数据路径(不会指空或丢源)。
+
+> 例如:linuxdo 在 07-15 当天两次都被 CF 拦截,`index.latest.linuxdo` 仍指向 `2026-07-14/...`,客户端照常能拉到 07-14 的数据。这是设计行为,对应用户「某源偶尔失败不能让 App 空白」的预期。
+
+该机制依赖 gitcode 上一次 `index.json` 可匿名拉取(公开仓库)。首跑(仓库还没有 `index.json`)时无旧指向可继承,失败源在首跑的 `index.json` 中会缺省。
 
 ## 限制与注意事项
 
-1. **LinuxDo 源不稳定**:受 Cloudflare 拦截影响,CI 上可能长期失败。消费方应对 `index.latest.linuxdo` 缺失或指向旧日期有容忍。
+1. **LinuxDo 源不稳定**:受 Cloudflare 拦截影响,CI 上可能长期失败(单源会重试 3 次后才跳过)。消费方应对 `index.latest.linuxdo` 缺失或指向旧日期有容忍(失败保留机制见上)。
 
 2. **无历史数据保证**:数据从 workflow 首次成功运行起开始积累。某源若从未成功过,对应目录不会存在。
 
