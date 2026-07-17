@@ -49,8 +49,10 @@ import com.example.aihot.ui.theme.AppText
  * 字号单一定义在 [AppText],改一处全局生效。
  */
 object AppTopBarDefaults {
-    val titleFontSize: TextUnit = AppText.titleHero.fontSize
-    val secondaryTitleFontSize: TextUnit = AppText.titleSection.fontSize
+    val titleFontSize: TextUnit
+        @Composable get() = AppText.titleHero.fontSize
+    val secondaryTitleFontSize: TextUnit
+        @Composable get() = AppText.titleSection.fontSize
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

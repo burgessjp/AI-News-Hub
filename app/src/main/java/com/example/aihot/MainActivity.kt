@@ -51,6 +51,7 @@ import com.example.aihot.ui.items.LinuxDoHotScreen
 import com.example.aihot.ui.items.StormzhangAiNewsScreen
 import com.example.aihot.ui.items.SearchScreen
 import com.example.aihot.ui.more.AboutScreen
+import com.example.aihot.ui.more.FontScale
 import com.example.aihot.ui.more.MoreScreen
 import com.example.aihot.ui.more.SettingsScreen
 import com.example.aihot.ui.more.FontChoice
@@ -66,10 +67,18 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
+
+    companion object {
+        /** Intent extra:为 true 时启动后自动进入「设置」页(系统选中翻译的「去设置」入口)。 */
+        const val EXTRA_OPEN_SETTINGS = "com.example.aihot.extra.OPEN_SETTINGS"
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setContent { AIHotApp() }
+        val openSettings = savedInstanceState == null &&
+            intent.getBooleanExtra(EXTRA_OPEN_SETTINGS, false)
+        setContent { AIHotApp(openSettingsOnLaunch = openSettings) }
     }
 }
 
@@ -196,7 +205,7 @@ private val pageStacksSaver = androidx.compose.runtime.saveable.Saver<
  * App 顶层路由 —— 多栈底部导航。
  *
  * 模型:
- *  - currentTab: 当前选中的 4 个根 tab 之一
+ *  - currentTab: 当前选中的 3 个根 tab 之一
  *  - pageStacks: 每个 tab 独立的二级页栈(栈空 = 处于根)
  *
  * 行为:
@@ -206,7 +215,7 @@ private val pageStacksSaver = androidx.compose.runtime.saveable.Saver<
  *  - 底栏始终常驻(见 AIHotApp 内说明)
  */
 @Composable
-fun AIHotApp() {
+fun AIHotApp(openSettingsOnLaunch: Boolean = false) {
     val appContext = androidx.compose.ui.platform.LocalContext.current.applicationContext
     val scope = rememberCoroutineScope()
     // 偏好存储(进程级单例):显示偏好(主题/字体) + AI 服务配置,均基于 DataStore 持久化。
@@ -226,10 +235,14 @@ fun AIHotApp() {
         initialValue = SettingsStore.DisplayPrefs()
     )
     val themeMode = displayPrefs.themeMode
+    val dynamicColor = displayPrefs.dynamicColor
     val fontChoice = displayPrefs.fontChoice
+    val fontScale = displayPrefs.fontScale
     val sourceMode = displayPrefs.sourceMode
     val onSelectTheme: (ThemeMode) -> Unit = { scope.launch { settingsStore.updateTheme(it) } }
+    val onToggleDynamicColor: (Boolean) -> Unit = { scope.launch { settingsStore.updateDynamicColor(it) } }
     val onSelectFont: (FontChoice) -> Unit = { scope.launch { settingsStore.updateFont(it) } }
+    val onSelectFontScale: (FontScale) -> Unit = { scope.launch { settingsStore.updateFontScale(it) } }
     val onSelectSource: (SourceMode) -> Unit = { scope.launch { settingsStore.updateSourceMode(it) } }
 
     val darkTheme = when (themeMode) {
@@ -268,11 +281,20 @@ fun AIHotApp() {
             }
         }
     }
-    // 切 tab
+    // 重击当前 tab 信号:已在根页时递增,根屏据此滚回顶部并刷新。
+    var reselectTick by remember { mutableStateOf(0) }
+
+    // 切 tab。重击当前 tab:栈非空 → 清空该栈回根页;已在根 → 发 reselect 信号
+    //(滚顶 + 刷新,由各根屏自行消费)。
     val selectTab: (AppTab) -> Unit = { tab ->
         if (tab != currentTab) {
             isNavigatingBack = false
             currentTab = tab
+        } else if (pageStacks[currentTab].orEmpty().isNotEmpty()) {
+            isNavigatingBack = true
+            pageStacks = pageStacks.toMutableMap().apply { this[currentTab] = emptyList() }
+        } else {
+            reselectTick++
         }
     }
 
@@ -294,12 +316,19 @@ fun AIHotApp() {
     // 系统返回键:当前 tab 栈非空时 pop
     BackHandler(enabled = !isRoot) { pop() }
 
+    // 外部入口要求直达设置页(如系统选中翻译的「去设置」)
+    androidx.compose.runtime.LaunchedEffect(openSettingsOnLaunch) {
+        if (openSettingsOnLaunch) push(Page.Settings)
+    }
+
     // 当前屏幕:根(tab) 或 二级页。用作 AnimatedContent 的 key。
     val screen: Screen = if (isRoot) Screen.Root(currentTab) else Screen.Secondary(currentPages.last())
 
     AIHotTheme(
         darkTheme = darkTheme,
-        fontFamily = if (fontChoice == FontChoice.System) null else fontChoice.fontFamily
+        dynamicColor = dynamicColor,
+        fontFamily = if (fontChoice == FontChoice.System) null else fontChoice.fontFamily,
+        fontScale = fontScale.scale
     ) {
         // 浮动药丸底栏架构:不再用 Scaffold bottomBar 槽,改用 Box 叠层。
         //  - 内容区 edge-to-edge 全屏,内层各 Tab 的 Scaffold 负责自己的状态栏 inset;
@@ -326,6 +355,7 @@ fun AIHotApp() {
                     when (s) {
                         is Screen.Root -> TabRoot(
                             tab = s.tab,
+                            reselectTick = reselectTick,
                             onItemClick = { push(Page.Detail(it)) },
                             onOpenAll = { push(Page.All) },
                             onOpenHackerNews = { push(Page.HackerNews) },
@@ -342,8 +372,12 @@ fun AIHotApp() {
                             page = s.page,
                             themeMode = themeMode,
                             onSelectTheme = onSelectTheme,
+                            dynamicColor = dynamicColor,
+                            onToggleDynamicColor = onToggleDynamicColor,
                             fontChoice = fontChoice,
                             onSelectFont = onSelectFont,
+                            fontScale = fontScale,
+                            onSelectFontScale = onSelectFontScale,
                             sourceMode = sourceMode,
                             onSelectSource = onSelectSource,
                             onBack = pop,
@@ -403,6 +437,7 @@ private sealed interface Screen {
 @Composable
 private fun TabRoot(
     tab: AppTab,
+    reselectTick: Int,
     onItemClick: (NewsItem) -> Unit,
     onOpenAll: () -> Unit,
     onOpenHackerNews: () -> Unit,
@@ -421,9 +456,11 @@ private fun TabRoot(
             // 「全部 ›」入口:跳转到全部动态二级页
             onOpenAll = onOpenAll,
             // 今日热点卡片链接到 AI HOT 阅读页,标注来源 "AI HOT"
-            onOpenUrl = { url, title -> onOpenUrl(url, title, "AI HOT") }
+            onOpenUrl = { url, title -> onOpenUrl(url, title, "AI HOT") },
+            reselectSignal = reselectTick
         )
         AppTab.Summary -> SummaryScreen(
+            reselectSignal = reselectTick,
             onOpenHackerNews = onOpenHackerNews,
             onOpenGitHubTrending = onOpenGitHubTrending,
             onOpenHuggingFacePapers = onOpenHuggingFacePapers,
@@ -448,8 +485,12 @@ private fun PageView(
     page: Page,
     themeMode: ThemeMode,
     onSelectTheme: (ThemeMode) -> Unit,
+    dynamicColor: Boolean,
+    onToggleDynamicColor: (Boolean) -> Unit,
     fontChoice: FontChoice,
     onSelectFont: (FontChoice) -> Unit,
+    fontScale: FontScale,
+    onSelectFontScale: (FontScale) -> Unit,
     sourceMode: SourceMode,
     onSelectSource: (SourceMode) -> Unit,
     onBack: () -> Unit,
@@ -509,15 +550,22 @@ private fun PageView(
         Page.Settings -> SettingsScreen(
             themeMode = themeMode,
             onSelectTheme = onSelectTheme,
+            dynamicColor = dynamicColor,
+            onToggleDynamicColor = onToggleDynamicColor,
             fontChoice = fontChoice,
             onSelectFont = onSelectFont,
+            fontScale = fontScale,
+            onSelectFontScale = onSelectFontScale,
             sourceMode = sourceMode,
             onSelectSource = onSelectSource,
             configStore = configStore,
             usageStore = usageStore,
             onBack = onBack
         )
-        Page.About -> AboutScreen(onBack = onBack)
+        Page.About -> AboutScreen(
+            onBack = onBack,
+            onOpenUrl = { url, title -> onOpenUrl(url, title, "关于") }
+        )
         Page.HackerNews -> HackerNewsScreen(
             onBack = onBack,
             onOpenComments = onOpenComments,

@@ -37,7 +37,7 @@ import com.example.aihot.R
 import com.example.aihot.ui.theme.AppText
 
 /**
- * 根 tab 集合(精选 / 全部 / 日报 / 摘要 / 更多)。
+ * 根 tab 集合(摘要 / 精选 / 更多)。
  *
  * 设计稿(参考 system_stream_editorial)用图标 FILL 区分选中态:
  *  - 选中:[selectedIcon] 实心(Filled)变体

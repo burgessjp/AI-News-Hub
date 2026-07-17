@@ -1,6 +1,7 @@
 package com.example.aihot.ui.summary
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,7 +35,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -56,6 +59,7 @@ import com.example.aihot.ui.components.AppTopBarDefaults
 import com.example.aihot.ui.components.BottomBarReservedHeight
 import com.example.aihot.ui.components.ShimmerBox
 import com.example.aihot.ui.theme.AppText
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -76,10 +80,12 @@ fun SummaryScreen(
     onOpenGitHubTrending: () -> Unit,
     onOpenHuggingFacePapers: () -> Unit,
     onOpenStormzhangAiNews: () -> Unit,
+    reselectSignal: Int = 0,
     vm: SummaryViewModel = viewModel()
 ) {
     val states by vm.states.collectAsStateWithLifecycle()
     val isRefreshing by vm.isRefreshing.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
 
     // 卡片配置:key → (标题 / 图标 / 进入列表的回调)
     val cards = listOf(
@@ -90,6 +96,14 @@ fun SummaryScreen(
     )
 
     val pagerState = rememberPagerState(pageCount = { cards.size })
+
+    // 重击当前 tab(reselectSignal 递增):滑回第一张卡并刷新全部源
+    LaunchedEffect(reselectSignal) {
+        if (reselectSignal > 0) {
+            pagerState.animateScrollToPage(0)
+            vm.refresh()
+        }
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
@@ -127,10 +141,11 @@ fun SummaryScreen(
                 // 避免卡片被浮动药丸底栏遮挡
                 .padding(bottom = BottomBarReservedHeight)
         ) {
-            // 顶部:数据来源提示 + 页面指示点
+            // 顶部:数据来源提示 + 页面指示点(可点跳页)
             SummaryHeaderRow(
                 currentPage = pagerState.currentPage,
-                pageCount = cards.size
+                pageCount = cards.size,
+                onDotClick = { i -> scope.launch { pagerState.animateScrollToPage(i) } }
             )
 
             // 左右滑动的卡片页(每页填满剩余空间)。底部留白由外层 Column 的
@@ -161,11 +176,13 @@ private data class SummaryCardSpec(
 
 /**
  * 顶部行:左 = 数据来源提示;右 = 页面指示圆点(当前页实心 accent,其余空心)。
+ * 圆点可点击直接跳页。
  */
 @Composable
 private fun SummaryHeaderRow(
     currentPage: Int,
-    pageCount: Int
+    pageCount: Int,
+    onDotClick: (Int) -> Unit = {}
 ) {
     val accent = MaterialTheme.colorScheme.primary
     Row(
@@ -181,7 +198,7 @@ private fun SummaryHeaderRow(
             modifier = Modifier.weight(1f)
         )
         Spacer(Modifier.size(8.dp))
-        // 页面指示点
+        // 页面指示点(可点击跳页)
         Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
             repeat(pageCount) { i ->
                 val isCurrent = i == currentPage
@@ -193,6 +210,7 @@ private fun SummaryHeaderRow(
                             if (isCurrent) accent
                             else MaterialTheme.colorScheme.outlineVariant
                         )
+                        .clickable { onDotClick(i) }
                 )
             }
         }

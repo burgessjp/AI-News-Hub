@@ -36,6 +36,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -56,7 +57,6 @@ import com.example.aihot.data.NewsItem
 import com.example.aihot.ui.DateGroupHeader
 import com.example.aihot.ui.EmptyState
 import com.example.aihot.ui.ErrorState
-import com.example.aihot.ui.FeaturedHeroCard
 import com.example.aihot.ui.ItemsViewModel
 import com.example.aihot.ui.NewsCard
 import com.example.aihot.ui.UiState
@@ -85,6 +85,12 @@ private fun NewsRowDivider() {
  *  - 加载时显示 shimmer 骨架(4 个),不显示裸 CircularProgressIndicator
  *  - 列表项用 Modifier.animateItem() — 切分类时自动淡入/移位(LazyItemScope 成员)
  *  - 滚下超过 1 屏时浮现"返回顶部"FAB(slideInVertically/slideOutVertically)
+ *  - 下拉刷新(PullToRefreshBox);[onRefreshExtra] 用于联动刷新页面自带的
+ *    额外模块(如精选 tab 的「今日热点」)
+ *  - [reselectSignal] 递增(重击当前 tab)时:滚回顶部并刷新
+ *
+ * @param reserveBottomBarSpace 底部是否预留浮动药丸底栏高度。根 tab(底栏悬浮)
+ *        传 true;二级页(底栏已隐藏,如「全部动态」)传 false,避免底部多余留白。
  */
 @OptIn(ExperimentalMaterial3Api::class, kotlinx.coroutines.FlowPreview::class)
 @Composable
@@ -93,13 +99,16 @@ fun ItemsScreen(
     modifier: Modifier = Modifier,
     vm: ItemsViewModel = viewModel(),
     header: (@Composable () -> Unit)? = null,
-    heroItem: NewsItem? = null
+    reserveBottomBarSpace: Boolean = true,
+    onRefreshExtra: (() -> Unit)? = null,
+    reselectSignal: Int = 0
 ) {
     val filter by vm.filter.collectAsStateWithLifecycle()
     val state by vm.state.collectAsStateWithLifecycle()
     val items by vm.items.collectAsStateWithLifecycle()
     val hasMore by vm.hasMore.collectAsStateWithLifecycle()
     val isLoadingMore by vm.isLoadingMore.collectAsStateWithLifecycle()
+    val isRefreshing by vm.isRefreshing.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
 
@@ -112,6 +121,15 @@ fun ItemsScreen(
     // 新列表会停在旧分类滑到的位置,甚至可能直接命中"接近底部"误触发翻页。
     LaunchedEffect(filter) {
         listState.scrollToItem(0)
+    }
+
+    // 重击当前 tab(reselectSignal 递增):滚回顶部并刷新。
+    LaunchedEffect(reselectSignal) {
+        if (reselectSignal > 0) {
+            listState.animateScrollToItem(0)
+            vm.refresh()
+            onRefreshExtra?.invoke()
+        }
     }
 
     // 滚动接近底部时自动加载下一页。
@@ -156,48 +174,39 @@ fun ItemsScreen(
                                 subtitle = if (filter.isSearching) "试试换个关键词" else null
                             )
                         } else {
-                            // Hero 卡片:精选 tab 顶部用 FeaturedHeroCard 强调第一条。
-                            // 仅在非搜索态且有 hero 时启用;hero 从分组数据中剔除避免重复。
-                            val showHero = !filter.isSearching && heroItem != null
                             // 按天分组(本地时区),保持原列表顺序。
                             // 仅当未在搜索状态时分组 —— 搜索结果跨天聚合意义不大,且更紧凑。
-                            val grouped = remember(data, filter.isSearching, showHero, heroItem) {
-                                val heroId = heroItem?.id
-                                val effective = if (showHero && heroId != null) {
-                                    data.filter { it.id != heroId }
-                                } else {
-                                    data
-                                }
+                            val grouped = remember(data, filter.isSearching) {
                                 if (filter.isSearching) {
-                                    listOf(GroupedDay("", effective))
+                                    listOf(GroupedDay("", data))
                                 } else {
-                                    effective.groupBy { dayKeyOf(it.publishedAt) }
+                                    data.groupBy { dayKeyOf(it.publishedAt) }
                                         .map { (k, items) -> GroupedDay(k, items) }
                                 }
                             }
+                            PullToRefreshBox(
+                                isRefreshing = isRefreshing,
+                                onRefresh = {
+                                    vm.refresh()
+                                    // 联动刷新页面自带的额外模块(如精选的「今日热点」)
+                                    onRefreshExtra?.invoke()
+                                }
+                            ) {
                             LazyColumn(
                                 state = listState,
-                                // 底部预留浮动药丸底栏的高度,避免末项被遮挡;
+                                // 根 tab 底部预留浮动药丸底栏的高度(reserveBottomBarSpace),
+                                // 避免末项被遮挡;二级页底栏已隐藏,只留常规间距。
                                 // 顶部留 4dp 与顶栏发丝线拉开间距。
-                                contentPadding = PaddingValues(top = 4.dp, bottom = BottomBarReservedHeight),
+                                contentPadding = PaddingValues(
+                                    top = 4.dp,
+                                    bottom = if (reserveBottomBarSpace) BottomBarReservedHeight else 16.dp
+                                ),
                                 modifier = Modifier.fillMaxSize()
                             ) {
                                 // 顶部装饰区(如「今日热点」卡片 + 区块标题)。仅非搜索时
                                 // 显示 —— 搜索态应聚焦结果,不宜插入热点等装饰模块。
                                 if (header != null && !filter.isSearching) {
                                     item(key = "screen-header") { header() }
-                                }
-                                // Hero 卡片 —— 紧贴顶部装饰区下方,在分类 chips 之前
-                                // showHero 已保证 heroItem 非空(!isSearching && heroItem != null),
-                                // 此处用 !! 取值;若未来 showHero 定义变更需同步调整。
-                                if (showHero) {
-                                    item(key = "hero-card") {
-                                        FeaturedHeroCard(
-                                            item = heroItem!!,
-                                            onClick = { onItemClick(heroItem) },
-                                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp)
-                                        )
-                                    }
                                 }
                                 // 分类 chips(搜索态隐藏)。随列表滚动,不再钉在顶部。
                                 if (!filter.isSearching) {
@@ -239,6 +248,7 @@ fun ItemsScreen(
                                     )
                                 }
                             }
+                            }
                         }
                     }
                 }
@@ -264,11 +274,12 @@ fun ItemsScreen(
                 },
                 containerColor = MaterialTheme.colorScheme.primaryContainer,
                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                // 底部留白避开浮动药丸底栏(BottomBarReservedHeight 含药丸高度 +
-                // 距底 margin + 手势栏 inset);左右 18dp 维持与列表内容对齐。
+                // 根 tab 底部留白避开浮动药丸底栏(BottomBarReservedHeight 含药丸高度 +
+                // 距底 margin + 手势栏 inset);二级页底栏已隐藏,只留常规间距。
+                // 左右 18dp 维持与列表内容对齐。
                 modifier = Modifier.padding(
                     end = 18.dp,
-                    bottom = BottomBarReservedHeight
+                    bottom = if (reserveBottomBarSpace) BottomBarReservedHeight else 24.dp
                 )
             ) {
                 Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "返回顶部")

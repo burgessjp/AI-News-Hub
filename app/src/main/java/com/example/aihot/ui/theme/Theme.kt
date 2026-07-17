@@ -7,6 +7,8 @@ import androidx.compose.material3.Typography
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -20,12 +22,16 @@ import androidx.compose.ui.text.font.FontFamily
  *
  * @param fontFamily 字体族覆盖。默认 null 沿用 [AppTypography] 的 Inter;
  *        设置页"衬线/等宽"选项传 Serif/Monospace 将全 App 文字统一切换。
+ *        同时作用于语义字号层 [AppTextStyles](经 [LocalAppTextStyles] 下发)。
+ * @param fontScale 字号整体缩放(设置页「字号」档位),只作用于 [AppTextStyles]
+ *        的 fontSize/lineHeight;MD3 typography 不缩放,避免组件内部错位。
  */
 @Composable
 fun AIHotTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     dynamicColor: Boolean = false,
     fontFamily: FontFamily? = null,
+    fontScale: Float = 1f,
     content: @Composable () -> Unit
 ) {
     val context = LocalContext.current
@@ -38,13 +44,19 @@ fun AIHotTheme(
     }
 
     val typography = if (fontFamily != null) AppTypography.withFontFamily(fontFamily) else AppTypography
+    // 语义字号层:字体族与缩放随设置变化,与 typography 同源(fontFamily 缺省 = Inter)
+    val appTextStyles = remember(fontFamily, fontScale) {
+        AppTextStyles(fontFamily = fontFamily ?: InterFontFamily, fontScale = fontScale)
+    }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = typography,
-        shapes = AppShapes,
-        content = content
-    )
+    CompositionLocalProvider(LocalAppTextStyles provides appTextStyles) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = typography,
+            shapes = AppShapes,
+            content = content
+        )
+    }
 }
 
 /**

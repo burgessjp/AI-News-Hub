@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.aihot.data.Mode
 import com.example.aihot.data.NewsItem
+import com.example.aihot.ui.HotTopicsViewModel
 import com.example.aihot.ui.ItemsViewModel
 import com.example.aihot.ui.components.AppTopBar
 import com.example.aihot.ui.components.HotTopicsSection
@@ -41,11 +42,14 @@ import java.util.Locale
 fun FeaturedTab(
     onItemClick: (NewsItem) -> Unit,
     onOpenUrl: (String, String) -> Unit,
-    onOpenAll: () -> Unit
+    onOpenAll: () -> Unit,
+    reselectSignal: Int = 0
 ) {
     val vm: ItemsViewModel = viewModel(key = "featured")
     // 进入精选 tab 时强制 mode=SELECTED(防止从其它 tab 切来时 mode 残留)
     LaunchedEffect(Unit) { vm.setMode(Mode.SELECTED) }
+    // 今日热点 ViewModel 提升到本层持有:下拉刷新/重击 tab 时与列表联动刷新
+    val hotVm: HotTopicsViewModel = viewModel(key = "hot-topics")
 
     // 实时日期「月日 · 周几」(中文区域格式)
     val dateText = remember {
@@ -71,11 +75,15 @@ fun FeaturedTab(
         ItemsScreen(
             onItemClick = onItemClick,
             vm = vm,
+            // 下拉刷新/重击 tab 时联动刷新「今日热点」
+            onRefreshExtra = { hotVm.refresh() },
+            reselectSignal = reselectSignal,
             header = {
                 Column(modifier = Modifier.fillMaxWidth()) {
                     // 今日热点卡片
                     HotTopicsSection(
                         onOpen = onOpenUrl,
+                        vm = hotVm,
                         modifier = Modifier.padding(horizontal = 18.dp, vertical = 6.dp)
                     )
                     // 「最新精选」区块标题 + 右侧「全部」入口(跳转到全部动态页)

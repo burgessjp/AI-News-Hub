@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -61,12 +62,21 @@ class ItemsViewModel : ViewModel() {
     private val _isLoadingMore = MutableStateFlow(false)
     val isLoadingMore: StateFlow<Boolean> = _isLoadingMore.asStateFlow()
 
+    /** 下拉刷新进行中(转圈 + 防重复)。 */
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
+    /** 刷新触发器:递增强制重拉(filter 不变时 StateFlow/distinct 会吞掉相等值,
+     *  单靠重写 filter 无法触发刷新,故用独立 tick)。 */
+    private val _refreshTick = MutableStateFlow(0)
+
     /** 列表层状态(独立于 filter,避免 filter 变化触发旧加载)。 */
     @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
-    val state: StateFlow<UiState<List<NewsItem>>> = _filter
-        .debounce(300) // 输入抖动;仅对 query 有意义,但对 mode/category 无害
+    val state: StateFlow<UiState<List<NewsItem>>> =
+        combine(_filter, _refreshTick) { f, t -> f to t }
+        .debounce(300) // 输入抖动;仅对 query 有意义,但对 mode/category/refresh 无害
         .distinctUntilChanged()
-        .flatMapLatest { f ->
+        .flatMapLatest { (f, _) ->
             kotlinx.coroutines.flow.flow {
                 emit(UiState.Loading)
                 _items.value = emptyList()
@@ -77,6 +87,8 @@ class ItemsViewModel : ViewModel() {
                     .onFailure { emit(UiState.Error(it.message ?: "未知错误")) }
             }
         }
+        // 终态(成功/失败)到达即结束下拉刷新转圈;Loading 不清,避免闪断
+        .onEach { if (it !is UiState.Loading) _isRefreshing.value = false }
         .stateIn(viewModelScope, SharingStarted.Lazily, UiState.Loading)
 
     init {
@@ -98,9 +110,9 @@ class ItemsViewModel : ViewModel() {
     }
 
     fun refresh() {
-        // 触发重新加载:复制当前 filter 写回以让 distinct 流通过
-        val cur = _filter.value
-        _filter.value = cur.copy()
+        // 触发重新加载:递增刷新 tick(filter 不变也能强制重拉)
+        _isRefreshing.value = true
+        _refreshTick.update { it + 1 }
     }
 
     /**

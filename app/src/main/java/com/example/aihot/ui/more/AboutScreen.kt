@@ -26,7 +26,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.aihot.ui.components.AppCard
@@ -40,14 +39,16 @@ import com.example.aihot.ui.components.SettingsRow
  *
  * 数据来源:AI HOT、HackerNews、GitHub Trending、HuggingFace Papers、stormzhang AI、LinuxDo 六源。
  *
+ * 链接统一走内置 WebView([onOpenUrl],计入浏览历史),不跳外部浏览器 ——
+ * 与全 App openUrl 策略一致。
+ *
  * 版本号取自 build.gradle.kts 的 versionName(运行时 PackageManager 读取,避免硬编码漂移)。
  *
  * 视觉与主列表页同构:品牌头卡片 + 章节条 + 扁平行 + hairline 分隔线。
  */
 @Composable
-fun AboutScreen(onBack: () -> Unit) {
+fun AboutScreen(onBack: () -> Unit, onOpenUrl: (String, String) -> Unit) {
     val context = LocalContext.current
-    val uriHandler = LocalUriHandler.current
     // 版本号取自包信息(对齐 build.gradle.kts versionName),不再硬编码
     val versionName = remember {
         @Suppress("DEPRECATION")
@@ -84,7 +85,7 @@ fun AboutScreen(onBack: () -> Unit) {
                     SettingsRow(
                         title = name,
                         subtitle = url,
-                        onClick = { uriHandler.openUri(url) },
+                        onClick = { onOpenUrl(url, name) },
                         showDivider = idx != dataSources.lastIndex
                     )
                 }
@@ -96,7 +97,7 @@ fun AboutScreen(onBack: () -> Unit) {
                 SettingsRow(
                     title = "项目源码",
                     subtitle = "GitHub · burgessjp/AI-News-Hub",
-                    onClick = { uriHandler.openUri("https://github.com/burgessjp/AI-News-Hub") },
+                    onClick = { onOpenUrl("https://github.com/burgessjp/AI-News-Hub", "项目源码") },
                     showDivider = false
                 )
             }

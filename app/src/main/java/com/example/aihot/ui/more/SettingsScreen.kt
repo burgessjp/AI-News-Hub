@@ -11,19 +11,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.BrightnessAuto
-import androidx.compose.material.icons.filled.CloudDownload
-import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.CurrencyYuan
-import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Hub
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Language
-import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Memory
-import androidx.compose.material.icons.filled.Sync
-import androidx.compose.material.icons.filled.TextFields
-import androidx.compose.material.icons.filled.Title
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -58,7 +51,6 @@ import com.example.aihot.data.AiUsageStore
 import com.example.aihot.data.source.SourceMode
 import com.example.aihot.ui.components.AppTopBar
 import com.example.aihot.ui.components.AppTopBarDefaults
-import com.example.aihot.ui.components.SegmentedOption
 import com.example.aihot.ui.components.SegmentedOptionRow
 import com.example.aihot.ui.components.SettingsGroupHeader
 import com.example.aihot.ui.components.SettingsRow
@@ -88,11 +80,24 @@ enum class FontChoice(val label: String, val fontFamily: FontFamily) {
 }
 
 /**
+ * 字号档位 —— 整体缩放语义字号层 AppTextStyles(见 ui/theme/AppText.kt)。
+ *
+ * 只缩放 AppText 档位的 fontSize/lineHeight;MD3 typography 不动,
+ * 避免 TopAppBar/Chip 等组件内部布局错位。
+ */
+enum class FontScale(val label: String, val scale: Float) {
+    Compact("紧凑", 0.9f),
+    Standard("标准", 1.0f),
+    Large("大号", 1.15f)
+}
+
+/**
  * 设置页。
  *
- * 视觉与主列表页同构:章节条 + 扁平行 / 横向三段选择器。
- *  - 外观:主题模式三选一(系统/亮/暗),横向三段式(图标 + 文字)
- *  - 字体:字体族三选一(默认/衬线/等宽),横向三段式
+ * 视觉与主列表页同构:章节条 + 扁平行;选择器为轨道式 [SegmentedOptionRow],
+ * 行图标用彩色图标块([SettingsRow] 的 iconAccent,与「更多」页 IconTileRow 同语言)。
+ *  - 外观:主题模式三选一(系统/亮/暗)+ 动态取色开关(Material You,Android 12+)
+ *  - 字体:字体族三选一(默认/衬线/等宽)+ 字号三档(紧凑/标准/大号)
  *  - 数据源:Hub 4 源从实时抓取还是 gitcode 归档取数,横向二段式
  *  - 语言:占位项(当前仅简体中文)
  *  - AI 服务:全局一套 OpenAI 兼容配置(内置 DeepSeek/智谱 GLM 预设 + 自定义),
@@ -107,34 +112,22 @@ enum class FontChoice(val label: String, val fontFamily: FontFamily) {
 fun SettingsScreen(
     themeMode: ThemeMode,
     onSelectTheme: (ThemeMode) -> Unit,
+    dynamicColor: Boolean,
+    onToggleDynamicColor: (Boolean) -> Unit,
     fontChoice: FontChoice,
     onSelectFont: (FontChoice) -> Unit,
+    fontScale: FontScale,
+    onSelectFontScale: (FontScale) -> Unit,
     sourceMode: SourceMode,
     onSelectSource: (SourceMode) -> Unit,
     configStore: AiConfigStore,
     usageStore: AiUsageStore,
     onBack: () -> Unit
 ) {
-    val themeOptions = remember {
-        listOf(
-            SegmentedOption(icon = Icons.Filled.BrightnessAuto, label = ThemeMode.System.label),
-            SegmentedOption(icon = Icons.Filled.LightMode, label = ThemeMode.Light.label),
-            SegmentedOption(icon = Icons.Filled.DarkMode, label = ThemeMode.Dark.label)
-        )
-    }
-    val fontOptions = remember {
-        listOf(
-            SegmentedOption(icon = Icons.Filled.Title, label = FontChoice.System.label),
-            SegmentedOption(icon = Icons.Filled.TextFields, label = FontChoice.Serif.label),
-            SegmentedOption(icon = Icons.Filled.Code, label = FontChoice.Mono.label)
-        )
-    }
-    val sourceOptions = remember {
-        listOf(
-            SegmentedOption(icon = Icons.Filled.Sync, label = SourceMode.LIVE.label),
-            SegmentedOption(icon = Icons.Filled.CloudDownload, label = SourceMode.ARCHIVE.label)
-        )
-    }
+    val themeOptions = remember { ThemeMode.entries.map { it.label } }
+    val fontOptions = remember { FontChoice.entries.map { it.label } }
+    val fontScaleOptions = remember { FontScale.entries.map { it.label } }
+    val sourceOptions = remember { SourceMode.entries.map { it.label } }
 
     val config by configStore.configFlow.collectAsStateWithLifecycle(
         initialValue = AiConfig()
@@ -158,23 +151,54 @@ fun SettingsScreen(
             modifier = Modifier.padding(padding),
             contentPadding = PaddingValues(bottom = 24.dp)
         ) {
-            // 外观 section —— 横向三段式主题选择器
+            // 外观 section —— 主题三段式(轨道式)+ 动态取色开关
             item { SettingsGroupHeader("外观") }
             item {
                 SegmentedOptionRow(
                     options = themeOptions,
                     selectedIndex = themeMode.ordinal,
-                    onSelect = { idx -> onSelectTheme(ThemeMode.entries[idx]) }
+                    onSelect = { idx -> onSelectTheme(ThemeMode.entries[idx]) },
+                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 6.dp)
+                )
+            }
+            item {
+                // Material You 动态取色:壁纸派生色,覆盖品牌双色板;Android 12+ 才可用
+                val dynamicSupported = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
+                SettingsRow(
+                    icon = Icons.Filled.Palette,
+                    iconAccent = MaterialTheme.colorScheme.secondary,
+                    title = "动态取色",
+                    subtitle = if (dynamicSupported) "跟随壁纸生成配色,覆盖品牌色" else "需 Android 12 及以上",
+                    showDivider = false,
+                    trailing = {
+                        Switch(
+                            checked = dynamicColor && dynamicSupported,
+                            enabled = dynamicSupported,
+                            onCheckedChange = { onToggleDynamicColor(it) }
+                        )
+                    },
+                    showChevron = false
                 )
             }
 
-            // 字体 section —— 横向三段式字体族选择器
+            // 字体 section —— 字体族 + 字号两组轨道式选择器,各带小节标签
             item { SettingsGroupHeader("字体") }
             item {
+                GroupLabel("字体族")
                 SegmentedOptionRow(
                     options = fontOptions,
                     selectedIndex = fontChoice.ordinal,
-                    onSelect = { idx -> onSelectFont(FontChoice.entries[idx]) }
+                    onSelect = { idx -> onSelectFont(FontChoice.entries[idx]) },
+                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 4.dp)
+                )
+            }
+            item {
+                GroupLabel("字号")
+                SegmentedOptionRow(
+                    options = fontScaleOptions,
+                    selectedIndex = fontScale.ordinal,
+                    onSelect = { idx -> onSelectFontScale(FontScale.entries[idx]) },
+                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 4.dp)
                 )
             }
 
@@ -186,7 +210,8 @@ fun SettingsScreen(
                 SegmentedOptionRow(
                     options = sourceOptions,
                     selectedIndex = sourceMode.ordinal,
-                    onSelect = { idx -> onSelectSource(SourceMode.entries[idx]) }
+                    onSelect = { idx -> onSelectSource(SourceMode.entries[idx]) },
+                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 6.dp)
                 )
             }
 
@@ -195,6 +220,7 @@ fun SettingsScreen(
             item {
                 SettingsRow(
                     icon = Icons.Filled.Language,
+                    iconAccent = MaterialTheme.colorScheme.primary,
                     title = "简体中文",
                     showDivider = false,
                     trailing = {
@@ -223,6 +249,17 @@ fun SettingsScreen(
     }
 }
 
+/** 小节标签(如「字体族」「字号」),引导下方选择器。 */
+@Composable
+private fun GroupLabel(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = 18.dp, top = 6.dp)
+    )
+}
+
 /**
  * AI 服务配置区块:翻译开关 + 服务商/API 地址/API Key/模型(自定义时另有单价两行)。
  *
@@ -242,8 +279,11 @@ private fun AiServiceSection(
     var showProviderDialog by rememberSaveable { mutableStateOf(false) }
     var showModelDialog by rememberSaveable { mutableStateOf(false) }
 
+    val cs = MaterialTheme.colorScheme
+
     SettingsRow(
         icon = Icons.Filled.Translate,
+        iconAccent = cs.primary,
         title = "启用翻译",
         subtitle = "翻译 HackerNews 标题/评论、GitHub Trending、HuggingFace 论文等",
         showDivider = true,
@@ -260,6 +300,7 @@ private fun AiServiceSection(
 
     SettingsRow(
         icon = Icons.Filled.Hub,
+        iconAccent = cs.secondary,
         title = "服务商",
         subtitle = config.provider.label,
         onClick = { showProviderDialog = true }
@@ -269,6 +310,7 @@ private fun AiServiceSection(
     if (config.provider == AiProvider.CUSTOM) {
         SettingsRow(
             icon = Icons.Filled.Language,
+            iconAccent = cs.tertiary,
             title = "API 地址",
             subtitle = config.baseUrl.ifBlank { "未设置" },
             onClick = { editingField = "base" }
@@ -276,6 +318,7 @@ private fun AiServiceSection(
     } else {
         SettingsRow(
             icon = Icons.Filled.Language,
+            iconAccent = cs.tertiary,
             title = "API 地址",
             subtitle = config.effectiveBaseUrl,
             showChevron = false
@@ -284,6 +327,7 @@ private fun AiServiceSection(
 
     SettingsRow(
         icon = Icons.Filled.Key,
+        iconAccent = cs.primary,
         title = "API Key",
         subtitle = if (config.apiKey.isBlank()) "未设置" else "已设置",
         onClick = { editingField = "key" }
@@ -291,6 +335,7 @@ private fun AiServiceSection(
 
     SettingsRow(
         icon = Icons.Filled.Memory,
+        iconAccent = cs.secondary,
         title = "模型",
         subtitle = config.model.ifBlank { "未设置" },
         showDivider = config.provider == AiProvider.CUSTOM,
@@ -304,12 +349,14 @@ private fun AiServiceSection(
     if (config.provider == AiProvider.CUSTOM) {
         SettingsRow(
             icon = Icons.Filled.CurrencyYuan,
+            iconAccent = cs.tertiary,
             title = "输入单价",
             subtitle = config.customInputPrice.ifBlank { "未设置(不估算费用)" },
             onClick = { editingField = "inputPrice" }
         )
         SettingsRow(
             icon = Icons.Filled.CurrencyYuan,
+            iconAccent = cs.tertiary,
             title = "输出单价",
             subtitle = config.customOutputPrice.ifBlank { "未设置(不估算费用)" },
             showDivider = false,

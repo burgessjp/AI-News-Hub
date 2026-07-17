@@ -43,12 +43,14 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.aihot.data.LinuxDoTopic
+import com.example.aihot.data.source.SourceMode
 import com.example.aihot.ui.EmptyState
 import com.example.aihot.ui.ErrorState
 import com.example.aihot.ui.LinuxDoHotViewModel
 import com.example.aihot.ui.UiState
 import com.example.aihot.ui.components.AppTopBar
 import com.example.aihot.ui.components.AppTopBarDefaults
+import com.example.aihot.ui.components.ListUpdateTimeHeader
 import com.example.aihot.ui.components.NewsCardSkeletonList
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -60,7 +62,8 @@ import java.util.Locale
  * LinuxDo 热榜全屏页面(「更多」tab 二级页)。
  *
  * 视觉对齐 [GitHubTrendingScreen]:
- *  - 顶栏:返回箭头 + 「LinuxDo 热榜」+ 右上「上次刷新 N 分钟前」
+ *  - 顶栏:返回箭头 + 「LinuxDo 热榜」;列表顶部居中「上次刷新 N 分钟前」
+ *    (ListUpdateTimeHeader,始终实时模式,与其余 4 源同一位置)
  *  - 列表:置顶帖 📌 徽章 / 非置顶排名徽章(1-3 primary 强调)
  *    + 标题 + 摘要 + 作者 + meta(标签 chip · 👁浏览 · 💬回复 · ❤️点赞 · 时间)
  *
@@ -95,16 +98,6 @@ fun LinuxDoHotScreen(
                             contentDescription = "返回"
                         )
                     }
-                },
-                actions = {
-                    // 「上次刷新 N 分钟前」:与 4 小时缓存策略配套,让用户知道数据有多旧。
-                    lastRefreshAt?.let { ts ->
-                        Text(
-                            text = "上次刷新 ${formatRefreshAgo(ts)}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
                 }
             )
         }
@@ -127,6 +120,7 @@ fun LinuxDoHotScreen(
                         ) {
                             LinuxDoList(
                                 topics = topics,
+                                lastRefreshAt = lastRefreshAt,
                                 onClick = { topic -> onOpenUrl(topic.url, topic.title) }
                             )
                         }
@@ -140,12 +134,16 @@ fun LinuxDoHotScreen(
 @Composable
 private fun LinuxDoList(
     topics: List<LinuxDoTopic>,
+    lastRefreshAt: Long?,
     onClick: (LinuxDoTopic) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(vertical = 8.dp)
     ) {
+        // 列表顶部居中显示「上次刷新 N 分钟前」—— 与其余 4 源同一位置
+        // (LinuxDo 始终实时,用 LIVE 文案),顶栏右上角不再重复显示。
+        item { ListUpdateTimeHeader(SourceMode.LIVE, lastRefreshAt) }
         itemsIndexed(
             items = topics,
             key = { _, topic -> topic.url }
@@ -370,18 +368,5 @@ private fun formatRelative(tsMillis: Long): String {
         minutes < 60 * 24 -> "${minutes / 60}小时前"
         minutes < 60 * 24 * 7 -> "${minutes / (60 * 24)}天前"
         else -> SimpleDateFormat("MM-dd", Locale.CHINA).format(Date(tsMillis))
-    }
-}
-
-/** 顶栏「上次刷新 N 分钟前」格式化(与 GitHubTrendingScreen 同源)。 */
-private fun formatRefreshAgo(fetchedAtMillis: Long): String {
-    val diff = System.currentTimeMillis() - fetchedAtMillis
-    val minutes = diff / 60_000L
-    return when {
-        minutes < 1 -> "刚刚"
-        minutes < 60 -> "${minutes} 分钟前"
-        minutes < 60 * 24 -> "${minutes / 60} 小时前"
-        minutes < 60 * 24 * 7 -> "${minutes / (60 * 24)} 天前"
-        else -> SimpleDateFormat("MM-dd HH:mm", Locale.CHINA).format(Date(fetchedAtMillis))
     }
 }

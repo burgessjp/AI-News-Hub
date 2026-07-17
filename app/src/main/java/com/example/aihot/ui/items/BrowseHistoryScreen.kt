@@ -74,7 +74,7 @@ import java.util.Locale
  * 数据来自 [BrowseHistoryRepository](Room),ViewModel 用搜索词 + 分组开关合并流。
  *
  * 交互:
- *  - 顶栏右上:搜索切换 / 按域名分组切换 / 清空全部
+ *  - 顶栏右上:按域名/按时间分组切换 / 清空全部
  *  - 列表项:字母占位块 + 标题 + host·来源·相对时间,点击重新打开(自动计数+1)
  *  - 左滑单条删除 + Snackbar 撤销
  *  - 按域名分组时,同 host 聚合,加 section header

@@ -153,11 +153,11 @@ private fun TranslateSheet(
                     state = s,
                     onRetry = { attempt++ },
                     onGoSettings = {
-                        Toast.makeText(
-                            context,
-                            "请在「更多 → 设置」中配置翻译服务",
-                            Toast.LENGTH_LONG
-                        ).show()
+                        // 真跳主 App 设置页(MainActivity 读 EXTRA_OPEN_SETTINGS 后 push 设置页)
+                        val intent = Intent(context, com.example.aihot.MainActivity::class.java)
+                            .putExtra(com.example.aihot.MainActivity.EXTRA_OPEN_SETTINGS, true)
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                        context.startActivity(intent)
                         onDismiss()
                     }
                 )

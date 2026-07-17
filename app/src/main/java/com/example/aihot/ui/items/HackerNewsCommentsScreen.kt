@@ -39,6 +39,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -48,6 +49,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.UriHandler
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
@@ -99,6 +102,22 @@ fun HackerNewsCommentsScreen(
     val titleStates by vm.titleStates.collectAsStateWithLifecycle()
     val snackbarHostState = remember { androidx.compose.material3.SnackbarHostState() }
 
+    // 评论正文 HTML 里的链接(AnnotatedString.fromHtml 的 LinkAnnotation)默认走
+    // LocalUriHandler → 外部浏览器,绕过内置 WebView 与浏览历史。这里覆写 handler:
+    // http(s) 统一收进内置 WebView(复用全局 openUrl,计浏览历史),其余 scheme 交还原默认。
+    val defaultUriHandler = LocalUriHandler.current
+    val commentUriHandler = remember(onOpenUrl, defaultUriHandler) {
+        object : UriHandler {
+            override fun openUri(uri: String) {
+                if (uri.startsWith("http://") || uri.startsWith("https://")) {
+                    onOpenUrl(uri, "加载中…")
+                } else {
+                    defaultUriHandler.openUri(uri)
+                }
+            }
+        }
+    }
+
     // 进入页面时触发首次加载(仅一级评论)。
     LaunchedEffect(story.id) { vm.load(story) }
 
@@ -139,6 +158,8 @@ fun HackerNewsCommentsScreen(
             )
         }
     ) { padding ->
+        // 提供评论链接专用的 UriHandler(见上),作用域限本页内容区
+        CompositionLocalProvider(LocalUriHandler provides commentUriHandler) {
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
@@ -189,6 +210,7 @@ fun HackerNewsCommentsScreen(
                     }
                 }
             }
+        }
         }
     }
 }

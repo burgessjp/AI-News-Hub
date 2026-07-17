@@ -81,11 +81,12 @@ python3 scripts/fetch_data.py --out-dir out --no-summary --no-previous-index
 
 ### 导航（MainActivity.kt，不用 Navigation Compose）
 
-- 3 个根 tab（`AppTab`）：摘要 `Summary` / AIHot 精选 `Featured` / 更多 `More`；`currentTab` + `pageStacks: Map<AppTab, List<Page>>` 每 tab 独立二级页栈，切 tab 保留各自栈。
+- 3 个根 tab（`AppTab`）：摘要 `Summary` / AIHot 精选 `Featured` / 更多 `More`；`currentTab` + `pageStacks: Map<AppTab, List<Page>>` 每 tab 独立二级页栈，切 tab 保留各自栈。**重击当前 tab**：栈非空则清栈回根页；已在根则递增 `reselectTick`，根屏（精选/摘要）消费为「滚回顶部 + 刷新」。
 - `Page` 是 private sealed interface（Detail/Web/All/Daily/Search/Settings/About/HackerNews/HackerNewsComments/GitHubTrending/LinuxDo/StormzhangAiNews/HuggingFacePapers/BrowseHistory/DailyArchive/DailyDate），经 `toBundle()`/`pageFromBundle()` + 自定义 `Saver` 挂到 `rememberSaveable`，进程被杀可恢复。**新增二级页必须同步加：Page 子类、toBundle/pageFromBundle 分支、PageView 分支。**
 - 转场集中在 `ui/anim/Motion.kt` 的 `pageTransition()`：默认 PUSH（横向推入），含 WebView 的页 override 为 FADE（AndroidView 位移会撕裂）。
-- 浮动药丸底栏：`Box` 叠层而非 `Scaffold(bottomBar)`；内容 edge-to-edge，底栏 overlay 在 BottomCenter，二级页 `AnimatedVisibility` 滑出；列表用 `BottomBarReservedHeight` 预留底部空间。
-- `openUrl` 是打开网页的唯一入口：在此统一记录浏览历史（Room），再 push `Page.Web`。
+- 返回键：根 `BackHandler` pop 当前 tab 栈；`WebViewScreen` 内层 `BackHandler` 优先——网页有可退历史时先 `goBack()` 退网页历史，退到首页后才 pop 整页。
+- 浮动药丸底栏：`Box` 叠层而非 `Scaffold(bottomBar)`；内容 edge-to-edge，底栏 overlay 在 BottomCenter，二级页 `AnimatedVisibility` 滑出；列表用 `BottomBarReservedHeight` 预留底部空间（二级页列表如「全部动态」经 `ItemsScreen(reserveBottomBarSpace=false)` 不再预留）。
+- `openUrl` 是打开网页的唯一入口：在此统一记录浏览历史（Room），再 push `Page.Web`。全 App 链接（含关于页、HN 评论内 HTML 链接）都收进内置 WebView，不走外部浏览器；`MainActivity` 支持 `EXTRA_OPEN_SETTINGS` 启动直达设置页（系统选中翻译的「去设置」用）。
 
 ### 数据层（data/）
 
@@ -100,7 +101,7 @@ python3 scripts/fetch_data.py --out-dir out --no-summary --no-previous-index
 
 ### 持久化
 
-- `SettingsStore`（DataStore `display_prefs`）：主题模式 / 字体 / 数据源模式。
+- `SettingsStore`（DataStore `display_prefs`）：主题模式 / 动态取色（Material You，Android 12+）/ 字体族 / 字号档位（`FontScale`，缩放 `AppTextStyles`）/ 数据源模式。
 - `AiConfigStore`（DataStore `ai_prefs`）：全局 AI 服务配置——服务商预设（DeepSeek/智谱 GLM/自定义，`AiProvider` 内置 baseUrl、模型列表与估算刊例价）+ apiKey/model + 自定义模型单价 + 翻译开关；首启从旧 `translation_prefs` 一次性迁移（baseUrl 自动补 `/v1`）。`AiUsageStore` 与其共用 `ai_prefs`：`usage_json` 按「模型 × 月」聚合 token 用量，设置页「用量与费用」区块按刊例价估算费用。
 - Room（`AppDatabase`，`aihot.db`，version 1，`fallbackToDestructiveMigration`）：仅浏览历史（`BrowseHistoryEntity/Dao/Repository`）。
 - HN 列表缓存与翻译缓存为 `cacheDir` 下的 JSON 文件。
@@ -109,10 +110,10 @@ python3 scripts/fetch_data.py --out-dir out --no-summary --no-previous-index
 
 两层设计，遵循 "Synthetic Intelligence News" 设计系统（品牌双色：Future Blue `#003EC7` + Intelligence Purple `#6B38D4`，蓝→紫渐变只用于 AI 特性）：
 
-1. MD3 规范层（`Color.kt`/`Type.kt`/`Shape.kt`/`Theme.kt`）：Light/Dark 双色板，固定品牌色不跟随 dynamic color。
-2. 语义层：`AppText.xxx`（9 个字号档）、`AppAlpha.xxx`（透明度），组件统一引用。
+1. MD3 规范层（`Color.kt`/`Type.kt`/`Shape.kt`/`Theme.kt`）：Light/Dark 双色板；品牌色为默认，`AIHotTheme(dynamicColor=true)`（设置页开关，Android 12+）时改用壁纸派生色。
+2. 语义层：`AppText.xxx`（9 个字号档）、`AppAlpha.xxx`（透明度），组件统一引用。`AppText` 是 `@Composable` 顶层属性，读 `LocalAppTextStyles` —— `AppTextStyles(fontFamily, fontScale)` 由 `AIHotTheme` 按设置构造（字体族跟随字体设置，字号随 `FontScale` 档位整体缩放），不再是硬编码 Inter 的 object。
 
-字体：Inter（SIL OFL 1.1，本地 4 字重 `res/font/inter_*.ttf`）；设置页可切 System/Serif/Monospace，经 `AIHotTheme(fontFamily=)` + `Typography.withFontFamily()` 全量替换。动画规范集中在 `ui/anim/Motion.kt`：只用 tween + MD3 emphasized 缓动，不用 spring/scale。
+字体：Inter（SIL OFL 1.1，本地 4 字重 `res/font/inter_*.ttf`）；设置页可切 System/Serif/Monospace，经 `AIHotTheme(fontFamily=)` + `Typography.withFontFamily()` 全量替换（AppTextStyles 同源切换）。动画规范集中在 `ui/anim/Motion.kt`：只用 tween + MD3 emphasized 缓动，不用 spring/scale。
 
 ## 编码约定
 

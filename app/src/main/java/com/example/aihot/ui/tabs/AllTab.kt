@@ -74,6 +74,8 @@ fun AllTab(
         ItemsScreen(
             onItemClick = onItemClick,
             vm = vm,
+            // 二级页:浮动底栏已隐藏,不再预留其高度
+            reserveBottomBarSpace = false,
             modifier = Modifier.fillMaxSize().padding(padding)
         )
     }

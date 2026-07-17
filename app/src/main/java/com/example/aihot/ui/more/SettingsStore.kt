@@ -3,6 +3,7 @@ package com.example.aihot.ui.more
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -13,7 +14,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.runBlocking
 
 /**
- * 显示偏好(主题模式 + 字体族 + 数据源模式)持久化。
+ * 显示偏好(主题模式 + 动态取色 + 字体族 + 字号档位 + 数据源模式)持久化。
  *
  * 此前 [themeMode] / [fontChoice] 仅靠 rememberSaveable 存内存,App 冷启动
  * 即丢失回到默认。这里用独立 DataStore 文件 `display_prefs`(与 AI 服务配置
@@ -30,7 +31,9 @@ class SettingsStore(context: Context) {
 
     data class DisplayPrefs(
         val themeMode: ThemeMode = ThemeMode.System,
+        val dynamicColor: Boolean = false,
         val fontChoice: FontChoice = FontChoice.System,
+        val fontScale: FontScale = FontScale.Standard,
         val sourceMode: SourceMode = SourceMode.LIVE
     )
 
@@ -38,8 +41,11 @@ class SettingsStore(context: Context) {
         DisplayPrefs(
             themeMode = p[KEY_THEME]?.let { name -> runCatching { ThemeMode.valueOf(name) }.getOrNull() }
                 ?: ThemeMode.System,
+            dynamicColor = p[KEY_DYNAMIC_COLOR] ?: false,
             fontChoice = p[KEY_FONT]?.let { name -> runCatching { FontChoice.valueOf(name) }.getOrNull() }
                 ?: FontChoice.System,
+            fontScale = p[KEY_FONT_SCALE]?.let { name -> runCatching { FontScale.valueOf(name) }.getOrNull() }
+                ?: FontScale.Standard,
             sourceMode = SourceMode.fromStored(p[KEY_SOURCE_MODE])
         )
     }
@@ -48,8 +54,16 @@ class SettingsStore(context: Context) {
         dataStore.edit { it[KEY_THEME] = mode.name }
     }
 
+    suspend fun updateDynamicColor(enabled: Boolean) {
+        dataStore.edit { it[KEY_DYNAMIC_COLOR] = enabled }
+    }
+
     suspend fun updateFont(choice: FontChoice) {
         dataStore.edit { it[KEY_FONT] = choice.name }
+    }
+
+    suspend fun updateFontScale(scale: FontScale) {
+        dataStore.edit { it[KEY_FONT_SCALE] = scale.name }
     }
 
     suspend fun updateSourceMode(mode: SourceMode) {
@@ -69,7 +83,9 @@ class SettingsStore(context: Context) {
 
     private companion object {
         val KEY_THEME = stringPreferencesKey("theme_mode")
+        val KEY_DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
         val KEY_FONT = stringPreferencesKey("font_choice")
+        val KEY_FONT_SCALE = stringPreferencesKey("font_scale")
         val KEY_SOURCE_MODE = stringPreferencesKey("source_mode")
     }
 }

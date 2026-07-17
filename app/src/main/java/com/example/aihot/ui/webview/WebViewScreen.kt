@@ -83,6 +83,8 @@ fun WebViewScreen(
     var currentUrl by remember { mutableStateOf(url) }
     var progress by remember { mutableStateOf(0) }
     var loading by remember { mutableStateOf(true) }
+    // 网页内部是否有可回退历史:决定系统返回键是退网页历史还是退出整页
+    var webCanGoBack by remember { mutableStateOf(false) }
     // 待下载任务:API<29 时等用户授予存储权限后再入队
     var pendingDownload by remember { mutableStateOf<DownloadParams?>(null) }
 
@@ -99,6 +101,12 @@ fun WebViewScreen(
                 web.destroy()
             }
         }
+    }
+
+    // 系统返回键:网页有内部历史时先退历史(WebView 内的站内跳转不应一键退出整页);
+    // 无历史时不拦截,交给外层(MainActivity)pop 整页。Compose 内层 BackHandler 优先于外层。
+    androidx.activity.compose.BackHandler(enabled = webCanGoBack) {
+        webViewRef.web?.goBack()
     }
 
     // 存储权限请求(API<29 下载需要)。授权回调里把暂存的任务入队 DownloadManager。
@@ -174,10 +182,16 @@ fun WebViewScreen(
                                 pageTitle = view.title ?: title
                                 currentUrl = url ?: currentUrl
                                 loading = false
+                                webCanGoBack = view.canGoBack()
                                 // 回写真实标题到浏览历史(用最终落地 URL,跟随重定向)
                                 val resolvedUrl = url ?: currentUrl
                                 val resolvedTitle = view.title?.takeIf { it.isNotBlank() }
                                 if (resolvedTitle != null) onTitleResolved(resolvedUrl, resolvedTitle)
+                            }
+
+                            override fun doUpdateVisitedHistory(view: WebView, url: String?, isReload: Boolean) {
+                                // 站内跳转/回退都会更新历史栈,同步「可回退」状态
+                                webCanGoBack = view.canGoBack()
                             }
                         }
                         webChromeClient = object : WebChromeClient() {
