@@ -49,7 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.aihot.data.HuggingFacePaper
-import com.example.aihot.data.TranslationConfig
+import com.example.aihot.data.AiConfig
 import com.example.aihot.ui.EmptyState
 import com.example.aihot.ui.ErrorState
 import com.example.aihot.ui.HuggingFacePapersViewModel
@@ -94,7 +94,7 @@ fun HuggingFacePapersScreen(
     val sourceMode by vm.sourceMode.collectAsStateWithLifecycle()
     val isRefreshing by vm.isRefreshing.collectAsStateWithLifecycle()
     val translationStates by vm.translationStates.collectAsStateWithLifecycle()
-    val config by vm.configFlow.collectAsStateWithLifecycle(initialValue = TranslationConfig())
+    val config by vm.configFlow.collectAsStateWithLifecycle(initialValue = AiConfig())
     val snackbarHostState = remember { SnackbarHostState() }
 
     // 配置未就绪提示:点「译」后若 state 变成 CONFIG_MISSING,弹一次引导
@@ -149,7 +149,7 @@ fun HuggingFacePapersScreen(
                             PapersList(
                                 papers = papers,
                                 translationStates = translationStates,
-                                translateEnabled = config.enabled,
+                                translateEnabled = config.translateEnabled,
                                 sourceMode = sourceMode,
                                 fetchedAtMillis = lastRefreshAt,
                                 onClick = { paper -> onOpenUrl(paper.url, paper.title) },

@@ -176,7 +176,7 @@ USER_PROMPT_BUILDERS = {
 
 
 def config_ready():
-    """三项 AI 配置是否齐全(对齐 App 的 TranslationConfig.isReady,但无 enabled 开关 ——
+    """三项 AI 配置是否齐全(对齐 App 的 AiConfig.isReady,但无 enabled 开关 ——
     脚本侧靠 pipeline.sh 是否注入决定是否做)。缺任一项返回 False。"""
     return all(os.getenv(k) for k in (ENV_BASE_URL, ENV_MODEL, ENV_API_KEY))
 

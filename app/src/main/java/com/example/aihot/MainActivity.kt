@@ -31,7 +31,8 @@ import com.example.aihot.data.AppDatabase
 import com.example.aihot.data.BrowseHistoryRepository
 import com.example.aihot.data.HackerNewsStory
 import com.example.aihot.data.NewsItem
-import com.example.aihot.data.TranslationConfigStore
+import com.example.aihot.data.AiConfigStore
+import com.example.aihot.data.AiUsageStore
 import com.example.aihot.data.source.SourceMode
 import com.example.aihot.ui.more.SettingsStore
 import com.example.aihot.ui.NewsDetailScreen
@@ -208,9 +209,11 @@ private val pageStacksSaver = androidx.compose.runtime.saveable.Saver<
 fun AIHotApp() {
     val appContext = androidx.compose.ui.platform.LocalContext.current.applicationContext
     val scope = rememberCoroutineScope()
-    // 偏好存储(进程级单例):显示偏好(主题/字体) + 翻译配置,均基于 DataStore 持久化。
+    // 偏好存储(进程级单例):显示偏好(主题/字体) + AI 服务配置,均基于 DataStore 持久化。
     val settingsStore = remember { SettingsStore(appContext) }
-    val configStore = remember { TranslationConfigStore(appContext) }
+    val configStore = remember { AiConfigStore(appContext) }
+    // AI 用量统计(与 AiConfigStore 同一 DataStore):设置页「用量与费用」区块数据源。
+    val usageStore = remember { AiUsageStore(appContext) }
 
     // 浏览历史仓库(进程级单例):基于 Room,记录所有通过 openUrl 打开的网页。
     val browseHistoryRepo = remember {
@@ -354,6 +357,7 @@ fun AIHotApp() {
                             onTitleResolved = onTitleResolved,
                             onOpenSettings = { push(Page.Settings) },
                             configStore = configStore,
+                            usageStore = usageStore,
                             browseHistoryRepo = browseHistoryRepo,
                             darkTheme = darkTheme
                         )
@@ -458,7 +462,8 @@ private fun PageView(
     onOpenUrl: (String, String, String?) -> Unit,
     onTitleResolved: (String, String) -> Unit,
     onOpenSettings: () -> Unit,
-    configStore: TranslationConfigStore,
+    configStore: AiConfigStore,
+    usageStore: AiUsageStore,
     browseHistoryRepo: BrowseHistoryRepository,
     darkTheme: Boolean = false
 ) {
@@ -509,6 +514,7 @@ private fun PageView(
             sourceMode = sourceMode,
             onSelectSource = onSelectSource,
             configStore = configStore,
+            usageStore = usageStore,
             onBack = onBack
         )
         Page.About -> AboutScreen(onBack = onBack)

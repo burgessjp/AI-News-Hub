@@ -30,7 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.aihot.data.ShortContentException
-import com.example.aihot.data.TranslationConfigStore
+import com.example.aihot.data.AiConfigStore
 import com.example.aihot.data.TranslationRepository
 import com.example.aihot.ui.theme.AIHotTheme
 import androidx.lifecycle.lifecycleScope
@@ -55,12 +55,12 @@ class TranslateSelectionActivity : ComponentActivity() {
         val text = intent.getStringExtra(Intent.EXTRA_PROCESS_TEXT)
         if (text.isNullOrBlank()) { finish(); return }
 
-        val configStore = TranslationConfigStore(applicationContext)
+        val configStore = AiConfigStore(applicationContext)
 
         // 开关关闭时根本不构建 UI:系统菜单项无法运行时动态隐藏,
         // 这里在 setContent 前拦截——Toast 提示后直接关闭,连 Sheet 都不渲染。
         lifecycleScope.launch {
-            val enabled = configStore.configFlow.first().enabled
+            val enabled = configStore.configFlow.first().translateEnabled
             if (!enabled) {
                 Toast.makeText(
                     this@TranslateSelectionActivity,
@@ -98,7 +98,7 @@ private enum class ErrorKind {
 /**
  * 翻译结果底部 Sheet。
  *
- * - [TranslationRepository] 与 [TranslationConfigStore] 进程内 new,
+ * - [TranslationRepository] 与 [AiConfigStore] 进程内 new,
  *   与 [com.example.aihot.ui.HackerNewsViewModel] 同范式,直接复用缓存与并发锁。
  * - [LaunchedEffect] 以 text 为 key:同一段文本只翻译一次。
  */
@@ -112,8 +112,8 @@ private fun TranslateSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     // repository 进程级缓存依赖 cacheDir,remember 复用同一实例(缓存/锁才有效)。
-    val repo = remember { TranslationRepository(context.applicationContext.cacheDir) }
-    val configStore = remember { TranslationConfigStore(context.applicationContext) }
+    val repo = remember { TranslationRepository(context.applicationContext) }
+    val configStore = remember { AiConfigStore(context.applicationContext) }
 
     var state by remember { mutableStateOf<TranslateState>(TranslateState.Loading) }
     var attempt by remember { mutableStateOf(0) }

@@ -95,7 +95,7 @@ fun HackerNewsCommentsScreen(
     vm: HackerNewsCommentsViewModel = viewModel(key = "hn-comments-${story.id}")
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
-    val config by vm.configFlow.collectAsStateWithLifecycle(initialValue = com.example.aihot.data.TranslationConfig())
+    val config by vm.configFlow.collectAsStateWithLifecycle(initialValue = com.example.aihot.data.AiConfig())
     val titleStates by vm.titleStates.collectAsStateWithLifecycle()
     val snackbarHostState = remember { androidx.compose.material3.SnackbarHostState() }
 
@@ -148,7 +148,7 @@ fun HackerNewsCommentsScreen(
                 item(key = "story-header") {
                     StoryHeader(
                         story = story,
-                        translateEnabled = config.enabled,
+                        translateEnabled = config.translateEnabled,
                         translationState = titleStates[story.id] ?: TranslationState.Idle,
                         onTranslate = { vm.translateTitle(story) },
                         onOpenUrl = onOpenUrl
@@ -180,7 +180,7 @@ fun HackerNewsCommentsScreen(
                                 }
                                 CommentRow(
                                     flat = flat,
-                                    translateEnabled = config.enabled,
+                                    translateEnabled = config.translateEnabled,
                                     onToggle = { vm.toggle(it) },
                                     onTranslate = { vm.translateComment(it) }
                                 )

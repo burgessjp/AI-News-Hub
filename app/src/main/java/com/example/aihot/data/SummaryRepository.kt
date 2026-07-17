@@ -44,7 +44,7 @@ private enum class SummarySource(val key: String, val title: String) {
  *   [com.example.aihot.data.source.SourceMode] 无关 —— 归档数据稳定、代表「今日」,
  *   适合做每日摘要;实时源波动大、用户可直接看列表。
  * - `ai_summary` 缺失(当天流水线 AI 调用失败 / 源不支持)时返回失败,UI 显示「暂无摘要 + 重试」。
- * - 不再依赖任何 AI 服务配置:无 baseUrl/apiKey/model 依赖,无需 [TranslationConfigStore]。
+ * - 不再依赖任何 AI 服务配置:无 baseUrl/apiKey/model 依赖,无需 [AiConfigStore]。
  */
 class SummaryRepository {
 

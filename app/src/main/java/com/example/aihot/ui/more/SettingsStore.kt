@@ -16,8 +16,8 @@ import kotlinx.coroutines.runBlocking
  * 显示偏好(主题模式 + 字体族 + 数据源模式)持久化。
  *
  * 此前 [themeMode] / [fontChoice] 仅靠 rememberSaveable 存内存,App 冷启动
- * 即丢失回到默认。这里用独立 DataStore 文件 `display_prefs`(与翻译配置
- * `translation_prefs` 分开,语义清晰)持久化,枚举按 [name] 存取。
+ * 即丢失回到默认。这里用独立 DataStore 文件 `display_prefs`(与 AI 服务配置
+ * `ai_prefs` 分开,语义清晰)持久化,枚举按 [name] 存取。
  *
  * [sourceMode] 控制 Hub 4 个稳定源(HackerNews / GitHub Trending / stormzhang AI /
  * HuggingFace Papers)从实时抓取还是 gitcode 归档取数,默认 [SourceMode.LIVE]。

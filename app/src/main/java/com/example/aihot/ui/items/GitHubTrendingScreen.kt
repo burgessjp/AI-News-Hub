@@ -49,7 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.aihot.data.TrendingRepo
-import com.example.aihot.data.TranslationConfig
+import com.example.aihot.data.AiConfig
 import com.example.aihot.ui.EmptyState
 import com.example.aihot.ui.ErrorState
 import com.example.aihot.ui.GitHubTrendingViewModel
@@ -92,7 +92,7 @@ fun GitHubTrendingScreen(
     val sourceMode by vm.sourceMode.collectAsStateWithLifecycle()
     val isRefreshing by vm.isRefreshing.collectAsStateWithLifecycle()
     val descStates by vm.descStates.collectAsStateWithLifecycle()
-    val config by vm.configFlow.collectAsStateWithLifecycle(initialValue = TranslationConfig())
+    val config by vm.configFlow.collectAsStateWithLifecycle(initialValue = AiConfig())
     val snackbarHostState = remember { SnackbarHostState() }
 
     // 配置未就绪提示:点「译」后若 state 变成 CONFIG_MISSING,弹一次引导
@@ -147,7 +147,7 @@ fun GitHubTrendingScreen(
                             TrendingList(
                                 repos = repos,
                                 descStates = descStates,
-                                translateEnabled = config.enabled,
+                                translateEnabled = config.translateEnabled,
                                 sourceMode = sourceMode,
                                 fetchedAtMillis = lastRefreshAt,
                                 onClick = { repo -> onOpenUrl(repo.url, "${repo.owner}/${repo.name}") },

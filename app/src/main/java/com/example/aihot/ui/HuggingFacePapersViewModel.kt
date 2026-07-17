@@ -6,7 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.aihot.data.HuggingFacePaper
 import com.example.aihot.data.HuggingFacePapersRepository
 import com.example.aihot.data.ShortContentException
-import com.example.aihot.data.TranslationConfigStore
+import com.example.aihot.data.AiConfigStore
 import com.example.aihot.data.TranslationRepository
 import com.example.aihot.data.source.HuggingFacePapersArchiveRepository
 import com.example.aihot.data.source.HuggingFacePapersSource
@@ -54,8 +54,8 @@ class HuggingFacePapersViewModel(application: Application) : AndroidViewModel(ap
     private fun currentRepo(): HuggingFacePapersSource =
         if (_sourceMode.value == SourceMode.ARCHIVE) archiveRepo else liveRepo
 
-    private val translationRepo = TranslationRepository(application.cacheDir)
-    private val configStore = TranslationConfigStore(application)
+    private val translationRepo = TranslationRepository(application)
+    private val configStore = AiConfigStore(application)
 
     private val _state = MutableStateFlow<UiState<List<HuggingFacePaper>>>(UiState.Loading)
     val state: StateFlow<UiState<List<HuggingFacePaper>>> = _state.asStateFlow()

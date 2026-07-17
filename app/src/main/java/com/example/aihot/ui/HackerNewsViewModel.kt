@@ -6,7 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.aihot.data.HackerNewsRepository
 import com.example.aihot.data.HackerNewsStory
 import com.example.aihot.data.ShortContentException
-import com.example.aihot.data.TranslationConfigStore
+import com.example.aihot.data.AiConfigStore
 import com.example.aihot.data.TranslationRepository
 import com.example.aihot.data.source.HackerNewsArchiveRepository
 import com.example.aihot.data.source.HackerNewsSource
@@ -50,8 +50,8 @@ class HackerNewsViewModel(application: Application) : AndroidViewModel(applicati
     private fun currentRepo(): HackerNewsSource =
         if (_sourceMode.value == SourceMode.ARCHIVE) archiveRepo else liveRepo
 
-    private val translationRepo = TranslationRepository(application.cacheDir)
-    private val configStore = TranslationConfigStore(application)
+    private val translationRepo = TranslationRepository(application)
+    private val configStore = AiConfigStore(application)
 
     private val _state = MutableStateFlow<UiState<List<HackerNewsStory>>>(UiState.Loading)
     val state: StateFlow<UiState<List<HackerNewsStory>>> = _state.asStateFlow()

@@ -6,7 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.aihot.data.GitHubTrendingRepository
 import com.example.aihot.data.ShortContentException
 import com.example.aihot.data.TrendingRepo
-import com.example.aihot.data.TranslationConfigStore
+import com.example.aihot.data.AiConfigStore
 import com.example.aihot.data.TranslationRepository
 import com.example.aihot.data.source.GitHubTrendingArchiveRepository
 import com.example.aihot.data.source.GitHubTrendingSource
@@ -57,8 +57,8 @@ class GitHubTrendingViewModel(application: Application) : AndroidViewModel(appli
     private fun currentRepo(): GitHubTrendingSource =
         if (_sourceMode.value == SourceMode.ARCHIVE) archiveRepo else liveRepo
 
-    private val translationRepo = TranslationRepository(application.cacheDir)
-    private val configStore = TranslationConfigStore(application)
+    private val translationRepo = TranslationRepository(application)
+    private val configStore = AiConfigStore(application)
 
     private val _state = MutableStateFlow<UiState<List<TrendingRepo>>>(UiState.Loading)
     val state: StateFlow<UiState<List<TrendingRepo>>> = _state.asStateFlow()

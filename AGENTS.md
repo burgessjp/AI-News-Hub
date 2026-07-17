@@ -93,14 +93,15 @@ python3 scripts/fetch_data.py --out-dir out --no-summary --no-previous-index
 - 无 DI 框架：Repository 在 ViewModel / Composable 内直接构造。
 - 双模式取数（`data/source/`）：4 个稳定源各有 `XxxSource` 接口 + 实时 Repository + `XxxArchiveRepository`；ViewModel 按 `SourceMode`（DataStore `display_prefs` 的 `source_mode`，默认 LIVE）选择实现。归档走 `ArchiveHttpClient`（gitcode 官方 REST API raw 端点，不用 raw 直链——背后是 WAF 会 403；index.json 有 2 分钟内存缓存 + Mutex 并发去重）。归档模式失败直接显示 Error 态，**不回退实时**。LinuxDo 不参与切换，始终实时。
 - `SummaryRepository`：AI 摘要 Tab 的摘要**不在 App 端运行时生成**，直接读归档快照顶层 `ai_summary` 字段（由数据流水线预生成）；`ai_summary` 缺失即失败态。
-- `TranslationRepository`：运行时调用户自配的 OpenAI 兼容服务（`${baseUrl}/v1/chat/completions`，温度 0.3），SHA256 缓存到 `cacheDir` 文件，Mutex 按 key 防并发重复。`TranslateSelectionActivity` 响应 `ACTION_PROCESS_TEXT` 在系统选中菜单注册「译」。
+- `AiChatClient`：OpenAI 兼容 chat 调用统一出口（`${baseUrl}/chat/completions`，baseUrl 含版本段），App 内所有端侧 AI 功能都经此访问「设置 → AI 服务」里的用户配置。
+- `TranslationRepository`：运行时经 `AiChatClient` 调用户自配的 AI 服务（温度 0.3），SHA256 缓存到 `cacheDir` 文件，Mutex 按 key 防并发重复；成功后把 token 用量写入 `AiUsageStore`。`TranslateSelectionActivity` 响应 `ACTION_PROCESS_TEXT` 在系统选中菜单注册「译」。
 - `NewsRepository`：自有后端 `/items`（cursor 分页）、`/hot-topics`、`/daily`、`/dailies`。
 - 数据模型集中在 `NewsItem.kt` / `HackerNews.kt` / 各源单文件（`TrendingRepo.kt`、`LinuxDoTopic.kt`、`StormzhangAiNews.kt`、`HuggingFacePaper.kt`）；`NewsItem`、`HackerNewsStory` 用 `@Parcelize`。
 
 ### 持久化
 
 - `SettingsStore`（DataStore `display_prefs`）：主题模式 / 字体 / 数据源模式。
-- `TranslationConfigStore`（DataStore `translation_prefs`）：翻译开关 + baseUrl/apiKey/model。
+- `AiConfigStore`（DataStore `ai_prefs`）：全局 AI 服务配置——服务商预设（DeepSeek/智谱 GLM/自定义，`AiProvider` 内置 baseUrl、模型列表与估算刊例价）+ apiKey/model + 自定义模型单价 + 翻译开关；首启从旧 `translation_prefs` 一次性迁移（baseUrl 自动补 `/v1`）。`AiUsageStore` 与其共用 `ai_prefs`：`usage_json` 按「模型 × 月」聚合 token 用量，设置页「用量与费用」区块按刊例价估算费用。
 - Room（`AppDatabase`，`aihot.db`，version 1，`fallbackToDestructiveMigration`）：仅浏览历史（`BrowseHistoryEntity/Dao/Repository`）。
 - HN 列表缓存与翻译缓存为 `cacheDir` 下的 JSON 文件。
 

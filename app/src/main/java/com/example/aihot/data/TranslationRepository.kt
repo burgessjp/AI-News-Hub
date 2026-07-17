@@ -1,18 +1,13 @@
 package com.example.aihot.data
 
+import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.security.MessageDigest
-import java.util.concurrent.TimeUnit
 
 /**
  * 翻译缓存条目。仅存译文 —— 原文不可变,以原文纯文本的 sha256 为 key,
@@ -52,25 +47,22 @@ private object TranslationCache {
 class ShortContentException : RuntimeException("content_too_short")
 
 /**
- * 翻译 Repository:调用用户配置的 OpenAI 兼容服务,带持久化缓存。
+ * 翻译 Repository:经 [AiChatClient] 调用用户在「设置 → AI 服务」配置的服务,带持久化缓存。
  *
  * 设计要点(复刻项目既有范式):
- *  - 自带 [OkHttpClient](同 [NewsRepository] 的超时配置);
+ *  - 网络统一走 [AiChatClient](OpenAI 兼容,超时同 [NewsRepository]);
  *  - 缓存存 `cacheDir/hn_translations.json`,key=原文纯文本 sha256 前 16 位;
  *  - [Mutex] 按 key 串行化,防同一条内容被并发点两次;
  *  - 短内容(<5 字符或无字母)跳过,返回 [ShortContentException];
- *  - 目标语言固定简体中文(见 system prompt)。
+ *  - 目标语言固定简体中文(见 system prompt);
+ *  - 请求成功后把 token 用量写入 [AiUsageStore](缓存命中不发请求,自然不统计)。
  */
-class TranslationRepository(
-    private val cacheDir: File?
-) {
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(20, TimeUnit.SECONDS)
-        .followRedirects(true)
-        .build()
+class TranslationRepository(context: Context) {
 
-    private val jsonMedia = "application/json; charset=utf-8".toMediaType()
+    private val appContext = context.applicationContext
+    private val cacheDir: File? = appContext.cacheDir
+    private val chatClient = AiChatClient()
+    private val usageStore = AiUsageStore(appContext)
 
     /** key 粒度的并发锁:同一条内容正在翻译时,后来的请求等待复用结果。 */
     private val locks = mutableMapOf<String, Mutex>()
@@ -85,9 +77,9 @@ class TranslationRepository(
      * HTTP 错误 / 解析失败 / 网络)。
      *
      * @param text 原文(评论为 HTML,标题为纯文本);内部会先 [HtmlUtil.stripHtml]
-     * @param config 用户配置(必须 [TranslationConfig.isReady],由调用方保证)
+     * @param config 用户的 AI 服务配置(必须 [AiConfig.isReady],由调用方保证)
      */
-    suspend fun translate(text: String, config: TranslationConfig): Result<String> {
+    suspend fun translate(text: String, config: AiConfig): Result<String> {
         val plain = HtmlUtil.stripHtml(text)
         // 短内容/无字母(纯链接、纯符号)不浪费 token
         if (plain.length < 5 || plain.none { it.isLetter() }) {
@@ -106,63 +98,32 @@ class TranslationRepository(
             val cached2 = withContext(Dispatchers.IO) { TranslationCache.read(cacheDir)[key] }
             if (cached2 != null) return@withLock Result.success(cached2)
 
-            runCatching { requestTranslation(plain, config) }
-                .onSuccess { translated ->
+            chatClient.chat(config, SYSTEM_PROMPT, plain)
+                .onSuccess { result ->
+                    // 统计 token 用量(响应无 usage 时 record 内部跳过)
+                    runCatching {
+                        usageStore.record(config.model, result.promptTokens, result.completionTokens)
+                    }
                     // 写缓存:读最新全量 → put → 写回,避免覆盖并发写入的其他 key
                     val map = withContext(Dispatchers.IO) { TranslationCache.read(cacheDir) }
-                    map[key] = translated
+                    map[key] = result.content
                     withContext(Dispatchers.IO) { TranslationCache.write(cacheDir, map) }
                 }
+                .map { it.content }
         }
         return got
     }
-
-    /** 发起一次 OpenAI 兼容 `/v1/chat/completions` 请求,返回译文文本。 */
-    private suspend fun requestTranslation(plain: String, config: TranslationConfig): String =
-        withContext(Dispatchers.IO) {
-            val body = JSONObject().apply {
-                put("model", config.model)
-                put("temperature", 0.3)
-                put("messages", JSONArray().apply {
-                    put(JSONObject().apply {
-                        put("role", "system")
-                        put(
-                            "content",
-                            "You are a translator. Translate the user's text into Simplified Chinese. " +
-                                "Preserve technical terms, code, and proper nouns in their original form. " +
-                                "Output ONLY the translation, no explanations, no quotes."
-                        )
-                    })
-                    put(JSONObject().apply {
-                        put("role", "user")
-                        put("content", plain)
-                    })
-                })
-            }
-
-            val req = Request.Builder()
-                .url("${config.baseUrl.trimEnd('/')}/v1/chat/completions")
-                .header("Authorization", "Bearer ${config.apiKey}")
-                .header("Content-Type", "application/json")
-                .post(body.toString().toRequestBody(jsonMedia))
-                .build()
-
-            client.newCall(req).execute().use { resp ->
-                if (!resp.isSuccessful) {
-                    val errBody = runCatching { resp.body?.string().orEmpty() }.getOrDefault("")
-                    throw RuntimeException("HTTP ${resp.code}${errBody.take(120).let { ": $it" }}")
-                }
-                val root = JSONObject(resp.body?.string().orEmpty())
-                root.optJSONArray("choices")?.optJSONObject(0)?.optJSONObject("message")
-                    ?.optString("content")?.trim()
-                    ?.takeIf { it.isNotBlank() }
-                    ?: throw RuntimeException("响应解析失败")
-            }
-        }
 
     private fun sha256Short(text: String): String {
         val md = MessageDigest.getInstance("SHA-256")
         val bytes = md.digest(text.toByteArray(Charsets.UTF_8))
         return bytes.joinToString("") { "%02x".format(it) }.take(16)
+    }
+
+    private companion object {
+        const val SYSTEM_PROMPT =
+            "You are a translator. Translate the user's text into Simplified Chinese. " +
+                "Preserve technical terms, code, and proper nouns in their original form. " +
+                "Output ONLY the translation, no explanations, no quotes."
     }
 }

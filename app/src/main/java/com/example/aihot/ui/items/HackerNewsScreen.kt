@@ -50,7 +50,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.aihot.data.HackerNewsStory
-import com.example.aihot.data.TranslationConfig
+import com.example.aihot.data.AiConfig
 import com.example.aihot.ui.EmptyState
 import com.example.aihot.ui.ErrorState
 import com.example.aihot.ui.HackerNewsViewModel
@@ -97,7 +97,7 @@ fun HackerNewsScreen(
     val sourceMode by vm.sourceMode.collectAsStateWithLifecycle()
     val isRefreshing by vm.isRefreshing.collectAsStateWithLifecycle()
     val titleStates by vm.titleStates.collectAsStateWithLifecycle()
-    val config by vm.configFlow.collectAsStateWithLifecycle(initialValue = TranslationConfig())
+    val config by vm.configFlow.collectAsStateWithLifecycle(initialValue = AiConfig())
     val snackbarHostState = remember { SnackbarHostState() }
 
     // 配置未就绪提示:点「译」后若 state 变成 CONFIG_MISSING,弹一次引导
@@ -152,7 +152,7 @@ fun HackerNewsScreen(
                             HackerNewsList(
                                 stories = stories,
                                 titleStates = titleStates,
-                                translateEnabled = config.enabled,
+                                translateEnabled = config.translateEnabled,
                                 sourceMode = sourceMode,
                                 fetchedAtMillis = lastRefreshAt,
                                 onClick = onOpenComments,

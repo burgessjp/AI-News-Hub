@@ -7,7 +7,7 @@ import com.example.aihot.data.HackerNewsComment
 import com.example.aihot.data.HackerNewsRepository
 import com.example.aihot.data.HackerNewsStory
 import com.example.aihot.data.ShortContentException
-import com.example.aihot.data.TranslationConfigStore
+import com.example.aihot.data.AiConfigStore
 import com.example.aihot.data.TranslationRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -47,13 +47,13 @@ sealed interface TranslationState {
  * 递归铺平(带 [FlatComment.depth])供 LazyColumn 渲染。
  *
  * 继承 [AndroidViewModel] 以拿 application.cacheDir 注入翻译缓存,
- * 以及构造 [TranslationConfigStore] / [TranslationRepository]。
+ * 以及构造 [AiConfigStore] / [TranslationRepository]。
  */
 class HackerNewsCommentsViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repo = HackerNewsRepository()
-    private val translationRepo = TranslationRepository(application.cacheDir)
-    private val configStore = TranslationConfigStore(application)
+    private val translationRepo = TranslationRepository(application)
+    private val configStore = AiConfigStore(application)
 
     private val _state = MutableStateFlow<UiState<List<FlatComment>>>(UiState.Loading)
     val state: StateFlow<UiState<List<FlatComment>>> = _state.asStateFlow()
