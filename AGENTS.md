@@ -11,7 +11,7 @@
 数据来源分两类：
 
 - **自有后端**：`aihot.virxact.com` 公开 API（动态分页 `/items`、今日热点 `/hot-topics`、AI 日报 `/daily`、归档 `/dailies`）。
-- **Hub 浏览区 5 个第三方源**：HackerNews（Firebase API）、GitHub Trending、LinuxDo 热榜、stormzhang AI 资讯、HuggingFace Papers（后三个为 jsoup HTML 抓取）。其中 4 个稳定源（除 LinuxDo）支持「实时抓取 / gitcode 归档」双模式切换（`SourceMode`），归档数据来自配套的数据流水线（见下「数据流水线」）。
+- **Hub 浏览区 6 个第三方源**：HackerNews（Firebase API）、GitHub Trending、LinuxDo 热榜、stormzhang AI 资讯、HuggingFace Papers、Product Hunt（V2 GraphQL API，需 Developer Token）。其中 5 个稳定源（除 LinuxDo）有 gitcode 归档数据；4 个（除 LinuxDo 与 Product Hunt）支持「实时抓取 / gitcode 归档」双模式切换（`SourceMode`），Product Hunt 因 Developer Token 不进 APK 仅走归档（LIVE 模式也回落归档），LinuxDo 始终实时。归档数据来自配套的数据流水线（见下「数据流水线」）。
 
 功能面：摘要 Tab（各源当日 AI 中文要点）、精选 / 全部动态、AI 日报与归档、搜索（本地搜索历史 + 今日热点热词引导）、HN 评论树、AI 翻译（OpenAI 兼容服务，用户自配 key；选中翻译 + WebView 整页翻译）、内置 WebView（含阅读模式、整页翻译、网页下载、视频全屏）、浏览历史（Room）。
 
@@ -58,11 +58,11 @@ gradle/libs.versions.toml    版本目录（所有依赖版本集中在此）
 
 ## 数据流水线（scripts/）
 
-App「Hub」浏览区归档数据的生产端：抓 5 个第三方源 → AI 总结 → 推送到 gitcode 数据仓库 `peng1818/AI-News-Hub-Data` 的 `news-hub-data` 分支。数据格式详见 `docs/news-hub-data-usage.md`。
+App「Hub」浏览区归档数据的生产端：抓 6 个第三方源 → AI 总结 → 推送到 gitcode 数据仓库 `peng1818/AI-News-Hub-Data` 的 `news-hub-data` 分支。数据格式详见 `docs/news-hub-data-usage.md`。
 
 - `pipeline.sh` —— 唯一编排入口（CI 与本地都调它）：执行前检测 4 个环境变量（缺任一直接 exit 1）：`AI_NEWS_HUB_AI_BASE_URL` / `AI_NEWS_HUB_AI_MODEL` / `AI_NEWS_HUB_AI_API_KEY` / `GITCODE_TOKEN`。
-- `fetch_data.py` —— 抓取 5 源落盘 `out/`。单源独立重试 3 次（2s/4s），失败源跳过且 `index.json` latest 指针从上一次继承（客户端永远拿到有效数据）；≥1 源成功退出码即为 0。日期/路径统一北京时间（CI 设 `TZ=Asia/Shanghai`）。
-- `ai_summary.py` —— 给 4 个稳定源（linuxdo 除外）生成简体中文要点写入快照顶层 `ai_summary` 字段（OpenAI 兼容调用，temperature 0.5）；失败仅 warn，不阻断落盘。
+- `fetch_data.py` —— 抓取 6 源落盘 `out/`。单源独立重试 3 次（2s/4s），失败源跳过且 `index.json` latest 指针从上一次继承（客户端永远拿到有效数据）；≥1 源成功退出码即为 0。日期/路径统一北京时间（CI 设 `TZ=Asia/Shanghai`）。Product Hunt 源走 V2 GraphQL API，需可选环境变量 `PRODUCT_HUNT_KEY`（Developer Token；缺失该源失败跳过，不阻断其余源，也不在 `pipeline.sh` 的 4 个硬依赖 env 之列）。
+- `ai_summary.py` —— 给 5 个稳定源（linuxdo 除外）生成简体中文要点写入快照顶层 `ai_summary` 字段（OpenAI 兼容调用，temperature 0.5）；失败仅 warn，不阻断落盘。
 - `push_data.py` —— 把 `out/` 提交推送到数据仓库（token 注入 URL，需 `GITCODE_TOKEN`）。
 - `gen_icon.py` / `gen_icon_svg.py` + `icon.svg` —— 启动图标生成（PIL/NumPy；SVG 版依赖 macOS `qlmanage`）。
 
@@ -72,6 +72,7 @@ App「Hub」浏览区归档数据的生产端：抓 5 个第三方源 → AI 总
 pip install -r scripts/requirements.txt   # requests / beautifulsoup4 / playwright
 python -m playwright install --with-deps chromium   # 仅 LinuxDo 源过 Cloudflare 需要
 export AI_NEWS_HUB_AI_BASE_URL=... AI_NEWS_HUB_AI_MODEL=... AI_NEWS_HUB_AI_API_KEY=... GITCODE_TOKEN=...
+export PRODUCT_HUNT_KEY=...               # 可选:Product Hunt Developer Token,缺失则该源失败跳过
 bash scripts/pipeline.sh
 # 本地干跑（跳过 AI 总结与旧 index 继承）：
 python3 scripts/fetch_data.py --out-dir out --no-summary --no-previous-index
@@ -96,12 +97,12 @@ python3 scripts/fetch_data.py --out-dir out --no-summary --no-previous-index
 
 - 网络一律 `OkHttpClient`（connect 15s / read 20s / 浏览器 UA），**不引入 Retrofit**；JSON 用内置 `org.json`，**不引入 Gson/Moshi**；HTML 抓取用 jsoup（GitHub Trending / stormzhang / HuggingFace）。
 - 无 DI 框架：Repository 在 ViewModel / Composable 内直接构造。
-- 双模式取数（`data/source/`）：4 个稳定源各有 `XxxSource` 接口 + 实时 Repository + `XxxArchiveRepository`；ViewModel 按 `SourceMode`（DataStore `display_prefs` 的 `source_mode`，默认 LIVE）选择实现。归档走 `ArchiveHttpClient`（gitcode 官方 REST API raw 端点，不用 raw 直链——背后是 WAF 会 403；index.json 有 2 分钟内存缓存 + Mutex 并发去重）。归档模式失败直接显示 Error 态，**不回退实时**。LinuxDo 不参与切换，始终实时。
+- 双模式取数（`data/source/`）：4 个稳定源（HackerNews / GitHub Trending / stormzhang AI / HuggingFace Papers）各有 `XxxSource` 接口 + 实时 Repository + `XxxArchiveRepository`，ViewModel 按 `SourceMode`（DataStore `display_prefs` 的 `source_mode`，默认 LIVE）选择实现。归档走 `ArchiveHttpClient`（gitcode 官方 REST API raw 端点，不用 raw 直链——背后是 WAF 会 403；index.json 有 2 分钟内存缓存 + Mutex 并发去重）。归档模式失败直接显示 Error 态，**不回退实时**。**Product Hunt 特殊**：Developer Token 是服务端 secret 不进 APK，故只有 `ProductHuntArchiveRepository`（无实时 Repository），两种 `SourceMode` 都走归档——与「LinuxDo 不参与切换始终实时」对称，PH 是「只归档」。
 - `SummaryRepository`：AI 摘要 Tab 的摘要**不在 App 端运行时生成**，直接读归档快照顶层 `ai_summary` 字段（由数据流水线预生成）；`ai_summary` 缺失即失败态。
 - `AiChatClient`：OpenAI 兼容 chat 调用统一出口（`${baseUrl}/chat/completions`，baseUrl 含版本段），App 内所有端侧 AI 功能都经此访问「设置 → AI 服务」里的用户配置。
 - `TranslationRepository`：运行时经 `AiChatClient` 调用户自配的 AI 服务（温度 0.3），SHA256 缓存到 `cacheDir` 文件，Mutex 按 key 防并发重复；成功后把 token 用量写入 `AiUsageStore`。`TranslateSelectionActivity` 响应 `ACTION_PROCESS_TEXT` 在系统选中菜单注册「译」；HN 评论翻译与 WebView 阅读模式「翻译本页」共用此仓库。
 - `NewsRepository`：自有后端 `/items`（cursor 分页）、`/hot-topics`、`/daily`、`/dailies`。
-- 数据模型集中在 `NewsItem.kt` / `HackerNews.kt` / 各源单文件（`TrendingRepo.kt`、`LinuxDoTopic.kt`、`StormzhangAiNews.kt`、`HuggingFacePaper.kt`）；`NewsItem`、`HackerNewsStory` 用 `@Parcelize`。
+- 数据模型集中在 `NewsItem.kt` / `HackerNews.kt` / 各源单文件（`TrendingRepo.kt`、`LinuxDoTopic.kt`、`StormzhangAiNews.kt`、`HuggingFacePaper.kt`、`ProductHunt.kt`）；`NewsItem`、`HackerNewsStory` 用 `@Parcelize`。
 
 ### 持久化
 

@@ -3,7 +3,7 @@
 数据仓库:[gitcode.com/peng1818/AI-News-Hub-Data](https://gitcode.com/peng1818/AI-News-Hub-Data)
 分支:`news-hub-data`
 
-本仓库定时抓取 [AI News Hub](../) App「Hub」tab 浏览区域的 5 个数据源,解析成 JSON 后按日期归档。本文档说明数据结构、获取方式与消费示例。
+本仓库定时抓取 [AI News Hub](../) App「Hub」tab 浏览区域的 6 个数据源,解析成 JSON 后按日期归档。本文档说明数据结构、获取方式与消费示例。
 
 ## 更新频率
 
@@ -32,7 +32,10 @@ news-hub-data 分支/
 ├── stormzhang-ai/
 │   └── 2026-07-15/
 │       └── 08-00-data.json
-└── huggingface-papers/
+├── huggingface-papers/
+│   └── 2026-07-15/
+│       └── 08-00-data.json
+└── producthunt/                         ← 需 PRODUCT_HUNT_KEY;token 失效时可能指向旧日期
     └── 2026-07-15/
         └── 08-00-data.json
 ```
@@ -52,7 +55,8 @@ news-hub-data 分支/
     "github-trending": "2026-07-15/08-00-data.json",
     "linuxdo": "2026-07-14/08-00-data.json",
     "stormzhang-ai": "2026-07-15/08-00-data.json",
-    "huggingface-papers": "2026-07-15/08-00-data.json"
+    "huggingface-papers": "2026-07-15/08-00-data.json",
+    "producthunt": "2026-07-15/08-00-data.json"
   }
 }
 ```
@@ -141,7 +145,7 @@ print(hn['items'][0]['title'])
 | `fetched_at_ms` | 抓取时刻,Unix 毫秒时间戳 |
 | `count` | `items` 数组长度 |
 | `items` | 该源的条目数组,结构因源而异(见下) |
-| `ai_summary` | 本次数据的简体中文 AI 要点(6-10 条加粗小标题形式)。仅 4 个稳定源有(hackernews / github-trending / huggingface-papers / stormzhang-ai);linuxdo 不做,AI 调用失败时该字段缺省 |
+| `ai_summary` | 本次数据的简体中文 AI 要点(6-10 条加粗小标题形式)。仅 5 个稳定源有(hackernews / github-trending / huggingface-papers / stormzhang-ai / producthunt);linuxdo 不做,AI 调用失败时该字段缺省 |
 
 部分源会有额外顶层字段(如 stormzhang-ai 带 `pageDate`)。
 
@@ -234,6 +238,28 @@ HuggingFace Trending Papers(AK 每日精选 arXiv 论文,按社区 upvote 排序
 | `authors` | string | 作者信息,如 `5 authors`;取不到则为空 |
 | `githubUrl` | string | 关联 GitHub 仓库地址;无则为空 |
 
+### producthunt(Product Hunt 当日热门)
+
+Product Hunt 当日(Product of the Day 语义)按 upvote 排序的热门产品,取前 20。走 V2 GraphQL API(`api.producthunt.com/v2/api/graphql`,`posts(first:20, order:VOTES, postedAfter: 当日UTC0点)`),需 Developer Token(`PRODUCT_HUNT_KEY`)。
+
+> ⚠️ **token 失效时该源失败**:`PRODUCT_HUNT_KEY` 缺失或 401/403 时该源 3 次重试后跳过,`index.latest.producthunt` 保留上一次成功指向(同 LinuxDo 的失败保留机制)。token 在 Product Hunt API Dashboard 重新生成即可恢复。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `rank` | int | 排名(1 起,由列表位置决定) |
+| `id` | string | 产品 id(GraphQL Post.id,字符串形态数字) |
+| `slug` | string | 产品 slug |
+| `name` | string | 产品名 |
+| `tagline` | string | 一句话价值定位;可能为空 |
+| `votesCount` | int | 社区 upvote 数(热度主指标) |
+| `commentsCount` | int | 评论数 |
+| `website` | string | 产品官网/落地页(PH 跳转链接,含 utm;点击优先用此) |
+| `url` | string | PH 产品页(website 为空时回退) |
+| `createdAt` | string | 上线时刻 ISO 8601(UTC),如 `2026-07-18T07:01:00Z` |
+| `dailyRank` | int | PH 当日综合榜排名(0 表示当日未上榜) |
+| `topics` | string[] | 话题标签,如 `["Developer Tools", "Artificial Intelligence"]`;至多 3 个 |
+| `thumbnailUrl` | string | 产品主图 URL(PH `thumbnail.url`,列表缩略图用);无则为空 |
+
 ## 辅助文件
 
 ### `manifest.json`
@@ -267,6 +293,8 @@ HuggingFace Trending Papers(AK 每日精选 arXiv 论文,按社区 upvote 排序
 ## 限制与注意事项
 
 1. **LinuxDo 源不稳定**:受 Cloudflare 拦截影响,CI 上可能长期失败(单源会重试 3 次后才跳过)。消费方应对 `index.latest.linuxdo` 缺失或指向旧日期有容忍(失败保留机制见上)。
+
+   **Product Hunt 源依赖 token**:`PRODUCT_HUNT_KEY`(Developer Token)缺失或失效(401/403)时该源同样会失败跳过并保留旧指向。token 在 [Product Hunt API Dashboard](https://api.producthunt.com/v2/dashboard) 重新生成、更新仓库 secret 即可恢复。
 
 2. **无历史数据保证**:数据从 workflow 首次成功运行起开始积累。某源若从未成功过,对应目录不会存在。
 
