@@ -24,7 +24,8 @@ private enum class SummarySource(val key: String, val title: String) {
     HACKERNEWS("hackernews", "HackerNews"),
     GITHUB_TRENDING("github-trending", "GitHub Trending"),
     HUGGINGFACE_PAPERS("huggingface-papers", "HuggingFace Papers"),
-    STORMZHANG_AI("stormzhang-ai", "stormzhang AI 资讯");
+    STORMZHANG_AI("stormzhang-ai", "stormzhang AI 资讯"),
+    PRODUCTHUNT("producthunt", "Product Hunt");
 
     companion object {
         /** 按归档源的 key 反查枚举;未知 key 返回 null。 */
@@ -71,12 +72,13 @@ class SummaryRepository {
     }
 
     companion object {
-        /** 4 个支持的归档源 key,供 ViewModel / UI 遍历。 */
+        /** 5 个支持的归档源 key,供 ViewModel / UI 遍历。 */
         val SOURCE_KEYS = listOf(
             SummarySource.HACKERNEWS.key,
             SummarySource.GITHUB_TRENDING.key,
             SummarySource.HUGGINGFACE_PAPERS.key,
-            SummarySource.STORMZHANG_AI.key
+            SummarySource.STORMZHANG_AI.key,
+            SummarySource.PRODUCTHUNT.key
         )
 
         /** 源 key → 展示标题。 */

@@ -27,6 +27,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.RocketLaunch
 import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.material.icons.outlined.Apps
@@ -97,6 +98,7 @@ fun SummaryScreen(
     onOpenGitHubTrending: () -> Unit,
     onOpenHuggingFacePapers: () -> Unit,
     onOpenStormzhangAiNews: () -> Unit,
+    onOpenProductHunt: () -> Unit,
     // 页码状态由 MainActivity 上提持有:进二级页返回后保持所在卡片(见其内注释)
     pagerState: PagerState,
     reselectSignal: Int = 0,
@@ -111,7 +113,8 @@ fun SummaryScreen(
         SummaryCardSpec(SummaryRepository.SOURCE_KEYS[0], "HackerNews", Icons.Filled.Whatshot, onOpenHackerNews),
         SummaryCardSpec(SummaryRepository.SOURCE_KEYS[1], "GitHub Trending", Icons.Outlined.Apps, onOpenGitHubTrending),
         SummaryCardSpec(SummaryRepository.SOURCE_KEYS[2], "HuggingFace Papers", Icons.Filled.Science, onOpenHuggingFacePapers),
-        SummaryCardSpec(SummaryRepository.SOURCE_KEYS[3], "stormzhang AI 资讯", Icons.Filled.Bolt, onOpenStormzhangAiNews)
+        SummaryCardSpec(SummaryRepository.SOURCE_KEYS[3], "stormzhang AI 资讯", Icons.Filled.Bolt, onOpenStormzhangAiNews),
+        SummaryCardSpec(SummaryRepository.SOURCE_KEYS[4], "Product Hunt", Icons.Filled.RocketLaunch, onOpenProductHunt)
     )
 
     // 重击当前 tab(reselectSignal 递增):滑回第一张卡并刷新全部源。

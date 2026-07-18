@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Newspaper
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.RocketLaunch
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -48,8 +49,8 @@ import com.example.aihot.ui.theme.AppText
  * user_hub_profile 原型。
  *
  * 结构(自顶向下,简洁直入):
- *  - 浏览组:HackerNews / GitHub Trending / LinuxDo / stormzhang AI / HuggingFace —— 品牌色图标块行
- *    (固定品牌色,不随主题变化,收口于 [SourceBrand])
+ *  - 浏览组:HackerNews / GitHub Trending / LinuxDo / stormzhang AI / HuggingFace / Product Hunt
+ *    —— 品牌色图标块行(固定品牌色,不随主题变化,收口于 [SourceBrand])
  *  - 偏好组(secondary 强调):设置 / 关于 —— 彩色图标块行
  *
  * 日报及其历史归档入口已移至「全部动态」页(精选 → 全部 → 日报,日报页内含历史归档按钮)。
@@ -62,6 +63,7 @@ fun MoreScreen(
     onOpenLinuxDo: () -> Unit,
     onOpenStormzhangAiNews: () -> Unit,
     onOpenHuggingFacePapers: () -> Unit,
+    onOpenProductHunt: () -> Unit,
     onOpenBrowseHistory: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenAbout: () -> Unit
@@ -121,9 +123,18 @@ fun MoreScreen(
                     brand = SourceBrand.HuggingFace,
                     title = "HuggingFace Paper Trending",
                     subtitle = "热门 AI 论文榜单",
+                    onClick = onOpenHuggingFacePapers
+                )
+            }
+            item {
+                IconTileRow(
+                    icon = Icons.Filled.RocketLaunch,
+                    brand = SourceBrand.ProductHunt,
+                    title = "Product Hunt",
+                    subtitle = "每日新产品榜单",
                     // 浏览组末行不画发丝线,与下方「历史」组章节条留出干净间隔。
                     showDivider = false,
-                    onClick = onOpenHuggingFacePapers
+                    onClick = onOpenProductHunt
                 )
             }
 
