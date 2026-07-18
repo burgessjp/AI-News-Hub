@@ -6,6 +6,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.SeekableTransitionState
+import androidx.compose.animation.core.rememberTransition
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -17,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -26,7 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.activity.compose.BackHandler
+import androidx.activity.compose.PredictiveBackHandler
 import com.example.aihot.data.AppDatabase
 import com.example.aihot.data.BrowseHistoryRepository
 import com.example.aihot.data.HackerNewsStory
@@ -64,7 +67,10 @@ import com.example.aihot.ui.anim.pageTransition
 import com.example.aihot.ui.theme.AIHotTheme
 import com.example.aihot.ui.webview.WebViewScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
 
@@ -313,16 +319,50 @@ fun AIHotApp(openSettingsOnLaunch: Boolean = false) {
         scope.launch { browseHistoryRepo.updateTitle(url, resolvedTitle) }
     }
 
-    // 系统返回键:当前 tab 栈非空时 pop
-    BackHandler(enabled = !isRoot) { pop() }
-
     // 外部入口要求直达设置页(如系统选中翻译的「去设置」)
-    androidx.compose.runtime.LaunchedEffect(openSettingsOnLaunch) {
+    LaunchedEffect(openSettingsOnLaunch) {
         if (openSettingsOnLaunch) push(Page.Settings)
     }
 
-    // 当前屏幕:根(tab) 或 二级页。用作 AnimatedContent 的 key。
+    // 当前屏幕:根(tab) 或 二级页。用作转场的 currentState/targetState。
     val screen: Screen = if (isRoot) Screen.Root(currentTab) else Screen.Secondary(currentPages.last())
+
+    // 可寻址转场:普通导航 animateTo 补间;预测返回手势期间按进度 seekTo。
+    val navTransitionState = remember { SeekableTransitionState(screen) }
+    val navTransition = rememberTransition(navTransitionState, label = "nav")
+
+    // 非手势导航(push / pop / 切 tab / 顶栏返回):screen 变化即补间到目标页。
+    // 预测返回手势完成后的 pop 不会触发二次动画(此时 targetState 已是目标页)。
+    LaunchedEffect(screen) {
+        if (navTransitionState.currentState != screen &&
+            navTransitionState.targetState != screen
+        ) {
+            navTransitionState.animateTo(screen)
+        }
+    }
+
+    // 系统返回 + 预测返回手势(替换原根 BackHandler;本身是 OnBackPressedCallback。
+    // WebView 内层 BackHandler 后组合、优先级更高,网页历史优先行为不变):
+    // 手势进度实时 seek 到返回目标页;松手完成则播完剩余动画后 pop;中途取消则回弹。
+    // API < 34 无手势事件,progress 流直接完成 → 退化为普通返回动画 + pop。
+    PredictiveBackHandler(enabled = !isRoot) { progress ->
+        val from = screen
+        val to: Screen = if (currentPages.size > 1) {
+            Screen.Secondary(currentPages[currentPages.lastIndex - 1])
+        } else {
+            Screen.Root(currentTab)
+        }
+        isNavigatingBack = true
+        try {
+            progress.collect { event -> navTransitionState.seekTo(event.progress, to) }
+            navTransitionState.animateTo(to)
+            pop()
+        } catch (e: CancellationException) {
+            // 手势取消:回弹到当前页(NonCancellable 保证回弹动画不被取消打断)
+            withContext(NonCancellable) { navTransitionState.animateTo(from) }
+            throw e
+        }
+    }
 
     AIHotTheme(
         darkTheme = darkTheme,
@@ -337,8 +377,7 @@ fun AIHotApp(openSettingsOnLaunch: Boolean = false) {
         //    由调用方在列表 contentPadding 留出空间避免末项被遮挡。
         Surface {
             Box(modifier = Modifier.fillMaxSize()) {
-                AnimatedContent(
-                    targetState = screen,
+                navTransition.AnimatedContent(
                     transitionSpec = {
                         // 转场策略由页面自身声明的 navStyle + 导航方向驱动,集中配置于 pageTransition()。
                         // 加新页面时只需在该 Page 上标注 PageNavStyle,无需改这里。
@@ -349,7 +388,6 @@ fun AIHotApp(openSettingsOnLaunch: Boolean = false) {
                         )
                     },
                     contentAlignment = Alignment.TopCenter,
-                    label = "nav",
                     modifier = Modifier.fillMaxSize()
                 ) { s ->
                     when (s) {
