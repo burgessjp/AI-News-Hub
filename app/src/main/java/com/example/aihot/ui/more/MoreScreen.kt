@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Article
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Settings
@@ -64,6 +65,7 @@ fun MoreScreen(
     onOpenStormzhangAiNews: () -> Unit,
     onOpenHuggingFacePapers: () -> Unit,
     onOpenProductHunt: () -> Unit,
+    onOpenRundownAi: () -> Unit,
     onOpenBrowseHistory: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenAbout: () -> Unit
@@ -132,9 +134,18 @@ fun MoreScreen(
                     brand = SourceBrand.ProductHunt,
                     title = "Product Hunt",
                     subtitle = "每日新产品榜单",
+                    onClick = onOpenProductHunt
+                )
+            }
+            item {
+                IconTileRow(
+                    icon = Icons.AutoMirrored.Filled.Article,
+                    brand = SourceBrand.TheRundownAi,
+                    title = "The Rundown AI",
+                    subtitle = "AI 日更 newsletter",
                     // 浏览组末行不画发丝线,与下方「历史」组章节条留出干净间隔。
                     showDivider = false,
-                    onClick = onOpenProductHunt
+                    onClick = onOpenRundownAi
                 )
             }
 

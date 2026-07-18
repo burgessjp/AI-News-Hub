@@ -25,7 +25,8 @@ private enum class SummarySource(val key: String, val title: String) {
     GITHUB_TRENDING("github-trending", "GitHub Trending"),
     HUGGINGFACE_PAPERS("huggingface-papers", "HuggingFace Papers"),
     STORMZHANG_AI("stormzhang-ai", "stormzhang AI 资讯"),
-    PRODUCTHUNT("producthunt", "Product Hunt");
+    PRODUCTHUNT("producthunt", "Product Hunt"),
+    RUNDOWN_AI("rundown-ai", "The Rundown AI");
 
     companion object {
         /** 按归档源的 key 反查枚举;未知 key 返回 null。 */
@@ -53,7 +54,8 @@ class SummaryRepository {
      * 读取某归档源当日的 AI 摘要。返回 [Result]:成功为 [SourceSummary](含正文与快照时刻),
      * 失败为异常(归档拉取失败 / ai_summary 缺失)。
      *
-     * @param source 归档源 key(hackernews / github-trending / huggingface-papers / stormzhang-ai)
+     * @param source 归档源 key(hackernews / github-trending / huggingface-papers /
+     * stormzhang-ai / producthunt / rundown-ai)
      */
     suspend fun summarize(source: String): Result<SourceSummary> {
         val src = SummarySource.fromKey(source)
@@ -72,13 +74,14 @@ class SummaryRepository {
     }
 
     companion object {
-        /** 5 个支持的归档源 key,供 ViewModel / UI 遍历。 */
+        /** 6 个支持的归档源 key,供 ViewModel / UI 遍历。 */
         val SOURCE_KEYS = listOf(
             SummarySource.HACKERNEWS.key,
             SummarySource.GITHUB_TRENDING.key,
             SummarySource.HUGGINGFACE_PAPERS.key,
             SummarySource.STORMZHANG_AI.key,
-            SummarySource.PRODUCTHUNT.key
+            SummarySource.PRODUCTHUNT.key,
+            SummarySource.RUNDOWN_AI.key
         )
 
         /** 源 key → 展示标题。 */

@@ -58,6 +58,7 @@ import com.example.aihot.ui.items.BrowseHistoryScreen
 import com.example.aihot.ui.items.HuggingFacePapersScreen
 import com.example.aihot.ui.items.LinuxDoHotScreen
 import com.example.aihot.ui.items.ProductHuntScreen
+import com.example.aihot.ui.items.RundownAiScreen
 import com.example.aihot.ui.items.StormzhangAiNewsScreen
 import com.example.aihot.ui.items.SearchScreen
 import com.example.aihot.ui.more.AboutScreen
@@ -139,6 +140,7 @@ private sealed interface Page {
     data object StormzhangAiNews : Page
     data object HuggingFacePapers : Page
     data object ProductHunt : Page
+    data object RundownAi : Page
     data object BrowseHistory : Page
 }
 
@@ -164,6 +166,7 @@ private fun Page.toBundle(): Bundle = Bundle().apply {
         is Page.StormzhangAiNews -> putString("t", "StormzhangAiNews")
         is Page.HuggingFacePapers -> putString("t", "HuggingFacePapers")
         is Page.ProductHunt -> putString("t", "ProductHunt")
+        is Page.RundownAi -> putString("t", "RundownAi")
         is Page.BrowseHistory -> putString("t", "BrowseHistory")
     }
 }
@@ -187,6 +190,7 @@ private fun pageFromBundle(b: Bundle): Page? {
         "StormzhangAiNews" -> Page.StormzhangAiNews
         "HuggingFacePapers" -> Page.HuggingFacePapers
         "ProductHunt" -> Page.ProductHunt
+        "RundownAi" -> Page.RundownAi
         "BrowseHistory" -> Page.BrowseHistory
         else -> null
     }
@@ -457,6 +461,7 @@ fun AIHotApp(openSettingsOnLaunch: Boolean = false) {
                             onOpenStormzhangAiNews = { push(Page.StormzhangAiNews) },
                             onOpenHuggingFacePapers = { push(Page.HuggingFacePapers) },
                             onOpenProductHunt = { push(Page.ProductHunt) },
+                            onOpenRundownAi = { push(Page.RundownAi) },
                             onOpenBrowseHistory = { push(Page.BrowseHistory) },
                             onOpenUrl = openUrl,
                             onOpenSettings = { push(Page.Settings) },
@@ -546,6 +551,7 @@ private fun TabRoot(
     onOpenStormzhangAiNews: () -> Unit,
     onOpenHuggingFacePapers: () -> Unit,
     onOpenProductHunt: () -> Unit,
+    onOpenRundownAi: () -> Unit,
     onOpenBrowseHistory: () -> Unit,
     onOpenUrl: (String, String, String?) -> Unit,
     onOpenSettings: () -> Unit,
@@ -568,7 +574,8 @@ private fun TabRoot(
             onOpenGitHubTrending = onOpenGitHubTrending,
             onOpenHuggingFacePapers = onOpenHuggingFacePapers,
             onOpenStormzhangAiNews = onOpenStormzhangAiNews,
-            onOpenProductHunt = onOpenProductHunt
+            onOpenProductHunt = onOpenProductHunt,
+            onOpenRundownAi = onOpenRundownAi
         )
         AppTab.More -> MoreScreen(
             onOpenHackerNews = onOpenHackerNews,
@@ -577,6 +584,7 @@ private fun TabRoot(
             onOpenStormzhangAiNews = onOpenStormzhangAiNews,
             onOpenHuggingFacePapers = onOpenHuggingFacePapers,
             onOpenProductHunt = onOpenProductHunt,
+            onOpenRundownAi = onOpenRundownAi,
             onOpenBrowseHistory = onOpenBrowseHistory,
             onOpenSettings = onOpenSettings,
             onOpenAbout = onOpenAbout
@@ -716,6 +724,12 @@ private fun PageView(
         Page.ProductHunt -> ProductHuntScreen(
             onBack = onBack,
             onOpenUrl = { url, title -> onOpenUrl(url, title, "Product Hunt") },
+            onOpenSettings = onOpenSettings,
+            listState = pageListStates.forPage(page)
+        )
+        Page.RundownAi -> RundownAiScreen(
+            onBack = onBack,
+            onOpenUrl = { url, title -> onOpenUrl(url, title, "The Rundown AI") },
             onOpenSettings = onOpenSettings,
             listState = pageListStates.forPage(page)
         )

@@ -24,6 +24,7 @@ import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.Article
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Refresh
@@ -99,6 +100,7 @@ fun SummaryScreen(
     onOpenHuggingFacePapers: () -> Unit,
     onOpenStormzhangAiNews: () -> Unit,
     onOpenProductHunt: () -> Unit,
+    onOpenRundownAi: () -> Unit,
     // 页码状态由 MainActivity 上提持有:进二级页返回后保持所在卡片(见其内注释)
     pagerState: PagerState,
     reselectSignal: Int = 0,
@@ -114,7 +116,8 @@ fun SummaryScreen(
         SummaryCardSpec(SummaryRepository.SOURCE_KEYS[1], "GitHub Trending", Icons.Outlined.Apps, onOpenGitHubTrending),
         SummaryCardSpec(SummaryRepository.SOURCE_KEYS[2], "HuggingFace Papers", Icons.Filled.Science, onOpenHuggingFacePapers),
         SummaryCardSpec(SummaryRepository.SOURCE_KEYS[3], "stormzhang AI 资讯", Icons.Filled.Bolt, onOpenStormzhangAiNews),
-        SummaryCardSpec(SummaryRepository.SOURCE_KEYS[4], "Product Hunt", Icons.Filled.RocketLaunch, onOpenProductHunt)
+        SummaryCardSpec(SummaryRepository.SOURCE_KEYS[4], "Product Hunt", Icons.Filled.RocketLaunch, onOpenProductHunt),
+        SummaryCardSpec(SummaryRepository.SOURCE_KEYS[5], "The Rundown AI", Icons.AutoMirrored.Filled.Article, onOpenRundownAi)
     )
 
     // 重击当前 tab(reselectSignal 递增):滑回第一张卡并刷新全部源。
@@ -409,6 +412,8 @@ private fun sourceAccentOf(source: String): Color {
         "github-trending" -> cs.primary
         "huggingface-papers" -> cs.primary
         "stormzhang-ai" -> cs.secondary        // 品牌紫,贴「AI 资讯」语义
+        "producthunt" -> cs.primary            // PH 品牌橙红由 SourceBrand 承载,卡片用 primary
+        "rundown-ai" -> cs.secondary           // 品牌紫,贴「AI newsletter」语义(与 stormzhang 同系)
         else -> cs.primary
     }
 }

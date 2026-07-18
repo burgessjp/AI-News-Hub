@@ -3,7 +3,7 @@
 数据仓库:[gitcode.com/peng1818/AI-News-Hub-Data](https://gitcode.com/peng1818/AI-News-Hub-Data)
 分支:`news-hub-data`
 
-本仓库定时抓取 [AI News Hub](../) App「Hub」tab 浏览区域的 6 个数据源,解析成 JSON 后按日期归档。本文档说明数据结构、获取方式与消费示例。
+本仓库定时抓取 [AI News Hub](../) App「Hub」tab 浏览区域的 7 个数据源,解析成 JSON 后按日期归档。本文档说明数据结构、获取方式与消费示例。
 
 ## 更新频率
 
@@ -35,7 +35,10 @@ news-hub-data 分支/
 ├── huggingface-papers/
 │   └── 2026-07-15/
 │       └── 08-00-data.json
-└── producthunt/                         ← 需 PRODUCT_HUNT_KEY;token 失效时可能指向旧日期
+├── producthunt/                         ← 需 PRODUCT_HUNT_KEY;token 失效时可能指向旧日期
+│   └── 2026-07-15/
+│       └── 08-00-data.json
+└── rundown-ai/                          ← The Rundown AI newsletter 首页文章卡片墙(无 token)
     └── 2026-07-15/
         └── 08-00-data.json
 ```
@@ -56,7 +59,8 @@ news-hub-data 分支/
     "linuxdo": "2026-07-14/08-00-data.json",
     "stormzhang-ai": "2026-07-15/08-00-data.json",
     "huggingface-papers": "2026-07-15/08-00-data.json",
-    "producthunt": "2026-07-15/08-00-data.json"
+    "producthunt": "2026-07-15/08-00-data.json",
+    "rundown-ai": "2026-07-15/08-00-data.json"
   }
 }
 ```
@@ -145,7 +149,7 @@ print(hn['items'][0]['title'])
 | `fetched_at_ms` | 抓取时刻,Unix 毫秒时间戳 |
 | `count` | `items` 数组长度 |
 | `items` | 该源的条目数组,结构因源而异(见下) |
-| `ai_summary` | 本次数据的简体中文 AI 要点(6-10 条加粗小标题形式)。仅 5 个稳定源有(hackernews / github-trending / huggingface-papers / stormzhang-ai / producthunt);linuxdo 不做,AI 调用失败时该字段缺省 |
+| `ai_summary` | 本次数据的简体中文 AI 要点(6-10 条加粗小标题形式)。仅 6 个稳定源有(hackernews / github-trending / huggingface-papers / stormzhang-ai / producthunt / rundown-ai);linuxdo 不做,AI 调用失败时该字段缺省 |
 
 部分源会有额外顶层字段(如 stormzhang-ai 带 `pageDate`)。
 
@@ -259,6 +263,20 @@ Product Hunt 当日(Product of the Day 语义)按 upvote 排序的热门产品,�
 | `dailyRank` | int | PH 当日综合榜排名(0 表示当日未上榜) |
 | `topics` | string[] | 话题标签,如 `["Developer Tools", "Artificial Intelligence"]`;至多 3 个 |
 | `thumbnailUrl` | string | 产品主图 URL(PH `thumbnail.url`,列表缩略图用);无则为空 |
+
+### rundown-ai(The Rundown AI 近况 newsletter)
+
+The Rundown AI(beehiiv 托管的头部英文 AI 日更 newsletter)首页文章卡片墙,取首页全部(约 16 篇近况 newsletter)。每篇 1 张卡:主标题(主事件)+ PLUS 副标题(次要工具/技巧)+ 作者段 + 封面图。走 `https://www.therundown.ai/` 首页 jsoup HTML 抓取(`a[href^="/p/"]`),无 token、无 CF 挑战、robots.txt 允许。**列表页无文章日期**(日期只在详情页 JSON-LD),故快照不带 `pageDate`。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `rank` | int | 排名(1 起,由首页卡片顺序决定) |
+| `slug` | string | 文章 slug,用于拼 URL;同时作翻译状态 key |
+| `url` | string | 文章完整地址 `https://www.therundown.ai/p/<slug>` |
+| `title` | string | 主标题(当日主事件) |
+| `subtitle` | string | PLUS 副标题(次要工具/技巧);可能为空 |
+| `authors` | string | 作者段,如 `Zach Mink, +4`(+4 表示还有 4 位合著者);原样展示 |
+| `coverUrl` | string | 封面图 URL(beehiiv cdn-cgi 图,排除作者头像);无则为空 |
 
 ## 辅助文件
 
