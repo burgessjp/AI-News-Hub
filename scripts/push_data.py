@@ -38,9 +38,29 @@ DEFAULT_BRANCH = "news-hub-data"
 
 
 def run(cmd, cwd=None, check=True):
-    """跑一条命令,失败抛 CalledProcessError(check=True 时)。"""
-    print(f"$ {' '.join(cmd)}")
+    """跑一条命令,失败抛 CalledProcessError(check=True 时)。
+
+    打印命令前先脱敏:git clone/push 的 URL 可能含注入的 token
+    (https://x-access-token:<token>@...),原样打印会泄露 secret。
+    用 _redact 把 token 段替换成 *** 再输出。
+    """
+    safe = [_redact(arg) for arg in cmd]
+    print(f"$ {' '.join(safe)}")
     return subprocess.run(cmd, cwd=cwd, check=check, capture_output=True, text=True)
+
+
+def _redact(arg):
+    """把字符串里 https://<user>:<token>@host 的 <token> 段替换成 ***。
+    非 URL 原样返回。"""
+    if "://" in arg and "@" in arg:
+        # scheme://userinfo@rest → scheme://userinfo:***@rest
+        at = arg.index("@")
+        scheme_end = arg.index("://") + 3
+        userinfo = arg[scheme_end:at]
+        if ":" in userinfo:
+            user = userinfo.split(":", 1)[0]
+            return arg[:scheme_end] + user + ":***@" + arg[at + 1:]
+    return arg
 
 
 def push(data_dir, repo_url, branch):
