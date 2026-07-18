@@ -2,8 +2,8 @@
 """
 AIHot 「Hub」tab 浏览区域数据抓取脚本。
 
-复刻 App 端的抓取逻辑(见 app/src/main/java/com/example/aihot/data/ 下的 5 个
-Repository 与对应 model 类),把 5 个数据源解析成 JSON 落盘:
+复刻 App 端的抓取逻辑(见 app/src/main/java/com/example/aihot/data/ 下的 6 个
+Repository 与对应 model 类),把 6 个数据源解析成 JSON 落盘:
 
   - hackernews         HackerNews Top Stories(两步拉取,Firebase API)
   - github-trending    GitHub Trending 仓库(HTML 抓取)
@@ -11,6 +11,7 @@ Repository 与对应 model 类),把 5 个数据源解析成 JSON 落盘:
   - stormzhang-ai      stormzhang AI 资讯(HTML 抓取)
   - huggingface-papers HuggingFace Trending Papers(HTML 抓取)
   - producthunt        Product Hunt 当日热门(GraphQL API,需 PRODUCT_HUNT_KEY)
+  - rundown-ai         The Rundown AI newsletter(beehiiv 首页文章卡片墙,HTML 抓取)
 
 输出目录结构:
   <out-dir>/<source>/<YYYY-MM-DD>/<HH-MM>-data.json
@@ -25,8 +26,8 @@ Repository 与对应 model 类),把 5 个数据源解析成 JSON 落盘:
 
 AI 总结(需求 c):
   - 每源抓完调 ai_summary.summarize_source 生成简体中文要点,写入快照顶层 `ai_summary`。
-  - 只总结 4 个稳定源(hackernews/github-trending/huggingface-papers/stormzhang-ai),
-    linuxdo 不做(对齐 App)。AI 调用失败仅 warn,不阻断落盘。
+  - 总结 6 个稳定源(hackernews/github-trending/huggingface-papers/stormzhang-ai/
+    producthunt/rundown-ai),linuxdo 不做(对齐 App)。AI 调用失败仅 warn,不阻断落盘。
   - 需 3 个 AI 环境变量(AI_NEWS_HUB_AI_BASE_URL/_MODEL/_API_KEY)齐全;缺失则跳过总结。
     加 --no-summary 可显式跳过(本地调试用)。
 
@@ -446,6 +447,106 @@ def fetch_stormzhang_ai():
     return items, {"pageDate": page_date}
 
 
+# ===== 数据源 4.5:The Rundown AI(beehiiv 托管的 AI newsletter) =====
+
+def _split_rundown_card_text(text):
+    """
+    拆 The Rundown AI 首页卡片的合并文本「标题 | PLUS: 副标题 | 作者, +N」。
+
+    beehiiv 首页卡的 get_text(' | ') 会把三段挤成一个字符串,需逆向拆分:
+      - 标题:第一段(PLUS 之前)
+      - subtitle:PLUS: 之后(到作者段前)
+      - authors:最后一段(通常是「姓名, +N」格式)
+
+    返回 (title, subtitle, authors)。任何一段缺失返回空串。
+    """
+    if not text:
+        return "", "", ""
+    # 按 ' | ' 切,首段恒为标题
+    parts = [p.strip() for p in text.split(" | ") if p.strip()]
+    if not parts:
+        return "", "", ""
+    title = parts[0]
+    subtitle = ""
+    authors = ""
+    # PLUS 段:副标题
+    for p in parts[1:]:
+        if p.upper().startswith("PLUS"):
+            subtitle = re.sub(r"^PLUS:\s*", "", p, flags=re.IGNORECASE).strip()
+        else:
+            # 非标题、非 PLUS 的最后一段视为作者(形如「Zach Mink, +4」)
+            authors = p
+    return title, subtitle, authors
+
+
+def fetch_rundown_ai():
+    """
+    HTML 抓取 https://www.therundown.ai 首页文章卡片墙(对齐 RundownAiRepository +
+    RundownAiArticle.fromJson)。选择器:a[href^="/p/"]。
+
+    The Rundown AI 是 beehiiv 托管的 AI 日更 newsletter(每日 1 篇大综合,含 5-8 个
+    AI 要点)。首页固定展示约 16 篇近况 newsletter 卡片,每张卡含:
+      - 标题(主)
+      - PLUS: 副标题(辅,即今日次要点)
+      - 作者(如「Zach Mink, +4」)
+      - 封面图(beehiiv cdn-cgi 图,排除作者头像 width=256 那张)
+
+    决策(用户确认):
+      - 只抓列表元数据,不抓正文(对齐 stormzhang)
+      - 无 token、无 paywall、robots.txt 允许(只禁 /login)
+      - 列表页无日期字段,故不返回 meta.pageDate
+
+    字段命名 camelCase,对齐 App 端 RundownAiArticle.kt 的 fromJson。
+    """
+    html = fetch_text(
+        "https://www.therundown.ai/",
+        extra_headers={
+            "Accept": "text/html,application/xhtml+xml",
+            "Accept-Language": "en-US,en;q=0.9",
+        },
+    )
+    soup = BeautifulSoup(html, "html.parser")
+    items = []
+    seen_slugs = set()
+    rank = 0
+    for el in soup.select('a[href^="/p/"]'):
+        href = (el.get("href") or "").strip()
+        # 提取 slug(可能带 query/anchor,先剥离)
+        slug = href.split("?")[0].split("#")[0].removeprefix("/p/").strip("/")
+        if not slug or slug in seen_slugs:
+            continue
+
+        # 卡内文本三段:标题 | PLUS: 副标题 | 作者
+        raw_text = el.get_text(" | ", strip=True)
+        title, subtitle, authors = _split_rundown_card_text(raw_text)
+        if not title:
+            continue
+
+        # 封面图:首张非作者头像(width=256 是作者头像特征)的 beehiiv cdn-cgi 图
+        cover_url = ""
+        for img in el.find_all("img"):
+            src = (img.get("src") or "").strip()
+            if not src or "width=256" in src:
+                continue
+            if "beehiiv.com/cdn-cgi/image" in src or "beehiiv-images-production" in src:
+                cover_url = src
+                break
+
+        rank += 1
+        seen_slugs.add(slug)
+        items.append({
+            "rank": rank,
+            "slug": slug,
+            "url": f"https://www.therundown.ai/p/{slug}",
+            "title": title,
+            "subtitle": subtitle,
+            "authors": authors,
+            "coverUrl": cover_url,
+        })
+
+    return items, {}
+
+
 # ===== 数据源 5:HuggingFace Trending Papers =====
 
 def fetch_huggingface_papers():
@@ -660,6 +761,7 @@ SOURCES = {
     "stormzhang-ai": fetch_stormzhang_ai,
     "huggingface-papers": fetch_huggingface_papers,
     "producthunt": fetch_producthunt,
+    "rundown-ai": fetch_rundown_ai,
 }
 
 # 单源抓取最大重试次数(需求 a:失败重试,最多 3 次)。首次 + 2 次重试。

@@ -6,9 +6,9 @@
 服务,生成一份简体中文要点,作为 `ai_summary` 字段写进快照顶层。
 
 设计要点(复刻 App):
-  - 只总结 4 个稳定源:hackernews / github-trending / huggingface-papers /
-    stormzhang-ai / producthunt。linuxdo 受 Cloudflare 影响不稳定,App 也没纳入,这里跳过。
-  - 4 个 system prompt 与 user prompt 格式化器逐字搬自
+  - 总结 6 个稳定源:hackernews / github-trending / huggingface-papers /
+    stormzhang-ai / producthunt / rundown-ai。linuxdo 受 Cloudflare 影响不稳定,App 也没纳入,这里跳过。
+  - 6 个 system prompt 与 user prompt 格式化器逐字搬自
     SummaryRepository.kt(lines 102-150 / 165-231),已经过 App 端打磨,不改字。
   - temperature=0.5(对齐 App 的 requestSummary);读取超时 30s。
   - 配置走环境变量:AI_NEWS_HUB_AI_BASE_URL / AI_NEWS_HUB_AI_MODEL /
@@ -39,8 +39,8 @@ TEMPERATURE = 0.5
 # 自带重试 3 次(对齐 fetch_data 主链路的重试上限);失败间隔 2s/4s
 MAX_ATTEMPTS = 3
 
-# App 端只对这 5 个源做摘要(linuxdo 不稳定,排除)
-SUMMARY_SOURCES = ("hackernews", "github-trending", "huggingface-papers", "stormzhang-ai", "producthunt")
+# App 端只对这 6 个源做摘要(linuxdo 不稳定,排除)
+SUMMARY_SOURCES = ("hackernews", "github-trending", "huggingface-papers", "stormzhang-ai", "producthunt", "rundown-ai")
 
 
 # ===== system prompt(逐字搬自 SummaryRepository.kt lines 165-231) =====
@@ -120,12 +120,30 @@ PRODUCTHUNT_PROMPT = """你是一位资深产品观察者与 Product Hunt 社区
 
 【禁止】不要输出英文正文；不要逐字翻译 tagline；不要「以上是…」「希望对你有帮助」等套话；不要额外解释你做了什么；不要输出引号或前后缀（如「以下是今日…简报」这类引导句）。直接给出要点列表。"""
 
+RUNDOWN_AI_PROMPT = """你是一位资深 AI 行业观察者与英文 newsletter 解读者。请把用户提供的 The Rundown AI 近期 newsletter 标题列表，整理成一份中文 AI 动态简报。
+
+【背景】The Rundown AI 是头部英文日更 AI newsletter，每期围绕一个主事件（标题）+ 一个次要工具/技巧（PLUS 副标题）。输入只有标题和副标题，没有正文，请基于标题本身的事实信息归纳，不要臆测细节。
+
+【语言要求】必须输出简体中文。公司名、产品名、模型名、人名等专有名词保留原文，不要音译。
+
+【输出格式】6 到 10 条要点，每条格式如下：
+• **事件标题**：用 2-3 句中文说明这件事是什么、为什么值得关注（结合标题与 PLUS 副标题的信息）。
+
+【内容要求】
+- 按事件重要性排序，重大发布（新模型、融资、政策、独家访谈）放前面；
+- 抓住标题里的事实（谁做了什么），不要展开没有依据的推测；
+- 同一主题的多期 newsletter 可合并成一条；
+- 工具类条目（PLUS 副标题）一句话带过即可，重点放在主事件。
+
+【禁止】不要输出英文正文；不要逐字翻译标题；不要「以上是…」「希望对你有帮助」等套话；不要额外解释你做了什么；不要输出引号或前后缀（如「以下是今日…简报」这类引导句）。直接给出要点列表。"""
+
 SYSTEM_PROMPTS = {
     "hackernews": HACKERNEWS_PROMPT,
     "github-trending": GITHUB_PROMPT,
     "huggingface-papers": PAPERS_PROMPT,
     "stormzhang-ai": STORMZHANG_PROMPT,
     "producthunt": PRODUCTHUNT_PROMPT,
+    "rundown-ai": RUNDOWN_AI_PROMPT,
 }
 
 
@@ -199,12 +217,32 @@ def _fmt_producthunt(items):
     return "以下是今日 Product Hunt 热门产品（按 upvote 排序）：\n" + "\n".join(lines)
 
 
+def _fmt_rundown_ai(items):
+    """top 15,每条「• title：subtitle」(对齐 App RUNDOWN_AI.load)。
+
+    The Rundown AI 每篇 newsletter 含一个主标题 + 一个 PLUS 副标题(次要工具/技巧),
+    合并成一行喂给 AI,无统计字段(列表页无 upvote/comments)。
+    """
+    lines = []
+    for n in items[:15]:
+        title = (n.get("title") or "").strip()
+        if not title:
+            continue
+        subtitle = (n.get("subtitle") or "").strip()
+        if subtitle:
+            lines.append(f"• {title}（PLUS：{subtitle}）")
+        else:
+            lines.append(f"• {title}")
+    return "以下是近期 The Rundown AI 的 newsletter 标题（按时间倒序）：\n" + "\n".join(lines)
+
+
 USER_PROMPT_BUILDERS = {
     "hackernews": _fmt_hackernews,
     "github-trending": _fmt_github_trending,
     "huggingface-papers": _fmt_huggingface_papers,
     "stormzhang-ai": _fmt_stormzhang_ai,
     "producthunt": _fmt_producthunt,
+    "rundown-ai": _fmt_rundown_ai,
 }
 
 
