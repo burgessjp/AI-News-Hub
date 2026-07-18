@@ -1,5 +1,6 @@
 package com.example.aihot
 
+import android.app.Activity
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -23,6 +24,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -31,7 +33,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.activity.BackEventCompat
 import androidx.activity.compose.PredictiveBackHandler
 import com.example.aihot.data.AppDatabase
@@ -274,6 +278,19 @@ fun AIHotApp(openSettingsOnLaunch: Boolean = false) {
         ThemeMode.System -> isSystemInDarkTheme()
         ThemeMode.Light -> false
         ThemeMode.Dark -> true
+    }
+
+    // 状态栏/导航栏图标外观跟随 App 实际暗色态(用户 ThemeMode 或系统暗色),
+    // 而非 enableEdgeToEdge() 默认依据的系统 uiMode —— 否则用户强制浅色 / 深色时,
+    // 图标颜色会与界面背景同色(如浅色背景配白字)。每次 darkTheme 重组即重下发。
+    val statusBarView = LocalView.current
+    if (!statusBarView.isInEditMode) {
+        SideEffect {
+            val window = (statusBarView.context as Activity).window
+            val controller = WindowInsetsControllerCompat(window, statusBarView)
+            controller.isAppearanceLightStatusBars = !darkTheme
+            controller.isAppearanceLightNavigationBars = !darkTheme
+        }
     }
 
     // 当前 tab + 每个 tab 的二级页栈
