@@ -83,11 +83,11 @@ python3 scripts/fetch_data.py --out-dir out --no-summary --no-previous-index
 
 - 3 个根 tab（`AppTab`）：摘要 `Summary` / AIHot 精选 `Featured` / 更多 `More`；`currentTab` + `pageStacks: Map<AppTab, List<Page>>` 每 tab 独立二级页栈，切 tab 保留各自栈。**重击当前 tab**：栈非空则清栈回根页；已在根则递增 `reselectTick`，根屏（精选/摘要）消费为「滚回顶部 + 刷新」。
 - `Page` 是 private sealed interface（Detail/Web/All/Daily/Search/Settings/About/HackerNews/HackerNewsComments/GitHubTrending/LinuxDo/StormzhangAiNews/HuggingFacePapers/BrowseHistory/DailyArchive/DailyDate），经 `toBundle()`/`pageFromBundle()` + 自定义 `Saver` 挂到 `rememberSaveable`，进程被杀可恢复。**新增二级页必须同步加：Page 子类、toBundle/pageFromBundle 分支、PageView 分支。**
-- 转场集中在 `ui/anim/Motion.kt` 的 `pageTransition()`：默认 PUSH（横向推入），含 WebView 的页 override 为 FADE（AndroidView 位移会撕裂）。转场由 `SeekableTransitionState` + `rememberTransition` 驱动：普通导航 `animateTo`，预测返回手势期间按进度 `seekTo`。
+- 转场集中在 `ui/anim/Motion.kt`：常规导航走 `pageTransition()`（默认 PUSH＝横向位移+淡化，前进新页从右滑入、返回退出页在最上层滑出右缘即 `targetContentZIndex = -1f`；含 WebView 的页 override 为 FADE，AndroidView 位移/缩放会撕裂；tab 切换 NONE↔NONE 为错峰 crossfade），预测返回手势走 `predictivePopTransition()`（LinearEasing 与手指 1:1、按 `swipeEdge` 决定滑出方向、退出页 scaleOut 0.9 + 淡出；由 `MainActivity` 的 `seekMode`/`backSwipeEdge` 状态切换，新增二级页仍只需标注 `PageNavStyle`）。转场由 `SeekableTransitionState` + `rememberTransition` 驱动：普通导航 `animateTo`，预测返回手势期间按进度 `seekTo`。
 - **列表/页码滚动状态不上屏内自持**：`AnimatedContent` 换页即销毁页内 `remember`/`rememberSaveable`（实测 `rememberPagerState` 也会丢），下层页重返组合时滚动位置被重置。故 `LazyListState`/`PagerState` 一律在 `AIHotApp` 层持有（根 tab 各一个 `remember`；二级页按 `Page` 值存 `pageListStates` map，弹出即清理）并下传——新增含列表的页面时遵循同一约定，不要在屏内 `rememberLazyListState()`。
-- `WebViewScreen` 延迟挂载 WebView（`attachWeb`，进页 350ms 后才创建）：WebView factory 的主线程重活会吃掉进入转场的帧，实测转场被拉长且淡入目标是白屏。
+- `WebViewScreen` 延迟挂载 WebView（`attachWeb`，进页 350ms 后才创建）：WebView factory 的主线程重活会吃掉进入转场的帧，实测转场被拉长且淡入目标是白屏；创建完成后经 `AnimatedVisibility` 淡入，避免硬切弹出。
 - 返回键：根 `PredictiveBackHandler`（activity-compose 1.10+）pop 当前 tab 栈——手势滑动时实时预览上一级页面，松手完成 pop、中途取消回弹（API < 34 退化为普通返回动画）；`WebViewScreen` 内层 `BackHandler` 优先——网页有可退历史时先 `goBack()` 退网页历史，退到首页后才 pop 整页。Manifest 已开 `enableOnBackInvokedCallback`（Android 13/14 退回桌面预览；15+ 默认）。
-- 浮动药丸底栏：`Box` 叠层而非 `Scaffold(bottomBar)`；内容 edge-to-edge，底栏 overlay 在 BottomCenter，二级页 `AnimatedVisibility` 滑出；列表用 `BottomBarReservedHeight` 预留底部空间（二级页列表如「全部动态」经 `ItemsScreen(reserveBottomBarSpace=false)` 不再预留）。底栏容器为近实底（`AppAlpha.bottomBarSurface` 0.94，遮内容透出）+ 3dp 浮起阴影（卡片零阴影惯例的唯一例外）+ `glassEdge` 白描边。
+- 浮动药丸底栏：`Box` 叠层而非 `Scaffold(bottomBar)`；内容 edge-to-edge，底栏 overlay 在 BottomCenter，二级页 `AnimatedVisibility` 滑出；列表用 `BottomBarReservedHeight` 预留底部空间（二级页列表如「全部动态」经 `ItemsScreen(reserveBottomBarSpace=false)` 不再预留）。底栏容器为近实底（`AppAlpha.bottomBarSurface` 0.94，遮内容透出）+ 3dp 浮起阴影（卡片零阴影惯例的唯一例外）+ `glassEdge` 白描边。可见性跟随转场目标（`isRoot || navTransitionState.targetState is Screen.Root`）：预测返回手势 seek 向根页时底栏随转场滑入，不再在 pop 完成后突兀出现。
 - `openUrl` 是打开网页的唯一入口：在此统一记录浏览历史（Room），再 push `Page.Web`。全 App 链接（含关于页、HN 评论内 HTML 链接）都收进内置 WebView，不走外部浏览器；`MainActivity` 支持 `EXTRA_OPEN_SETTINGS` 启动直达设置页（系统选中翻译的「去设置」用）。
 
 ### 数据层（data/）
@@ -115,7 +115,7 @@ python3 scripts/fetch_data.py --out-dir out --no-summary --no-previous-index
 1. MD3 规范层（`Color.kt`/`Type.kt`/`Shape.kt`/`Theme.kt`）：Light/Dark 双色板；品牌色为默认，`AIHotTheme(dynamicColor=true)`（设置页开关，Android 12+）时改用壁纸派生色。蓝→紫品牌渐变收口在 `Color.kt` 的 `BrandGradient`（AI 特性专用：今日热点、AI 摘要卡头），调用方不自行拼 Brush。
 2. 语义层：`AppText.xxx`（9 个字号档）、`AppAlpha.xxx`（透明度），组件统一引用。`AppText` 是 `@Composable` 顶层属性，读 `LocalAppTextStyles` —— `AppTextStyles(fontFamily, fontScale)` 由 `AIHotTheme` 按设置构造（字体族跟随字体设置，字号随 `FontScale` 档位整体缩放），不再是硬编码 Inter 的 object。
 
-字体：Inter（SIL OFL 1.1，本地 4 字重 `res/font/inter_*.ttf`）；设置页可切 System/Serif/Monospace，经 `AIHotTheme(fontFamily=)` + `Typography.withFontFamily()` 全量替换（AppTextStyles 同源切换）。动画规范集中在 `ui/anim/Motion.kt`：只用 tween + MD3 emphasized 缓动，不用 spring/scale。
+字体：Inter（SIL OFL 1.1，本地 4 字重 `res/font/inter_*.ttf`）；设置页可切 System/Serif/Monospace，经 `AIHotTheme(fontFamily=)` + `Typography.withFontFamily()` 全量替换（AppTextStyles 同源切换）。动画规范集中在 `ui/anim/Motion.kt`：常规转场只用 tween + MD3 emphasized 缓动，不用 spring/scale；预测返回手势例外——`predictivePopTransition()` 用 LinearEasing（与手指 1:1 跟手）+ scaleOut（对齐官方 Navigation3 默认规格）。
 
 ## 编码约定
 

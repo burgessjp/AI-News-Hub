@@ -32,6 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.activity.BackEventCompat
 import androidx.activity.compose.PredictiveBackHandler
 import com.example.aihot.data.AppDatabase
 import com.example.aihot.data.BrowseHistoryRepository
@@ -68,6 +69,7 @@ import com.example.aihot.ui.tabs.AllTab
 import com.example.aihot.ui.tabs.FeaturedTab
 import com.example.aihot.ui.anim.PageNavStyle
 import com.example.aihot.ui.anim.pageTransition
+import com.example.aihot.ui.anim.predictivePopTransition
 import com.example.aihot.ui.theme.AIHotTheme
 import com.example.aihot.ui.webview.WebViewScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -271,6 +273,11 @@ fun AIHotApp(openSettingsOnLaunch: Boolean = false) {
     // 转场方向:push 时为 false(前进),pop 时为 true(返回)。
     // transitionSpec 据此决定 PUSH 类页面的位移方向(返回时方向镜像)。
     var isNavigatingBack by remember { mutableStateOf(false) }
+    // 预测返回手势状态:收到首个手势事件后置 true,transitionSpec 切换为
+    // predictivePopTransition(LinearEasing,动画进度与手指 1:1);
+    // backSwipeEdge 记录手势起始边缘,决定退出页滑出方向。
+    var seekMode by remember { mutableStateOf(false) }
+    var backSwipeEdge by remember { mutableStateOf(BackEventCompat.EDGE_LEFT) }
 
     val currentPages: List<Page> = pageStacks[currentTab].orEmpty()
     val isRoot: Boolean = currentPages.isEmpty()
@@ -348,7 +355,8 @@ fun AIHotApp(openSettingsOnLaunch: Boolean = false) {
     // 系统返回 + 预测返回手势(替换原根 BackHandler;本身是 OnBackPressedCallback。
     // WebView 内层 BackHandler 后组合、优先级更高,网页历史优先行为不变):
     // 手势进度实时 seek 到返回目标页;松手完成则播完剩余动画后 pop;中途取消则回弹。
-    // API < 34 无手势事件,progress 流直接完成 → 退化为普通返回动画 + pop。
+    // 返回键触发时 progress 流零事件直接完成 → seekMode 保持 false,
+    // 走 pageTransition 的 emphasized 返回动画(API < 34 同此路径)。
     PredictiveBackHandler(enabled = !isRoot) { progress ->
         val from = screen
         val to: Screen = if (currentPages.size > 1) {
@@ -358,11 +366,20 @@ fun AIHotApp(openSettingsOnLaunch: Boolean = false) {
         }
         isNavigatingBack = true
         try {
-            progress.collect { event -> navTransitionState.seekTo(event.progress, to) }
+            progress.collect { event ->
+                // 首个手势事件到达才切 predictive 规格(LinearEasing 跟手);
+                // 先于 seekTo 写入,保证 transition 创建时捕获新规格。
+                seekMode = true
+                backSwipeEdge = event.swipeEdge
+                navTransitionState.seekTo(event.progress, to)
+            }
             navTransitionState.animateTo(to)
             pop()
+            seekMode = false
         } catch (e: CancellationException) {
-            // 手势取消:回弹到当前页(NonCancellable 保证回弹动画不被取消打断)
+            // 手势取消:先复位 seekMode(避免回弹期间新导航误用 predictive 规格),
+            // 再回弹到当前页(NonCancellable 保证回弹动画不被取消打断)
+            seekMode = false
             withContext(NonCancellable) { navTransitionState.animateTo(from) }
             throw e
         }
@@ -396,13 +413,23 @@ fun AIHotApp(openSettingsOnLaunch: Boolean = false) {
             Box(modifier = Modifier.fillMaxSize()) {
                 navTransition.AnimatedContent(
                     transitionSpec = {
-                        // 转场策略由页面自身声明的 navStyle + 导航方向驱动,集中配置于 pageTransition()。
+                        // 转场策略由页面自身声明的 navStyle + 导航方向驱动,集中配置于
+                        // pageTransition()/predictivePopTransition()。
                         // 加新页面时只需在该 Page 上标注 PageNavStyle,无需改这里。
-                        pageTransition(
-                            enter = targetState.navStyle,
-                            exit = initialState.navStyle,
-                            back = isNavigatingBack
-                        )
+                        // 预测返回手势期间(seekMode)切换为跟手的 predictive 规格。
+                        if (seekMode) {
+                            predictivePopTransition(
+                                enter = targetState.navStyle,
+                                exit = initialState.navStyle,
+                                swipeEdge = backSwipeEdge
+                            )
+                        } else {
+                            pageTransition(
+                                enter = targetState.navStyle,
+                                exit = initialState.navStyle,
+                                back = isNavigatingBack
+                            )
+                        }
                     },
                     contentAlignment = Alignment.TopCenter,
                     modifier = Modifier.fillMaxSize()
@@ -458,8 +485,10 @@ fun AIHotApp(openSettingsOnLaunch: Boolean = false) {
 
                 // 浮动药丸底栏:根页显示,进入二级页时向下滑出。
                 // 二级页不显示底栏(沉浸感)。
+                // 可见性跟随转场目标而非仅 isRoot:预测返回手势一开始 seek 向根页,
+                // 底栏即随转场滑入;手势取消则随目标复原滑出——不再在 pop 完成后突兀出现。
                 AnimatedVisibility(
-                    visible = isRoot,
+                    visible = isRoot || navTransitionState.targetState is Screen.Root,
                     enter = slideInVertically(initialOffsetY = { it }),
                     exit = slideOutVertically(targetOffsetY = { it }),
                     modifier = Modifier

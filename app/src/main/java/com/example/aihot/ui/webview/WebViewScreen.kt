@@ -158,8 +158,12 @@ fun WebViewScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // 转场结束后再创建 WebView(见上方 attachWeb 说明)
-            if (attachWeb) {
+            // 转场结束后再创建 WebView(见上方 attachWeb 说明);创建完成后淡入,
+            // 避免 attachWeb 翻转瞬间 WebView 硬切弹出。
+            AnimatedVisibility(
+                visible = attachWeb,
+                enter = fadeIn(tween(Motion.SHORT, easing = Motion.EmphasizedDecel))
+            ) {
             AndroidView(
                 factory = { ctx ->
                     WebView(ctx).apply {
