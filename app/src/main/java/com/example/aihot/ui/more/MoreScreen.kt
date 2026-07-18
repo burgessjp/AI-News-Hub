@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Newspaper
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.RocketLaunch
 import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -68,6 +69,7 @@ fun MoreScreen(
     onOpenRundownAi: () -> Unit,
     onOpenBrowseHistory: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenAiService: () -> Unit,
     onOpenAbout: () -> Unit
 ) {
     Scaffold(
@@ -165,6 +167,15 @@ fun MoreScreen(
             // 偏好组(secondary 强调)—— 图标块用浅灰底 + 中性图标,
             // 与浏览组的彩色图标块拉开层次:内容入口彩色、设置项低调
             item { SectionHeader("偏好", accent = MaterialTheme.colorScheme.secondary) }
+            item {
+                IconTileRow(
+                    icon = Icons.Filled.SmartToy,
+                    iconColor = IconAccent.Neutral,
+                    title = "AI 服务",
+                    subtitle = "服务商、模型、翻译、用量",
+                    onClick = onOpenAiService
+                )
+            }
             item {
                 IconTileRow(
                     icon = Icons.Filled.Settings,

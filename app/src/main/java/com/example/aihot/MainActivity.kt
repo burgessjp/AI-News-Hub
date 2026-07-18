@@ -44,6 +44,7 @@ import com.example.aihot.data.HackerNewsStory
 import com.example.aihot.data.NewsItem
 import com.example.aihot.data.AiConfig
 import com.example.aihot.data.AiConfigStore
+import com.example.aihot.data.CacheManager
 import com.example.aihot.data.AiUsageStore
 import com.example.aihot.data.SummaryRepository
 import com.example.aihot.data.source.SourceMode
@@ -66,6 +67,7 @@ import com.example.aihot.ui.items.RundownAiScreen
 import com.example.aihot.ui.items.StormzhangAiNewsScreen
 import com.example.aihot.ui.items.SearchScreen
 import com.example.aihot.ui.more.AboutScreen
+import com.example.aihot.ui.more.AiServiceScreen
 import com.example.aihot.ui.more.FontScale
 import com.example.aihot.ui.more.MoreScreen
 import com.example.aihot.ui.more.SettingsScreen
@@ -136,6 +138,8 @@ private sealed interface Page {
     data object Daily : Page
     data object Search : Page
     data object Settings : Page
+    /** AI 服务 —— 服务商/模型/翻译开关 + 用量统计,从「更多」页进入。 */
+    data object AiService : Page
     data object About : Page
     data object HackerNews : Page
     data class HackerNewsComments(val story: HackerNewsStory) : Page
@@ -163,6 +167,7 @@ private fun Page.toBundle(): Bundle = Bundle().apply {
         is Page.Daily -> putString("t", "Daily")
         is Page.Search -> putString("t", "Search")
         is Page.Settings -> putString("t", "Settings")
+        is Page.AiService -> putString("t", "AiService")
         is Page.About -> putString("t", "About")
         is Page.HackerNews -> putString("t", "HackerNews")
         is Page.GitHubTrending -> putString("t", "GitHubTrending")
@@ -187,6 +192,7 @@ private fun pageFromBundle(b: Bundle): Page? {
         "Daily" -> Page.Daily
         "Search" -> Page.Search
         "Settings" -> Page.Settings
+        "AiService" -> Page.AiService
         "About" -> Page.About
         "HackerNews" -> Page.HackerNews
         "GitHubTrending" -> Page.GitHubTrending
@@ -273,6 +279,17 @@ fun AIHotApp(openSettingsOnLaunch: Boolean = false) {
     val onSelectFont: (FontChoice) -> Unit = { scope.launch { settingsStore.updateFont(it) } }
     val onSelectFontScale: (FontScale) -> Unit = { scope.launch { settingsStore.updateFontScale(it) } }
     val onSelectSource: (SourceMode) -> Unit = { scope.launch { settingsStore.updateSourceMode(it) } }
+
+    // 缓存占用(进入设置页时计算一次,清理后刷新)。0 表示未计算,UI 显示「< 1 KB」。
+    var cacheSizeBytes by remember { mutableStateOf(0L) }
+    // 首次组合计算一次;清理后由 onClearCache 内手动再算一次。
+    LaunchedEffect(Unit) { cacheSizeBytes = CacheManager.sizeBytes(appContext) }
+    val onClearCache: () -> Unit = {
+        scope.launch {
+            CacheManager.clear(appContext, browseHistoryRepo, settingsStore)
+            cacheSizeBytes = CacheManager.sizeBytes(appContext)
+        }
+    }
 
     val darkTheme = when (themeMode) {
         ThemeMode.System -> isSystemInDarkTheme()
@@ -482,6 +499,7 @@ fun AIHotApp(openSettingsOnLaunch: Boolean = false) {
                             onOpenBrowseHistory = { push(Page.BrowseHistory) },
                             onOpenUrl = openUrl,
                             onOpenSettings = { push(Page.Settings) },
+                            onOpenAiService = { push(Page.AiService) },
                             onOpenAbout = { push(Page.About) }
                         )
                         is Screen.Secondary -> PageView(
@@ -511,6 +529,8 @@ fun AIHotApp(openSettingsOnLaunch: Boolean = false) {
                             aiConfig = aiConfig,
                             usageStore = usageStore,
                             browseHistoryRepo = browseHistoryRepo,
+                            cacheSizeBytes = cacheSizeBytes,
+                            onClearCache = onClearCache,
                             darkTheme = darkTheme
                         )
                     }
@@ -572,6 +592,7 @@ private fun TabRoot(
     onOpenBrowseHistory: () -> Unit,
     onOpenUrl: (String, String, String?) -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenAiService: () -> Unit,
     onOpenAbout: () -> Unit
 ) {
     when (tab) {
@@ -604,6 +625,7 @@ private fun TabRoot(
             onOpenRundownAi = onOpenRundownAi,
             onOpenBrowseHistory = onOpenBrowseHistory,
             onOpenSettings = onOpenSettings,
+            onOpenAiService = onOpenAiService,
             onOpenAbout = onOpenAbout
         )
     }
@@ -638,6 +660,8 @@ private fun PageView(
     aiConfig: AiConfig,
     usageStore: AiUsageStore,
     browseHistoryRepo: BrowseHistoryRepository,
+    cacheSizeBytes: Long,
+    onClearCache: () -> Unit,
     darkTheme: Boolean = false
 ) {
     when (page) {
@@ -695,6 +719,11 @@ private fun PageView(
             onSelectFontScale = onSelectFontScale,
             sourceMode = sourceMode,
             onSelectSource = onSelectSource,
+            cacheSizeBytes = cacheSizeBytes,
+            onClearCache = onClearCache,
+            onBack = onBack
+        )
+        Page.AiService -> AiServiceScreen(
             configStore = configStore,
             usageStore = usageStore,
             onBack = onBack
