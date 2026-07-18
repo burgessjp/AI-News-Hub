@@ -55,4 +55,7 @@ jobs:
           AI_NEWS_HUB_AI_MODEL: ${{ secrets.AI_NEWS_HUB_AI_MODEL }}
           AI_NEWS_HUB_AI_API_KEY: ${{ secrets.AI_NEWS_HUB_AI_API_KEY }}
           GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
+          # Product Hunt Developer Token(可选源:缺失时 producthunt 源失败跳过,
+          # 其余 5 源照常)。去 https://api.producthunt.com/v2/dashboard 拿。
+          PRODUCT_HUNT_KEY: ${{ secrets.PRODUCT_HUNT_KEY }}
         run: bash scripts/pipeline.sh

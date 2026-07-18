@@ -7,7 +7,7 @@
 
 设计要点(复刻 App):
   - 只总结 4 个稳定源:hackernews / github-trending / huggingface-papers /
-    stormzhang-ai。linuxdo 受 Cloudflare 影响不稳定,App 也没纳入,这里跳过。
+    stormzhang-ai / producthunt。linuxdo 受 Cloudflare 影响不稳定,App 也没纳入,这里跳过。
   - 4 个 system prompt 与 user prompt 格式化器逐字搬自
     SummaryRepository.kt(lines 102-150 / 165-231),已经过 App 端打磨,不改字。
   - temperature=0.5(对齐 App 的 requestSummary);读取超时 30s。
@@ -39,8 +39,8 @@ TEMPERATURE = 0.5
 # 自带重试 3 次(对齐 fetch_data 主链路的重试上限);失败间隔 2s/4s
 MAX_ATTEMPTS = 3
 
-# App 端只对这 4 个源做摘要(linuxdo 不稳定,排除)
-SUMMARY_SOURCES = ("hackernews", "github-trending", "huggingface-papers", "stormzhang-ai")
+# App 端只对这 5 个源做摘要(linuxdo 不稳定,排除)
+SUMMARY_SOURCES = ("hackernews", "github-trending", "huggingface-papers", "stormzhang-ai", "producthunt")
 
 
 # ===== system prompt(逐字搬自 SummaryRepository.kt lines 165-231) =====
@@ -89,7 +89,7 @@ PAPERS_PROMPT = """你是一位 AI 研究前沿解读员。请把用户提供的
 - 避免堆砌术语，用普通开发者能懂的话解释；
 - 同一方向的论文可合并对比。
 
-【禁止】不要输出全英文；不要逐字翻译摘要；不要套话；直接给出要点列表。"""
+【禁止】不要输出全英文；不要逐字翻译摘要；不要「以上是…」「希望对你有帮助」等套话；不要额外解释你做了什么；不要输出引号或前后缀（如「以下是今日…简报」这类引导句）。直接给出要点列表。"""
 
 STORMZHANG_PROMPT = """你是一位 AI 行业资讯编辑。用户提供的已是中文 AI 资讯摘要（来自 Hacker News / Reddit / Product Hunt / The Rundown AI / TLDR AI 等多个信源），请重新归纳成一份结构清晰的中文要点清单。
 
@@ -105,11 +105,27 @@ STORMZHANG_PROMPT = """你是一位 AI 行业资讯编辑。用户提供的已�
 
 【禁止】不要照抄原文；不要套话；直接给出要点列表。"""
 
+PRODUCTHUNT_PROMPT = """你是一位资深产品观察者与 Product Hunt 社区编辑。请把用户提供的 Product Hunt 当日热门产品，整理成一份中文产品发现简报。
+
+【语言要求】必须输出简体中文。产品名、公司名保留原文，不翻译；产品定位（tagline）用中文意译，保留原意。
+
+【输出格式】6 到 10 条要点，每条格式如下：
+• **产品名（一句话价值定位）**：用 2-3 句中文说明它解决什么问题、面向谁、有什么亮点（AI/开发者工具/效率等），并在末尾标注热度（如「（↑upvote，💬评论）」）。
+
+【内容要求】
+- 按 upvote 热度排序，重要的放前面；
+- 抓住产品本质（解决了什么痛点、有何创新），不要只复述 tagline；
+- 同类产品（如多个 AI 工具）可合并对比；
+- 明显是 AI/开发者相关的产品适当多写，纯消费类一句话带过。
+
+【禁止】不要输出英文正文；不要逐字翻译 tagline；不要「以上是…」「希望对你有帮助」等套话；不要额外解释你做了什么；不要输出引号或前后缀（如「以下是今日…简报」这类引导句）。直接给出要点列表。"""
+
 SYSTEM_PROMPTS = {
     "hackernews": HACKERNEWS_PROMPT,
     "github-trending": GITHUB_PROMPT,
     "huggingface-papers": PAPERS_PROMPT,
     "stormzhang-ai": STORMZHANG_PROMPT,
+    "producthunt": PRODUCTHUNT_PROMPT,
 }
 
 
@@ -167,11 +183,28 @@ def _fmt_stormzhang_ai(items):
     return "以下是今日聚合的 AI 资讯（含多个信源）：\n" + "\n".join(lines)
 
 
+def _fmt_producthunt(items):
+    """top 15,每条「• name(↑votes,💬comments)：tagline」(对齐 App PRODUCTHUNT.load)。"""
+    lines = []
+    for p in items[:15]:
+        name = (p.get("name") or "").strip()
+        if not name:
+            continue
+        tagline = (p.get("tagline") or "").strip() or "（无定位）"
+        topics = p.get("topics") or []
+        topic_str = f"[{','.join(topics[:2])}] " if topics else ""
+        lines.append(
+            f"• {name}（↑{p.get('votesCount', 0)}，💬{p.get('commentsCount', 0)}）：{topic_str}{tagline}"
+        )
+    return "以下是今日 Product Hunt 热门产品（按 upvote 排序）：\n" + "\n".join(lines)
+
+
 USER_PROMPT_BUILDERS = {
     "hackernews": _fmt_hackernews,
     "github-trending": _fmt_github_trending,
     "huggingface-papers": _fmt_huggingface_papers,
     "stormzhang-ai": _fmt_stormzhang_ai,
+    "producthunt": _fmt_producthunt,
 }
 
 

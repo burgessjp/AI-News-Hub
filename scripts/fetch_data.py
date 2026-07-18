@@ -10,6 +10,7 @@ Repository 与对应 model 类),把 5 个数据源解析成 JSON 落盘:
   - linuxdo            LinuxDo 热榜(Discourse JSON)
   - stormzhang-ai      stormzhang AI 资讯(HTML 抓取)
   - huggingface-papers HuggingFace Trending Papers(HTML 抓取)
+  - producthunt        Product Hunt 当日热门(GraphQL API,需 PRODUCT_HUNT_KEY)
 
 输出目录结构:
   <out-dir>/<source>/<YYYY-MM-DD>/<HH-MM>-data.json
@@ -529,6 +530,127 @@ def fetch_huggingface_papers():
     return items, {}
 
 
+# ===== 数据源 6:Product Hunt 当日热门 =====
+
+# PH 主站 www.producthunt.com 套 Cloudflare 强挑战(首页 403 + Just a moment),
+# 但 PH 提供 V2 GraphQL API(api.producthunt.com/v2/api/graphql),用 Developer
+# Token 走 Bearer 鉴权,稳定不过 CF。Token 走环境变量 PRODUCT_HUNT_KEY(不进仓库),
+# 缺失或失效时本源抛错被单源失败跳过,不影响其余源。
+PH_GQL_URL = "https://api.producthunt.com/v2/api/graphql"
+PH_TOKEN_ENV = "PRODUCT_HUNT_KEY"
+# 当日榜单:取当日 UTC 0 点后上线的、按 votes 排序的前 20(贴合 PH「Product of the Day」语义)。
+PH_QUERY = """
+query($first: Int!, $after: DateTime) {
+  posts(first: $first, order: VOTES, postedAfter: $after) {
+    edges {
+      node {
+        id
+        slug
+        name
+        tagline
+        votesCount
+        commentsCount
+        website
+        url
+        createdAt
+        dailyRank
+        topics(first: 3) { edges { node { name } } }
+        thumbnail { url }
+      }
+    }
+  }
+}
+"""
+
+
+def _ph_today_utc_start():
+    """当日 UTC 0 点的 ISO 字符串(如 '2026-07-18T00:00:00Z')。
+    PH 按太平洋时间排「Product of the Day」,但 API 的 postedAfter 用 UTC 最直观,
+    且北京 06:00/14:00 抓取时 UTC 当天已覆盖 PH 当日榜单。"""
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT00:00:00Z")
+
+
+def fetch_producthunt():
+    """
+    Product Hunt 当日热门(对齐 App 端归档模式:数据结构供 ProductHuntArchiveRepository 消费)。
+
+    GraphQL V2 + Bearer Developer Token(api.producthunt.com/v2/api/graphql):
+      - 查询 posts(first:20, order:VOTES, postedAfter: 今日UTC0点)
+      - 字段:id/slug/name/tagline/votesCount/commentsCount/website/url/createdAt/
+        dailyRank/topics[]/thumbnail{url}
+    - PRODUCT_HUNT_KEY 缺失 → RuntimeError(被单源失败跳过,index 继承旧 latest)
+    - 401/403 → RuntimeError(token 无效/过期,错误信息明确便于发现)
+
+    返回 (items, {}),item 字段对齐 App ProductHunt.kt fromJson。
+    """
+    token = os.environ.get(PH_TOKEN_ENV)
+    if not token:
+        raise RuntimeError(
+            f"Product Hunt 需要 Developer Token,但环境变量 {PH_TOKEN_ENV} 未设置"
+            "(去 https://api.producthunt.com/v2/dashboard 的 API Dashboard 拿)"
+        )
+
+    variables = {"first": 20, "after": _ph_today_utc_start()}
+    resp = SESSION.post(
+        PH_GQL_URL,
+        json={"query": PH_QUERY, "variables": variables},
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        },
+        timeout=TIMEOUT,
+    )
+    # 401/403 单独给明确信息(token 问题最常见,便于排查)
+    if resp.status_code in (401, 403):
+        raise RuntimeError(
+            f"Product Hunt token 无效或已过期(HTTP {resp.status_code}),"
+            f"请去 API Dashboard 重新生成 Developer Token"
+        )
+    resp.raise_for_status()
+    data = resp.json()
+
+    # GraphQL 错误(schema 改版 / 字段失效)单独报
+    if data.get("errors"):
+        raise RuntimeError(f"Product Hunt GraphQL 返回错误:{str(data['errors'])[:200]}")
+
+    edges = (((data.get("data") or {}).get("posts")) or {}).get("edges") or []
+    items = []
+    for idx, edge in enumerate(edges):
+        node = edge.get("node") or {}
+        pid = node.get("id")
+        name = (node.get("name") or "").strip()
+        slug = (node.get("slug") or "").strip()
+        # id / name 必有(对齐 App 端 ProductHunt.kt:缺则跳过)
+        if not pid or not name:
+            continue
+        topics = []
+        for t_edge in (((node.get("topics") or {}).get("edges")) or []):
+            tn = ((t_edge.get("node") or {}).get("name") or "").strip()
+            if tn:
+                topics.append(tn)
+        # 产品主图(thumbnail 是 Media 对象,取 .url;列表缩略图用,无则为空)
+        thumbnail = node.get("thumbnail") or {}
+        thumbnail_url = (thumbnail.get("url") or "").strip() if isinstance(thumbnail, dict) else ""
+        # website 是 PH 的跳转链接(含 utm),url 是 PH 产品页;两者都留,App 端优先用 website
+        items.append({
+            "rank": idx + 1,
+            "id": pid,
+            "slug": slug,
+            "name": name,
+            "tagline": (node.get("tagline") or "").strip(),
+            "votesCount": node.get("votesCount", 0) or 0,
+            "commentsCount": node.get("commentsCount", 0) or 0,
+            "website": node.get("website") or "",
+            "url": node.get("url") or "",
+            "createdAt": node.get("createdAt") or "",
+            "dailyRank": node.get("dailyRank", 0) or 0,
+            "topics": topics,
+            "thumbnailUrl": thumbnail_url,
+        })
+    return items, {}
+
+
 # ===== 数据源注册表:name → 抓取函数 =====
 
 SOURCES = {
@@ -537,6 +659,7 @@ SOURCES = {
     "linuxdo": fetch_linuxdo,
     "stormzhang-ai": fetch_stormzhang_ai,
     "huggingface-papers": fetch_huggingface_papers,
+    "producthunt": fetch_producthunt,
 }
 
 # 单源抓取最大重试次数(需求 a:失败重试,最多 3 次)。首次 + 2 次重试。
@@ -759,6 +882,12 @@ def main():
             ai_summary.ENV_BASE_URL, ai_summary.ENV_MODEL, ai_summary.ENV_API_KEY
         ) if not os.getenv(k)]
         print(f"[AI] 未配置 {missing},本次跳过 AI 总结(可加 --no-summary 显式关闭)",
+              file=sys.stderr)
+
+    # Product Hunt 源的可选 token 提示:缺失时该源会失败(被单源失败跳过),这里提前告知。
+    # 与 AI 配置一样不阻断流水线;与 4 个 REQUIRED_ENVS 不同(AI/GITCODE 缺失直接 exit 1)。
+    if not os.getenv(PH_TOKEN_ENV) and ("producthunt" in dict(targets)):
+        print(f"[PH] 未配置 {PH_TOKEN_ENV},producthunt 源将失败(其余源不受影响)",
               file=sys.stderr)
 
     results = {}  # source -> {"status": "ok"|"fail"|"skipped", ...}
