@@ -667,7 +667,7 @@ query($first: Int!, $after: DateTime) {
 def _ph_today_utc_start():
     """当日 UTC 0 点的 ISO 字符串(如 '2026-07-18T00:00:00Z')。
     PH 按太平洋时间排「Product of the Day」,但 API 的 postedAfter 用 UTC 最直观,
-    且北京 06:00/14:00 抓取时 UTC 当天已覆盖 PH 当日榜单。"""
+    且北京 07:00/14:00 抓取时 UTC 当天已覆盖 PH 当日榜单。"""
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT00:00:00Z")
 
 

@@ -54,7 +54,7 @@ gradle/libs.versions.toml    版本目录（所有依赖版本集中在此）
 
 - `.github/workflows/build.yml`：push / PR 到 main 时跑 `./gradlew assembleDebug` 并上传 debug APK 构件。
 - `.github/workflows/release.yml`：打 `v*` tag 触发。用 secrets 还原 keystore 与 `keystore.properties` → `assembleRelease` → 创建 GitHub Release 并附 APK。所需 secrets：`RELEASE_KEYSTORE_BASE64` / `RELEASE_STORE_PASSWORD` / `RELEASE_KEY_ALIAS` / `RELEASE_KEY_PASSWORD`。
-- `.github/workflows/fetch-data.yml`：数据流水线（见下节），每天北京时间 06:00 / 14:00 定时 + 手动触发。
+- `.github/workflows/fetch-data.yml`：数据流水线（见下节），每天北京时间 07:00 / 14:00 定时 + 手动触发。
 
 ## 数据流水线（scripts/）
 
