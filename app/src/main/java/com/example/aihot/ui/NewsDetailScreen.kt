@@ -1,8 +1,7 @@
 package com.example.aihot.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,23 +15,24 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Article
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.Article
 import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.outlined.Category
+import androidx.compose.material.icons.outlined.Language
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -50,7 +50,7 @@ import com.example.aihot.ui.theme.AppText
  *  2. meta 行 —— 来源 · 分类 · 时间 …… 分数小药丸(单行紧凑)
  *  3. 摘要正文 —— 直接铺排,无卡片边框
  *  4. 英文原标题 —— 弱化引文样式(左侧竖线 accent),辅助参考
- *  5. hairline 分隔线 + 链接卡(permalink 优先,url fallback)
+ *  5. 链接块 —— surfaceContainerLow 底 + shapes.small 圆角,整块可点(permalink 优先,url fallback)
  *
  * 不再使用 ScoreBadgeLarge 大色块 / TonalSection 卡片框 ——
  * 全 App 已统一为"扁平 + 描边分层"风格,详情页跟进。
@@ -84,11 +84,11 @@ fun NewsDetailScreen(
                 .padding(horizontal = 18.dp)
                 .padding(top = 14.dp, bottom = 24.dp)
         ) {
-            // ① 标题
+            // ① 标题(一级大标题档,阅读流第一优先级)
             if (item.title.isNotBlank()) {
                 Text(
                     text = item.title,
-                    style = AppText.titleSection,
+                    style = AppText.titleHero,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -114,32 +114,22 @@ fun NewsDetailScreen(
                 EnTitleBlock(text = item.titleEn)
             }
 
-            // ⑤ hairline 分隔线 + 链接行(扁平,与正文阅读流统一)
-            val deepLink = item.permalink.takeIf { it.isNotBlank() }
-                ?: item.url.takeIf { it.isNotBlank() }
+            // ⑤ 链接块(surfaceContainerLow 底 + shapes.small 圆角,整块可点)
             val showPerma = !item.permalink.isNullOrBlank()
             val showRaw = !item.url.isNullOrBlank() && item.url != item.permalink
             if (showPerma || showRaw) {
                 Spacer(Modifier.height(20.dp))
-                HorizontalDivider(
-                    thickness = 0.5.dp,
-                    color = MaterialTheme.colorScheme.outlineVariant
-                )
-                // 行间再叠一道 hairline(与列表页 NewsRowDivider 同构)
-                if (showPerma && showRaw) {
-                    LinkRowDivider()
-                }
                 if (showPerma) {
-                    LinkRow(
+                    LinkCard(
                         icon = Icons.AutoMirrored.Filled.MenuBook,
                         sourceName = "AI HOT 阅读页",
                         title = "查看中文翻译版(站内无墙)",
                         onClick = { onOpenUrl(item.permalink, "AI HOT 阅读页") }
                     )
-                    if (showRaw) LinkRowDivider()
+                    if (showRaw) Spacer(Modifier.height(10.dp))
                 }
                 if (showRaw) {
-                    LinkRow(
+                    LinkCard(
                         icon = Icons.AutoMirrored.Filled.Article,
                         sourceName = item.source.ifBlank { "原文" },
                         title = item.titleEn?.takeIf { it.isNotBlank() } ?: item.title,
@@ -152,42 +142,70 @@ fun NewsDetailScreen(
 }
 
 /**
- * meta 行 —— 单行紧凑,左侧来源·分类·时间(weight 1f),右侧分数小药丸。
+ * meta 行 —— 单行紧凑,左侧来源 / 分类 / 时间(各带 12dp 小图标,weight 1f),
+ * 右侧分数小药丸。
  *
- * 与列表页 [NewsCard] 底部 meta 行同构,保证详情/列表 meta 信息风格一致。
+ * 与列表页 [NewsCard] 底部 meta 行同构,保证详情/列表 meta 信息风格一致;
+ * 来源允许压缩(weight 1f fill=false),超长单行省略。
  */
 @Composable
 private fun MetaRow(item: NewsItem) {
-    val cs = MaterialTheme.colorScheme
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // 左侧 meta 文本组:来源 · 分类 · 时间(用 · 拼接,weight 1f 可省略)
-        val parts = buildList {
-            if (item.source.isNotBlank()) add(item.source)
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            if (item.source.isNotBlank()) {
+                MetaItem(
+                    icon = Icons.Outlined.Language,
+                    text = item.source,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+            }
             val cat = item.categoryLabel()
-            if (cat.isNotBlank()) add(cat)
+            if (cat.isNotBlank()) {
+                MetaItem(icon = Icons.Outlined.Category, text = cat)
+            }
             val time = relativeTime(item.publishedAt)
-            if (time.isNotBlank()) add(time)
-        }
-        if (parts.isNotEmpty()) {
-            Text(
-                text = parts.joinToString(" · "),
-                style = MaterialTheme.typography.labelSmall,
-                color = cs.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false)
-            )
-        } else {
-            Spacer(Modifier.weight(1f))
+            if (time.isNotBlank()) {
+                MetaItem(icon = Icons.Outlined.Schedule, text = time)
+            }
         }
 
         // 右侧分数药丸
         if (item.score > 0) {
             ScorePill(score = item.score)
         }
+    }
+}
+
+/** meta 项 —— 12dp 小图标 + 4dp 间距 + labelSmall 文本(单行省略)。 */
+@Composable
+private fun MetaItem(
+    icon: ImageVector,
+    text: String,
+    modifier: Modifier = Modifier
+) {
+    val cs = MaterialTheme.colorScheme
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = cs.onSurfaceVariant,
+            modifier = Modifier.size(12.dp)
+        )
+        Spacer(Modifier.width(4.dp))
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            color = cs.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
@@ -253,73 +271,60 @@ private fun EnTitleBlock(text: String) {
     }
 }
 
-/** 链接行间 hairline 分隔线 —— 与列表页 NewsRowDivider 同构。 */
-@Composable
-private fun LinkRowDivider() {
-    HorizontalDivider(
-        thickness = 0.5.dp,
-        color = MaterialTheme.colorScheme.outlineVariant
-    )
-}
-
 /**
- * 链接行 —— 扁平无卡片框,与详情页正文阅读流及列表页 [NewsCard] 风格统一。
+ * 链接块 —— surfaceContainerLow 底 + shapes.small 圆角的整块可点区域。
  *
- * 结构(单行): primary 色图标 · 来源(灰) / 标题(SemiBold) …… 打开箭头
- *  - 图标裸色(无 primaryContainer 色块背景),与 meta 行图标同构
- *  - 行间依靠 [LinkRowDivider] 区分,不再用描边圆角卡片
- *  - 整行可点,带 ripple
+ * 结构: primary 色图标 · 来源(灰) / 标题(SemiBold) …… 打开箭头;内 padding 12dp。
+ * 多块之间用 10dp 间隔,不再用 hairline 分隔线。
  */
 @Composable
-private fun LinkRow(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+private fun LinkCard(
+    icon: ImageVector,
     sourceName: String,
     title: String,
     onClick: () -> Unit
 ) {
     val cs = MaterialTheme.colorScheme
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = ripple(),
-                onClick = onClick
-            )
-            .padding(horizontal = 2.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically
+    Surface(
+        onClick = onClick,
+        color = cs.surfaceContainerLow,
+        shape = MaterialTheme.shapes.small,
+        modifier = Modifier.fillMaxWidth()
     ) {
-        Icon(
-            icon,
-            contentDescription = null,
-            tint = cs.primary,
-            modifier = Modifier.size(20.dp)
-        )
-        Spacer(Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = sourceName,
-                style = MaterialTheme.typography.labelSmall,
-                color = cs.onSurfaceVariant
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = cs.primary,
+                modifier = Modifier.size(20.dp)
             )
-            Spacer(Modifier.height(2.dp))
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = cs.onSurface,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = sourceName,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = cs.onSurfaceVariant
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = cs.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            Icon(
+                Icons.AutoMirrored.Filled.ArrowForward,
+                contentDescription = "打开",
+                tint = cs.onSurfaceVariant,
+                modifier = Modifier.size(16.dp)
             )
         }
-        Spacer(Modifier.width(8.dp))
-        Icon(
-            Icons.AutoMirrored.Filled.ArrowBack,
-            contentDescription = "打开",
-            tint = cs.onSurfaceVariant,
-            modifier = Modifier
-                .size(16.dp)
-                .rotate(180f)
-        )
     }
 }

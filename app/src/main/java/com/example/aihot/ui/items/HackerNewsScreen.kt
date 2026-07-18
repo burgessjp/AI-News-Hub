@@ -14,14 +14,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -39,7 +38,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -60,10 +58,9 @@ import com.example.aihot.ui.UiState
 import com.example.aihot.ui.components.AppTopBar
 import com.example.aihot.ui.components.AppTopBarDefaults
 import com.example.aihot.ui.components.ListUpdateTimeHeader
-import com.example.aihot.ui.components.NewsCardSkeletonList
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import com.example.aihot.ui.components.RankBadge
+import com.example.aihot.ui.components.RankRowSkeletonList
+import com.example.aihot.ui.components.formatRelativeTime
 import com.example.aihot.ui.theme.AppAlpha
 import com.example.aihot.ui.theme.AppText
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -74,7 +71,7 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
  *
  * 视觉(对齐设计稿):
  *  - 顶栏:返回箭头 + 「HackerNews」标题
- *  - 列表:排名徽章(1-3 用 primary 强调,其余低对比)+ 标题 + 得票/评论数
+ *  - 列表:排名徽章([RankBadge] 统一分档)+ 标题 + 得票/评论数
  *
  * 交互:
  *  - 点击单条 → 打开该 story 的评论树页面
@@ -138,7 +135,7 @@ fun HackerNewsScreen(
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             when (val s = state) {
-                is UiState.Loading -> NewsCardSkeletonList(count = 8)
+                is UiState.Loading -> RankRowSkeletonList(count = 8)
                 is UiState.Error -> ErrorState(
                     message = s.message,
                     onRetry = { vm.forceRefresh() }
@@ -146,7 +143,14 @@ fun HackerNewsScreen(
                 is UiState.Success -> {
                     val stories = s.data
                     if (stories.isEmpty()) {
-                        EmptyState(title = "暂无内容")
+                        // 数据缺失空态(归档快照为空/实时无条目):给刷新恢复路径
+                        EmptyState(
+                            title = "暂无内容",
+                            subtitle = "下拉或点下方按钮刷新看看",
+                            icon = Icons.Outlined.Inventory2,
+                            actionLabel = "刷新一下",
+                            onAction = { vm.forceRefresh() }
+                        )
                     } else {
                         PullToRefreshBox(
                             isRefreshing = isRefreshing,
@@ -217,12 +221,11 @@ private fun HackerNewsList(
 /**
  * 单条 story 行:序号徽章 + 标题 + 作者/时间 + 得票/评论/来源域名(HN 原生风)。
  *
- * 三层信息:
- *  1. 标题(最多两行)+ 可选的「译」按钮与译文
- *  2. 作者 · 相对时间(作者主色强调)
- *  3. 得票 ▲ · 评论 💬 · 来源域名 🌐(三栏均匀分布,icon + 文字)
+ * 信息分层:
+ *  1. 标题(最多两行,来源域名 tertiary 色括注末尾——源识别记忆点)+ 可选的「译」按钮与译文
+ *  2. 作者 · 相对时间 · 得票 · 评论(单行,作者主色强调,其余弱色)
  *
- * @param rank 1 起的序号;1-3 用 primary 强调,其余低对比。
+ * @param rank 1 起的序号,徽章配色由 [RankBadge] 统一分档。
  */
 @Composable
 private fun HackerNewsRow(
@@ -234,7 +237,6 @@ private fun HackerNewsRow(
     onTranslate: () -> Unit
 ) {
     val cs = MaterialTheme.colorScheme
-    val topRank = rank <= 3
     var titleCollapsed by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
@@ -248,31 +250,18 @@ private fun HackerNewsRow(
         verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // 序号徽章:1-3 实心 primary,其余描边低对比
-        Box(
-            modifier = Modifier
-                .size(24.dp)
-                .clip(RoundedCornerShape(7.dp))
-                .background(if (topRank) cs.primary else cs.surfaceContainerHigh),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = rank.toString(),
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                color = if (topRank) cs.onPrimary else cs.onSurfaceVariant
-            )
-        }
+        // 序号徽章:全 App 统一 RankBadge(1 名 tertiary / 2-3 tertiaryContainer / 其余低对比)
+        RankBadge(rank = rank)
 
         Column(modifier = Modifier.weight(1f)) {
-            // ① 标题 + 内联来源域名 (host) —— HN 原生风,域名弱色括注在末尾
+            // ① 标题 + 内联来源域名 (host) —— HN 原生风,域名 tertiary 色括注在末尾(源识别记忆点)
             val host = storyHost(story)
-            val titleAnnotated = remember(story.title, host, cs.onSurfaceVariant) {
+            val titleAnnotated = remember(story.title, host, cs.tertiary) {
                 buildAnnotatedString {
                     append(story.title.ifBlank { "(无标题)" })
                     append("  ")
-                    // 域名括注局部 SpanStyle:刻意比 titleSmall(14sp)小一档做弱化,局部样式不抽 token
-                    withStyle(SpanStyle(color = cs.onSurfaceVariant, fontSize = 12.sp)) {
+                    // 域名括注局部 SpanStyle:刻意比 titleCompact(14sp)小一档做弱化,局部样式不抽 token
+                    withStyle(SpanStyle(color = cs.tertiary, fontSize = 12.sp)) {
                         append("($host)")
                     }
                 }
@@ -280,7 +269,7 @@ private fun HackerNewsRow(
             Row(verticalAlignment = Alignment.Top) {
                 Text(
                     text = titleAnnotated,
-                    style = MaterialTheme.typography.titleSmall,
+                    style = AppText.titleCompact,
                     fontWeight = FontWeight.SemiBold,
                     color = cs.onSurface,
                     maxLines = 2,
@@ -411,18 +400,4 @@ private fun storyHost(story: HackerNewsStory): String {
             ?.removePrefix("www.")
             ?: "news.ycombinator.com"
     }.getOrDefault("news.ycombinator.com")
-}
-
-/** 把 Unix 秒级时间戳转成相对时间(如 "3 小时前")。 */
-private fun formatRelativeTime(unixSeconds: Long): String {
-    val now = System.currentTimeMillis()
-    val diff = now - unixSeconds * 1000L
-    val minutes = diff / 60_000L
-    return when {
-        minutes < 1 -> "刚刚"
-        minutes < 60 -> "${minutes} 分钟前"
-        minutes < 60 * 24 -> "${minutes / 60} 小时前"
-        minutes < 60 * 24 * 30 -> "${minutes / (60 * 24)} 天前"
-        else -> SimpleDateFormat("yyyy-MM-dd", Locale.CHINA).format(Date(unixSeconds * 1000L))
-    }
 }

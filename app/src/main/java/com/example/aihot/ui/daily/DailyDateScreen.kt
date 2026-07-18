@@ -57,7 +57,11 @@ fun DailyDateScreen(
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             when (val s = state) {
                 is UiState.Loading -> com.example.aihot.ui.components.NewsCardSkeletonList(count = 4)
-                is UiState.Error -> ErrorState(message = s.message, onRetry = { vm.loadDate(date) })
+                is UiState.Error -> ErrorState(
+                    message = s.message,
+                    title = "日报加载失败",
+                    onRetry = { vm.loadDate(date) }
+                )
                 is UiState.Success -> DailyContent(
                     report = s.data,
                     onOpen = { url -> onOpenUrl(url, "AI HOT") }

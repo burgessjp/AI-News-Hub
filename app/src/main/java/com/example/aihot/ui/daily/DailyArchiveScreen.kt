@@ -73,7 +73,11 @@ fun DailyArchiveScreen(
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             when (val s = state) {
                 is UiState.Loading -> com.example.aihot.ui.components.NewsCardSkeletonList(count = 6)
-                is UiState.Error -> ErrorState(message = s.message, onRetry = { vm.loadArchive() })
+                is UiState.Error -> ErrorState(
+                    message = s.message,
+                    title = "归档加载失败",
+                    onRetry = { vm.loadArchive() }
+                )
                 is UiState.Success -> {
                     LazyColumn(
                         contentPadding = PaddingValues(vertical = 4.dp),

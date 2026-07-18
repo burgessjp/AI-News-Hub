@@ -52,7 +52,7 @@ import com.example.aihot.data.source.SourceMode
 import com.example.aihot.ui.components.AppTopBar
 import com.example.aihot.ui.components.AppTopBarDefaults
 import com.example.aihot.ui.components.SegmentedOptionRow
-import com.example.aihot.ui.components.SettingsGroupHeader
+import com.example.aihot.ui.components.SectionHeader
 import com.example.aihot.ui.components.SettingsRow
 import kotlinx.coroutines.launch
 
@@ -152,7 +152,7 @@ fun SettingsScreen(
             contentPadding = PaddingValues(bottom = 24.dp)
         ) {
             // 外观 section —— 主题三段式(轨道式)+ 动态取色开关
-            item { SettingsGroupHeader("外观") }
+            item { SectionHeader("外观") }
             item {
                 SegmentedOptionRow(
                     options = themeOptions,
@@ -182,7 +182,7 @@ fun SettingsScreen(
             }
 
             // 字体 section —— 字体族 + 字号两组轨道式选择器,各带小节标签
-            item { SettingsGroupHeader("字体") }
+            item { SectionHeader("字体") }
             item {
                 GroupLabel("字体族")
                 SegmentedOptionRow(
@@ -205,7 +205,7 @@ fun SettingsScreen(
             // 数据源 section —— Hub 4 个稳定源从实时抓取还是 gitcode 归档取数
             // 实时:直连第三方站点(默认,数据最新);归档:读 gitcode 历史快照(稳定不受反爬影响)
             // 切换后下拉刷新即用新源,无需重进页面(ViewModel 订阅 prefsFlow 动态选 repo)。
-            item { SettingsGroupHeader("数据源") }
+            item { SectionHeader("数据源") }
             item {
                 SegmentedOptionRow(
                     options = sourceOptions,
@@ -216,7 +216,7 @@ fun SettingsScreen(
             }
 
             // 语言 section(占位)
-            item { SettingsGroupHeader("语言") }
+            item { SectionHeader("语言") }
             item {
                 SettingsRow(
                     icon = Icons.Filled.Language,
@@ -235,13 +235,13 @@ fun SettingsScreen(
             }
 
             // AI 服务 section —— 全局一套配置,所有端侧 AI 功能共用
-            item { SettingsGroupHeader("AI 服务") }
+            item { SectionHeader("AI 服务") }
             item {
                 AiServiceSection(config = config, configStore = configStore)
             }
 
             // 用量与费用 section —— token 消耗统计 + 官方刊例价估算
-            item { SettingsGroupHeader("用量与费用") }
+            item { SectionHeader("用量与费用") }
             item {
                 AiUsageSection(usageStore = usageStore, config = config)
             }

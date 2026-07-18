@@ -19,10 +19,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -48,7 +48,9 @@ import com.example.aihot.ui.UiState
 import com.example.aihot.ui.components.AppTopBar
 import com.example.aihot.ui.components.AppTopBarDefaults
 import com.example.aihot.ui.components.ListUpdateTimeHeader
-import com.example.aihot.ui.components.NewsCardSkeletonList
+import com.example.aihot.ui.components.RankBadge
+import com.example.aihot.ui.components.RankRowSkeletonList
+import com.example.aihot.ui.theme.AppAlpha
 import com.example.aihot.ui.theme.AppText
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -58,7 +60,7 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
  *
  * 视觉对齐 [GitHubTrendingScreen] / [LinuxDoHotScreen]:
  *  - 顶栏:返回箭头 + 「stormzhang AI 资讯」+ 右上「上次刷新 N 分钟前」
- *  - 列表:排名徽章(1-3 primary 强调)+ 中文摘要(主)+ 英文原文(辅,弱色)
+ *  - 列表:排名徽章([RankBadge] 统一分档)+ 中文摘要(主)+ 英文原文(辅,弱色)
  *    + 信源徽章(描边小标签)· 发布时间
  *
  * 交互:
@@ -113,7 +115,7 @@ fun StormzhangAiNewsScreen(
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             when (val s = state) {
-                is UiState.Loading -> NewsCardSkeletonList(count = 8)
+                is UiState.Loading -> RankRowSkeletonList(count = 8)
                 is UiState.Error -> ErrorState(
                     message = s.message,
                     onRetry = { vm.forceRefresh() }
@@ -121,7 +123,14 @@ fun StormzhangAiNewsScreen(
                 is UiState.Success -> {
                     val news = s.data
                     if (news.isEmpty()) {
-                        EmptyState(title = "暂无内容")
+                        // 数据缺失空态(归档快照为空/实时无条目):给刷新恢复路径
+                        EmptyState(
+                            title = "暂无内容",
+                            subtitle = "下拉或点下方按钮刷新看看",
+                            icon = Icons.Outlined.Inventory2,
+                            actionLabel = "刷新一下",
+                            onAction = { vm.forceRefresh() }
+                        )
                     } else {
                         PullToRefreshBox(
                             isRefreshing = isRefreshing,
@@ -191,7 +200,6 @@ private fun AiNewsRow(
     onClick: () -> Unit
 ) {
     val cs = MaterialTheme.colorScheme
-    val topRank = item.rank <= 3
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -204,27 +212,14 @@ private fun AiNewsRow(
         verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // 序号徽章:1-3 实心 primary,其余描边低对比(同 GitHubTrendingRow)
-        Box(
-            modifier = Modifier
-                .size(24.dp)
-                .clip(RoundedCornerShape(7.dp))
-                .background(if (topRank) cs.primary else cs.surfaceContainerHigh),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = item.rank.toString(),
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                color = if (topRank) cs.onPrimary else cs.onSurfaceVariant
-            )
-        }
+        // 序号徽章:全 App 统一 RankBadge(同 GitHubTrendingRow)
+        RankBadge(rank = item.rank)
 
         Column(modifier = Modifier.weight(1f)) {
             // ① 中文摘要(主标题):加粗,最多三行
             Text(
                 text = item.summary,
-                style = MaterialTheme.typography.titleSmall,
+                style = AppText.titleCompact,
                 fontWeight = FontWeight.SemiBold,
                 color = cs.onSurface,
                 maxLines = 3,
@@ -291,9 +286,9 @@ private fun SourceBadge(source: String) {
     }
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(4.dp))
-            .background(color.copy(alpha = 0.12f))
-            .border(width = 1.dp, color = color.copy(alpha = 0.20f), shape = RoundedCornerShape(4.dp))
+            .clip(MaterialTheme.shapes.extraSmall)
+            .background(color.copy(alpha = AppAlpha.badgeOverlay))
+            .border(width = 1.dp, color = color.copy(alpha = AppAlpha.badgeOutline), shape = MaterialTheme.shapes.extraSmall)
             .padding(horizontal = 8.dp, vertical = 3.dp)
     ) {
         Text(

@@ -1,7 +1,10 @@
 package com.example.aihot.ui.theme
 
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 
 /**
@@ -132,7 +135,7 @@ val DarkColors = darkColorScheme(
     primaryContainer = DarkPrimaryContainer, onPrimaryContainer = DarkOnPrimaryContainer,
     secondary = DarkSecondary, onSecondary = DarkOnSecondary,
     secondaryContainer = DarkSecondaryContainer, onSecondaryContainer = DarkOnSecondaryContainer,
-    tertiary = DarkTertiary, onTertiary = DarkTertiary,
+    tertiary = DarkTertiary, onTertiary = DarkOnTertiary,
     tertiaryContainer = DarkTertiaryContainer, onTertiaryContainer = DarkOnTertiaryContainer,
     error = DarkError, onError = DarkOnError,
     errorContainer = DarkErrorContainer, onErrorContainer = DarkOnErrorContainer,
@@ -149,3 +152,22 @@ val DarkColors = darkColorScheme(
     inverseSurface = DarkInverseSurface, inverseOnSurface = DarkInverseOnSurface,
     inversePrimary = DarkInversePrimary
 )
+
+// ===== 品牌渐变(AI 特性专用)=====
+
+/**
+ * 品牌蓝→紫渐变 —— Future Blue(primary)→ Intelligence Purple(secondary)。
+ *
+ * 设计系统纪律:渐变只用于 AI 特性(今日热点聚合、AI 摘要卡头等),不扩散到普通界面。
+ * 颜色取自 colorScheme 而非固定字面值:深/浅两套色板各自保证渐变上 onPrimary
+ * 文字的对比度(浅色=深渐变+白字,深色=浅渐变+深字),调用方无需模式判断。
+ * 单一来源:今日热点(HotTopicsSection)与摘要卡头(SummaryScreen)共用。
+ */
+val BrandGradient: Brush
+    @Composable
+    get() = Brush.linearGradient(
+        colors = listOf(
+            MaterialTheme.colorScheme.primary,
+            MaterialTheme.colorScheme.secondary
+        )
+    )

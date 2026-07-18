@@ -31,7 +31,7 @@ import androidx.compose.ui.unit.dp
 import com.example.aihot.ui.components.AppCard
 import com.example.aihot.ui.components.AppTopBar
 import com.example.aihot.ui.components.AppTopBarDefaults
-import com.example.aihot.ui.components.SettingsGroupHeader
+import com.example.aihot.ui.components.SectionHeader
 import com.example.aihot.ui.components.SettingsRow
 
 /**
@@ -79,7 +79,7 @@ fun AboutScreen(onBack: () -> Unit, onOpenUrl: (String, String) -> Unit) {
             item { BrandHeader(versionName = versionName) }
 
             // 数据来源
-            item { SettingsGroupHeader("数据来源") }
+            item { SectionHeader("数据来源") }
             dataSources.forEachIndexed { idx, (name, url) ->
                 item {
                     SettingsRow(
@@ -92,7 +92,7 @@ fun AboutScreen(onBack: () -> Unit, onOpenUrl: (String, String) -> Unit) {
             }
 
             // 项目
-            item { SettingsGroupHeader("项目") }
+            item { SectionHeader("项目") }
             item {
                 SettingsRow(
                     title = "项目源码",
@@ -103,7 +103,7 @@ fun AboutScreen(onBack: () -> Unit, onOpenUrl: (String, String) -> Unit) {
             }
 
             // 开源依赖
-            item { SettingsGroupHeader("开源依赖") }
+            item { SectionHeader("开源依赖") }
             deps.forEachIndexed { idx, (name, license) ->
                 item {
                     SettingsRow(
@@ -125,7 +125,7 @@ fun AboutScreen(onBack: () -> Unit, onOpenUrl: (String, String) -> Unit) {
 }
 
 /**
- * 品牌头卡片 —— cyan 圆形 logo + 名称 + 版本号 + slogan。
+ * 品牌头卡片 —— primaryContainer 圆形 logo + 名称 + 版本号 + slogan。
  */
 @Composable
 private fun BrandHeader(versionName: String) {

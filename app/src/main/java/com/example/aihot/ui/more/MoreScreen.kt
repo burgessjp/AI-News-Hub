@@ -1,7 +1,6 @@
 package com.example.aihot.ui.more
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -15,7 +14,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Info
@@ -41,7 +39,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.aihot.ui.components.AppTopBar
 import com.example.aihot.ui.components.BottomBarReservedHeight
-import com.example.aihot.ui.components.SettingsGroupHeader
+import com.example.aihot.ui.components.SectionHeader
+import com.example.aihot.ui.theme.AppAlpha
 import com.example.aihot.ui.theme.AppText
 
 /**
@@ -49,7 +48,8 @@ import com.example.aihot.ui.theme.AppText
  * user_hub_profile 原型。
  *
  * 结构(自顶向下,简洁直入):
- *  - 浏览组(primary 强调):HackerNews / GitHub Trending / LinuxDo / stormzhang AI / HuggingFace —— 彩色图标块行
+ *  - 浏览组:HackerNews / GitHub Trending / LinuxDo / stormzhang AI / HuggingFace —— 品牌色图标块行
+ *    (固定品牌色,不随主题变化,收口于 [SourceBrand])
  *  - 偏好组(secondary 强调):设置 / 关于 —— 彩色图标块行
  *
  * 日报及其历史归档入口已移至「全部动态」页(精选 → 全部 → 日报,日报页内含历史归档按钮)。
@@ -77,12 +77,12 @@ fun MoreScreen(
             // 底部预留浮动药丸底栏高度(MoreTab 是根 tab,底栏悬浮)
             contentPadding = PaddingValues(bottom = BottomBarReservedHeight)
         ) {
-            // 浏览组
-            item { SettingsGroupHeader("浏览") }
+            // 浏览组 —— 图标块用各源固定品牌色(见 SourceBrandColors.kt)
+            item { SectionHeader("浏览") }
             item {
                 IconTileRow(
                     icon = Icons.Filled.Whatshot,
-                    iconColor = IconAccent.Primary,
+                    brand = SourceBrand.HackerNews,
                     title = "HackerNews",
                     subtitle = "HackerNews 热门榜单",
                     onClick = onOpenHackerNews
@@ -91,7 +91,7 @@ fun MoreScreen(
             item {
                 IconTileRow(
                     icon = Icons.Filled.Code,
-                    iconColor = IconAccent.Tertiary,
+                    brand = SourceBrand.GitHub,
                     title = "GitHub Trending",
                     subtitle = "GitHub 热门仓库",
                     onClick = onOpenGitHubTrending
@@ -100,7 +100,7 @@ fun MoreScreen(
             item {
                 IconTileRow(
                     icon = Icons.Filled.Forum,
-                    iconColor = IconAccent.Secondary,
+                    brand = SourceBrand.LinuxDo,
                     title = "LinuxDo 热榜",
                     subtitle = "L 站热门话题",
                     onClick = onOpenLinuxDo
@@ -109,7 +109,7 @@ fun MoreScreen(
             item {
                 IconTileRow(
                     icon = Icons.Filled.Newspaper,
-                    iconColor = IconAccent.Tertiary,
+                    brand = SourceBrand.Stormzhang,
                     title = "stormzhang AI 资讯",
                     subtitle = "每日 AI 资讯聚合",
                     onClick = onOpenStormzhangAiNews
@@ -118,7 +118,7 @@ fun MoreScreen(
             item {
                 IconTileRow(
                     icon = Icons.Filled.School,
-                    iconColor = IconAccent.Secondary,
+                    brand = SourceBrand.HuggingFace,
                     title = "HuggingFace Paper Trending",
                     subtitle = "热门 AI 论文榜单",
                     // 浏览组末行不画发丝线,与下方「历史」组章节条留出干净间隔。
@@ -128,7 +128,7 @@ fun MoreScreen(
             }
 
             // 历史组 —— 浏览历史的独立入口
-            item { SettingsGroupHeader("历史", accentColor = MaterialTheme.colorScheme.tertiary) }
+            item { SectionHeader("历史", accent = MaterialTheme.colorScheme.tertiary) }
             item {
                 IconTileRow(
                     icon = Icons.Filled.History,
@@ -142,7 +142,7 @@ fun MoreScreen(
 
             // 偏好组(secondary 强调)—— 图标块用浅灰底 + 中性图标,
             // 与浏览组的彩色图标块拉开层次:内容入口彩色、设置项低调
-            item { SettingsGroupHeader("偏好", accentColor = MaterialTheme.colorScheme.secondary) }
+            item { SectionHeader("偏好", accent = MaterialTheme.colorScheme.secondary) }
             item {
                 IconTileRow(
                     icon = Icons.Filled.Settings,
@@ -166,17 +166,19 @@ fun MoreScreen(
     }
 }
 
-/** 图标块强调色档位 —— 决定 IconTileRow 的图标底色与着色。
- *  - Primary / Secondary / Tertiary:浏览组的内容入口,用品牌色三档强调
- *  - Neutral:偏好组的设置/关于,用浅灰底 + 中性图标,与浏览组拉开层次
+/** 图标块强调色档位 —— 历史/偏好组 IconTileRow 的图标底色与着色
+ *  (浏览组 5 源已改固定品牌色,见 [SourceBrand])。
+ *  - Primary:历史组的内容入口(浏览历史)
+ *  - Neutral:偏好组的设置/关于,用浅灰底 + 中性图标,与浏览组的品牌色块拉开层次
  */
-private enum class IconAccent { Primary, Secondary, Tertiary, Neutral }
+private enum class IconAccent { Primary, Neutral }
 
 /**
  * 彩色图标块菜单行 —— 对齐 user_hub_profile 原型的 Browse/Preferences 项。
  *
  * 视觉:
- *  - 左侧 48dp 圆角块(rounded-xl),底色 = 强调色 10% alpha,图标 = 强调色
+ *  - 左侧 48dp 圆角块(rounded-xl):[brand] 非空时为品牌色实底 + 对比色图标(浏览组 5 源);
+ *    否则底色 = 强调色低透明底,图标 = 强调色(历史/偏好组,见 [iconColor])
  *  - 标题(titleMedium/SemiBold)+ 副标题(caption/onSurfaceVariant)
  *  - 右侧 chevron
  *  - 行间 hairline 发丝线(左侧缩进对齐图标块右侧)
@@ -184,21 +186,30 @@ private enum class IconAccent { Primary, Secondary, Tertiary, Neutral }
 @Composable
 private fun IconTileRow(
     icon: ImageVector,
-    iconColor: IconAccent,
     title: String,
     subtitle: String,
     modifier: Modifier = Modifier,
+    iconColor: IconAccent = IconAccent.Neutral,
+    brand: SourceBrandColors? = null,
     showDivider: Boolean = true,
     onClick: () -> Unit
 ) {
     val cs = MaterialTheme.colorScheme
-    // 每档给出 (底色, 图标色, 底色 alpha)。Neutral 用更高的 alpha(0.20)
-    // 让浅灰块明显可见——彩色强调色饱和度高 0.12 即够,中性灰需要更实才不显寡淡。
-    val (tileBg, tileFg, bgAlpha) = when (iconColor) {
-        IconAccent.Primary -> Triple(cs.primary, cs.primary, 0.12f)
-        IconAccent.Secondary -> Triple(cs.secondary, cs.secondary, 0.12f)
-        IconAccent.Tertiary -> Triple(cs.tertiary, cs.tertiary, 0.12f)
-        IconAccent.Neutral -> Triple(cs.outline, cs.onSurfaceVariant, 0.20f)
+    val tileBg: Color
+    val tileFg: Color
+    if (brand != null) {
+        // 品牌色块:实底品牌色 + 对比图标色,不走透明度档(品牌识别需饱和实色)
+        tileBg = brand.container
+        tileFg = brand.icon
+    } else {
+        // 每档给出 (底色, 图标色, 底色 alpha)。Neutral 用更高的 alpha(0.20)
+        // 让浅灰块明显可见——彩色强调色饱和度高 0.12 即够,中性灰需要更实才不显寡淡。
+        val (bg, fg, bgAlpha) = when (iconColor) {
+            IconAccent.Primary -> Triple(cs.primary, cs.primary, AppAlpha.badgeOverlay)
+            IconAccent.Neutral -> Triple(cs.outline, cs.onSurfaceVariant, AppAlpha.neutralOverlay)
+        }
+        tileBg = bg.copy(alpha = bgAlpha)
+        tileFg = fg
     }
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
@@ -213,12 +224,12 @@ private fun IconTileRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 48dp 图标块(彩色档为强调色,Neutral 档为浅灰)
+            // 48dp 图标块(brand 档为品牌色实底,IconAccent 档为低透明强调色/浅灰)
             Box(
                 modifier = Modifier
                     .size(48.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(tileBg.copy(alpha = bgAlpha)),
+                    .clip(MaterialTheme.shapes.small)
+                    .background(tileBg),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(

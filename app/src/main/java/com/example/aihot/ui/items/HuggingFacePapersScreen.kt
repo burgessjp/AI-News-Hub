@@ -14,17 +14,16 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.ThumbUp
+import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -41,9 +40,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -59,7 +55,10 @@ import com.example.aihot.ui.UiState
 import com.example.aihot.ui.components.AppTopBar
 import com.example.aihot.ui.components.AppTopBarDefaults
 import com.example.aihot.ui.components.ListUpdateTimeHeader
-import com.example.aihot.ui.components.NewsCardSkeletonList
+import com.example.aihot.ui.components.RankBadge
+import com.example.aihot.ui.components.RankRowSkeletonList
+import com.example.aihot.ui.components.StatBadge
+import com.example.aihot.ui.components.formatCount
 import com.example.aihot.ui.theme.AppText
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -69,8 +68,8 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
  *
  * 视觉对齐 [GitHubTrendingScreen] / [StormzhangAiNewsScreen]:
  *  - 顶栏:返回箭头 + 「HuggingFace Paper Trending」+ 右上「上次刷新 N 分钟前」
- *  - 列表:排名徽章(1-3 primary 强调)+ 论文标题(主)+ 摘要(辅,弱色)
- *    + 👍 upvotes(热度主指标,primary 强调)· 📅 发布日期 · 👥 作者
+ *  - 列表:排名徽章([RankBadge] 统一分档)+ 论文标题(主)+ 摘要(辅,弱色)
+ *    + upvotes(热度主指标,primary 强调)· 发布日期 · 作者
  *
  * 交互:
  *  - 点击单条 → 内置 WebView 打开论文页([onOpenUrl])
@@ -135,7 +134,7 @@ fun HuggingFacePapersScreen(
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             when (val s = state) {
-                is UiState.Loading -> NewsCardSkeletonList(count = 8)
+                is UiState.Loading -> RankRowSkeletonList(count = 8)
                 is UiState.Error -> ErrorState(
                     message = s.message,
                     onRetry = { vm.forceRefresh() }
@@ -143,7 +142,14 @@ fun HuggingFacePapersScreen(
                 is UiState.Success -> {
                     val papers = s.data
                     if (papers.isEmpty()) {
-                        EmptyState(title = "暂无内容")
+                        // 数据缺失空态(归档快照为空/实时无条目):给刷新恢复路径
+                        EmptyState(
+                            title = "暂无内容",
+                            subtitle = "下拉或点下方按钮刷新看看",
+                            icon = Icons.Outlined.Inventory2,
+                            actionLabel = "刷新一下",
+                            onAction = { vm.forceRefresh() }
+                        )
                     } else {
                         PullToRefreshBox(
                             isRefreshing = isRefreshing,
@@ -210,13 +216,13 @@ private fun PapersList(
 }
 
 /**
- * 单条论文行:序号徽章 + 标题(主)+ 摘要(辅)+ 👍 upvotes · 📅 发布日期 · 👥 作者。
+ * 单条论文行:序号徽章 + 标题(主)+ 摘要(辅)+ upvotes · 发布日期 · 作者。
  *
  * 三层信息:
  *  1. 标题:加粗正文,最多三行(论文标题是本条主信息);翻译开关开时行末带「译」按钮
  *  2. 摘要:弱色小字,最多两行(一句话概述,辅助参考);部分条目无此行
  *  2.5 整体译文:标题+摘要合并翻译的中文译文块,显示在摘要之后(翻译开关开且已翻译时)
- *  3. meta:upvotes(🔥 primary 强调,热度主指标)+ 发布日期 + 作者
+ *  3. meta:upvotes(primary 强调,热度主指标)+ 发布日期 + 作者
  *
  * @param item 论文数据(rank 即为页面排名)
  */
@@ -229,7 +235,6 @@ private fun PaperRow(
     onTranslate: () -> Unit
 ) {
     val cs = MaterialTheme.colorScheme
-    val topRank = item.rank <= 3
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -242,21 +247,8 @@ private fun PaperRow(
         verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // 序号徽章:1-3 实心 primary,其余描边低对比(同 GitHubTrendingRow)
-        Box(
-            modifier = Modifier
-                .size(24.dp)
-                .clip(RoundedCornerShape(7.dp))
-                .background(if (topRank) cs.primary else cs.surfaceContainerHigh),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = item.rank.toString(),
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                color = if (topRank) cs.onPrimary else cs.onSurfaceVariant
-            )
-        }
+        // 序号徽章:全 App 统一 RankBadge(同 GitHubTrendingRow)
+        RankBadge(rank = item.rank)
 
         Column(modifier = Modifier.weight(1f)) {
             // ① 标题(主):加粗,最多三行;翻译开关开时行末带「译」按钮
@@ -264,7 +256,7 @@ private fun PaperRow(
             Row(verticalAlignment = Alignment.Top) {
                 Text(
                     text = item.title,
-                    style = MaterialTheme.typography.titleSmall,
+                    style = AppText.titleCompact,
                     fontWeight = FontWeight.SemiBold,
                     color = cs.onSurface,
                     maxLines = 3,
@@ -301,69 +293,32 @@ private fun PaperRow(
                 TranslatedText(translated = translationState.translated)
             }
 
-            // ③ meta:👍 upvotes(primary 强调)· 📅 发布日期 · 👥 作者
+            // ③ meta:upvotes(primary 强调)· 发布日期 · 作者
             Spacer(Modifier.height(6.dp))
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 // upvotes 是热度主指标,用 primary 强调,让用户一眼看到「为什么上趋势」
-                CountBadge(
+                StatBadge(
                     icon = Icons.Filled.ThumbUp,
-                    text = formatCount(item.upvotes),
+                    value = formatCount(item.upvotes),
                     tint = cs.primary,
                     fontWeight = FontWeight.SemiBold
                 )
                 if (item.published.isNotBlank()) {
-                    CountBadge(
+                    StatBadge(
                         icon = Icons.Filled.CalendarMonth,
-                        text = item.published
+                        value = item.published
                     )
                 }
                 if (item.authors.isNotBlank()) {
-                    CountBadge(
+                    StatBadge(
                         icon = Icons.Filled.Groups,
-                        text = item.authors
+                        value = item.authors
                     )
                 }
             }
         }
     }
-}
-
-/** 计数徽章:icon + 文本,弱色(除非调用方 override tint)。 */
-@Composable
-private fun CountBadge(
-    icon: ImageVector,
-    text: String,
-    tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
-    fontWeight: FontWeight = FontWeight.Normal
-) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = tint,
-            modifier = Modifier.size(13.dp)
-        )
-        Spacer(Modifier.width(3.dp))
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelSmall,
-            color = tint,
-            fontWeight = fontWeight,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
-}
-
-/** 大数字缩写:< 1000 原样,1.2k / 12k / 1.2m(对齐 HuggingFace upvote 展示习惯)。 */
-private fun formatCount(n: Int): String = when {
-    n < 1000 -> n.toString()
-    n < 1_000_000 -> {
-        if (n < 10_000) "${"%.1f".format(n / 1000.0)}k" // 1.2k 形态
-        else "${n / 1000}k"
-    }
-    else -> "${"%.1f".format(n / 1_000_000.0)}m"
 }

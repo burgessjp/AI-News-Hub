@@ -12,6 +12,13 @@ package com.example.aihot.ui.theme
  *  - [primaryEmphasis]:  primary 弱化(文字、渐变终点)        0.85f
  *  - [badgeOverlay]:     徽章/药丸半透明底(primary/分档色)   0.12f
  *  - [onPrimaryOverlay]: onPrimary 半透明底(深底浅 chip)     0.18f
+ *  - [barOverlay]:       顶栏毛玻璃半透明底                 0.72f
+ *  - [bottomBarSurface]: 底栏近实底(遮内容透出)            0.94f
+ *  - [hairlineOverlay]:  发丝分隔线(顶栏下缘)                0.50f
+ *  - [glassEdge]:        玻璃边缘高光描边(白色)              0.30f
+ *  - [chipOverlay]:      标签 chip 弱化底                    0.60f
+ *  - [badgeOutline]:     徽章同色描边                        0.20f
+ *  - [neutralOverlay]:   中性灰弱化底                        0.20f
  */
 object AppAlpha {
     /** primary 弱化 —— 用于 primary 色文字弱化、渐变终点。
@@ -25,4 +32,30 @@ object AppAlpha {
     /** onPrimary 半透明底 —— 用于深色背景(onPrimary)上的浅色 chip。
      *  不与 [badgeOverlay] 合并:两者基色语义相反(深底浮浅 vs 浅底浮深)。 */
     const val onPrimaryOverlay: Float = 0.18f
+
+    /** 顶栏毛玻璃半透明底 —— surface 系降透明,内容滚动时透出底层,传达"浮起"感。
+     *  合并原 0.70f(底栏)与 0.72f(顶栏),取 0.72f(视觉无差);
+     *  底栏后改用 [bottomBarSurface] 近实底,本档现为顶栏专用。 */
+    const val barOverlay: Float = 0.72f
+
+    /** 底栏近实底 —— 浮动药丸底栏专用:近乎不透明,遮住滚动到药丸下方的内容透出
+     *  (Compose 无真模糊,半透明叠内容显脏)。与 [barOverlay] 分档:顶栏仍走毛玻璃半透明。 */
+    const val bottomBarSurface: Float = 0.94f
+
+    /** 发丝分隔线 —— 顶栏下缘 1dp 发丝线,半透明比实色更柔和,贴合"低对比分层"。 */
+    const val hairlineOverlay: Float = 0.5f
+
+    /** 玻璃边缘高光描边 —— 底栏药丸的白色半透明描边,模拟玻璃边缘反光。 */
+    const val glassEdge: Float = 0.3f
+
+    /** 标签 chip 弱化底 —— secondaryContainer 降透明做浅底小标签。 */
+    const val chipOverlay: Float = 0.6f
+
+    /** 徽章同色描边 —— 信源徽章等的 1dp 同色描边,比底色([badgeOverlay])略实以显形。
+     *  与 [neutralOverlay] 同值不合档:一为描边一为底色,语义不同。 */
+    const val badgeOutline: Float = 0.20f
+
+    /** 中性灰弱化底 —— 中性灰图标块底色;灰度饱和度低,需比彩色档([badgeOverlay])
+     *  更高的 alpha 才不显寡淡。与 [badgeOutline] 同值不合档(底色 vs 描边)。 */
+    const val neutralOverlay: Float = 0.20f
 }

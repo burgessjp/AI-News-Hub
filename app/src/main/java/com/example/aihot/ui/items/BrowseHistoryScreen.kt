@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DeleteSweep
@@ -62,7 +61,8 @@ import com.example.aihot.ui.BrowseHistoryViewModel
 import com.example.aihot.ui.EmptyState
 import com.example.aihot.ui.components.AppTopBar
 import com.example.aihot.ui.components.AppTopBarDefaults
-import com.example.aihot.ui.components.SettingsGroupHeader
+import com.example.aihot.ui.components.SectionHeader
+import com.example.aihot.ui.theme.AppAlpha
 import com.example.aihot.ui.theme.AppText
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -257,9 +257,8 @@ private fun HistoryList(
             val grouped = items.groupBy { it.host }
             grouped.forEach { (host, group) ->
                 item(key = "header_$host") {
-                    SettingsGroupHeader(
-                        host,
-                        accentColor = MaterialTheme.colorScheme.primary
+                    SectionHeader(
+                        title = host
                     )
                 }
                 items(items = group, key = { e -> "g:${e.url}" }) { e ->
@@ -355,8 +354,8 @@ private fun HistoryRow(
             Box(
                 modifier = Modifier
                     .size(40.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(tileBg.copy(alpha = 0.12f)),
+                    .clip(MaterialTheme.shapes.small)
+                    .background(tileBg.copy(alpha = AppAlpha.badgeOverlay)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -426,8 +425,8 @@ private fun MetaDot() {
 private fun VisitBadge(count: Int) {
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(4.dp))
-            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+            .clip(MaterialTheme.shapes.extraSmall)
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = AppAlpha.badgeOverlay))
             .padding(horizontal = 4.dp, vertical = 1.dp)
     ) {
         Text(

@@ -23,9 +23,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.outlined.Inbox
+import androidx.compose.material.icons.outlined.SearchOff
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FilterChip
@@ -184,9 +186,13 @@ fun ItemsScreen(
                         // 列表会永远停在第一页(即便后续页已加载)。
                         val data = items
                         if (data.isEmpty()) {
+                            // 空态场景化:搜索无结果给「换关键词」恢复路径;非搜索空态给刷新动作
                             EmptyState(
                                 title = if (filter.isSearching) "未找到相关内容" else "暂无内容",
-                                subtitle = if (filter.isSearching) "试试换个关键词" else null
+                                subtitle = if (filter.isSearching) "换个关键词试试" else "点下方按钮刷新看看",
+                                icon = if (filter.isSearching) Icons.Outlined.SearchOff else Icons.Outlined.Inbox,
+                                actionLabel = if (filter.isSearching) null else "刷新一下",
+                                onAction = if (filter.isSearching) null else ({ vm.refresh() })
                             )
                         } else {
                             // 按天分组(本地时区),保持原列表顺序。
@@ -364,7 +370,7 @@ private fun CategoryChips(
                 onClick = { onSelect(null) },
                 label = { Text("全部") },
                 // 完全圆角(药丸),对齐设计系统的 pill 形标签
-                shape = RoundedCornerShape(50),
+                shape = CircleShape,
                 border = androidx.compose.foundation.BorderStroke(
                     1.dp,
                     if (selected == null) androidx.compose.ui.graphics.Color.Transparent
@@ -381,7 +387,7 @@ private fun CategoryChips(
                     selected = selected == cat,
                     onClick = { onSelect(cat) },
                     label = { Text(cat.zh) },
-                    shape = RoundedCornerShape(50),
+                    shape = CircleShape,
                     border = androidx.compose.foundation.BorderStroke(
                         1.dp,
                         if (selected == cat) androidx.compose.ui.graphics.Color.Transparent

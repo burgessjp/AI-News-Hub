@@ -149,3 +149,10 @@ val LocalAppTextStyles = staticCompositionLocalOf { AppTextStyles() }
  */
 val AppText: AppTextStyles
     @Composable get() = LocalAppTextStyles.current
+
+/** 章节条专用字距 —— 全宽分组标题(labelLarge/Bold)的精调字距。
+ *  labelLarge 全 App 有 3 种字距(本值/[TrackingWide]/MD3 默认),不收敛进字号档以免误伤。 */
+val TrackingSection = 0.5.sp
+
+/** 宽字距 —— 日报日期标签等小字大写感 label 的精调字距。 */
+val TrackingWide = 1.sp

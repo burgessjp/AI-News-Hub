@@ -121,3 +121,52 @@ fun NewsCardSkeletonList(
         }
     }
 }
+
+/**
+ * 排名行骨架 —— 匹配 Hub 五源屏(HN/GitHub/LinuxDo/stormzhang/HF)的真实行结构:
+ * 左 24dp 排名徽章 + 右侧标题两行 + meta 统计行(padding 18h/14v、间距 12dp 对齐
+ * 各屏真实行),避免加载→内容切换时的结构跳变。
+ */
+@Composable
+fun RankRowSkeleton(
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 18.dp, vertical = 14.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = androidx.compose.ui.Alignment.Top
+    ) {
+        // 左栏:24dp 排名徽章(extraSmall 圆角)
+        ShimmerBox(modifier = Modifier.size(24.dp), cornerRadius = 6.dp)
+        // 右栏:标题两行 + meta 行(三个统计小块,占位 StatBadge 位)
+        Column(modifier = Modifier.weight(1f)) {
+            ShimmerBox(modifier = Modifier.fillMaxWidth(0.95f).height(16.dp))
+            Spacer(Modifier.height(6.dp))
+            ShimmerBox(modifier = Modifier.fillMaxWidth(0.65f).height(16.dp))
+            Spacer(Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                ShimmerBox(modifier = Modifier.size(48.dp, 12.dp), cornerRadius = 4.dp)
+                ShimmerBox(modifier = Modifier.size(40.dp, 12.dp), cornerRadius = 4.dp)
+                ShimmerBox(modifier = Modifier.size(56.dp, 12.dp), cornerRadius = 4.dp)
+            }
+        }
+    }
+}
+
+/**
+ * 一组排名行骨架 —— Hub 五源屏等「徽章行」列表的加载占位。
+ * 行间不再额外留空:真实行靠行内 vertical padding 呼吸,骨架保持同一节奏。
+ */
+@Composable
+fun RankRowSkeletonList(
+    count: Int = 8,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        repeat(count) {
+            RankRowSkeleton()
+        }
+    }
+}

@@ -14,7 +14,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.runBlocking
 
 /**
- * 显示偏好(主题模式 + 动态取色 + 字体族 + 字号档位 + 数据源模式)持久化。
+ * 显示偏好(主题模式 + 动态取色 + 字体族 + 字号档位 + 数据源模式)持久化;
+ * 搜索历史([searchHistoryFlow],最近 10 条)同存于此文件,与显示偏好语义轻绑定。
  *
  * 此前 [themeMode] / [fontChoice] 仅靠 rememberSaveable 存内存,App 冷启动
  * 即丢失回到默认。这里用独立 DataStore 文件 `display_prefs`(与 AI 服务配置
@@ -70,6 +71,44 @@ class SettingsStore(context: Context) {
         dataStore.edit { it[KEY_SOURCE_MODE] = mode.name }
     }
 
+    // ===== 搜索历史 =====
+
+    /**
+     * 搜索历史流 —— 最新在前,最多 [MAX_SEARCH_HISTORY] 条。
+     *
+     * 存储格式:换行分隔的纯字符串(搜索框为单行输入,词条不可能含换行),
+     * 读取时 trim + 过滤空串,对历史脏数据容错。
+     */
+    val searchHistoryFlow: Flow<List<String>> = dataStore.data.map { p ->
+        p[KEY_SEARCH_HISTORY].orEmpty()
+            .split('\n')
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .take(MAX_SEARCH_HISTORY)
+    }
+
+    /**
+     * 记录一条搜索历史:去首尾空白、空串不存、大小写敏感去重(已存在则移到最前)、
+     * 只保留最近 [MAX_SEARCH_HISTORY] 条。
+     */
+    suspend fun addSearchHistory(term: String) {
+        val t = term.trim()
+        if (t.isEmpty()) return
+        dataStore.edit { p ->
+            val old = p[KEY_SEARCH_HISTORY].orEmpty()
+                .split('\n')
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+            val new = (listOf(t) + old.filter { it != t }).take(MAX_SEARCH_HISTORY)
+            p[KEY_SEARCH_HISTORY] = new.joinToString("\n")
+        }
+    }
+
+    /** 清空搜索历史(条目少,调用方直接清空,无需二次确认)。 */
+    suspend fun clearSearchHistory() {
+        dataStore.edit { it.remove(KEY_SEARCH_HISTORY) }
+    }
+
     /**
      * 同步读取数据源模式 —— 供 ViewModel 在构造期(init 属性)非协程上下文取值。
      *
@@ -87,5 +126,7 @@ class SettingsStore(context: Context) {
         val KEY_FONT = stringPreferencesKey("font_choice")
         val KEY_FONT_SCALE = stringPreferencesKey("font_scale")
         val KEY_SOURCE_MODE = stringPreferencesKey("source_mode")
+        val KEY_SEARCH_HISTORY = stringPreferencesKey("search_history")
+        const val MAX_SEARCH_HISTORY = 10
     }
 }

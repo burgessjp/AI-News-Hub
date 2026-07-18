@@ -35,7 +35,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.aihot.data.DailyEntry
@@ -48,7 +47,9 @@ import com.example.aihot.ui.DailyViewModel
 import com.example.aihot.ui.components.AppTopBar
 import com.example.aihot.ui.components.AppTopBarDefaults
 import com.example.aihot.ui.components.ArchiveIconButton
+import com.example.aihot.ui.components.SectionHeader
 import com.example.aihot.ui.theme.AppText
+import com.example.aihot.ui.theme.TrackingWide
 
 /**
  * 日报屏幕:展示最新日报,顶部入口进入归档。
@@ -98,7 +99,11 @@ fun DailyScreen(
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             when (val s = state) {
                 is UiState.Loading -> DailySkeleton()
-                is UiState.Error -> ErrorState(message = s.message, onRetry = { vm.refreshLatest() })
+                is UiState.Error -> ErrorState(
+                    message = s.message,
+                    title = "日报加载失败",
+                    onRetry = { vm.refreshLatest() }
+                )
                 is UiState.Success -> DailyContent(report = s.data, onOpen = { url -> onOpenUrl(url, "AI HOT") })
             }
         }
@@ -117,12 +122,12 @@ internal fun DailyContent(report: DailyReport, onOpen: (String) -> Unit) {
             DailySummaryHeader(report = report)
         }
 
-        // 各分节:分节标题(横贯背景条) + 扁平行 + hairline 分隔线
+        // 各分节:分节标题(统一 SectionHeader,透明底 + 小竖条) + 扁平行 + hairline 分隔线
         val visibleSections = report.sections.filter { it.items.isNotEmpty() }
         visibleSections.forEachIndexed { sIdx, section ->
             item(key = "divider-$sIdx") { DailyRowDivider() }
             item(key = "section-title-$sIdx") {
-                SectionHeader(label = section.label)
+                SectionHeader(title = section.label)
             }
             itemsIndexed(
                 items = section.items,
@@ -180,10 +185,10 @@ private fun DailyRowDivider() {
  * 顶部汇总区 —— 扁平布局,无卡片描边,与精选 item 视觉统一。
  *
  * 结构(自上而下):
- *  1. 日期 label(cyan,小号大写感)
+ *  1. 日期 label(primary,小号大写感)
  *  2. 头条标题(headlineSmall,SemiBold)
  *  3. lead 摘要(bodyMedium,多行)
- *  4. 统计行:条目数 · 分类数 · 快讯数 · 预计阅读(数字 cyan 加粗,标签灰色)
+ *  4. 统计行:条目数 · 分类数 · 快讯数 · 预计阅读(数字 primary 加粗,标签灰色)
  */
 @Composable
 private fun DailySummaryHeader(report: DailyReport) {
@@ -196,7 +201,7 @@ private fun DailySummaryHeader(report: DailyReport) {
                 fontWeight = FontWeight.SemiBold,
                 color = accent,
                 // 日报日期标签专用大字距,非 labelLarge 通用属性,不进 Type.kt
-                letterSpacing = 1.sp
+                letterSpacing = TrackingWide
             )
             report.lead?.let { lead ->
                 if (lead.title.isNotBlank()) {
@@ -253,7 +258,7 @@ private fun java.time.DayOfWeek.toChinese(): String = when (this) {
     java.time.DayOfWeek.SUNDAY -> "周日"
 }
 
-/** 统计行:每个统计项 = 数字(cyan,加粗)+ 标签(灰);项间中点分隔。 */
+/** 统计行:每个统计项 = 数字(primary,加粗)+ 标签(灰);项间中点分隔。 */
 @Composable
 private fun DailySummaryStats(report: DailyReport, accent: androidx.compose.ui.graphics.Color) {
     val entries = report.sections.sumOf { it.items.size }
@@ -297,40 +302,7 @@ private fun DailySummaryStats(report: DailyReport, accent: androidx.compose.ui.g
 }
 
 /**
- * 分节标题 —— 横贯全宽的背景条 + cyan 左竖线 accent + 加粗 label。
- *
- * 视觉强度高于普通文字标题,用于在扁平列表中划清大类边界。
- * 与精选列表的 DateGroupHeader 风格一致(同样的 surfaceContainerHigh 底)。
- */
-@Composable
-private fun SectionHeader(label: String) {
-    val accent = MaterialTheme.colorScheme.primary
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .padding(horizontal = 18.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // cyan 左竖线 accent
-        Box(
-            modifier = Modifier
-                .width(4.dp)
-                .height(16.dp)
-                .background(accent)
-        )
-        Spacer(Modifier.width(10.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-    }
-}
-
-/**
- * 快讯时间线行 —— 左侧 cyan 圆点 + 连接竖线(Twitter 线风格)。
+ * 快讯时间线行 —— 左侧 primary 圆点 + 连接竖线(Twitter 线风格)。
  */
 @Composable
 private fun FlashTimelineRow(flash: Flash, onOpen: (String) -> Unit, isLast: Boolean) {

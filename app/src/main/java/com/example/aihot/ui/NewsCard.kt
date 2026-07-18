@@ -22,11 +22,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.aihot.data.NewsItem
+import com.example.aihot.ui.components.SectionHeader
+import com.example.aihot.ui.theme.AppAlpha
 import com.example.aihot.ui.theme.AppText
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -39,11 +41,12 @@ import java.time.temporal.ChronoUnit
  * 新闻列表行 —— 扁平无卡片风格(参考新设计)。
  *
  * 布局(一行):
- *  - 左栏(固定窄宽):绝对时间 HH:mm(年月日由分组条承担,这里只显示时分)
+ *  - 左栏(固定窄宽):绝对时间 HH:mm(年月日由分组条承担,这里只显示时分),
+ *    Medium 字重 + onSurface 85%,与标题首行基线对齐
  *  - 右栏(权重 1):
- *      标题行:标题(2 行,SemiBold) … 🔥 分数(右对齐,分档配色,带火焰图标)
+ *      标题行:标题(2 行,AppText.titleItem 16sp SemiBold) … 热度徽章(右对齐,火焰图标 + 分档配色)
  *      摘要(2 行,onSurfaceVariant)
- *      底部行:精选标记 + 来源 · 分类
+ *      底部行:精选标记 + 来源 · 分类(onSurfaceVariant 降层级)
  *
  *  - 左右 18dp / 上下 12dp 留白,行间无卡片描边,依靠列表分隔线区分
  */
@@ -66,20 +69,23 @@ fun NewsCard(
         verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // 左栏:时分 HH:mm(年月日已由日期分组条承担)
+        // 左栏:时分 HH:mm(年月日已由日期分组条承担)。
+        // alignByBaseline 与右栏首行(标题)基线对齐,取代旧 top padding 硬调
         val time = absoluteTime(item.publishedAt)
         if (time.isNotEmpty()) {
             Text(
                 text = time,
                 style = MaterialTheme.typography.labelMedium,
-                color = cs.onSurfaceVariant,
+                color = cs.onSurface.copy(alpha = AppAlpha.primaryEmphasis),
                 fontWeight = FontWeight.Medium,
-                modifier = Modifier.padding(top = 2.dp)
+                modifier = Modifier.alignByBaseline()
             )
         }
 
-        // 右栏:主内容
-        Column(modifier = Modifier.weight(1f)) {
+        // 右栏:主内容(基线取自首个有基线的子级 = 标题首行)
+        Column(modifier = Modifier
+            .weight(1f)
+            .alignByBaseline()) {
             // 标题行:标题(权重 1) + 热度分数(右对齐,自然宽度)
             //  - 分数提到标题行右侧,与标题首行对齐,避免与底部来源信息混在一起
             //  - 带火焰图标 + 分值,明示这是"热度",而非无意义的数字
@@ -87,15 +93,15 @@ fun NewsCard(
                 Row(verticalAlignment = Alignment.Top) {
                     Text(
                         text = item.title,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
+                        // titleItem 档位本身即 SemiBold,不再显式覆盖字重
+                        style = AppText.titleItem,
                         color = cs.onSurface,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f)
                     )
                     if (item.score > 0) {
-                        ScoreBadge(score = item.score)
+                        HotBadge(score = item.score)
                     }
                 }
             }
@@ -152,36 +158,46 @@ fun NewsCard(
 }
 
 /**
- * 列表项热度分数徽章 —— 与详情页 [com.example.aihot.ui.ScoreBadgeLarge] 同源配色,
- * 缩到列表项可用的尺寸。
+ * 列表项热度徽章 —— 火焰图标 + 分值,明示语义是「热度」,避免无单位裸数字。
  *
- * 视觉:🔥 + 分值,分档配色(≥80 红 / ≥60 橙黄 / ≥40 次要 / 其余灰),
- * 火焰图标明示语义是"热度",避免出现无单位的裸数字。
+ * 分档配色全走 colorScheme(保留原 红/橙/紫/灰 四档语义):
+ *  - ≥80:tertiary(最热)
+ *  - ≥60:secondary
+ *  - ≥40:primary
+ *  - 其余:收进 surfaceContainerHigh 浅底 chip + onSurfaceVariant,压低低分视觉权重
  */
 @Composable
-private fun ScoreBadge(score: Int) {
+private fun HotBadge(score: Int) {
     val cs = MaterialTheme.colorScheme
-    val color = when {
-        score >= 80 -> cs.error
-        score >= 60 -> cs.tertiary
-        score >= 40 -> cs.secondary
-        else -> cs.outline
+    val tint = when {
+        score >= 80 -> cs.tertiary
+        score >= 60 -> cs.secondary
+        score >= 40 -> cs.primary
+        else -> cs.onSurfaceVariant
     }
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(2.dp),
-        modifier = Modifier.padding(start = 8.dp)
+        modifier = Modifier
+            .padding(start = 8.dp)
+            .clip(MaterialTheme.shapes.extraSmall)
+            .then(
+                if (score >= 40) Modifier
+                else Modifier
+                    .background(cs.surfaceContainerHigh)
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            )
     ) {
         Icon(
             Icons.Filled.LocalFireDepartment,
             contentDescription = "热度",
-            tint = color,
+            tint = tint,
             modifier = Modifier.size(14.dp)
         )
         Text(
             text = score.toString(),
             style = MaterialTheme.typography.labelMedium,
-            color = color,
+            color = tint,
             fontWeight = FontWeight.Bold
         )
     }
@@ -271,27 +287,10 @@ fun relativeTime(iso: String?): String {
 }
 
 /**
- * 日期分组条 —— 列表中按天分组的 sticky 标题。
- *
- * 视觉:浅色背景(surfaceContainerHigh) + cyan 加粗文字,横贯全宽。
+ * 日期分组条 —— 列表中按天分组的标题。
+ * 视觉统一收口到 [SectionHeader](透明底 + 小竖条强调),此处仅做日期文案的薄封装。
  */
 @Composable
 fun DateGroupHeader(dayKey: String, modifier: Modifier = Modifier) {
-    val cs = MaterialTheme.colorScheme
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(cs.surfaceContainerHigh)
-            .padding(horizontal = 18.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = dayLabel(dayKey),
-            style = MaterialTheme.typography.labelLarge,
-            color = cs.primary,
-            fontWeight = FontWeight.Bold,
-            // 章节条专用字距:5 处 labelLarge 有 3 种字距(0.5/1.0/默认),此值不进 Type.kt 以免误伤
-            letterSpacing = 0.5.sp
-        )
-    }
+    SectionHeader(title = dayLabel(dayKey), modifier = modifier)
 }

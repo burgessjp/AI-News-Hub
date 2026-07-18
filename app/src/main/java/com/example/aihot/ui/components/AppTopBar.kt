@@ -20,6 +20,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import com.example.aihot.ui.theme.AppAlpha
 import com.example.aihot.ui.theme.AppText
 
 /**
@@ -106,7 +107,7 @@ fun AppTopBar(
             colors = TopAppBarDefaults.topAppBarColors(
                 // 半透明玻璃质感:72% surface 透明度,内容滚动时透出底层,传达"浮起"感。
                 // Compose 无原生 backdrop-blur,半透明 + 下方发丝线是零依赖近似方案。
-                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f)
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = AppAlpha.barOverlay)
             ),
             windowInsets = if (applyTopInset) TopAppBarDefaults.windowInsets else WindowInsets(0),
             modifier = modifier
@@ -114,7 +115,7 @@ fun AppTopBar(
         HorizontalDivider(
             thickness = 1.dp,
             // 发丝线 50% 透明,比实色更柔和,符合设计系统"低对比分层"
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = AppAlpha.hairlineOverlay)
         )
     }
 }

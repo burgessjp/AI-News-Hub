@@ -20,12 +20,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.CallSplit
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -59,7 +59,10 @@ import com.example.aihot.ui.UiState
 import com.example.aihot.ui.components.AppTopBar
 import com.example.aihot.ui.components.AppTopBarDefaults
 import com.example.aihot.ui.components.ListUpdateTimeHeader
-import com.example.aihot.ui.components.NewsCardSkeletonList
+import com.example.aihot.ui.components.RankBadge
+import com.example.aihot.ui.components.RankRowSkeletonList
+import com.example.aihot.ui.components.StatBadge
+import com.example.aihot.ui.components.formatCount
 import com.example.aihot.ui.theme.AppText
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -69,7 +72,7 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
  *
  * 视觉对齐 [HackerNewsScreen]:
  *  - 顶栏:返回箭头 + 「GitHub Trending」+ 右上「上次刷新 N 分钟前」
- *  - 列表:排名徽章(1-3 primary 强调)+ owner/name + 描述 + 语言色点·语言 · ⭐·🍴·🔥
+ *  - 列表:排名徽章([RankBadge] 统一分档)+ owner/name + 描述 + 语言色点·语言 · stars·forks·今日新增
  *
  * 交互:
  *  - 点击单条 → 内置 WebView 打开仓库([onOpenUrl])
@@ -133,7 +136,7 @@ fun GitHubTrendingScreen(
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             when (val s = state) {
-                is UiState.Loading -> NewsCardSkeletonList(count = 8)
+                is UiState.Loading -> RankRowSkeletonList(count = 8)
                 is UiState.Error -> ErrorState(
                     message = s.message,
                     onRetry = { vm.forceRefresh() }
@@ -141,7 +144,14 @@ fun GitHubTrendingScreen(
                 is UiState.Success -> {
                     val repos = s.data
                     if (repos.isEmpty()) {
-                        EmptyState(title = "暂无内容")
+                        // 数据缺失空态(归档快照为空/实时无条目):给刷新恢复路径
+                        EmptyState(
+                            title = "暂无内容",
+                            subtitle = "下拉或点下方按钮刷新看看",
+                            icon = Icons.Outlined.Inventory2,
+                            actionLabel = "刷新一下",
+                            onAction = { vm.forceRefresh() }
+                        )
                     } else {
                         PullToRefreshBox(
                             isRefreshing = isRefreshing,
@@ -208,12 +218,12 @@ private fun TrendingList(
 }
 
 /**
- * 单条仓库行:序号徽章 + owner/name + 描述 + 语言色点·语言 · ⭐总数 · 🍴 forks · 🔥今日新增。
+ * 单条仓库行:序号徽章 + owner/name + 描述 + 语言色点·语言 · stars 总数 · forks · 今日新增。
  *
  * 三层信息:
  *  1. 标题:owner(弱色)/ name(加粗)
  *  2. 描述:最多两行,弱色;翻译开关开时行末带「译」按钮,译文显示在描述下方
- *  3. meta:语言(带色点)+ stars + forks + 今日新增(🔥 强调色)
+ *  3. meta:语言(带色点)+ stars + forks + 今日新增(火焰图标,强调色)
  *
  * @param repo 仓库数据(rank 即为页面排名)
  */
@@ -226,7 +236,6 @@ private fun TrendingRow(
     onTranslate: () -> Unit
 ) {
     val cs = MaterialTheme.colorScheme
-    val topRank = repo.rank <= 3
     var descCollapsed by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
@@ -240,40 +249,27 @@ private fun TrendingRow(
         verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // 序号徽章:1-3 实心 primary,其余描边低对比(同 HackerNewsRow)
-        Box(
-            modifier = Modifier
-                .size(24.dp)
-                .clip(RoundedCornerShape(7.dp))
-                .background(if (topRank) cs.primary else cs.surfaceContainerHigh),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = repo.rank.toString(),
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                color = if (topRank) cs.onPrimary else cs.onSurfaceVariant
-            )
-        }
+        // 序号徽章:全 App 统一 RankBadge(同 HackerNewsRow)
+        RankBadge(rank = repo.rank)
 
         Column(modifier = Modifier.weight(1f)) {
-            // ① 标题:owner(弱色)/ name(加粗),对齐 GitHub 原生风
+            // ① 标题:owner(弱色)/ name(加粗),对齐 GitHub 原生风(owner/name 强弱结构保持)
             Row(verticalAlignment = Alignment.Bottom) {
                 Text(
                     text = repo.owner,
-                    style = MaterialTheme.typography.titleSmall,
+                    style = AppText.titleCompact,
                     color = cs.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = " / ",
-                    style = MaterialTheme.typography.titleSmall,
+                    style = AppText.titleCompact,
                     color = cs.onSurfaceVariant
                 )
                 Text(
                     text = repo.name,
-                    style = MaterialTheme.typography.titleSmall,
+                    style = AppText.titleCompact,
                     fontWeight = FontWeight.Bold,
                     color = cs.onSurface,
                     maxLines = 1,
@@ -312,7 +308,7 @@ private fun TrendingRow(
                 }
             }
 
-            // ③ meta:语言色点·语言 · ⭐总数 · 🍴 forks · 🔥今日新增
+            // ③ meta:语言色点·语言 · stars 总数 · forks · 今日新增
             Spacer(Modifier.height(6.dp))
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -325,21 +321,21 @@ private fun TrendingRow(
                         colorHex = repo.languageColor
                     )
                 }
-                // ⭐ 总 stars
-                CountBadge(
+                // 总 stars
+                StatBadge(
                     icon = Icons.Filled.Star,
-                    text = formatCount(repo.totalStars)
+                    value = formatCount(repo.totalStars)
                 )
-                // 🍴 forks
-                CountBadge(
+                // forks
+                StatBadge(
                     icon = Icons.AutoMirrored.Filled.CallSplit,
-                    text = formatCount(repo.forks)
+                    value = formatCount(repo.forks)
                 )
-                // 🔥 今日新增(primary 强调,让用户一眼看到「为什么上趋势」)
+                // 今日新增(primary 强调,让用户一眼看到「为什么上趋势」)
                 if (repo.starsToday > 0) {
-                    CountBadge(
+                    StatBadge(
                         icon = Icons.Filled.LocalFireDepartment,
-                        text = "${formatCount(repo.starsToday)} today",
+                        value = "${formatCount(repo.starsToday)} today",
                         tint = cs.primary,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -372,40 +368,4 @@ private fun LanguageTag(language: String, colorHex: String) {
             maxLines = 1
         )
     }
-}
-
-/** 计数徽章:icon + 文本,弱色(除非调用方 override tint)。 */
-@Composable
-private fun CountBadge(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    text: String,
-    tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
-    fontWeight: FontWeight = FontWeight.Normal
-) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = tint,
-            modifier = Modifier.size(13.dp)
-        )
-        Spacer(Modifier.width(3.dp))
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelSmall,
-            color = tint,
-            fontWeight = fontWeight,
-            maxLines = 1
-        )
-    }
-}
-
-/** 大数字缩写:< 1000 原样,1.2k / 12k / 1.2m(对齐 GitHub 列表展示习惯)。 */
-private fun formatCount(n: Int): String = when {
-    n < 1000 -> n.toString()
-    n < 1_000_000 -> {
-        if (n < 10_000) "${"%.1f".format(n / 1000.0)}k" // 1.2k 形态
-        else "${n / 1000}k"
-    }
-    else -> "${"%.1f".format(n / 1_000_000.0)}m"
 }

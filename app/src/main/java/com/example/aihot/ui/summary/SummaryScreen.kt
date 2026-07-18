@@ -1,5 +1,9 @@
 package com.example.aihot.ui.summary
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -14,21 +18,23 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.material.icons.outlined.Apps
+import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -44,6 +50,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -57,11 +64,13 @@ import com.example.aihot.data.SourceSummary
 import com.example.aihot.data.SummaryRepository
 import com.example.aihot.ui.SummaryViewModel
 import com.example.aihot.ui.UiState
+import com.example.aihot.ui.anim.Motion
 import com.example.aihot.ui.components.AppTopBar
-import com.example.aihot.ui.components.AppTopBarDefaults
 import com.example.aihot.ui.components.BottomBarReservedHeight
 import com.example.aihot.ui.components.ShimmerBox
+import com.example.aihot.ui.theme.AppAlpha
 import com.example.aihot.ui.theme.AppText
+import com.example.aihot.ui.theme.BrandGradient
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -70,8 +79,13 @@ import java.util.Locale
 /**
  * AI 摘要 Tab 根屏 —— 4 个归档源各占一页,[HorizontalPager] 左右滑动切换。
  *
- * 每页是一张全高卡片:顶部源标题(图标 + 名),中部摘要正文(可滚动),底部「查看完整列表 →」。
- * 顶部小圆点指示当前页 / 总页数。点底部按钮进对应源列表页。
+ * 每页一张全高卡片:
+ *  - 品牌渐变卡头([BrandGradient],AI 特性专用):onPrimary 圆形底衬源图标
+ *    (tint 用源强调色)+ 源名 + 数据时刻,右侧 AutoAwesome 小图标强化 AI 语义
+ *  - 摘要正文(可滚动)条目化:两位序号(源强调色,Bold)+ 富文本行,序号与首行基线对齐
+ *  - 底部「查看完整列表 →」(primary 加粗)
+ * 顶部提示行右侧是页面指示器:当前页横向胶囊 / 未选中圆点,tween 过渡,可点跳页。
+ * 4 张卡保持同构(同一产品语言),差异化只靠卡头图标与序号强调色。
  *
  * 数据来自 gitcode 每日归档快照顶层的 `ai_summary` 字段(由数据流水线预生成),App 端直接读取,
  * 不再运行时调用 AI API。
@@ -113,14 +127,24 @@ fun SummaryScreen(
         }
     }
 
+    // 顶栏日期(与精选 tab 同规格「M月d日 · 周x」):组合期算一次即可
+    val dateText = remember { formatToday() }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
+            // 一级根 tab 规格(对齐精选/更多):titleHero 主标题 + 右侧日期,保留刷新。
+            // horizontalPadding=18 让标题与下方卡片(18dp 边距)左对齐
             AppTopBar(
-                title = "AI 摘要 · ${formatToday()}",
-                titleFontSize = AppTopBarDefaults.secondaryTitleFontSize,
+                title = "AI 摘要",
+                horizontalPadding = 18.dp,
                 actions = {
-                    // 刷新按钮:配置就绪时可用,刷新中转圈
+                    Text(
+                        text = dateText,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    // 刷新按钮:刷新中转圈
                     if (isRefreshing) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(20.dp),
@@ -128,7 +152,7 @@ fun SummaryScreen(
                             color = MaterialTheme.colorScheme.primary
                         )
                     } else {
-                        androidx.compose.material3.IconButton(onClick = { vm.refresh() }) {
+                        IconButton(onClick = { vm.refresh() }) {
                             Icon(
                                 Icons.Filled.Refresh,
                                 contentDescription = "刷新",
@@ -149,7 +173,7 @@ fun SummaryScreen(
                 // 避免卡片被浮动药丸底栏遮挡
                 .padding(bottom = BottomBarReservedHeight)
         ) {
-            // 顶部:数据来源提示 + 页面指示点(可点跳页)
+            // 顶部:数据来源提示 + 页面指示器(可点跳页)
             SummaryHeaderRow(
                 currentPage = pagerState.currentPage,
                 pageCount = cards.size,
@@ -183,8 +207,8 @@ private data class SummaryCardSpec(
 )
 
 /**
- * 顶部行:左 = 数据来源提示;右 = 页面指示圆点(当前页实心 accent,其余空心)。
- * 圆点可点击直接跳页。
+ * 顶部行:左 = 数据来源提示;右 = 页面指示器(当前页横向胶囊,未选中圆点)。
+ * 指示器可点击直接跳页;宽度/颜色随切页 tween 过渡(Motion.SHORT)。
  */
 @Composable
 private fun SummaryHeaderRow(
@@ -192,7 +216,7 @@ private fun SummaryHeaderRow(
     pageCount: Int,
     onDotClick: (Int) -> Unit = {}
 ) {
-    val accent = MaterialTheme.colorScheme.primary
+    val cs = MaterialTheme.colorScheme
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -202,22 +226,30 @@ private fun SummaryHeaderRow(
         Text(
             text = "基于每日归档 · 左右滑动",
             style = AppText.caption,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = cs.onSurfaceVariant,
             modifier = Modifier.weight(1f)
         )
         Spacer(Modifier.size(8.dp))
-        // 页面指示点(可点击跳页)
-        Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+        // 页面指示器(可点击跳页):当前页 16×6 胶囊(primary),未选中 6dp 圆点
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             repeat(pageCount) { i ->
                 val isCurrent = i == currentPage
+                val dotWidth by animateDpAsState(
+                    targetValue = if (isCurrent) 16.dp else 6.dp,
+                    animationSpec = tween(Motion.SHORT, easing = Motion.EmphasizedDecel),
+                    label = "pageIndicatorWidth"
+                )
+                val dotColor by animateColorAsState(
+                    targetValue = if (isCurrent) cs.primary
+                    else cs.onSurfaceVariant.copy(alpha = AppAlpha.hairlineOverlay),
+                    animationSpec = tween(Motion.SHORT, easing = Motion.EmphasizedDecel),
+                    label = "pageIndicatorColor"
+                )
                 Box(
                     modifier = Modifier
-                        .size(if (isCurrent) 7.dp else 5.dp)
+                        .size(width = dotWidth, height = 6.dp)
                         .clip(CircleShape)
-                        .background(
-                            if (isCurrent) accent
-                            else MaterialTheme.colorScheme.outlineVariant
-                        )
+                        .background(dotColor)
                         .clickable { onDotClick(i) }
                 )
             }
@@ -227,11 +259,12 @@ private fun SummaryHeaderRow(
 
 /**
  * 单张源摘要页 —— 一张全高卡片(描边圆角),内含:
- *  - 头部:图标 + 源名 + 数据时刻
+ *  - 品牌渐变卡头([SummaryCardHeader]):源图标 + 源名 + 数据时刻
  *  - 中部:摘要正文(可纵向滚动),按 state 分支
  *  - 底部:「查看完整列表 →」按钮(进对应源列表页)
  *
- * 按钮用 TextButton 吸收自己的点击,不依赖卡片整体点击(pager 页面整页可滑,按钮区单独可点)。
+ * 底部按钮区用独立 Surface 吸收自己的点击,不依赖卡片整体点击
+ * (pager 页面整页可滑,按钮区单独可点)。
  */
 @Composable
 private fun SummaryCardPage(
@@ -240,54 +273,18 @@ private fun SummaryCardPage(
     onRetry: () -> Unit
 ) {
     val cs = MaterialTheme.colorScheme
-    val accent = cs.primary
+    val accent = sourceAccentOf(spec.source)
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = cs.surfaceContainerLow,
-        shape = RoundedCornerShape(20.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, cs.outlineVariant),
+        shape = MaterialTheme.shapes.medium,
+        border = BorderStroke(1.dp, cs.outlineVariant),
         tonalElevation = 0.dp,
         shadowElevation = 0.dp
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // 头部:图标 + 标题 + 数据时刻
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(30.dp)
-                        .clip(CircleShape)
-                        .background(accent.copy(alpha = 0.12f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        spec.icon,
-                        contentDescription = null,
-                        tint = accent,
-                        modifier = Modifier.size(17.dp)
-                    )
-                }
-                Spacer(Modifier.size(10.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = spec.title,
-                        style = AppText.titleItem,
-                        fontWeight = FontWeight.Bold,
-                        color = cs.onSurface
-                    )
-                    if (state is UiState.Success) {
-                        Text(
-                            text = "数据时刻：${formatFetchedAt(state.data.fetchedAtMs)}",
-                            style = AppText.caption,
-                            color = cs.outline
-                        )
-                    }
-                }
-            }
+            // 品牌渐变卡头(Surface 按卡片 shapes.medium 裁切,上圆角自然贴合)
+            SummaryCardHeader(spec = spec, state = state, accent = accent)
 
             // 中部:摘要正文(可滚动),按 state 分支
             Box(
@@ -302,11 +299,11 @@ private fun SummaryCardPage(
                         message = state.message,
                         onRetry = onRetry
                     )
-                    is UiState.Success -> SummaryBody(text = state.data.text)
+                    is UiState.Success -> SummaryBody(text = state.data.text, accent = accent)
                 }
             }
 
-            // 底部:查看完整列表按钮
+            // 底部:查看完整列表按钮(primary 加粗;不随源强调色,保持出口一致)
             Surface(
                 onClick = spec.onOpen,
                 color = cs.surfaceContainerLow,
@@ -321,14 +318,14 @@ private fun SummaryCardPage(
                     Text(
                         text = "查看完整列表",
                         style = AppText.body,
-                        fontWeight = FontWeight.SemiBold,
-                        color = accent,
+                        fontWeight = FontWeight.Bold,
+                        color = cs.primary,
                         modifier = Modifier.weight(1f)
                     )
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowForward,
                         contentDescription = "查看完整列表",
-                        tint = accent,
+                        tint = cs.primary,
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -338,23 +335,110 @@ private fun SummaryCardPage(
 }
 
 /**
- * 摘要正文 —— 纵向滚动列表,按行渲染(prompt 输出以「• 」分条)。
- * 每行解析 **加粗** 标记成富文本(标题加粗 + 正文常规)。
+ * 品牌渐变卡头 —— 约 66-72dp 高的 [BrandGradient] 横带(上圆角随卡片 shapes.medium)。
+ *
+ * 卡头内:onPrimary 圆形底衬源图标(tint 用源强调色)+ 源名(onPrimary,titleItem
+ * 自带 SemiBold)+ 数据时刻(onPrimary 85%);右侧 AutoAwesome 弱化白小图标强化 AI 语义。
+ * 文字/底衬一律走 onPrimary 系:浅色模式是白字压深渐变,深色模式是深字压浅渐变,
+ * 两种模式对比度都有保证(与今日热点渐变头同一处理)。
  */
 @Composable
-private fun SummaryBody(text: String) {
+private fun SummaryCardHeader(
+    spec: SummaryCardSpec,
+    state: UiState<SourceSummary>,
+    accent: Color
+) {
+    val cs = MaterialTheme.colorScheme
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(BrandGradient)
+            .padding(horizontal = 16.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(34.dp)
+                .clip(CircleShape)
+                .background(cs.onPrimary),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                spec.icon,
+                contentDescription = null,
+                tint = accent,
+                modifier = Modifier.size(18.dp)
+            )
+        }
+        Spacer(Modifier.size(10.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = spec.title,
+                style = AppText.titleItem,
+                color = cs.onPrimary
+            )
+            if (state is UiState.Success) {
+                Text(
+                    text = "数据时刻：${formatFetchedAt(state.data.fetchedAtMs)}",
+                    style = AppText.caption,
+                    color = cs.onPrimary.copy(alpha = AppAlpha.primaryEmphasis)
+                )
+            }
+        }
+        Icon(
+            Icons.Filled.AutoAwesome,
+            contentDescription = null,
+            tint = cs.onPrimary.copy(alpha = AppAlpha.primaryEmphasis),
+            modifier = Modifier.size(18.dp)
+        )
+    }
+}
+
+/**
+ * 源强调色 —— 卡头图标 tint 与条目序号的差异化锚点。
+ * 4 张卡同构(同一产品语言),仅靠强调色与图标区分源。
+ */
+@Composable
+private fun sourceAccentOf(source: String): Color {
+    val cs = MaterialTheme.colorScheme
+    return when (source) {
+        "hackernews" -> cs.tertiary            // 暖橙,呼应 HN 品牌与热度语义
+        "github-trending" -> cs.primary
+        "huggingface-papers" -> cs.primary
+        "stormzhang-ai" -> cs.secondary        // 品牌紫,贴「AI 资讯」语义
+        else -> cs.primary
+    }
+}
+
+/**
+ * 摘要正文 —— 条目化排版:每行一条,两位序号(01、02……源强调色 Bold)
+ * 与正文首行基线对齐,条目间距 12dp。每行解析 **加粗** 标记成富文本
+ * (标题加粗 + 正文常规),bullet 符号 trim 掉,由序号取代条目标记。
+ */
+@Composable
+private fun SummaryBody(text: String, accent: Color) {
     val lines = text.lines().filter { it.isNotBlank() }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
         contentPadding = PaddingValues(vertical = 4.dp)
     ) {
-        items(lines) { line ->
-            Text(
-                text = renderRichLine(line),
-                style = AppText.body,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+        itemsIndexed(lines) { index, line ->
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = "%02d".format(index + 1),
+                    style = AppText.bodySmall,
+                    fontWeight = FontWeight.Bold,
+                    color = accent,
+                    modifier = Modifier.alignByBaseline()
+                )
+                Text(
+                    text = renderRichLine(line),
+                    style = AppText.body,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.alignByBaseline()
+                )
+            }
         }
     }
 }
@@ -411,6 +495,21 @@ private fun SummaryError(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
+        // 卡片内嵌的紧凑错误态:CloudOff 小图标 + 口语化标题 + 底层错误详情
+        Icon(
+            Icons.Outlined.CloudOff,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(Modifier.size(8.dp))
+        Text(
+            text = "摘要暂时没加载出来",
+            style = AppText.bodySmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Spacer(Modifier.size(4.dp))
         Text(
             text = message,
             style = AppText.bodySmall,
@@ -431,8 +530,8 @@ private fun formatFetchedAt(ms: Long): String {
     }.getOrDefault("未知")
 }
 
-/** 今天日期(系统时区),格式「M月d日」,用于顶栏标题。 */
+/** 今天日期(系统时区),格式「M月d日 · 周x」,与精选 tab 顶栏日期同规格。 */
 private fun formatToday(): String =
     runCatching {
-        SimpleDateFormat("M月d日", Locale.CHINA).format(Date())
+        SimpleDateFormat("M月d日 · E", Locale.CHINA).format(Date())
     }.getOrDefault("")

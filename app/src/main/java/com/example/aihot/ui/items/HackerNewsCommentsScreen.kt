@@ -71,9 +71,7 @@ import com.example.aihot.ui.UiState
 import com.example.aihot.ui.components.AppTopBar
 import com.example.aihot.ui.components.AppTopBarDefaults
 import com.example.aihot.ui.components.NewsCardSkeletonList
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import com.example.aihot.ui.components.formatRelativeTime
 import com.example.aihot.ui.theme.AppText
 
 /**
@@ -193,6 +191,7 @@ fun HackerNewsCommentsScreen(
                             item(key = "empty") {
                                 EmptyState(
                                     title = "暂无评论",
+                                    subtitle = "去原文参与讨论",
                                     icon = Icons.AutoMirrored.Filled.Comment
                                 )
                             }
@@ -353,7 +352,7 @@ private fun LinkRow(
  *
  * 交互(Reddit/HN 风格):正文区**不可点**,避免正文里的链接和展开操作打架;
  * 「查看回复」做成正文下方的独立按钮,点击它才展开/折叠子评论。按钮三态:
- *  - 默认:「▾ 查看 N 条回复」(已展开则「收起」)
+ *  - 默认:「查看 N 条回复」(已展开则「收起」)
  *  - 加载中:小转圈 + 「加载中」
  *  - 失败:「加载失败,点击重试」
  *
@@ -582,18 +581,4 @@ private fun CommentDivider() {
             .height(8.dp)
             .background(MaterialTheme.colorScheme.surfaceContainer)
     )
-}
-
-/** 把 Unix 秒级时间戳转成相对时间(如 "3 小时前")。与 HackerNewsScreen 同实现。 */
-private fun formatRelativeTime(unixSeconds: Long): String {
-    val now = System.currentTimeMillis()
-    val diff = now - unixSeconds * 1000L
-    val minutes = diff / 60_000L
-    return when {
-        minutes < 1 -> "刚刚"
-        minutes < 60 -> "${minutes} 分钟前"
-        minutes < 60 * 24 -> "${minutes / 60} 小时前"
-        minutes < 60 * 24 * 30 -> "${minutes / (60 * 24)} 天前"
-        else -> SimpleDateFormat("yyyy-MM-dd", Locale.CHINA).format(Date(unixSeconds * 1000L))
-    }
 }

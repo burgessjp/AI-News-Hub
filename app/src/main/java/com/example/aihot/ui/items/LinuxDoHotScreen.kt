@@ -19,13 +19,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Comment
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.RemoveRedEye
 import androidx.compose.material.icons.filled.ThumbUp
+import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -52,12 +52,15 @@ import com.example.aihot.ui.UiState
 import com.example.aihot.ui.components.AppTopBar
 import com.example.aihot.ui.components.AppTopBarDefaults
 import com.example.aihot.ui.components.ListUpdateTimeHeader
-import com.example.aihot.ui.components.NewsCardSkeletonList
+import com.example.aihot.ui.components.RankBadge
+import com.example.aihot.ui.components.RankRowSkeletonList
+import com.example.aihot.ui.components.StatBadge
+import com.example.aihot.ui.components.formatCount
+import com.example.aihot.ui.components.formatRelative
+import com.example.aihot.ui.theme.AppAlpha
+import com.example.aihot.ui.theme.AppText
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 /**
  * LinuxDo 热榜全屏页面(「更多」tab 二级页)。
@@ -65,8 +68,8 @@ import java.util.Locale
  * 视觉对齐 [GitHubTrendingScreen]:
  *  - 顶栏:返回箭头 + 「LinuxDo 热榜」;列表顶部居中「上次刷新 N 分钟前」
  *    (ListUpdateTimeHeader,始终实时模式,与其余 4 源同一位置)
- *  - 列表:置顶帖 📌 徽章 / 非置顶排名徽章(1-3 primary 强调)
- *    + 标题 + 摘要 + 作者 + meta(标签 chip · 👁浏览 · 💬回复 · ❤️点赞 · 时间)
+ *  - 列表:置顶帖图钉徽章 / 非置顶排名徽章([RankBadge] 统一分档)
+ *    + 标题 + 摘要 + 作者 + meta(标签 chip · 浏览 · 回复 · 点赞 · 时间)
  *
  * 交互:
  *  - 点击单条 → 内置 WebView 打开话题([onOpenUrl])
@@ -107,7 +110,7 @@ fun LinuxDoHotScreen(
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             when (val s = state) {
-                is UiState.Loading -> NewsCardSkeletonList(count = 8)
+                is UiState.Loading -> RankRowSkeletonList(count = 8)
                 is UiState.Error -> ErrorState(
                     message = s.message,
                     onRetry = { vm.forceRefresh() }
@@ -115,7 +118,14 @@ fun LinuxDoHotScreen(
                 is UiState.Success -> {
                     val topics = s.data
                     if (topics.isEmpty()) {
-                        EmptyState(title = "暂无内容")
+                        // 数据缺失空态:给刷新恢复路径
+                        EmptyState(
+                            title = "暂无内容",
+                            subtitle = "下拉或点下方按钮刷新看看",
+                            icon = Icons.Outlined.Inventory2,
+                            actionLabel = "刷新一下",
+                            onAction = { vm.forceRefresh() }
+                        )
                     } else {
                         PullToRefreshBox(
                             isRefreshing = isRefreshing,
@@ -170,9 +180,9 @@ private fun LinuxDoList(
 
 /**
  * 单条话题行:
- *  - 左侧徽章:置顶帖 📌(primary),非置顶排名编号(1-3 实心 primary,其余弱底)
+ *  - 左侧徽章:置顶帖图钉(tertiaryContainer),非置顶排名编号([RankBadge] 统一分档)
  *  - 中间信息:标题(加粗)+ 摘要(2 行弱色,可空)+ 作者(头像 + 名字)
- *  - 底部 meta:标签 chip(可空) · 👁浏览 · 💬回复 · ❤️点赞 · 相对时间
+ *  - 底部 meta:标签 chip(可空) · 浏览 · 回复 · 点赞 · 相对时间
  */
 @Composable
 private fun LinuxDoRow(
@@ -180,7 +190,6 @@ private fun LinuxDoRow(
     onClick: () -> Unit
 ) {
     val cs = MaterialTheme.colorScheme
-    val topRank = topic.rank in 1..3
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -193,43 +202,32 @@ private fun LinuxDoRow(
         verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // 左侧徽章:置顶 📌 / 排名(1-3 实心 primary)
-        Box(
-            modifier = Modifier
-                .size(24.dp)
-                .clip(RoundedCornerShape(7.dp))
-                .background(
-                    when {
-                        topic.pinned -> cs.tertiaryContainer
-                        topRank -> cs.primary
-                        else -> cs.surfaceContainerHigh
-                    }
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            if (topic.pinned) {
+        // 左侧徽章:置顶图钉 / 排名(全 App 统一 RankBadge)
+        if (topic.pinned) {
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .clip(MaterialTheme.shapes.extraSmall)
+                    .background(cs.tertiaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
                 Icon(
                     imageVector = Icons.Filled.PushPin,
                     contentDescription = "置顶",
                     tint = cs.onTertiaryContainer,
                     modifier = Modifier.size(14.dp)
                 )
-            } else {
-                Text(
-                    text = topic.rank.toString(),
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = if (topRank) cs.onPrimary else cs.onSurfaceVariant
-                )
             }
+        } else {
+            RankBadge(rank = topic.rank)
         }
 
         Column(modifier = Modifier.weight(1f)) {
             // ① 标题
             Text(
                 text = topic.title,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
+                style = AppText.titleCompact,
+                fontWeight = FontWeight.SemiBold,
                 color = if (topic.closed) cs.onSurfaceVariant else cs.onSurface,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
@@ -247,7 +245,7 @@ private fun LinuxDoRow(
                 )
             }
 
-            // ③ 作者:头像 + 名字(头像缺失时回退为空,不占位)
+            // ③ 作者:头像 + 名字(头像 20dp 圆形,源识别记忆点;缺失时回退为空,不占位)
             if (topic.authorName.isNotBlank()) {
                 Spacer(Modifier.height(6.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -256,7 +254,7 @@ private fun LinuxDoRow(
                             model = topic.avatarUrl,
                             contentDescription = null,
                             modifier = Modifier
-                                .size(16.dp)
+                                .size(20.dp)
                                 .clip(CircleShape)
                                 .background(cs.surfaceContainerHigh)
                         )
@@ -272,7 +270,7 @@ private fun LinuxDoRow(
                 }
             }
 
-            // ④ meta:标签 chip(前 2 个) · 👁浏览 · 💬回复 · ❤️点赞 · 时间
+            // ④ meta:标签 chip(前 2 个) · 浏览 · 回复 · 点赞 · 时间
             Spacer(Modifier.height(6.dp))
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -282,18 +280,18 @@ private fun LinuxDoRow(
                 topic.tags.take(2).forEach { tag ->
                     TagChip(tag = tag)
                 }
-                CountBadge(
+                StatBadge(
                     icon = Icons.Filled.RemoveRedEye,
-                    text = formatCount(topic.views)
+                    value = formatCount(topic.views)
                 )
-                CountBadge(
+                StatBadge(
                     icon = Icons.AutoMirrored.Filled.Comment,
-                    text = formatCount(topic.replyCount)
+                    value = formatCount(topic.replyCount)
                 )
                 if (topic.likeCount > 0) {
-                    CountBadge(
+                    StatBadge(
                         icon = Icons.Filled.ThumbUp,
-                        text = formatCount(topic.likeCount)
+                        value = formatCount(topic.likeCount)
                     )
                 }
                 if (topic.createdAtMs > 0) {
@@ -316,8 +314,8 @@ private fun TagChip(tag: String) {
     val cs = MaterialTheme.colorScheme
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(50))
-            .background(cs.secondaryContainer.copy(alpha = 0.6f))
+            .clip(CircleShape)
+            .background(cs.secondaryContainer.copy(alpha = AppAlpha.chipOverlay))
             .padding(horizontal = 6.dp, vertical = 1.dp)
     ) {
         Text(
@@ -327,52 +325,5 @@ private fun TagChip(tag: String) {
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
-    }
-}
-
-/** 计数徽章:icon + 文本,弱色。 */
-@Composable
-private fun CountBadge(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    text: String
-) {
-    val cs = MaterialTheme.colorScheme
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = cs.onSurfaceVariant,
-            modifier = Modifier.size(13.dp)
-        )
-        Spacer(Modifier.width(3.dp))
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelSmall,
-            color = cs.onSurfaceVariant,
-            maxLines = 1
-        )
-    }
-}
-
-/** 大数字缩写:< 1000 原样,1.2k / 12k / 1.2m。 */
-private fun formatCount(n: Int): String = when {
-    n < 1000 -> n.toString()
-    n < 1_000_000 -> {
-        if (n < 10_000) "${"%.1f".format(n / 1000.0)}k"
-        else "${n / 1000}k"
-    }
-    else -> "${"%.1f".format(n / 1_000_000.0)}m"
-}
-
-/** 相对时间:「刚刚 / N 分钟前 / N 小时前 / N 天前 / 超过 7 天显日期」。 */
-private fun formatRelative(tsMillis: Long): String {
-    val diff = System.currentTimeMillis() - tsMillis
-    val minutes = diff / 60_000L
-    return when {
-        minutes < 1 -> "刚刚"
-        minutes < 60 -> "${minutes}分钟前"
-        minutes < 60 * 24 -> "${minutes / 60}小时前"
-        minutes < 60 * 24 * 7 -> "${minutes / (60 * 24)}天前"
-        else -> SimpleDateFormat("MM-dd", Locale.CHINA).format(Date(tsMillis))
     }
 }

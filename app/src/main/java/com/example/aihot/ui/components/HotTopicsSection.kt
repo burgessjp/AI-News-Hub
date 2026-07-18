@@ -11,9 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -22,8 +20,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -33,13 +29,15 @@ import com.example.aihot.ui.HotTopicsViewModel
 import com.example.aihot.ui.UiState
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.aihot.ui.theme.AppAlpha
+import com.example.aihot.ui.theme.AppText
+import com.example.aihot.ui.theme.BrandGradient
 
 /**
  * 今日热点模块 —— 精选 tab 顶部的卡片式聚合模块。
  *
  * 视觉(对齐设计稿):
- *  - 一整张卡片,顶部 primary 渐变背景的标题栏(flame 图标 + 「今日热点」+ 右侧来源数小字)
- *  - 卡片内每条热点一行:左序号徽章(1-3 用 primary 强调,其余低对比)+ 标题 + 来源/聚合数
+ *  - 一整张卡片,顶部 [BrandGradient] 品牌渐变标题栏(flame 图标 + 「今日热点」+ 右侧来源数小字)
+ *  - 卡片内每条热点一行:左序号徽章([RankBadge] 统一分档)+ 标题 + 来源/聚合数
  *
  * 交互:
  *  - 点击单条 → 打开内置 WebView(优先 permalink,回退 url)
@@ -76,10 +74,11 @@ fun HotTopicsSection(
                     }
                 )
                 if (index != topics.lastIndex) {
+                    // 分隔线缩进对齐标题列:16(行 padding)+ 24(徽章)+ 10(间距)= 50
                     Spacer(
                         Modifier
                             .fillMaxWidth()
-                            .padding(start = 44.dp, end = 16.dp)
+                            .padding(start = 50.dp, end = 16.dp)
                             .height(0.5.dp)
                             .background(MaterialTheme.colorScheme.outlineVariant)
                     )
@@ -90,7 +89,8 @@ fun HotTopicsSection(
 }
 
 /**
- * 卡片顶部标题栏 —— primary 渐变背景 + flame 图标 + 「今日热点」。
+ * 卡片顶部标题栏 —— [BrandGradient] 品牌渐变背景 + flame 图标 + 「今日热点」。
+ * (渐变单一来源在 theme/Color.kt,与摘要卡头共用;AI 特性专用,不扩散。)
  */
 @Composable
 private fun HotTopicsHeader(count: Int) {
@@ -98,13 +98,7 @@ private fun HotTopicsHeader(count: Int) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(
-                // 蓝→紫渐变:Future Blue → Intelligence Purple。
-                // 设计系统原则:渐变保留给 AI 特性(热点聚合是 AI 编辑产出),不滥用。
-                Brush.linearGradient(
-                    colors = listOf(cs.primary, cs.secondary)
-                )
-            )
+            .background(BrandGradient)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -119,7 +113,7 @@ private fun HotTopicsHeader(count: Int) {
         // 右侧:聚合来源数小标签
         Box(
             modifier = Modifier
-                .clip(RoundedCornerShape(50))
+                .clip(CircleShape)
                 .background(cs.onPrimary.copy(alpha = AppAlpha.onPrimaryOverlay))
                 .padding(horizontal = 8.dp, vertical = 2.dp)
         ) {
@@ -136,7 +130,7 @@ private fun HotTopicsHeader(count: Int) {
 /**
  * 单条热点行:序号徽章 + 标题 + 来源/聚合数。
  *
- * @param rank 1 起的序号;1-3 用 primary 强调,其余低对比。
+ * @param rank 1 起的序号,徽章配色由 [RankBadge] 统一分档。
  */
 @Composable
 private fun HotTopicRow(
@@ -145,7 +139,6 @@ private fun HotTopicRow(
     onClick: () -> Unit
 ) {
     val cs = MaterialTheme.colorScheme
-    val topRank = rank <= 3
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -158,29 +151,14 @@ private fun HotTopicRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        // 序号徽章:1-3 实心 primary,其余描边低对比
-        Box(
-            modifier = Modifier
-                .size(20.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .background(
-                    if (topRank) cs.primary else Color.Transparent
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = rank.toString(),
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                color = if (topRank) cs.onPrimary else cs.onSurfaceVariant
-            )
-        }
+        // 序号徽章:全 App 统一 RankBadge(24dp)
+        RankBadge(rank = rank)
 
         Column(modifier = Modifier.weight(1f)) {
-            // 标题
+            // 标题(titleCompact 语义档:Medium 基线,标题场景覆盖 SemiBold;随字号设置缩放)
             Text(
                 text = topic.title,
-                style = MaterialTheme.typography.titleSmall,
+                style = AppText.titleCompact,
                 fontWeight = FontWeight.SemiBold,
                 color = cs.onSurface,
                 maxLines = 2,

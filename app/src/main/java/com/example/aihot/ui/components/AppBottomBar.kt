@@ -1,7 +1,7 @@
 package com.example.aihot.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -12,7 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.GridView
@@ -22,6 +22,7 @@ import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.Whatshot
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -34,6 +35,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.aihot.R
+import com.example.aihot.ui.theme.AppAlpha
 import com.example.aihot.ui.theme.AppText
 
 /**
@@ -85,7 +87,9 @@ val BottomBarReservedHeight = 120.dp
  * 与全宽 [androidx.compose.material3.NavigationBar] 的区别:
  *  - 浮在内容上(由调用方在 Box 内对齐 BottomCenter,不再用 Scaffold bottomBar 槽)
  *  - 90% 宽 + max 400dp,圆角 50dp(完全药丸)
- *  - 玻璃质感:surface-container 70% 透明 + 1px 白色半透明描边(玻璃边缘高光)
+ *  - 近实底:surface-container × AppAlpha.bottomBarSurface(0.94——Compose 无真模糊,
+ *    半透明叠滚动内容显脏,近实底遮透出)+ 3dp 浮起阴影
+ *    + 1px 白色半透明描边(AppAlpha.glassEdge,近实底下仍有型的玻璃边缘高光)
  *  - 容器内边距:horizontal 24dp / vertical 12dp(对齐设计稿 px-6 py-3)
  *  - 选中项:secondary-container 实心填充药丸 + on-secondary-container 文字/图标 +
  *    实心图标(FILL 1);未选中:透明 + on-surface-variant + 描边图标(FILL 0)
@@ -102,29 +106,33 @@ fun AppBottomBar(
     onSelect: (AppTab) -> Unit
 ) {
     val cs = MaterialTheme.colorScheme
-    Row(
+    // 药丸 Surface:近实底(遮内容透出)+ 3dp 浮起阴影 + 白色半透明描边(玻璃边缘高光)
+    Surface(
         modifier = Modifier
             .fillMaxWidth(0.9f)
-            .widthIn(max = 400.dp)
-            // 药丸:完全圆角 + 玻璃质感底 + 白色半透明描边(模拟玻璃边缘高光)
-            .clip(RoundedCornerShape(50))
-            .background(cs.surfaceContainer.copy(alpha = 0.7f))
-            .border(
-                width = 1.dp,
-                color = Color.White.copy(alpha = 0.3f),
-                shape = RoundedCornerShape(50)
-            )
-            // 容器内边距对齐设计稿 px-6 py-3
-            .padding(horizontal = 24.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly,
-        verticalAlignment = Alignment.CenterVertically
+            .widthIn(max = 400.dp),
+        shape = CircleShape,
+        color = cs.surfaceContainer.copy(alpha = AppAlpha.bottomBarSurface),
+        // 浮动层的合理浮起(卡片零阴影惯例的例外,仅悬浮底栏)
+        shadowElevation = 3.dp,
+        border = BorderStroke(
+            width = 1.dp,
+            color = Color.White.copy(alpha = AppAlpha.glassEdge)
+        )
     ) {
-        AppTab.entries.forEach { tab ->
-            NavPillItem(
-                tab = tab,
-                selected = tab == current,
-                onClick = { onSelect(tab) }
-            )
+        Row(
+            // 容器内边距对齐设计稿 px-6 py-3
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            AppTab.entries.forEach { tab ->
+                NavPillItem(
+                    tab = tab,
+                    selected = tab == current,
+                    onClick = { onSelect(tab) }
+                )
+            }
         }
     }
 }
@@ -153,7 +161,7 @@ private fun NavPillItem(
     val tint = if (selected) cs.onSecondaryContainer else cs.onSurfaceVariant
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(50))
+            .clip(CircleShape)
             // 选中:secondary-container 实心填充;未选中:透明
             .background(if (selected) cs.secondaryContainer else Color.Transparent)
             .clickable(
@@ -165,7 +173,10 @@ private fun NavPillItem(
             .padding(
                 horizontal = if (selected) 20.dp else 8.dp,
                 vertical = if (selected) 8.dp else 8.dp
-            ),
+            )
+            // 触控宽保底 48dp(未选中态 8×2+22=38dp 不达标,补足);
+            // 高 56dp 由内容(icon 22 + 间距 2 + 文字行高 16)+ padding 16 保证
+            .widthIn(min = 48.dp),
         contentAlignment = Alignment.Center
     ) {
         Column(

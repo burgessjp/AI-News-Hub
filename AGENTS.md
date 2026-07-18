@@ -13,7 +13,7 @@
 - **自有后端**：`aihot.virxact.com` 公开 API（动态分页 `/items`、今日热点 `/hot-topics`、AI 日报 `/daily`、归档 `/dailies`）。
 - **Hub 浏览区 5 个第三方源**：HackerNews（Firebase API）、GitHub Trending、LinuxDo 热榜、stormzhang AI 资讯、HuggingFace Papers（后三个为 jsoup HTML 抓取）。其中 4 个稳定源（除 LinuxDo）支持「实时抓取 / gitcode 归档」双模式切换（`SourceMode`），归档数据来自配套的数据流水线（见下「数据流水线」）。
 
-功能面：摘要 Tab（各源当日 AI 中文要点）、精选 / 全部动态、AI 日报与归档、搜索、HN 评论树、AI 翻译（OpenAI 兼容服务，用户自配 key）、内置 WebView、浏览历史（Room）。
+功能面：摘要 Tab（各源当日 AI 中文要点）、精选 / 全部动态、AI 日报与归档、搜索（本地搜索历史 + 今日热点热词引导）、HN 评论树、AI 翻译（OpenAI 兼容服务，用户自配 key）、内置 WebView、浏览历史（Room）。
 
 ## 仓库结构
 
@@ -87,7 +87,7 @@ python3 scripts/fetch_data.py --out-dir out --no-summary --no-previous-index
 - **列表/页码滚动状态不上屏内自持**：`AnimatedContent` 换页即销毁页内 `remember`/`rememberSaveable`（实测 `rememberPagerState` 也会丢），下层页重返组合时滚动位置被重置。故 `LazyListState`/`PagerState` 一律在 `AIHotApp` 层持有（根 tab 各一个 `remember`；二级页按 `Page` 值存 `pageListStates` map，弹出即清理）并下传——新增含列表的页面时遵循同一约定，不要在屏内 `rememberLazyListState()`。
 - `WebViewScreen` 延迟挂载 WebView（`attachWeb`，进页 350ms 后才创建）：WebView factory 的主线程重活会吃掉进入转场的帧，实测转场被拉长且淡入目标是白屏。
 - 返回键：根 `PredictiveBackHandler`（activity-compose 1.10+）pop 当前 tab 栈——手势滑动时实时预览上一级页面，松手完成 pop、中途取消回弹（API < 34 退化为普通返回动画）；`WebViewScreen` 内层 `BackHandler` 优先——网页有可退历史时先 `goBack()` 退网页历史，退到首页后才 pop 整页。Manifest 已开 `enableOnBackInvokedCallback`（Android 13/14 退回桌面预览；15+ 默认）。
-- 浮动药丸底栏：`Box` 叠层而非 `Scaffold(bottomBar)`；内容 edge-to-edge，底栏 overlay 在 BottomCenter，二级页 `AnimatedVisibility` 滑出；列表用 `BottomBarReservedHeight` 预留底部空间（二级页列表如「全部动态」经 `ItemsScreen(reserveBottomBarSpace=false)` 不再预留）。
+- 浮动药丸底栏：`Box` 叠层而非 `Scaffold(bottomBar)`；内容 edge-to-edge，底栏 overlay 在 BottomCenter，二级页 `AnimatedVisibility` 滑出；列表用 `BottomBarReservedHeight` 预留底部空间（二级页列表如「全部动态」经 `ItemsScreen(reserveBottomBarSpace=false)` 不再预留）。底栏容器为近实底（`AppAlpha.bottomBarSurface` 0.94，遮内容透出）+ 3dp 浮起阴影（卡片零阴影惯例的唯一例外）+ `glassEdge` 白描边。
 - `openUrl` 是打开网页的唯一入口：在此统一记录浏览历史（Room），再 push `Page.Web`。全 App 链接（含关于页、HN 评论内 HTML 链接）都收进内置 WebView，不走外部浏览器；`MainActivity` 支持 `EXTRA_OPEN_SETTINGS` 启动直达设置页（系统选中翻译的「去设置」用）。
 
 ### 数据层（data/）
@@ -103,7 +103,7 @@ python3 scripts/fetch_data.py --out-dir out --no-summary --no-previous-index
 
 ### 持久化
 
-- `SettingsStore`（DataStore `display_prefs`）：主题模式 / 动态取色（Material You，Android 12+）/ 字体族 / 字号档位（`FontScale`，缩放 `AppTextStyles`）/ 数据源模式。
+- `SettingsStore`（DataStore `display_prefs`）：主题模式 / 动态取色（Material You，Android 12+）/ 字体族 / 字号档位（`FontScale`，缩放 `AppTextStyles`）/ 数据源模式 / 搜索历史（`search_history`，换行分隔、去重置顶、上限 10 条，仅用户明确提交搜索时记录）。
 - `AiConfigStore`（DataStore `ai_prefs`）：全局 AI 服务配置——服务商预设（DeepSeek/智谱 GLM/自定义，`AiProvider` 内置 baseUrl、模型列表与估算刊例价）+ apiKey/model + 自定义模型单价 + 翻译开关；首启从旧 `translation_prefs` 一次性迁移（baseUrl 自动补 `/v1`）。`AiUsageStore` 与其共用 `ai_prefs`：`usage_json` 按「模型 × 月」聚合 token 用量，设置页「用量与费用」区块按刊例价估算费用。
 - Room（`AppDatabase`，`aihot.db`，version 1，`fallbackToDestructiveMigration`）：仅浏览历史（`BrowseHistoryEntity/Dao/Repository`）。
 - HN 列表缓存与翻译缓存为 `cacheDir` 下的 JSON 文件。
@@ -112,7 +112,7 @@ python3 scripts/fetch_data.py --out-dir out --no-summary --no-previous-index
 
 两层设计，遵循 "Synthetic Intelligence News" 设计系统（品牌双色：Future Blue `#003EC7` + Intelligence Purple `#6B38D4`，蓝→紫渐变只用于 AI 特性）：
 
-1. MD3 规范层（`Color.kt`/`Type.kt`/`Shape.kt`/`Theme.kt`）：Light/Dark 双色板；品牌色为默认，`AIHotTheme(dynamicColor=true)`（设置页开关，Android 12+）时改用壁纸派生色。
+1. MD3 规范层（`Color.kt`/`Type.kt`/`Shape.kt`/`Theme.kt`）：Light/Dark 双色板；品牌色为默认，`AIHotTheme(dynamicColor=true)`（设置页开关，Android 12+）时改用壁纸派生色。蓝→紫品牌渐变收口在 `Color.kt` 的 `BrandGradient`（AI 特性专用：今日热点、AI 摘要卡头），调用方不自行拼 Brush。
 2. 语义层：`AppText.xxx`（9 个字号档）、`AppAlpha.xxx`（透明度），组件统一引用。`AppText` 是 `@Composable` 顶层属性，读 `LocalAppTextStyles` —— `AppTextStyles(fontFamily, fontScale)` 由 `AIHotTheme` 按设置构造（字体族跟随字体设置，字号随 `FontScale` 档位整体缩放），不再是硬编码 Inter 的 object。
 
 字体：Inter（SIL OFL 1.1，本地 4 字重 `res/font/inter_*.ttf`）；设置页可切 System/Serif/Monospace，经 `AIHotTheme(fontFamily=)` + `Typography.withFontFamily()` 全量替换（AppTextStyles 同源切换）。动画规范集中在 `ui/anim/Motion.kt`：只用 tween + MD3 emphasized 缓动，不用 spring/scale。
@@ -120,7 +120,8 @@ python3 scripts/fetch_data.py --out-dir out --no-summary --no-previous-index
 ## 编码约定
 
 - **注释用中文，代码/变量名用英文**（与存量代码一致）。
-- 字号一律 `AppText.xxx`、透明度一律 `AppAlpha.xxx`，不散落 `.sp` / `.alpha` 字面量。
+- 字号一律 `AppText.xxx`、透明度一律 `AppAlpha.xxx`，不散落 `.sp` / `.alpha` 字面量；圆角一律 `MaterialTheme.shapes`（6/12/18/24/32）或 `CircleShape`；颜色只走 `colorScheme`——唯一例外是更多页源品牌色（集中收口在 `ui/more/SourceBrandColors.kt`）与 stormzhang 信源徽章（原站 hex）。
+- 列表排名/统计/章节条统一用 `ui/components/` 的 `RankBadge` / `StatBadge` / `SectionHeader`，骨架屏按列表结构选 `NewsCardSkeletonList`（时间列版）或 `RankRowSkeletonList`（徽章版），不再新建私有拷贝。
 - 协程 + Flow：`StateFlow` 驱动 UI，`collectAsStateWithLifecycle` 订阅；网络在 Repository 内切 `Dispatchers.IO`；并发去重用 `Mutex.withLock` 套路。
 - release 开启 R8 + shrinkResources；`com.example.aihot.data.**` 全部保留（`app/proguard-rules.pro`），新增需反射/序列化保留的类时同步补规则。
 - 改动导航、数据源模式、流水线行为时，同步更新本文件与相关文档注释。

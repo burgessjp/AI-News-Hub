@@ -33,7 +33,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.aihot.ui.theme.AppAlpha
 
 /**
@@ -41,56 +40,14 @@ import com.example.aihot.ui.theme.AppAlpha
  *
  * 全 App 列表页(Featured/All/Daily)已统一为「扁平行 + hairline 分隔线」,
  * 次级页此前还在用浮动 [AppCard] 逐行描边,视觉割裂。本文件提供与主列表页
- * 同构的两组件,消除这一不一致,并取代此前在 Settings/About 各复制一份的
- * `SectionLabel`。
+ * 同构的扁平行组件,消除这一不一致。
  *
  * 规格与主列表页完全一致:
  *  - 内容横向 padding:18dp
  *  - 发丝分隔线:0.5dp outlineVariant,左侧缩进对齐文字列(避开图标列)
- *  - 章节条:surfaceContainerHigh 背景 + cyan 4dp×16dp 左竖条 + labelLarge/Bold
- */
-
-/**
- * 章节标题条 —— 与 [com.example.aihot.ui.DateGroupHeader] 同构。
  *
- * 视觉:surfaceContainerHigh 背景 + 左竖条(1.5dp×24dp,默认 primary)+ 加粗文字。
- *
- * @param accentColor 竖条与文字的强调色。默认 primary(浏览组);
- *        Hub 页偏好组传 secondary(紫),与浏览组的蓝形成双色分组对照。
+ * 章节条已收口到 [SectionHeader](透明底 + 小竖条强调),本文件不再私有实现。
  */
-@Composable
-fun SettingsGroupHeader(
-    text: String,
-    modifier: Modifier = Modifier,
-    accentColor: androidx.compose.ui.graphics.Color = androidx.compose.ui.graphics.Color.Unspecified
-) {
-    val cs = MaterialTheme.colorScheme
-    // 默认 unspecified → 用 primary;调用方可显式传 secondary 等。
-    val barColor = if (accentColor == androidx.compose.ui.graphics.Color.Unspecified) cs.primary else accentColor
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(cs.surfaceContainerHigh)
-            .padding(horizontal = 18.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // 左竖条 —— 章节强调锚点。
-        Box(
-            modifier = Modifier
-                .size(width = 4.dp, height = 16.dp)
-                .background(barColor)
-        )
-        Spacer(Modifier.width(10.dp))
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelLarge,
-            color = barColor,
-            fontWeight = FontWeight.Bold,
-            // 章节条专用字距:5 处 labelLarge 有 3 种字距(0.5/1.0/默认),此值不进 Type.kt 以免误伤
-            letterSpacing = 0.5.sp
-        )
-    }
-}
 
 /**
  * 扁平行 —— 带可选图标、副标题、尾部内容与 chevron,行间用 hairline 分隔。
@@ -133,7 +90,7 @@ fun SettingsRow(
                 Box(
                     modifier = Modifier
                         .size(36.dp)
-                        .clip(RoundedCornerShape(10.dp))
+                        .clip(MaterialTheme.shapes.small)
                         .background(iconAccent.copy(alpha = AppAlpha.badgeOverlay)),
                     contentAlignment = Alignment.Center
                 ) {
