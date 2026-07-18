@@ -11,7 +11,7 @@ import org.json.JSONObject
  * GraphQL `posts(order:VOTES, postedAfter: 今日)` 抓取归档,App 端只读归档快照
  * (Developer Token 不进 APK)。
  *
- * 不加 @Parcelize:点击走 [website](内置 WebView),URL 是普通字符串,无需跨页面传整个对象。
+ * 不加 @Parcelize:点击走 [url](PH 产品页,内置 WebView),URL 是普通字符串,无需跨页面传整个对象。
  *
  * @param rank          1 起的排名(由列表位置决定,API dailyRank 为当日综合榜,这里按 votes 序)
  * @param id            产品 id(GraphQL Post.id,字符串形态的数字)
@@ -20,8 +20,8 @@ import org.json.JSONObject
  * @param tagline       一句话价值定位
  * @param votesCount    社区 upvote 数(热度主指标)
  * @param commentsCount 评论数
- * @param website       产品官网/落地页(PH 跳转链接,含 utm;点击优先用此)
- * @param url           PH 产品页(回退用,website 为空时点进 PH 产品页)
+ * @param website       产品官网/落地页(PH 跳转链接,含 utm;url 为空时回退用)
+ * @param url           PH 产品页(点击优先用此)
  * @param createdAt     上线时间 ISO,如 "2026-07-18T07:01:00Z";原样展示不做解析
  * @param dailyRank     PH 当日综合榜排名(0 表示当日未上榜)
  * @param topics        话题标签,如 ["Developer Tools", "Artificial Intelligence"];至多 3 个
@@ -79,8 +79,8 @@ data class ProductHunt(
     }
 
     /**
-     * 点击优先产品官网(website);官网缺失时回退 PH 产品页(url);都缺则空串。
+     * 点击优先 PH 产品页(url);产品页缺失时回退产品官网(website);都缺则空串。
      * 空串时 UI 不触发跳转(见 ProductHuntScreen)。
      */
-    val targetUrl: String get() = website.ifBlank { url }
+    val targetUrl: String get() = url.ifBlank { website }
 }

@@ -253,8 +253,8 @@ Product Hunt 当日(Product of the Day 语义)按 upvote 排序的热门产品,�
 | `tagline` | string | 一句话价值定位;可能为空 |
 | `votesCount` | int | 社区 upvote 数(热度主指标) |
 | `commentsCount` | int | 评论数 |
-| `website` | string | 产品官网/落地页(PH 跳转链接,含 utm;点击优先用此) |
-| `url` | string | PH 产品页(website 为空时回退) |
+| `website` | string | 产品官网/落地页(PH 跳转链接,含 utm;url 为空时回退) |
+| `url` | string | PH 产品页(点击优先用此) |
 | `createdAt` | string | 上线时刻 ISO 8601(UTC),如 `2026-07-18T07:01:00Z` |
 | `dailyRank` | int | PH 当日综合榜排名(0 表示当日未上榜) |
 | `topics` | string[] | 话题标签,如 `["Developer Tools", "Artificial Intelligence"]`;至多 3 个 |

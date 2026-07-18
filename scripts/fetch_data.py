@@ -632,7 +632,7 @@ def fetch_producthunt():
         # 产品主图(thumbnail 是 Media 对象,取 .url;列表缩略图用,无则为空)
         thumbnail = node.get("thumbnail") or {}
         thumbnail_url = (thumbnail.get("url") or "").strip() if isinstance(thumbnail, dict) else ""
-        # website 是 PH 的跳转链接(含 utm),url 是 PH 产品页;两者都留,App 端优先用 website
+        # website 是 PH 的跳转链接(含 utm),url 是 PH 产品页;两者都留,App 端优先用 url
         items.append({
             "rank": idx + 1,
             "id": pid,

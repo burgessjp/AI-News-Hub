@@ -75,7 +75,7 @@ import com.example.aihot.ui.theme.AppText
  *    + upvotes(primary 强调,热度主指标)· 评论数
  *
  * 交互:
- *  - 点击单条 → 内置 WebView 打开产品官网([ProductHunt.targetUrl],website 优先)
+ *  - 点击单条 → 内置 WebView 打开 PH 产品页([ProductHunt.targetUrl],url 优先)
  *  - 加载中:shimmer 骨架;失败:错误态 + 重试;空:空状态;下拉刷新走 forceRefresh
  *  - 整体翻译:翻译开关开且配置就绪时,标题行出现「译」按钮,name+tagline 合并一次翻译
  *
