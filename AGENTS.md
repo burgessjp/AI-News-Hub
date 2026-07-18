@@ -13,7 +13,7 @@
 - **自有后端**：`aihot.virxact.com` 公开 API（动态分页 `/items`、今日热点 `/hot-topics`、AI 日报 `/daily`、归档 `/dailies`）。
 - **Hub 浏览区 5 个第三方源**：HackerNews（Firebase API）、GitHub Trending、LinuxDo 热榜、stormzhang AI 资讯、HuggingFace Papers（后三个为 jsoup HTML 抓取）。其中 4 个稳定源（除 LinuxDo）支持「实时抓取 / gitcode 归档」双模式切换（`SourceMode`），归档数据来自配套的数据流水线（见下「数据流水线」）。
 
-功能面：摘要 Tab（各源当日 AI 中文要点）、精选 / 全部动态、AI 日报与归档、搜索（本地搜索历史 + 今日热点热词引导）、HN 评论树、AI 翻译（OpenAI 兼容服务，用户自配 key）、内置 WebView、浏览历史（Room）。
+功能面：摘要 Tab（各源当日 AI 中文要点）、精选 / 全部动态、AI 日报与归档、搜索（本地搜索历史 + 今日热点热词引导）、HN 评论树、AI 翻译（OpenAI 兼容服务，用户自配 key；选中翻译 + WebView 整页翻译）、内置 WebView（含阅读模式、整页翻译、网页下载、视频全屏）、浏览历史（Room）。
 
 ## 仓库结构
 
@@ -25,6 +25,8 @@ app/                     唯一 Android 模块
     data/source/         SourceMode(LIVE/ARCHIVE)、ArchiveHttpClient、各源归档实现
     ui/                  ViewModel 与 Screen，按功能分包（tabs/summary/items/daily/more/
                          webview/components/theme/anim/translate）
+  src/main/assets/       readability.js（Mozilla Readability 0.6，Apache-2.0，
+                         WebView 阅读模式提取正文用，经 evaluateJavascript 注入）
 scripts/                 Python 数据流水线 + 图标生成脚本（见「数据流水线」）
 .github/workflows/       build.yml / release.yml / fetch-data.yml
 docs/news-hub-data-usage.md  数据仓库（gitcode AI-News-Hub-Data）格式与消费方式文档
@@ -85,7 +87,7 @@ python3 scripts/fetch_data.py --out-dir out --no-summary --no-previous-index
 - `Page` 是 private sealed interface（Detail/Web/All/Daily/Search/Settings/About/HackerNews/HackerNewsComments/GitHubTrending/LinuxDo/StormzhangAiNews/HuggingFacePapers/BrowseHistory/DailyArchive/DailyDate），经 `toBundle()`/`pageFromBundle()` + 自定义 `Saver` 挂到 `rememberSaveable`，进程被杀可恢复。**新增二级页必须同步加：Page 子类、toBundle/pageFromBundle 分支、PageView 分支。**
 - 转场集中在 `ui/anim/Motion.kt`：常规导航走 `pageTransition()`（默认 PUSH＝横向位移+淡化，前进新页从右滑入、返回退出页在最上层滑出右缘即 `targetContentZIndex = -1f`；含 WebView 的页 override 为 FADE，AndroidView 位移/缩放会撕裂；tab 切换 NONE↔NONE 为错峰 crossfade），预测返回手势走 `predictivePopTransition()`（LinearEasing 与手指 1:1、按 `swipeEdge` 决定滑出方向、退出页 scaleOut 0.9 + 淡出；由 `MainActivity` 的 `seekMode`/`backSwipeEdge` 状态切换，新增二级页仍只需标注 `PageNavStyle`）。转场由 `SeekableTransitionState` + `rememberTransition` 驱动：普通导航 `animateTo`，预测返回手势期间按进度 `seekTo`。
 - **列表/页码滚动状态不上屏内自持**：`AnimatedContent` 换页即销毁页内 `remember`/`rememberSaveable`（实测 `rememberPagerState` 也会丢），下层页重返组合时滚动位置被重置。故 `LazyListState`/`PagerState` 一律在 `AIHotApp` 层持有（根 tab 各一个 `remember`；二级页按 `Page` 值存 `pageListStates` map，弹出即清理）并下传——新增含列表的页面时遵循同一约定，不要在屏内 `rememberLazyListState()`。
-- `WebViewScreen` 延迟挂载 WebView（`attachWeb`，进页 350ms 后才创建）：WebView factory 的主线程重活会吃掉进入转场的帧，实测转场被拉长且淡入目标是白屏；创建完成后经 `AnimatedVisibility` 淡入，避免硬切弹出。
+- `WebViewScreen` 延迟挂载 WebView（`attachWeb`，进页 350ms 后才创建）：WebView factory 的主线程重活会吃掉进入转场的帧，实测转场被拉长且淡入目标是白屏；创建完成后经 `AnimatedVisibility` 淡入，避免硬切弹出。功能面：顶栏「更多」菜单（刷新/前进/后退/复制链接/在浏览器打开/关闭页面）+ 域名副标题、主帧失败错误态（`ErrorState` 重试）、长按图片/链接操作、HTML5 视频全屏（`onShowCustomView` 覆盖层）、http(s)/blob/data: 三类下载、字号跟随 `FontScale`（`textZoom`）、UA 基于系统 WebView UA 去 `wv` 标记伪装移动 Chrome。阅读模式与整页翻译在 `ui/webview/ReaderMode.kt`：注入 assets `readability.js` 提取正文套模板 `loadDataWithBaseURL` 渲染（baseUrl 带 `#aihot-reader` 哨兵 fragment，`onPageStarted` 据此判定阅读态；模板声明 `color-scheme` 自带暗色，避免算法深色叠加），「翻译本页」按块调 `TranslationRepository`，译文不改写原页，在 `ModalBottomSheet` 弹层（半屏起步、可拖拽全屏/拖下关闭）与原文对照展示、逐批渐进刷新（遵循设置页翻译开关，总字符上限 12000）。
 - 返回键：根 `PredictiveBackHandler`（activity-compose 1.10+）pop 当前 tab 栈——手势滑动时实时预览上一级页面，松手完成 pop、中途取消回弹（API < 34 退化为普通返回动画）；`WebViewScreen` 内层 `BackHandler` 优先——网页有可退历史时先 `goBack()` 退网页历史，退到首页后才 pop 整页。Manifest 已开 `enableOnBackInvokedCallback`（Android 13/14 退回桌面预览；15+ 默认）。
 - 浮动药丸底栏：`Box` 叠层而非 `Scaffold(bottomBar)`；内容 edge-to-edge，底栏 overlay 在 BottomCenter，二级页 `AnimatedVisibility` 滑出；列表用 `BottomBarReservedHeight` 预留底部空间（二级页列表如「全部动态」经 `ItemsScreen(reserveBottomBarSpace=false)` 不再预留）。底栏容器为近实底（`AppAlpha.bottomBarSurface` 0.94，遮内容透出）+ 3dp 浮起阴影（卡片零阴影惯例的唯一例外）+ `glassEdge` 白描边。可见性跟随转场目标（`isRoot || navTransitionState.targetState is Screen.Root`）：预测返回手势 seek 向根页时底栏随转场滑入，不再在 pop 完成后突兀出现。
 - `openUrl` 是打开网页的唯一入口：在此统一记录浏览历史（Room），再 push `Page.Web`。全 App 链接（含关于页、HN 评论内 HTML 链接）都收进内置 WebView，不走外部浏览器；`MainActivity` 支持 `EXTRA_OPEN_SETTINGS` 启动直达设置页（系统选中翻译的「去设置」用）。
@@ -97,7 +99,7 @@ python3 scripts/fetch_data.py --out-dir out --no-summary --no-previous-index
 - 双模式取数（`data/source/`）：4 个稳定源各有 `XxxSource` 接口 + 实时 Repository + `XxxArchiveRepository`；ViewModel 按 `SourceMode`（DataStore `display_prefs` 的 `source_mode`，默认 LIVE）选择实现。归档走 `ArchiveHttpClient`（gitcode 官方 REST API raw 端点，不用 raw 直链——背后是 WAF 会 403；index.json 有 2 分钟内存缓存 + Mutex 并发去重）。归档模式失败直接显示 Error 态，**不回退实时**。LinuxDo 不参与切换，始终实时。
 - `SummaryRepository`：AI 摘要 Tab 的摘要**不在 App 端运行时生成**，直接读归档快照顶层 `ai_summary` 字段（由数据流水线预生成）；`ai_summary` 缺失即失败态。
 - `AiChatClient`：OpenAI 兼容 chat 调用统一出口（`${baseUrl}/chat/completions`，baseUrl 含版本段），App 内所有端侧 AI 功能都经此访问「设置 → AI 服务」里的用户配置。
-- `TranslationRepository`：运行时经 `AiChatClient` 调用户自配的 AI 服务（温度 0.3），SHA256 缓存到 `cacheDir` 文件，Mutex 按 key 防并发重复；成功后把 token 用量写入 `AiUsageStore`。`TranslateSelectionActivity` 响应 `ACTION_PROCESS_TEXT` 在系统选中菜单注册「译」。
+- `TranslationRepository`：运行时经 `AiChatClient` 调用户自配的 AI 服务（温度 0.3），SHA256 缓存到 `cacheDir` 文件，Mutex 按 key 防并发重复；成功后把 token 用量写入 `AiUsageStore`。`TranslateSelectionActivity` 响应 `ACTION_PROCESS_TEXT` 在系统选中菜单注册「译」；HN 评论翻译与 WebView 阅读模式「翻译本页」共用此仓库。
 - `NewsRepository`：自有后端 `/items`（cursor 分页）、`/hot-topics`、`/daily`、`/dailies`。
 - 数据模型集中在 `NewsItem.kt` / `HackerNews.kt` / 各源单文件（`TrendingRepo.kt`、`LinuxDoTopic.kt`、`StormzhangAiNews.kt`、`HuggingFacePaper.kt`）；`NewsItem`、`HackerNewsStory` 用 `@Parcelize`。
 

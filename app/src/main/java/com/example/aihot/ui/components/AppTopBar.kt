@@ -34,6 +34,7 @@ import com.example.aihot.ui.theme.AppText
  *
  * @param applyTopInset 是否消费状态栏 inset。嵌入到已有顶部 Tab/顶栏的容器
  *        (如 HomeScreen 的 TabRow)时传 false,避免状态栏空白堆叠。
+ * @param subtitle 可选副标题(标题下方一行小字,如 Web 页的当前域名),null 不显示。
  * @param titleFontSize 标题字号,默认沿用 titleLarge(24sp)。详情/Web 页传 20sp 更克制。
  * @param horizontalPadding 顶栏内容(标题/导航图标/操作)的左右边距。
  *        默认 4dp 沿用 MD3 TopAppBar 内置留白;需要与列表内容对齐时(如精选 tab
@@ -63,6 +64,7 @@ fun AppTopBar(
     modifier: Modifier = Modifier,
     navigationIcon: @Composable (() -> Unit)? = null,
     applyTopInset: Boolean = true,
+    subtitle: String? = null,
     titleFontSize: TextUnit = AppTopBarDefaults.titleFontSize,
     horizontalPadding: Dp = 4.dp,
     actions: @Composable RowScope.() -> Unit = {}
@@ -74,15 +76,27 @@ fun AppTopBar(
     Column {
         TopAppBar(
             title = {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontSize = titleFontSize,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(start = if (navigationIcon == null) extra else 0.dp)
-                )
+                Column {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontSize = titleFontSize,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(start = if (navigationIcon == null) extra else 0.dp)
+                    )
+                    if (!subtitle.isNullOrBlank()) {
+                        Text(
+                            text = subtitle,
+                            style = AppText.caption,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(start = if (navigationIcon == null) extra else 0.dp)
+                        )
+                    }
+                }
             },
             navigationIcon = {
                 if (navigationIcon != null) {

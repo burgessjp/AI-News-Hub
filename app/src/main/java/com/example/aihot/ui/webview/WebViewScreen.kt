@@ -1,74 +1,127 @@
 package com.example.aihot.ui.webview
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.DownloadManager
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.util.Base64
+import android.view.View
 import android.webkit.JavascriptInterface
+import android.webkit.MimeTypeMap
 import android.webkit.URLUtil
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
+import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import android.annotation.SuppressLint
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.outlined.IosShare
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.ArrowForward
+import androidx.compose.material.icons.automirrored.outlined.MenuBook
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.Language
+import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.Translate
+import androidx.compose.material.icons.outlined.WebAsset
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import com.example.aihot.ui.anim.Motion
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
+import com.example.aihot.data.AiConfig
+import com.example.aihot.data.TranslationRepository
+import com.example.aihot.ui.ErrorState
+import com.example.aihot.ui.LoadingState
+import com.example.aihot.ui.anim.Motion
 import com.example.aihot.ui.components.AppTopBar
 import com.example.aihot.ui.components.AppTopBarDefaults
+import com.example.aihot.ui.more.FontScale
+import com.example.aihot.ui.theme.AppText
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlin.math.roundToInt
 
 /**
  * 内置 WebView 屏幕 — 不跳出 App。
  *
  * 显示原文 / AI HOT 阅读页,带:
- *  - 顶栏返回按钮 + 页面标题(随网页加载动态更新)+ 分享(系统分享当前页)
- *  - 顶部线性进度条(加载中)
- *  - 站内导航(链接在同 WebView 内打开,不弹外部浏览器)
- *  - 网页发起的文件下载:HTTP(S) 走 DownloadManager;blob: URL 注入 JS
- *    读成 base64 回传后写入文件(常见于网页用 JS 合成/生成的图片"保存")
+ *  - 顶栏:返回 + 标题(随网页加载动态更新)+ 当前域名副标题 + 「更多」菜单
+ *    (刷新 / 前进 / 后退 / 阅读模式 / 分享 / 复制链接 / 在浏览器打开 / 关闭页面)
+ *  - 顶部线性进度条(加载中;整页翻译时复用为翻译进度)
+ *  - 主帧加载失败错误态([ErrorState] + 重试),不再是空白页
+ *  - 站内导航(主帧 http(s) 交 WebView 原生处理;子框架不拦截;外部 scheme 唤起外部 App)
+ *  - 阅读模式:注入 assets/readability.js 提取正文,套干净模板重排(见 ReaderMode.kt);
+ *    阅读页内可用用户自配 AI 服务「翻译本页」——译文不改写原页,在底部弹层
+ *    (ModalBottomSheet,半屏/全屏可拖拽)里与原文对照展示,逐段渐进刷新,可取消
+ *  - 长按:图片(保存/复制地址,http/data/blob 均可)与链接(复制/浏览器打开)
+ *  - 全屏视频(onShowCustomView 覆盖层,返回键先退全屏)
+ *  - 网页发起的文件下载:HTTP(S) 走 DownloadManager;blob:/data: URL 解码后写文件
  *  - 网页深色模式(算法深色,优先用网页自带的深色主题)
+ *  - 字号跟随「设置 → 字号档位」(settings.textZoom)
  */
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
@@ -76,19 +129,44 @@ fun WebViewScreen(
     url: String,
     title: String = "加载中…",
     darkTheme: Boolean = false,
+    fontScale: FontScale = FontScale.Standard,
+    aiConfig: AiConfig = AiConfig(),
     onBack: () -> Unit,
+    onOpenSettings: () -> Unit = {},
     onTitleResolved: (url: String, title: String) -> Unit = { _, _ -> }
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    // 无 DI,Repository 就地构造(与项目惯例一致);翻译缓存/用量统计由仓库内部处理
+    val translationRepo = remember { TranslationRepository(context) }
+
     var pageTitle by remember { mutableStateOf(title) }
-    // 当前页真实 URL(随导航更新),分享时用它而非初始 url
+    // 当前页真实 URL(随导航更新,已剥阅读页哨兵),分享/复制/打开浏览器都用它
     var currentUrl by remember { mutableStateOf(url) }
     var progress by remember { mutableStateOf(0) }
     var loading by remember { mutableStateOf(true) }
-    // 网页内部是否有可回退历史:决定系统返回键是退网页历史还是退出整页
+    // 网页内部是否有可回退/前进历史:决定菜单可用态与系统返回键行为
     var webCanGoBack by remember { mutableStateOf(false) }
+    var webCanGoForward by remember { mutableStateOf(false) }
+    // 主帧加载失败描述(非空即显示错误态);子资源失败不记录(页面可能部分可用)
+    var loadError by remember { mutableStateOf<String?>(null) }
     // 待下载任务:API<29 时等用户授予存储权限后再入队
     var pendingDownload by remember { mutableStateOf<DownloadParams?>(null) }
+    // 「更多」菜单 / 长按目标 / AI 配置引导弹窗
+    var menuExpanded by remember { mutableStateOf(false) }
+    var longPressTarget by remember { mutableStateOf<LongPressTarget?>(null) }
+    var showAiConfigDialog by remember { mutableStateOf(false) }
+    // 全屏视频:onShowCustomView 给的 View 非空即覆盖全屏
+    var fullscreenView by remember { mutableStateOf<View?>(null) }
+    // 阅读模式:readerActive 由 onPageStarted 按哨兵 URL 判定(见 ReaderMode.kt);
+    // 翻译状态:原文块 + 译文结果(底部弹层对照展示,不改写原页 DOM)
+    var readerActive by remember { mutableStateOf(false) }
+    var readerLoading by remember { mutableStateOf(false) }
+    var translating by remember { mutableStateOf(false) }
+    var translateProgress by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    var translateOriginals by remember { mutableStateOf<List<String>?>(null) }
+    var translateResults by remember { mutableStateOf<List<String?>?>(null) }
+    var showTranslateSheet by remember { mutableStateOf(false) }
 
     // 延迟挂载 WebView:进入转场(FADE)结束后再创建,避免 factory 的主线程重活
     // 与转场抢帧(此前实测转场被拉长、且淡入目标是白屏,视觉上像没有动画)。
@@ -104,8 +182,13 @@ fun WebViewScreen(
     // factory 里赋值会触发 key 变化 → dispose 循环 → WebView 被提前 destroy → 页面加载中断。
     // 这里 key 用 Unit,仅在离开 composition 时执行一次 onDispose。
     val webViewRef = remember { object { var web: WebView? = null } }
+    // 视频全屏回调 / 翻译协程 / readability.js 文本缓存,同样用 Ref 避免触发重组
+    val fullscreenCallbackRef = remember { object { var cb: WebChromeClient.CustomViewCallback? = null } }
+    val translateJobRef = remember { object { var job: Job? = null } }
+    val readabilityRef = remember { object { var js: String? = null } }
     DisposableEffect(Unit) {
         onDispose {
+            translateJobRef.job?.cancel()
             webViewRef.web?.let { web ->
                 web.removeJavascriptInterface("AndroidBlobSaver")
                 (web.parent as? android.view.ViewGroup)?.removeView(web)
@@ -116,8 +199,13 @@ fun WebViewScreen(
 
     // 系统返回键:网页有内部历史时先退历史(WebView 内的站内跳转不应一键退出整页);
     // 无历史时不拦截,交给外层(MainActivity)pop 整页。Compose 内层 BackHandler 优先于外层。
-    androidx.activity.compose.BackHandler(enabled = webCanGoBack) {
+    androidx.activity.compose.BackHandler(enabled = webCanGoBack && fullscreenView == null) {
         webViewRef.web?.goBack()
+    }
+    // 视频全屏时返回键先退全屏(声明在上方 BackHandler 之后,同层级后声明者优先)。
+    // onHideCustomView 是 WebChromeClient 公开方法,直接调用即走我们的 override 复位状态。
+    androidx.activity.compose.BackHandler(enabled = fullscreenView != null) {
+        webViewRef.web?.webChromeClient?.onHideCustomView()
     }
 
     // 存储权限请求(API<29 下载需要)。授权回调里把暂存的任务入队 DownloadManager。
@@ -133,173 +221,653 @@ fun WebViewScreen(
         }
     }
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.surface,
-        topBar = {
-            AppTopBar(
-                title = pageTitle.ifBlank { "加载中…" },
-                titleFontSize = AppTopBarDefaults.secondaryTitleFontSize,
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                    }
-                },
-                // 单纯的系统分享:把当前页 URL 作为纯文本交给系统分享面板
-                actions = {
-                    IconButton(onClick = { shareUrl(context, pageTitle, currentUrl) }) {
-                        Icon(Icons.Outlined.IosShare, contentDescription = "分享")
-                    }
-                }
+    fun toast(msg: String) = Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+
+    /** 复制到剪贴板并提示。 */
+    fun copyText(text: String) {
+        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+        cm?.setPrimaryClip(ClipData.newPlainText("url", text))
+        toast("已复制")
+    }
+
+    /** 用系统浏览器打开。 */
+    fun openInBrowser(target: String) {
+        try {
+            context.startActivity(
+                Intent(Intent.ACTION_VIEW, Uri.parse(target))
+                    .addCategory(Intent.CATEGORY_BROWSABLE)
             )
+        } catch (e: Exception) {
+            toast("未找到可用的浏览器")
         }
-    ) { padding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
-            // 转场结束后再创建 WebView(见上方 attachWeb 说明);创建完成后淡入,
-            // 避免 attachWeb 翻转瞬间 WebView 硬切弹出。
-            AnimatedVisibility(
-                visible = attachWeb,
-                enter = fadeIn(tween(Motion.SHORT, easing = Motion.EmphasizedDecel))
-            ) {
-            AndroidView(
-                factory = { ctx ->
-                    WebView(ctx).apply {
-                        webViewRef.web = this
-                        configureWebSettings(darkTheme)
-                        webViewClient = object : WebViewClient() {
-                            override fun shouldOverrideUrlLoading(
-                                view: WebView,
-                                request: WebResourceRequest
-                            ): Boolean {
-                                // 按协议分流:http(s)/about/data 留在站内;
-                                // blob: 由 DownloadListener 处理,这里直接忽略(避免落到 startActivity);
-                                // javascript: 拒绝执行(防注入,不在白名单 → 不 loadUrl);
-                                // 其余 scheme(intent://、weixin://、mailto:、tel:…)
-                                // 唤起外部 App,失败时优雅降级。
-                                val uri = request.url
-                                val scheme = uri.scheme?.lowercase()
-                                if (scheme == "http" || scheme == "https" ||
-                                    scheme == "about" || scheme == "data"
-                                ) {
-                                    view.loadUrl(uri.toString())
-                                    return true
-                                }
-                                // blob: 的下载已由 setDownloadListener 托管,导航层不处理
-                                if (scheme == "blob") return true
-                                // javascript: 不执行,直接拦截(防止任意网页注入 JS)
-                                if (scheme == "javascript") return true
-                                handleExternalUri(view.context, uri)
-                                return true
-                            }
+    }
 
-                            override fun onPageFinished(view: WebView, url: String?) {
-                                pageTitle = view.title ?: title
-                                currentUrl = url ?: currentUrl
-                                loading = false
-                                webCanGoBack = view.canGoBack()
-                                // 回写真实标题到浏览历史(用最终落地 URL,跟随重定向)
-                                val resolvedUrl = url ?: currentUrl
-                                val resolvedTitle = view.title?.takeIf { it.isNotBlank() }
-                                if (resolvedTitle != null) onTitleResolved(resolvedUrl, resolvedTitle)
-                            }
+    /** 错误态重试:URL 已提交过用 reload;首次就失败(URL 未提交)重新 loadUrl。 */
+    fun retryLoad() {
+        val web = webViewRef.web ?: return
+        loadError = null
+        if (web.url.isNullOrBlank()) web.loadUrl(url) else web.reload()
+    }
 
-                            override fun doUpdateVisitedHistory(view: WebView, url: String?, isReload: Boolean) {
-                                // 站内跳转/回退都会更新历史栈,同步「可回退」状态
-                                webCanGoBack = view.canGoBack()
-                            }
+    /** 进入阅读模式:注入 Readability 提取正文,套模板经 loadDataWithBaseURL 渲染。 */
+    fun enterReaderMode() {
+        val web = webViewRef.web ?: return
+        if (readerLoading) return
+        scope.launch {
+            readerLoading = true
+            try {
+                // readability.js 文本只读一次 assets,进程内缓存
+                val lib = readabilityRef.js ?: withContext(Dispatchers.IO) {
+                    context.assets.open("readability.js").bufferedReader().use { it.readText() }
+                }.also { readabilityRef.js = it }
+                val article = extractReaderArticle(web, lib)
+                if (article == null) {
+                    toast("未能提取正文,当前页可能不是文章页")
+                    return@launch
+                }
+                // 进入新阅读页前清掉上一页的翻译产物
+                translateOriginals = null
+                translateResults = null
+                showTranslateSheet = false
+                // baseUrl 带哨兵 fragment 标记阅读页;相对路径资源仍按原 URL 解析
+                web.loadDataWithBaseURL(
+                    currentUrl + READER_SENTINEL,
+                    buildReaderHtml(article),
+                    "text/html", "utf-8", null
+                )
+            } finally {
+                readerLoading = false
+            }
+        }
+    }
+
+    /** 退出阅读模式:阅读页是历史栈顶,goBack 直接回原页(还保留滚动位置)。 */
+    fun exitReaderMode() {
+        val web = webViewRef.web ?: return
+        translateJobRef.job?.cancel()
+        if (web.canGoBack()) web.goBack() else web.loadUrl(currentUrl)
+    }
+
+    /**
+     * 整页翻译:抽块 → 打开翻译弹层 → 逐块翻译,每批结果渐进写入弹层状态。
+     * 不改写阅读页 DOM;已有结果(或正在翻译)时直接打开弹层,不重复请求。
+     */
+    fun startTranslate() {
+        if (!aiConfig.isReady) {
+            showAiConfigDialog = true
+            return
+        }
+        if (translating || translateResults != null) {
+            showTranslateSheet = true
+            return
+        }
+        val web = webViewRef.web ?: return
+        translateJobRef.job = scope.launch {
+            translating = true
+            translateProgress = null
+            try {
+                val texts = extractBlockTexts(web)
+                if (texts.isNullOrEmpty() || texts.all { it.isBlank() }) {
+                    toast("没有可翻译的内容")
+                    return@launch
+                }
+                translateOriginals = texts
+                // 占位结果:弹层立即按原文渲染,译文随后逐批填入
+                translateResults = List(texts.size) { null }
+                showTranslateSheet = true
+                translateResults = translateReaderBlocks(translationRepo, aiConfig, texts) { partial, done, total ->
+                    translateResults = partial
+                    translateProgress = done to total
+                }
+            } finally {
+                translating = false
+                translateProgress = null
+            }
+        }
+    }
+
+    /** 长按图片的「保存图片」:按 URL 形态分流到既有下载链路。 */
+    fun savePressedImage(imageUrl: String) {
+        when {
+            imageUrl.startsWith("http", ignoreCase = true) -> handleDownload(
+                context,
+                DownloadParams(imageUrl, webViewRef.web?.settings?.userAgentString, null, null),
+                storagePermissionLauncher
+            ) { pendingDownload = it }
+            imageUrl.startsWith("data:", ignoreCase = true) -> saveDataUrl(context, imageUrl)
+            imageUrl.startsWith("blob:", ignoreCase = true) ->
+                webViewRef.web?.let { downloadBlob(it, context, imageUrl, null, null) }
+                    ?: toast("无法保存图片")
+            else -> toast("暂不支持保存此图片")
+        }
+    }
+
+    // 顶栏域名副标题:让用户始终知道自己在哪个站
+    val pageHost = remember(currentUrl) {
+        runCatching { Uri.parse(currentUrl).host }.getOrNull().orEmpty()
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            containerColor = MaterialTheme.colorScheme.surface,
+            topBar = {
+                AppTopBar(
+                    title = pageTitle.ifBlank { "加载中…" },
+                    subtitle = pageHost.ifBlank { null },
+                    titleFontSize = AppTopBarDefaults.secondaryTitleFontSize,
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
                         }
-                        webChromeClient = object : WebChromeClient() {
-                            override fun onProgressChanged(view: WebView?, newProgress: Int) {
-                                progress = newProgress
-                                loading = newProgress < 100
+                    },
+                    actions = {
+                        Box {
+                            IconButton(onClick = { menuExpanded = true }) {
+                                Icon(Icons.Outlined.MoreVert, contentDescription = "更多")
                             }
-
-                            override fun onReceivedTitle(view: WebView?, title: String?) {
-                                if (!title.isNullOrBlank()) {
-                                    pageTitle = title
-                                    // 部分站点在 onPageFinished 之前/之后才设标题,
-                                    // 这里也回写一次,保证历史标题最终是真实标题
-                                    onTitleResolved(currentUrl, title)
-                                }
-                            }
-                        }
-                        // 网页发起的下载处理。
-                        //  - blob: URL:DownloadManager 不认 —— 注入 JS 把 blob 读成 base64,
-                        //    经 BlobSaver 接口回传后解码写入文件(网页用 JS 合成图片"保存"时即此路径)。
-                        //  - http(s):走 DownloadManager。
-                        //  - 其它(data:/非 http):直接提示无法下载,不再崩溃。
-                        addJavascriptInterface(
-                            BlobSaver(context) { name, mime, data -> saveBlob(context, name, mime, data) },
-                            "AndroidBlobSaver"
-                        )
-                        setDownloadListener { downloadUrl, userAgent, contentDisposition, mimetype, _ ->
-                            when {
-                                downloadUrl.startsWith("blob:", ignoreCase = true) -> {
-                                    val filename = guessDownloadName(
-                                        downloadUrl, contentDisposition, mimetype
+                            DropdownMenu(
+                                expanded = menuExpanded,
+                                onDismissRequest = { menuExpanded = false }
+                            ) {
+                                if (!readerActive) {
+                                    DropdownMenuItem(
+                                        text = { Text("刷新") },
+                                        leadingIcon = { Icon(Icons.Outlined.Refresh, null) },
+                                        onClick = {
+                                            menuExpanded = false
+                                            webViewRef.web?.reload()
+                                        }
                                     )
-                                    // 块级作用域函数不能用 JS 关键字做变量名,这里用 fn
-                                    val fn = filename.replace("'", "\\'")
-                                    val mt = (mimetype ?: "application/octet-stream").replace("'", "\\'")
-                                    // downloadUrl 来自网页,需同样转义单引号(与 fn/mt 一致),防 JS 字面量注入
-                                    val du = downloadUrl.replace("'", "\\'")
-                                    // 用 fetch 拿到 blob 后转 base64 回传原生,避开 DownloadManager 对 blob 的限制
-                                    val js = """
-                                    (function(){
-                                      try {
-                                        fetch('$du').then(function(r){return r.blob();}).then(function(b){
-                                          var fr = new FileReader();
-                                          fr.onload = function(){
-                                            var data = fr.result.split(',')[1];
-                                            AndroidBlobSaver.save('$fn', '$mt', data);
-                                          };
-                                          fr.readAsDataURL(b);
-                                        }).catch(function(e){
-                                          AndroidBlobSaver.save('$fn', '$mt', null);
-                                        });
-                                      } catch(e) {
-                                        AndroidBlobSaver.save('$fn', '$mt', null);
-                                      }
-                                    })();
-                                    """.trimIndent()
-                                    evaluateJavascript(js, null)
-                                }
-
-                                downloadUrl.startsWith("http", ignoreCase = true) -> {
-                                    val params = DownloadParams(
-                                        url = downloadUrl,
-                                        userAgent = userAgent,
-                                        contentDisposition = contentDisposition,
-                                        mimetype = mimetype
+                                    DropdownMenuItem(
+                                        text = { Text("后退") },
+                                        leadingIcon = { Icon(Icons.AutoMirrored.Outlined.ArrowBack, null) },
+                                        enabled = webCanGoBack,
+                                        onClick = {
+                                            menuExpanded = false
+                                            webViewRef.web?.goBack()
+                                        }
                                     )
-                                    handleDownload(context, params, storagePermissionLauncher) {
-                                        pendingDownload = it
+                                    DropdownMenuItem(
+                                        text = { Text("前进") },
+                                        leadingIcon = { Icon(Icons.AutoMirrored.Outlined.ArrowForward, null) },
+                                        enabled = webCanGoForward,
+                                        onClick = {
+                                            menuExpanded = false
+                                            webViewRef.web?.goForward()
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("阅读模式") },
+                                        leadingIcon = { Icon(Icons.AutoMirrored.Outlined.MenuBook, null) },
+                                        enabled = !readerLoading,
+                                        onClick = {
+                                            menuExpanded = false
+                                            enterReaderMode()
+                                        }
+                                    )
+                                } else {
+                                    DropdownMenuItem(
+                                        text = { Text("退出阅读模式") },
+                                        leadingIcon = { Icon(Icons.Outlined.WebAsset, null) },
+                                        onClick = {
+                                            menuExpanded = false
+                                            exitReaderMode()
+                                        }
+                                    )
+                                    // 翻译入口遵循「设置 → AI 服务」的翻译开关;
+                                    // 译文在底部弹层展示,不改写阅读页
+                                    if (aiConfig.translateEnabled) {
+                                        DropdownMenuItem(
+                                            text = { Text("翻译本页") },
+                                            leadingIcon = { Icon(Icons.Outlined.Translate, null) },
+                                            onClick = {
+                                                menuExpanded = false
+                                                startTranslate()
+                                            }
+                                        )
                                     }
                                 }
-
-                                else -> {
-                                    Toast.makeText(
-                                        context, "暂不支持下载此类型的链接", Toast.LENGTH_SHORT
-                                    ).show()
-                                }
+                                HorizontalDivider()
+                                DropdownMenuItem(
+                                    text = { Text("分享") },
+                                    leadingIcon = { Icon(Icons.Outlined.Share, null) },
+                                    onClick = {
+                                        menuExpanded = false
+                                        shareUrl(context, pageTitle, currentUrl)
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("复制链接") },
+                                    leadingIcon = { Icon(Icons.Outlined.ContentCopy, null) },
+                                    onClick = {
+                                        menuExpanded = false
+                                        copyText(currentUrl)
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("在浏览器打开") },
+                                    leadingIcon = { Icon(Icons.Outlined.Language, null) },
+                                    onClick = {
+                                        menuExpanded = false
+                                        openInBrowser(currentUrl)
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("关闭页面") },
+                                    leadingIcon = { Icon(Icons.Outlined.Close, null) },
+                                    onClick = {
+                                        menuExpanded = false
+                                        onBack()
+                                    }
+                                )
                             }
                         }
-                        loadUrl(url)
                     }
-                },
-                update = { web ->
-                    // 运行时切换主题:重新应用算法深色设置,即时生效
-                    applyDarkTheme(web.settings, darkTheme)
-                },
-                modifier = Modifier.fillMaxSize()
-            )
+                )
             }
+        ) { padding ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+            ) {
+                // 转场结束后再创建 WebView(见上方 attachWeb 说明)
+                if (attachWeb) {
+                    AndroidView(
+                        factory = { ctx ->
+                            WebView(ctx).apply {
+                                webViewRef.web = this
+                                configureWebSettings(darkTheme, fontScale)
+                                webViewClient = object : WebViewClient() {
+                                    override fun shouldOverrideUrlLoading(
+                                        view: WebView,
+                                        request: WebResourceRequest
+                                    ): Boolean {
+                                        // 子框架(iframe 等)导航不拦截,交 WebView 自己处理;
+                                        // 主帧按 scheme 分流:
+                                        //  - http(s)/about/data:返回 false 原生加载,保留 POST
+                                        //    与跳转语义(此前 loadUrl+true 会丢 POST 数据);
+                                        //  - blob: 下载由 DownloadListener 托管,导航层忽略;
+                                        //  - javascript: 拒绝执行(防注入);
+                                        //  - 其余 scheme(intent://、weixin://、mailto:、tel:…)
+                                        //    唤起外部 App,失败时优雅降级。
+                                        if (!request.isForMainFrame) return false
+                                        val uri = request.url
+                                        when (uri.scheme?.lowercase()) {
+                                            "http", "https", "about", "data" -> return false
+                                            "blob", "javascript" -> return true
+                                        }
+                                        handleExternalUri(view.context, uri)
+                                        return true
+                                    }
 
-            // 顶部加载进度条(2dp 细线,加载完成淡出,无背景轨道)
-            TopProgressBar(loading = loading, progress = { progress / 100f })
+                                    override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
+                                        loading = true
+                                        loadError = null
+                                        val isReader = url?.endsWith(READER_SENTINEL) == true
+                                        if (!isReader) {
+                                            // 离开阅读页(点链接/回退/退出):清理翻译状态
+                                            translateJobRef.job?.cancel()
+                                            translating = false
+                                            translateProgress = null
+                                            translateOriginals = null
+                                            translateResults = null
+                                            showTranslateSheet = false
+                                        }
+                                        readerActive = isReader
+                                    }
+
+                                    override fun onPageFinished(view: WebView, url: String?) {
+                                        pageTitle = view.title ?: title
+                                        // 阅读页 URL 带哨兵,剥掉后再用于分享/复制/历史
+                                        val finishedUrl = url?.removeSuffix(READER_SENTINEL)
+                                        currentUrl = finishedUrl ?: currentUrl
+                                        loading = false
+                                        webCanGoBack = view.canGoBack()
+                                        webCanGoForward = view.canGoForward()
+                                        // 回写真实标题到浏览历史(用最终落地 URL,跟随重定向)
+                                        val resolvedUrl = finishedUrl ?: currentUrl
+                                        val resolvedTitle = view.title?.takeIf { it.isNotBlank() }
+                                        if (resolvedTitle != null) onTitleResolved(resolvedUrl, resolvedTitle)
+                                    }
+
+                                    override fun doUpdateVisitedHistory(view: WebView, url: String?, isReload: Boolean) {
+                                        // 站内跳转/回退都会更新历史栈,同步「可回退/前进」状态
+                                        webCanGoBack = view.canGoBack()
+                                        webCanGoForward = view.canGoForward()
+                                    }
+
+                                    override fun onReceivedError(
+                                        view: WebView,
+                                        request: WebResourceRequest,
+                                        error: WebResourceError
+                                    ) {
+                                        // 只报主帧错误:图片/接口等子资源失败不打扰
+                                        if (request.isForMainFrame) {
+                                            loadError = "(${error.errorCode}) ${error.description}"
+                                            loading = false
+                                        }
+                                    }
+
+                                    override fun onReceivedHttpError(
+                                        view: WebView,
+                                        request: WebResourceRequest,
+                                        errorResponse: WebResourceResponse
+                                    ) {
+                                        // 主帧 HTTP 错误(404/500 等)同样进错误态
+                                        if (request.isForMainFrame) {
+                                            loadError = "HTTP ${errorResponse.statusCode}"
+                                        }
+                                    }
+                                }
+                                webChromeClient = object : WebChromeClient() {
+                                    override fun onProgressChanged(view: WebView?, newProgress: Int) {
+                                        progress = newProgress
+                                        loading = newProgress < 100
+                                    }
+
+                                    override fun onReceivedTitle(view: WebView?, title: String?) {
+                                        if (!title.isNullOrBlank()) {
+                                            pageTitle = title
+                                            // 部分站点在 onPageFinished 之前/之后才设标题,
+                                            // 这里也回写一次,保证历史标题最终是真实标题
+                                            onTitleResolved(currentUrl, title)
+                                        }
+                                    }
+
+                                    // HTML5 视频全屏:把全屏 View 交给 Compose 覆盖层渲染
+                                    override fun onShowCustomView(view: View, callback: CustomViewCallback) {
+                                        fullscreenCallbackRef.cb?.let { runCatching { it.onCustomViewHidden() } }
+                                        fullscreenCallbackRef.cb = callback
+                                        fullscreenView = view
+                                    }
+
+                                    override fun onHideCustomView() {
+                                        fullscreenView = null
+                                        fullscreenCallbackRef.cb?.let { runCatching { it.onCustomViewHidden() } }
+                                        fullscreenCallbackRef.cb = null
+                                    }
+                                }
+                                // 长按:图片/链接弹操作菜单;文本保持系统默认(长按选择)
+                                setOnLongClickListener {
+                                    val hit = hitTestResult
+                                    val extra = hit.extra
+                                    when {
+                                        extra.isNullOrBlank() -> false
+                                        hit.type == WebView.HitTestResult.IMAGE_TYPE ||
+                                            hit.type == WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE -> {
+                                            longPressTarget = LongPressTarget.Image(extra)
+                                            true
+                                        }
+                                        hit.type == WebView.HitTestResult.SRC_ANCHOR_TYPE -> {
+                                            longPressTarget = LongPressTarget.Link(extra)
+                                            true
+                                        }
+                                        else -> false
+                                    }
+                                }
+                                // 网页发起的下载处理。
+                                //  - blob: URL:DownloadManager 不认 —— 注入 JS 把 blob 读成 base64,
+                                //    经 BlobSaver 接口回传后解码写入文件(网页用 JS 合成图片"保存"时即此路径)。
+                                //  - http(s):走 DownloadManager。
+                                //  - data:(base64):canvas 导出图片的常见形态,解码后同 blob 写文件。
+                                //  - 其它:直接提示无法下载,不再崩溃。
+                                addJavascriptInterface(
+                                    BlobSaver(context) { name, mime, data -> saveBlob(context, name, mime, data) },
+                                    "AndroidBlobSaver"
+                                )
+                                setDownloadListener { downloadUrl, userAgent, contentDisposition, mimetype, _ ->
+                                    when {
+                                        downloadUrl.startsWith("blob:", ignoreCase = true) ->
+                                            downloadBlob(this, context, downloadUrl, contentDisposition, mimetype)
+
+                                        downloadUrl.startsWith("http", ignoreCase = true) -> {
+                                            val params = DownloadParams(
+                                                url = downloadUrl,
+                                                userAgent = userAgent,
+                                                contentDisposition = contentDisposition,
+                                                mimetype = mimetype
+                                            )
+                                            handleDownload(context, params, storagePermissionLauncher) {
+                                                pendingDownload = it
+                                            }
+                                        }
+
+                                        downloadUrl.startsWith("data:", ignoreCase = true) ->
+                                            saveDataUrl(context, downloadUrl)
+
+                                        else -> {
+                                            Toast.makeText(
+                                                context, "暂不支持下载此类型的链接", Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
+                                    }
+                                }
+                                loadUrl(url)
+                            }
+                        },
+                        update = { web ->
+                            // 运行时切换主题/字号档位:即时生效
+                            applyDarkTheme(web.settings, darkTheme)
+                            web.settings.textZoom = (fontScale.scale * 100).roundToInt()
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+
+                // 顶部加载进度条(2dp 细线,加载完成淡出)
+                TopProgressBar(loading = loading, progress = { progress / 100f })
+
+                // 主帧加载失败:错误态覆盖(挡住 WebView 自带的错误页),可重试
+                loadError?.let { err ->
+                    ErrorState(
+                        message = err,
+                        onRetry = { retryLoad() },
+                        title = "页面加载失败",
+                        modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+                    )
+                }
+
+                // 正在提取正文(Readability 注入通常 <1s):居中 loading
+                if (readerLoading) {
+                    LoadingState()
+                }
+            }
+        }
+
+        // HTML5 视频全屏覆盖层:盖住顶栏与 WebView,黑底(视频功能色,与主题无关)
+        fullscreenView?.let { fv ->
+            AndroidView(
+                factory = { fv },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black)
+            )
+        }
+    }
+
+    // 长按图片/链接的操作弹窗
+    longPressTarget?.let { target ->
+        AlertDialog(
+            onDismissRequest = { longPressTarget = null },
+            title = { Text(if (target is LongPressTarget.Image) "图片" else "链接") },
+            text = {
+                Column {
+                    Text(
+                        text = target.url,
+                        style = AppText.caption,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    if (target is LongPressTarget.Image) {
+                        TextButton(
+                            onClick = {
+                                longPressTarget = null
+                                savePressedImage(target.url)
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("保存图片") }
+                        TextButton(
+                            onClick = {
+                                longPressTarget = null
+                                copyText(target.url)
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("复制图片地址") }
+                    } else {
+                        TextButton(
+                            onClick = {
+                                longPressTarget = null
+                                copyText(target.url)
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("复制链接") }
+                        TextButton(
+                            onClick = {
+                                longPressTarget = null
+                                openInBrowser(target.url)
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("在浏览器打开") }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { longPressTarget = null }) { Text("取消") }
+            }
+        )
+    }
+
+    // 翻译弹层:原文/译文对照,逐批渐进刷新;半屏起步,可拖拽全屏/拖下关闭
+    val sheetOriginals = translateOriginals
+    if (showTranslateSheet && sheetOriginals != null) {
+        TranslateSheet(
+            originals = sheetOriginals,
+            results = translateResults,
+            progress = translateProgress,
+            translating = translating,
+            onCancelTranslate = { translateJobRef.job?.cancel() },
+            onDismiss = { showTranslateSheet = false }
+        )
+    }
+
+    // 翻译需要可用的 AI 服务配置:未配置时引导去设置页
+    if (showAiConfigDialog) {
+        AlertDialog(
+            onDismissRequest = { showAiConfigDialog = false },
+            title = { Text("未配置 AI 服务") },
+            text = { Text("整页翻译使用「设置 → AI 服务」里的服务配置,请先填写 API Key 与模型。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showAiConfigDialog = false
+                    onOpenSettings()
+                }) { Text("去设置") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAiConfigDialog = false }) { Text("取消") }
+            }
+        )
+    }
+}
+
+/** 长按命中目标。url 为图片地址(IMAGE/SRC_IMAGE_ANCHOR)或链接地址(SRC_ANCHOR)。 */
+private sealed interface LongPressTarget {
+    val url: String
+
+    data class Image(override val url: String) : LongPressTarget
+    data class Link(override val url: String) : LongPressTarget
+}
+
+/**
+ * 翻译弹层 —— 原文/译文对照列表。
+ *
+ * [ModalBottomSheet] 半屏起步(skipPartiallyExpanded=false),可手势拖拽到全屏、
+ * 拖下关闭。译文未到的块先以弱化色显示原文;到达后译文在上、原文小字在下,
+ * 翻译中可在头部取消(已译部分保留)。
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TranslateSheet(
+    originals: List<String>,
+    results: List<String?>?,
+    progress: Pair<Int, Int>?,
+    translating: Boolean,
+    onCancelTranslate: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+    ) {
+        // 头部:标题 + 进度/取消
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+        ) {
+            Text(
+                text = "全文翻译",
+                style = AppText.titleItem,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            if (translating && progress != null) {
+                Text(
+                    text = "翻译中 ${progress.first}/${progress.second}",
+                    style = AppText.caption,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            if (translating) {
+                Spacer(modifier = Modifier.width(4.dp))
+                TextButton(onClick = onCancelTranslate) { Text("取消") }
+            }
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        // 空白块(空段落等)不参与展示
+        val blocks = remember(originals) { originals.indices.filter { originals[it].isNotBlank() } }
+        LazyColumn(modifier = Modifier.fillMaxWidth()) {
+            items(blocks.size) { position ->
+                val index = blocks[position]
+                val original = originals[index]
+                val translated = results?.getOrNull(index)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 10.dp)
+                ) {
+                    if (translated != null) {
+                        Text(
+                            text = translated,
+                            style = AppText.body,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = original,
+                            style = AppText.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        // 译文未到(或被跳过):先以弱化色显示原文
+                        Text(
+                            text = original,
+                            style = AppText.body,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+            item {
+                Spacer(
+                    modifier = Modifier
+                        .navigationBarsPadding()
+                        .height(16.dp)
+                )
+            }
         }
     }
 }
@@ -403,6 +971,65 @@ private fun enqueueDownload(context: Context, params: DownloadParams) {
 }
 
 /**
+ * 下载 blob: URL —— DownloadManager 不认 blob,注入 JS 把 blob 读成 base64,
+ * 经 BlobSaver 接口回传后解码写入文件。
+ */
+private fun downloadBlob(
+    webView: WebView,
+    context: Context,
+    blobUrl: String,
+    contentDisposition: String?,
+    mimetype: String?
+) {
+    val filename = guessDownloadName(blobUrl, contentDisposition, mimetype)
+    // 块级作用域函数不能用 JS 关键字做变量名,这里用 fn
+    val fn = filename.replace("'", "\\'")
+    val mt = (mimetype ?: "application/octet-stream").replace("'", "\\'")
+    // blobUrl 来自网页,需同样转义单引号(与 fn/mt 一致),防 JS 字面量注入
+    val du = blobUrl.replace("'", "\\'")
+    // 用 fetch 拿到 blob 后转 base64 回传原生,避开 DownloadManager 对 blob 的限制
+    val js = """
+    (function(){
+      try {
+        fetch('$du').then(function(r){return r.blob();}).then(function(b){
+          var fr = new FileReader();
+          fr.onload = function(){
+            var data = fr.result.split(',')[1];
+            AndroidBlobSaver.save('$fn', '$mt', data);
+          };
+          fr.readAsDataURL(b);
+        }).catch(function(e){
+          AndroidBlobSaver.save('$fn', '$mt', null);
+        });
+      } catch(e) {
+        AndroidBlobSaver.save('$fn', '$mt', null);
+      }
+    })();
+    """.trimIndent()
+    webView.evaluateJavascript(js, null)
+    Toast.makeText(context, "正在保存文件…", Toast.LENGTH_SHORT).show()
+}
+
+/**
+ * 下载 data: URL(canvas 导出图片的常见形态)。仅处理 base64 形态,
+ * 解码后走与 blob 相同的写文件路径;非 base64 的 data: 提示不支持。
+ */
+private fun saveDataUrl(context: Context, url: String) {
+    // data:[<mime>][;base64],<data>
+    val comma = url.indexOf(',')
+    val meta = if (comma > 5) url.substring(5, comma) else ""
+    if (comma < 0 || !meta.contains(";base64")) {
+        Toast.makeText(context, "暂不支持下载此类型的链接", Toast.LENGTH_SHORT).show()
+        return
+    }
+    val mime = meta.substringBefore(';').ifBlank { "application/octet-stream" }
+    val ext = MimeTypeMap.getSingleton().getExtensionFromMimeType(mime) ?: "bin"
+    // 中文名更友好:image/* → "下载图片",其余 → "下载文件"
+    val base = if (mime.startsWith("image/")) "下载图片" else "下载文件"
+    saveBlob(context, "$base.$ext", mime, url.substring(comma + 1))
+}
+
+/**
  * 推断下载文件名。blob: URL 没有文件名信息,按 mimetype 生成"下载图片.<ext>"。
  */
 private fun guessDownloadName(
@@ -414,7 +1041,7 @@ private fun guessDownloadName(
         return URLUtil.guessFileName(url, contentDisposition, mimetype)
     }
     // blob: 无法从 URL 取扩展名,按 mime 推断
-    val ext = android.webkit.MimeTypeMap.getSingleton()
+    val ext = MimeTypeMap.getSingleton()
         .getExtensionFromMimeType(mimetype) ?: "bin"
     // 中文名更友好:image/* → "下载图片",其余 → "下载文件"
     val base = if (mimetype?.startsWith("image/") == true) "下载图片" else "下载文件"
@@ -422,7 +1049,7 @@ private fun guessDownloadName(
 }
 
 /**
- * 把 base64 数据写入公共「下载」目录(blob 下载专用)。
+ * 把 base64 数据写入公共「下载」目录(blob / data: 下载共用)。
  *
  * - API ≥ 29:scoped storage 下不能直接写公共目录,改用 MediaStore(Downloads)。
  * - API < 29:走传统 File 路径 + MediaScanner 扫描。
@@ -543,14 +1170,14 @@ private fun handleExternalUri(context: Context, uri: Uri) {
 }
 
 /** 应用网页深色模式:优先用网页自带深色主题,无则算法深色(自动转深)。 */
-private fun applyDarkTheme(settings: android.webkit.WebSettings, darkTheme: Boolean) {
+private fun applyDarkTheme(settings: WebSettings, darkTheme: Boolean) {
     if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
         WebSettingsCompat.setAlgorithmicDarkeningAllowed(settings, darkTheme)
     }
 }
 
 @SuppressLint("SetJavaScriptEnabled")
-private fun WebView.configureWebSettings(darkTheme: Boolean) {
+private fun WebView.configureWebSettings(darkTheme: Boolean, fontScale: FontScale) {
     layoutParams = android.view.ViewGroup.LayoutParams(
         android.view.ViewGroup.LayoutParams.MATCH_PARENT,
         android.view.ViewGroup.LayoutParams.MATCH_PARENT
@@ -563,13 +1190,19 @@ private fun WebView.configureWebSettings(darkTheme: Boolean) {
         setSupportZoom(true)
         builtInZoomControls = true
         displayZoomControls = false
-        cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
+        cacheMode = WebSettings.LOAD_DEFAULT
+        // 字号跟随「设置 → 字号档位」(100=标准)
+        textZoom = (fontScale.scale * 100).roundToInt()
         // 安全加固:显式关闭文件/内容访问(默认 false,此处声明防后续误开)
         allowFileAccess = false          // 禁止 file:// 内容访问
         allowContentAccess = false       // 禁止 content:// 访问(本 App 无需)
         mediaPlaybackRequiresUserGesture = true  // 禁止页面自动播放音视频
-        // User-Agent 用默认浏览器 UA,避免被网站黑名单挡
-        userAgentString = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
+        // UA 以系统 WebView 自带 UA 为基础(版本随 WebView 自动更新,不再硬编码老化),
+        // 去掉 "; wv" 与 "Version/4.0" 标记伪装成移动版 Chrome —— 部分站点
+        // (如 Google 登录)会拒绝原生 WebView UA
+        userAgentString = WebSettings.getDefaultUserAgent(context)
+            .replace("; wv", "")
+            .replace(Regex("Version/\\d+(\\.\\d+)*\\s+"), "")
     }
     applyDarkTheme(settings, darkTheme)
 }

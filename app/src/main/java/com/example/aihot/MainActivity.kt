@@ -38,6 +38,7 @@ import com.example.aihot.data.AppDatabase
 import com.example.aihot.data.BrowseHistoryRepository
 import com.example.aihot.data.HackerNewsStory
 import com.example.aihot.data.NewsItem
+import com.example.aihot.data.AiConfig
 import com.example.aihot.data.AiConfigStore
 import com.example.aihot.data.AiUsageStore
 import com.example.aihot.data.SummaryRepository
@@ -251,6 +252,10 @@ fun AIHotApp(openSettingsOnLaunch: Boolean = false) {
     val fontChoice = displayPrefs.fontChoice
     val fontScale = displayPrefs.fontScale
     val sourceMode = displayPrefs.sourceMode
+    // AI 服务全局配置:除设置页外,WebView 整页翻译也读取(开关/就绪态判定)
+    val aiConfig by configStore.configFlow.collectAsStateWithLifecycle(
+        initialValue = AiConfig()
+    )
     val onSelectTheme: (ThemeMode) -> Unit = { scope.launch { settingsStore.updateTheme(it) } }
     val onToggleDynamicColor: (Boolean) -> Unit = { scope.launch { settingsStore.updateDynamicColor(it) } }
     val onSelectFont: (FontChoice) -> Unit = { scope.launch { settingsStore.updateFont(it) } }
@@ -476,6 +481,7 @@ fun AIHotApp(openSettingsOnLaunch: Boolean = false) {
                             onTitleResolved = onTitleResolved,
                             onOpenSettings = { push(Page.Settings) },
                             configStore = configStore,
+                            aiConfig = aiConfig,
                             usageStore = usageStore,
                             browseHistoryRepo = browseHistoryRepo,
                             darkTheme = darkTheme
@@ -596,6 +602,7 @@ private fun PageView(
     onTitleResolved: (String, String) -> Unit,
     onOpenSettings: () -> Unit,
     configStore: AiConfigStore,
+    aiConfig: AiConfig,
     usageStore: AiUsageStore,
     browseHistoryRepo: BrowseHistoryRepository,
     darkTheme: Boolean = false
@@ -611,7 +618,10 @@ private fun PageView(
             url = page.url,
             title = page.title,
             darkTheme = darkTheme,
+            fontScale = fontScale,
+            aiConfig = aiConfig,
             onBack = onBack,
+            onOpenSettings = onOpenSettings,
             onTitleResolved = onTitleResolved
         )
         Page.All -> AllTab(
