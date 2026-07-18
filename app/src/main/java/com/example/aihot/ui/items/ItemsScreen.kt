@@ -41,8 +41,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
@@ -124,8 +126,13 @@ fun ItemsScreen(
     }
 
     // 重击当前 tab(reselectSignal 递增):滚回顶部并刷新。
+    // lastHandled 记录已消费的 tick:切 tab 回来/从二级页返回时本屏重新进入组合,
+    // LaunchedEffect 会以旧的 reselectSignal 再跑一遍,与 lastHandled 相等即跳过,
+    // 避免「页面重新可见就自动刷新」。
+    var lastHandledReselect by remember { mutableIntStateOf(reselectSignal) }
     LaunchedEffect(reselectSignal) {
-        if (reselectSignal > 0) {
+        if (reselectSignal != lastHandledReselect) {
+            lastHandledReselect = reselectSignal
             listState.animateScrollToItem(0)
             vm.refresh()
             onRefreshExtra?.invoke()

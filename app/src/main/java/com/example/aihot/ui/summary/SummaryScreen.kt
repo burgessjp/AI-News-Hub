@@ -37,7 +37,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -97,9 +100,14 @@ fun SummaryScreen(
 
     val pagerState = rememberPagerState(pageCount = { cards.size })
 
-    // 重击当前 tab(reselectSignal 递增):滑回第一张卡并刷新全部源
+    // 重击当前 tab(reselectSignal 递增):滑回第一张卡并刷新全部源。
+    // lastHandled 记录已消费的 tick:切 tab 回来/从二级页返回时本屏重新进入组合,
+    // LaunchedEffect 会以旧的 reselectSignal 再跑一遍,与 lastHandled 相等即跳过,
+    // 避免「页面重新可见就自动刷新」。
+    var lastHandledReselect by remember { mutableIntStateOf(reselectSignal) }
     LaunchedEffect(reselectSignal) {
-        if (reselectSignal > 0) {
+        if (reselectSignal != lastHandledReselect) {
+            lastHandledReselect = reselectSignal
             pagerState.animateScrollToPage(0)
             vm.refresh()
         }
