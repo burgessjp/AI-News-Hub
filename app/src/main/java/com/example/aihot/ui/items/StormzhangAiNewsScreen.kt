@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -72,6 +73,8 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 fun StormzhangAiNewsScreen(
     onBack: () -> Unit,
     onOpenUrl: (String, String) -> Unit,
+    // 滚动状态由 MainActivity 按 Page 持有:进 WebView 返回后保持位置
+    listState: LazyListState,
     vm: StormzhangAiNewsViewModel = viewModel(key = "stormzhang_ai_news")
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -126,6 +129,7 @@ fun StormzhangAiNewsScreen(
                         ) {
                             AiNewsList(
                                 news = news,
+                                listState = listState,
                                 sourceMode = sourceMode,
                                 fetchedAtMillis = lastRefreshAt,
                                 onClick = { item -> onOpenUrl(item.url, item.summary) }
@@ -141,11 +145,13 @@ fun StormzhangAiNewsScreen(
 @Composable
 private fun AiNewsList(
     news: List<StormzhangAiNews>,
+    listState: LazyListState,
     sourceMode: SourceMode,
     fetchedAtMillis: Long?,
     onClick: (StormzhangAiNews) -> Unit
 ) {
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(vertical = 8.dp)
     ) {

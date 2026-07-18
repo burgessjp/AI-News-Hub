@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -95,6 +96,8 @@ fun HackerNewsCommentsScreen(
     onBack: () -> Unit,
     onOpenUrl: (String, String) -> Unit,
     onOpenSettings: () -> Unit,
+    // 滚动状态由 MainActivity 按 Page 持有:进 WebView 返回后保持位置
+    listState: LazyListState,
     vm: HackerNewsCommentsViewModel = viewModel(key = "hn-comments-${story.id}")
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -162,6 +165,7 @@ fun HackerNewsCommentsScreen(
         CompositionLocalProvider(LocalUriHandler provides commentUriHandler) {
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             LazyColumn(
+                state = listState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = 24.dp)
             ) {

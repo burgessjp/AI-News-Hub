@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -87,6 +88,8 @@ fun HuggingFacePapersScreen(
     onBack: () -> Unit,
     onOpenUrl: (String, String) -> Unit,
     onOpenSettings: () -> Unit,
+    // 滚动状态由 MainActivity 按 Page 持有:进 WebView 返回后保持位置
+    listState: LazyListState,
     vm: HuggingFacePapersViewModel = viewModel(key = "huggingface_papers")
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -148,6 +151,7 @@ fun HuggingFacePapersScreen(
                         ) {
                             PapersList(
                                 papers = papers,
+                                listState = listState,
                                 translationStates = translationStates,
                                 translateEnabled = config.translateEnabled,
                                 sourceMode = sourceMode,
@@ -166,6 +170,7 @@ fun HuggingFacePapersScreen(
 @Composable
 private fun PapersList(
     papers: List<HuggingFacePaper>,
+    listState: LazyListState,
     translationStates: Map<String, TranslationState>,
     translateEnabled: Boolean,
     sourceMode: SourceMode,
@@ -174,6 +179,7 @@ private fun PapersList(
     onTranslate: (HuggingFacePaper) -> Unit
 ) {
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(vertical = 8.dp)
     ) {

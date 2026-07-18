@@ -17,7 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -90,6 +90,8 @@ fun BrowseHistoryScreen(
     repo: BrowseHistoryRepository,
     onBack: () -> Unit,
     onOpenUrl: (String, String, String?) -> Unit,
+    // 滚动状态由 MainActivity 按 Page 持有:进 WebView 返回后保持位置
+    listState: LazyListState,
     vm: BrowseHistoryViewModel = viewModel(
         key = "browse_history",
         factory = BrowseHistoryViewModel.Factory(repo)
@@ -185,6 +187,7 @@ fun BrowseHistoryScreen(
                     items = history,
                     groupByHost = groupByHost,
                     hasMore = hasMore,
+                    listState = listState,
                     onClick = { e -> onOpenUrl(e.url, e.title, e.source) },
                     onSwipeDelete = { e ->
                         lastDeleted = e
@@ -227,12 +230,11 @@ private fun HistoryList(
     items: List<BrowseHistoryEntity>,
     groupByHost: Boolean,
     hasMore: Boolean,
+    listState: LazyListState,
     onClick: (BrowseHistoryEntity) -> Unit,
     onSwipeDelete: (BrowseHistoryEntity) -> Unit,
     onLoadMore: () -> Unit
 ) {
-    val listState = rememberLazyListState()
-
     // 滚动接近底部时加载下一页:最后一个可见项索引 >= 总数 - 阈值,且还有更多
     val reachedBottom by remember {
         derivedStateOf {

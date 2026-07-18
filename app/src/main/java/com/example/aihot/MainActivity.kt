@@ -11,6 +11,9 @@ import androidx.compose.animation.core.rememberTransition
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -36,6 +39,7 @@ import com.example.aihot.data.HackerNewsStory
 import com.example.aihot.data.NewsItem
 import com.example.aihot.data.AiConfigStore
 import com.example.aihot.data.AiUsageStore
+import com.example.aihot.data.SummaryRepository
 import com.example.aihot.data.source.SourceMode
 import com.example.aihot.ui.more.SettingsStore
 import com.example.aihot.ui.NewsDetailScreen
@@ -364,6 +368,19 @@ fun AIHotApp(openSettingsOnLaunch: Boolean = false) {
         }
     }
 
+    // 各列表/页码的滚动状态上提到此(转场层之上):AnimatedContent 换页会销毁页内
+    // remember/rememberSaveable(实测 rememberPagerState 也随换页丢失),下层页重返
+    // 组合时是全新状态 → 滚动位置/页码被重置。由本层持有即可跨 push/pop 存活;
+    // 进程死亡后不保留(数据本身也会重拉,可接受)。
+    val featuredListState = rememberLazyListState()
+    val summaryPagerState = rememberPagerState(pageCount = { SummaryRepository.SOURCE_KEYS.size })
+    // 二级页滚动状态:以 Page 值(data class,可作 key)索引,页面弹出后清理。
+    val pageListStates = remember { mutableMapOf<Page, LazyListState>() }
+    LaunchedEffect(pageStacks) {
+        val alive = pageStacks.values.flatten().toSet()
+        pageListStates.keys.removeAll { it !in alive }
+    }
+
     AIHotTheme(
         darkTheme = darkTheme,
         dynamicColor = dynamicColor,
@@ -394,6 +411,8 @@ fun AIHotApp(openSettingsOnLaunch: Boolean = false) {
                         is Screen.Root -> TabRoot(
                             tab = s.tab,
                             reselectTick = reselectTick,
+                            featuredListState = featuredListState,
+                            summaryPagerState = summaryPagerState,
                             onItemClick = { push(Page.Detail(it)) },
                             onOpenAll = { push(Page.All) },
                             onOpenHackerNews = { push(Page.HackerNews) },
@@ -408,6 +427,7 @@ fun AIHotApp(openSettingsOnLaunch: Boolean = false) {
                         )
                         is Screen.Secondary -> PageView(
                             page = s.page,
+                            pageListStates = pageListStates,
                             themeMode = themeMode,
                             onSelectTheme = onSelectTheme,
                             dynamicColor = dynamicColor,
@@ -476,6 +496,8 @@ private sealed interface Screen {
 private fun TabRoot(
     tab: AppTab,
     reselectTick: Int,
+    featuredListState: LazyListState,
+    summaryPagerState: androidx.compose.foundation.pager.PagerState,
     onItemClick: (NewsItem) -> Unit,
     onOpenAll: () -> Unit,
     onOpenHackerNews: () -> Unit,
@@ -495,10 +517,12 @@ private fun TabRoot(
             onOpenAll = onOpenAll,
             // 今日热点卡片链接到 AI HOT 阅读页,标注来源 "AI HOT"
             onOpenUrl = { url, title -> onOpenUrl(url, title, "AI HOT") },
-            reselectSignal = reselectTick
+            reselectSignal = reselectTick,
+            listState = featuredListState
         )
         AppTab.Summary -> SummaryScreen(
             reselectSignal = reselectTick,
+            pagerState = summaryPagerState,
             onOpenHackerNews = onOpenHackerNews,
             onOpenGitHubTrending = onOpenGitHubTrending,
             onOpenHuggingFacePapers = onOpenHuggingFacePapers,
@@ -521,6 +545,7 @@ private fun TabRoot(
 @Composable
 private fun PageView(
     page: Page,
+    pageListStates: MutableMap<Page, LazyListState>,
     themeMode: ThemeMode,
     onSelectTheme: (ThemeMode) -> Unit,
     dynamicColor: Boolean,
@@ -564,7 +589,8 @@ private fun PageView(
             onItemClick = onItemClick,
             onBack = onBack,
             onOpenDaily = onOpenDaily,
-            onOpenSearch = onOpenSearch
+            onOpenSearch = onOpenSearch,
+            listState = pageListStates.forPage(page)
         )
         Page.Daily -> DailyScreen(
             onItemClick = onItemClick,
@@ -583,7 +609,8 @@ private fun PageView(
         )
         Page.Search -> SearchScreen(
             onBack = onBack,
-            onItemClick = onItemClick
+            onItemClick = onItemClick,
+            listState = pageListStates.forPage(page)
         )
         Page.Settings -> SettingsScreen(
             themeMode = themeMode,
@@ -607,36 +634,47 @@ private fun PageView(
         Page.HackerNews -> HackerNewsScreen(
             onBack = onBack,
             onOpenComments = onOpenComments,
-            onOpenSettings = onOpenSettings
+            onOpenSettings = onOpenSettings,
+            listState = pageListStates.forPage(page)
         )
         is Page.HackerNewsComments -> HackerNewsCommentsScreen(
             story = page.story,
             onBack = onBack,
             onOpenUrl = { url, title -> onOpenUrl(url, title, "HackerNews") },
-            onOpenSettings = onOpenSettings
+            onOpenSettings = onOpenSettings,
+            listState = pageListStates.forPage(page)
         )
         Page.GitHubTrending -> GitHubTrendingScreen(
             onBack = onBack,
             onOpenUrl = { url, title -> onOpenUrl(url, title, "GitHub Trending") },
-            onOpenSettings = onOpenSettings
+            onOpenSettings = onOpenSettings,
+            listState = pageListStates.forPage(page)
         )
         Page.LinuxDo -> LinuxDoHotScreen(
             onBack = onBack,
-            onOpenUrl = { url, title -> onOpenUrl(url, title, "LinuxDo") }
+            onOpenUrl = { url, title -> onOpenUrl(url, title, "LinuxDo") },
+            listState = pageListStates.forPage(page)
         )
         Page.StormzhangAiNews -> StormzhangAiNewsScreen(
             onBack = onBack,
-            onOpenUrl = { url, title -> onOpenUrl(url, title, "stormzhang AI") }
+            onOpenUrl = { url, title -> onOpenUrl(url, title, "stormzhang AI") },
+            listState = pageListStates.forPage(page)
         )
         Page.HuggingFacePapers -> HuggingFacePapersScreen(
             onBack = onBack,
             onOpenUrl = { url, title -> onOpenUrl(url, title, "HuggingFace") },
-            onOpenSettings = onOpenSettings
+            onOpenSettings = onOpenSettings,
+            listState = pageListStates.forPage(page)
         )
         Page.BrowseHistory -> BrowseHistoryScreen(
             repo = browseHistoryRepo,
             onBack = onBack,
-            onOpenUrl = { url, title, source -> onOpenUrl(url, title, source) }
+            onOpenUrl = { url, title, source -> onOpenUrl(url, title, source) },
+            listState = pageListStates.forPage(page)
         )
     }
 }
+
+/** 取某个二级页持有的列表滚动状态(上提原因见 AIHotApp 内说明)。 */
+private fun MutableMap<Page, LazyListState>.forPage(page: Page): LazyListState =
+    getOrPut(page) { LazyListState() }

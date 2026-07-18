@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -79,6 +80,8 @@ import java.util.Locale
 fun LinuxDoHotScreen(
     onBack: () -> Unit,
     onOpenUrl: (String, String) -> Unit,
+    // 滚动状态由 MainActivity 按 Page 持有:进 WebView 返回后保持位置
+    listState: LazyListState,
     vm: LinuxDoHotViewModel = viewModel(key = "linuxdo_hot")
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -120,6 +123,7 @@ fun LinuxDoHotScreen(
                         ) {
                             LinuxDoList(
                                 topics = topics,
+                                listState = listState,
                                 lastRefreshAt = lastRefreshAt,
                                 onClick = { topic -> onOpenUrl(topic.url, topic.title) }
                             )
@@ -134,10 +138,12 @@ fun LinuxDoHotScreen(
 @Composable
 private fun LinuxDoList(
     topics: List<LinuxDoTopic>,
+    listState: LazyListState,
     lastRefreshAt: Long?,
     onClick: (LinuxDoTopic) -> Unit
 ) {
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(vertical = 8.dp)
     ) {

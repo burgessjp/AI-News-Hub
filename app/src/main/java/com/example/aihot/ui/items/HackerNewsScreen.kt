@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -90,6 +91,8 @@ fun HackerNewsScreen(
     onBack: () -> Unit,
     onOpenComments: (HackerNewsStory) -> Unit,
     onOpenSettings: () -> Unit,
+    // 滚动状态由 MainActivity 按 Page 持有:进评论页返回后保持位置
+    listState: LazyListState,
     vm: HackerNewsViewModel = viewModel(key = "hackernews")
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -151,6 +154,7 @@ fun HackerNewsScreen(
                         ) {
                             HackerNewsList(
                                 stories = stories,
+                                listState = listState,
                                 titleStates = titleStates,
                                 translateEnabled = config.translateEnabled,
                                 sourceMode = sourceMode,
@@ -169,6 +173,7 @@ fun HackerNewsScreen(
 @Composable
 private fun HackerNewsList(
     stories: List<HackerNewsStory>,
+    listState: LazyListState,
     titleStates: Map<Long, TranslationState>,
     translateEnabled: Boolean,
     sourceMode: SourceMode,
@@ -177,6 +182,7 @@ private fun HackerNewsList(
     onTranslate: (HackerNewsStory) -> Unit
 ) {
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(vertical = 8.dp)
     ) {

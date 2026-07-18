@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -43,6 +44,8 @@ fun FeaturedTab(
     onItemClick: (NewsItem) -> Unit,
     onOpenUrl: (String, String) -> Unit,
     onOpenAll: () -> Unit,
+    // 滚动状态由 MainActivity 上提持有:push 二级页返回后保持位置(见其内注释)
+    listState: LazyListState,
     reselectSignal: Int = 0
 ) {
     val vm: ItemsViewModel = viewModel(key = "featured")
@@ -75,6 +78,7 @@ fun FeaturedTab(
         ItemsScreen(
             onItemClick = onItemClick,
             vm = vm,
+            listState = listState,
             // 下拉刷新/重击 tab 时联动刷新「今日热点」
             onRefreshExtra = { hotVm.refresh() },
             reselectSignal = reselectSignal,

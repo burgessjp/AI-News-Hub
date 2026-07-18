@@ -20,8 +20,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -42,6 +42,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -98,6 +99,8 @@ private fun NewsRowDivider() {
 @Composable
 fun ItemsScreen(
     onItemClick: (NewsItem) -> Unit,
+    // 滚动状态由调用方上提持有(MainActivity):push 二级页返回后保持位置
+    listState: LazyListState,
     modifier: Modifier = Modifier,
     vm: ItemsViewModel = viewModel(),
     header: (@Composable () -> Unit)? = null,
@@ -111,7 +114,6 @@ fun ItemsScreen(
     val hasMore by vm.hasMore.collectAsStateWithLifecycle()
     val isLoadingMore by vm.isLoadingMore.collectAsStateWithLifecycle()
     val isRefreshing by vm.isRefreshing.collectAsStateWithLifecycle()
-    val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
 
     val showBackToTop by remember {
@@ -121,8 +123,14 @@ fun ItemsScreen(
     // 切换筛选(分类/模式/搜索词)时,把列表滚回顶部。
     // 数据会由 ViewModel 重新拉取,但 LazyListState 自身不会复位 —— 若不手动复位,
     // 新列表会停在旧分类滑到的位置,甚至可能直接命中"接近底部"误触发翻页。
+    // lastFilter 记录已消费的筛选:从二级页返回重新进入组合时 filter 未变 → 跳过,
+    // 保住上提持有后恢复的滚动位置(listState 由 MainActivity 持有)。
+    var lastFilter by remember { mutableStateOf(filter) }
     LaunchedEffect(filter) {
-        listState.scrollToItem(0)
+        if (filter != lastFilter) {
+            lastFilter = filter
+            listState.scrollToItem(0)
+        }
     }
 
     // 重击当前 tab(reselectSignal 递增):滚回顶部并刷新。

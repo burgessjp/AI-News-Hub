@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -85,6 +86,8 @@ fun GitHubTrendingScreen(
     onBack: () -> Unit,
     onOpenUrl: (String, String) -> Unit,
     onOpenSettings: () -> Unit,
+    // 滚动状态由 MainActivity 按 Page 持有:进 WebView 返回后保持位置
+    listState: LazyListState,
     vm: GitHubTrendingViewModel = viewModel(key = "github_trending")
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -146,6 +149,7 @@ fun GitHubTrendingScreen(
                         ) {
                             TrendingList(
                                 repos = repos,
+                                listState = listState,
                                 descStates = descStates,
                                 translateEnabled = config.translateEnabled,
                                 sourceMode = sourceMode,
@@ -164,6 +168,7 @@ fun GitHubTrendingScreen(
 @Composable
 private fun TrendingList(
     repos: List<TrendingRepo>,
+    listState: LazyListState,
     descStates: Map<String, TranslationState>,
     translateEnabled: Boolean,
     sourceMode: SourceMode,
@@ -172,6 +177,7 @@ private fun TrendingList(
     onTranslate: (TrendingRepo) -> Unit
 ) {
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(vertical = 8.dp)
     ) {

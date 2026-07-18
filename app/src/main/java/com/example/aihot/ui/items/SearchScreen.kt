@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
@@ -61,6 +62,8 @@ import com.example.aihot.ui.UiState
 fun SearchScreen(
     onBack: () -> Unit,
     onItemClick: (NewsItem) -> Unit,
+    // 滚动状态由 MainActivity 按 Page 持有:进详情页返回后保持位置
+    listState: LazyListState,
     vm: ItemsViewModel = viewModel()
 ) {
     var text by rememberSaveable { mutableStateOf(vm.filter.value.query ?: "") }
@@ -110,6 +113,7 @@ fun SearchScreen(
                         )
                     } else {
                         LazyColumn(
+                            state = listState,
                             contentPadding = PaddingValues(vertical = 4.dp),
                             modifier = Modifier.fillMaxSize()
                         ) {

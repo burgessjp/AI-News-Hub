@@ -1,5 +1,6 @@
 package com.example.aihot.ui.tabs
 
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -34,7 +35,9 @@ fun AllTab(
     onItemClick: (NewsItem) -> Unit,
     onBack: () -> Unit,
     onOpenDaily: () -> Unit,
-    onOpenSearch: () -> Unit
+    onOpenSearch: () -> Unit,
+    // 滚动状态由 MainActivity 按 Page 持有:push 更深页返回后保持位置
+    listState: LazyListState
 ) {
     val vm: ItemsViewModel = viewModel(key = "all")
     LaunchedEffect(Unit) { vm.setMode(Mode.ALL) }
@@ -74,6 +77,7 @@ fun AllTab(
         ItemsScreen(
             onItemClick = onItemClick,
             vm = vm,
+            listState = listState,
             // 二级页:浮动底栏已隐藏,不再预留其高度
             reserveBottomBarSpace = false,
             modifier = Modifier.fillMaxSize().padding(padding)

@@ -38,6 +38,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,6 +57,7 @@ import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
 import com.example.aihot.ui.components.AppTopBar
 import com.example.aihot.ui.components.AppTopBarDefaults
+import kotlinx.coroutines.delay
 
 /**
  * 内置 WebView 屏幕 — 不跳出 App。
@@ -87,6 +89,15 @@ fun WebViewScreen(
     var webCanGoBack by remember { mutableStateOf(false) }
     // 待下载任务:API<29 时等用户授予存储权限后再入队
     var pendingDownload by remember { mutableStateOf<DownloadParams?>(null) }
+
+    // 延迟挂载 WebView:进入转场(FADE)结束后再创建,避免 factory 的主线程重活
+    // 与转场抢帧(此前实测转场被拉长、且淡入目标是白屏,视觉上像没有动画)。
+    // 转场期间先展示顶栏 + 加载进度条,WebView 创建完成后再接上。
+    var attachWeb by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay(Motion.MEDIUM + 50L)
+        attachWeb = true
+    }
 
     // factory 创建的 WebView 引用,供 DisposableEffect 在离开屏幕时 destroy,避免内存泄漏。
     // 注意:必须用普通 Ref(非 mutableStateOf)捕获 —— 若用 State 作 DisposableEffect 的 key,
@@ -147,6 +158,8 @@ fun WebViewScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
+            // 转场结束后再创建 WebView(见上方 attachWeb 说明)
+            if (attachWeb) {
             AndroidView(
                 factory = { ctx ->
                     WebView(ctx).apply {
@@ -279,6 +292,7 @@ fun WebViewScreen(
                 },
                 modifier = Modifier.fillMaxSize()
             )
+            }
 
             // 顶部加载进度条(2dp 细线,加载完成淡出,无背景轨道)
             TopProgressBar(loading = loading, progress = { progress / 100f })

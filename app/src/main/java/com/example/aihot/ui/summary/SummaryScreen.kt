@@ -16,7 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -83,6 +83,8 @@ fun SummaryScreen(
     onOpenGitHubTrending: () -> Unit,
     onOpenHuggingFacePapers: () -> Unit,
     onOpenStormzhangAiNews: () -> Unit,
+    // 页码状态由 MainActivity 上提持有:进二级页返回后保持所在卡片(见其内注释)
+    pagerState: PagerState,
     reselectSignal: Int = 0,
     vm: SummaryViewModel = viewModel()
 ) {
@@ -97,8 +99,6 @@ fun SummaryScreen(
         SummaryCardSpec(SummaryRepository.SOURCE_KEYS[2], "HuggingFace Papers", Icons.Filled.Science, onOpenHuggingFacePapers),
         SummaryCardSpec(SummaryRepository.SOURCE_KEYS[3], "stormzhang AI 资讯", Icons.Filled.Bolt, onOpenStormzhangAiNews)
     )
-
-    val pagerState = rememberPagerState(pageCount = { cards.size })
 
     // 重击当前 tab(reselectSignal 递增):滑回第一张卡并刷新全部源。
     // lastHandled 记录已消费的 tick:切 tab 回来/从二级页返回时本屏重新进入组合,
