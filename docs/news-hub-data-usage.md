@@ -3,7 +3,7 @@
 数据仓库:[gitcode.com/peng1818/AI-News-Hub-Data](https://gitcode.com/peng1818/AI-News-Hub-Data)
 分支:`news-hub-data`
 
-本仓库定时抓取 [AI News Hub](../) App「Hub」tab 浏览区域的 7 个数据源,解析成 JSON 后按日期归档。本文档说明数据结构、获取方式与消费示例。
+本仓库定时抓取 [AI News Hub](../) App「Hub」tab 浏览区域的 8 个数据源(7 个第三方源 + AIHot 自家后端精选 TOP20),解析成 JSON 后按日期归档。本文档说明数据结构、获取方式与消费示例。
 
 ## 更新频率
 
@@ -38,7 +38,10 @@ news-hub-data 分支/
 ├── producthunt/                         ← 需 PRODUCT_HUNT_KEY;token 失效时可能指向旧日期
 │   └── 2026-07-15/
 │       └── 08-00-data.json
-└── rundown-ai/                          ← The Rundown AI newsletter 首页文章卡片墙(无 token)
+├── rundown-ai/                          ← The Rundown AI newsletter 首页文章卡片墙(无 token)
+│   └── 2026-07-15/
+│       └── 08-00-data.json
+└── aihot-featured/                      ← AIHot 自家后端 /items?mode=selected&take=20(公开 API,无 token)
     └── 2026-07-15/
         └── 08-00-data.json
 ```
@@ -60,7 +63,8 @@ news-hub-data 分支/
     "stormzhang-ai": "2026-07-15/08-00-data.json",
     "huggingface-papers": "2026-07-15/08-00-data.json",
     "producthunt": "2026-07-15/08-00-data.json",
-    "rundown-ai": "2026-07-15/08-00-data.json"
+    "rundown-ai": "2026-07-15/08-00-data.json",
+    "aihot-featured": "2026-07-15/08-00-data.json"
   }
 }
 ```
@@ -149,7 +153,7 @@ print(hn['items'][0]['title'])
 | `fetched_at_ms` | 抓取时刻,Unix 毫秒时间戳 |
 | `count` | `items` 数组长度 |
 | `items` | 该源的条目数组,结构因源而异(见下) |
-| `ai_summary` | 本次数据的简体中文 AI 要点(6-10 条加粗小标题形式)。仅 6 个稳定源有(hackernews / github-trending / huggingface-papers / stormzhang-ai / producthunt / rundown-ai);linuxdo 不做,AI 调用失败时该字段缺省 |
+| `ai_summary` | 本次数据的简体中文 AI 要点(6-10 条加粗小标题形式)。仅 7 个稳定源有(hackernews / github-trending / huggingface-papers / stormzhang-ai / producthunt / rundown-ai / aihot-featured);linuxdo 不做,AI 调用失败时该字段缺省 |
 
 部分源会有额外顶层字段(如 stormzhang-ai 带 `pageDate`)。
 
@@ -278,6 +282,27 @@ The Rundown AI(beehiiv 托管的头部英文 AI 日更 newsletter)首页文章�
 | `authors` | string | 作者段,如 `Zach Mink, +4`(+4 表示还有 4 位合著者);原样展示 |
 | `coverUrl` | string | 封面图 URL(beehiiv cdn-cgi 图,排除作者头像);无则为空 |
 
+### aihot-featured(AIHot 自家后端精选 TOP20)
+
+AIHot 自家后端 `aihot.virxact.com` 的「精选」列表 TOP20,来自 `/api/public/items?mode=selected&take=20` 公开 JSON API(无 token,UA 必填否则 nginx 403)。后端已聚合多源 RSS/X 等并人工/算法筛选,字段对齐 App 端 `NewsItem.fromJson`。
+
+> 📌 **此源特殊性**:与其它 7 个第三方源不同,aihot-featured 抓的是**自有后端**而非第三方站点。归档仅供 App 摘要 Tab 第 7 张卡消费(`ai_summary`);App「AIHot 精选」二级页本身继续实时拉后端分页接口(数据更新鲜),不走此归档。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `rank` | int | 排名(1 起,由列表顺序决定) |
+| `id` | string | 条目 id(后端 cuid,如 `cmrpwwjho06djbisr218fe8ro`) |
+| `title` | string | 中文标题 |
+| `titleEn` | string | 英文原标题;可能为空 |
+| `summary` | string | 中文一句话摘要;可能为空 |
+| `url` | string | 第三方原文地址(TechCrunch / The Verge / X 等) |
+| `permalink` | string | 站内中文阅读页深链 `https://aihot.virxact.com/items/<id>`;点击优先用此 |
+| `source` | string | 来源信源名,如 `TechCrunch:AI(RSS)` / `X:宝玉 (@dotey)` |
+| `publishedAt` | string | 发布时刻 ISO 8601(UTC),如 `2026-07-18T04:47:25.000Z` |
+| `category` | string | 分类,如 `tip` / `industry` / `paper`;可能为空 |
+| `score` | int | 后端筛选权重(越高越重要) |
+| `selected` | bool | 是否入选精选池(此源恒为 true) |
+
 ## 辅助文件
 
 ### `manifest.json`
@@ -318,7 +343,7 @@ The Rundown AI(beehiiv 托管的头部英文 AI 日更 newsletter)首页文章�
 
 3. **频率与配额**:每天 1 次定时 + 偶发手动触发。不要高频轮询 raw URL,gitcode 有访问频率限制。客户端建议缓存 `index.json` 的 `updated_at` 判断是否需要刷新。
 
-4. **字段可能变化**:各源抓自第三方页面(GitHub Trending / HuggingFace / linux.do 等),若对方改版导致字段缺失,会在 `manifest.json` 的 error 中体现。字段语义遵循上述文档,新增字段不破坏旧消费者。
+4. **字段可能变化**:各源抓自第三方页面(GitHub Trending / HuggingFace / linux.do 等)或自有后端 API(aihot-featured),若对方改版/接口调整导致字段缺失,会在 `manifest.json` 的 error 中体现。字段语义遵循上述文档,新增字段不破坏旧消费者。
 
 5. **时区**:所有时间戳与文件名路径均为北京时间(UTC+8)。`fetched_at` / `run_at` 带显式 `+0800` 偏移,`_ms` 为 UTC Unix 毫秒(与时区无关)。
 

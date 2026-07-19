@@ -16,10 +16,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.GridView
-import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.GridView
-import androidx.compose.material.icons.outlined.Whatshot
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -39,11 +37,14 @@ import com.example.aihot.ui.theme.AppAlpha
 import com.example.aihot.ui.theme.AppText
 
 /**
- * 根 tab 集合(摘要 / 精选 / 更多)。
+ * 根 tab 集合(摘要 / 更多)。
  *
  * 设计稿(参考 system_stream_editorial)用图标 FILL 区分选中态:
  *  - 选中:[selectedIcon] 实心(Filled)变体
  *  - 未选中:[icon] 描边(Outlined)变体
+ *
+ * 「AIHot 精选」原为独立根 tab,现改为从「更多」页进入的二级页(Page.FeaturedHub),
+ * 底栏精简为 2 项。精选 tab 的 Whatshot 图标语义迁移到 MoreScreen 浏览组入口。
  *
  * @param labelRes 显示文案的 string resource
  * @param icon 未选中时的描边图标(FILL 0)
@@ -58,11 +59,6 @@ enum class AppTab(
         R.string.tab_summary,
         Icons.Outlined.AutoAwesome,
         Icons.Filled.AutoAwesome
-    ),
-    Featured(
-        R.string.tab_featured,
-        Icons.Outlined.Whatshot,
-        Icons.Filled.Whatshot
     ),
     More(
         R.string.tab_more,

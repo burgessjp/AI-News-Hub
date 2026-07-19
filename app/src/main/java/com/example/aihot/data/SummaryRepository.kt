@@ -26,7 +26,8 @@ private enum class SummarySource(val key: String, val title: String) {
     HUGGINGFACE_PAPERS("huggingface-papers", "HuggingFace Papers"),
     STORMZHANG_AI("stormzhang-ai", "stormzhang AI 资讯"),
     PRODUCTHUNT("producthunt", "Product Hunt"),
-    RUNDOWN_AI("rundown-ai", "The Rundown AI");
+    RUNDOWN_AI("rundown-ai", "The Rundown AI"),
+    AIHOT_FEATURED("aihot-featured", "AIHot 精选");
 
     companion object {
         /** 按归档源的 key 反查枚举;未知 key 返回 null。 */
@@ -55,7 +56,7 @@ class SummaryRepository {
      * 失败为异常(归档拉取失败 / ai_summary 缺失)。
      *
      * @param source 归档源 key(hackernews / github-trending / huggingface-papers /
-     * stormzhang-ai / producthunt / rundown-ai)
+     * stormzhang-ai / producthunt / rundown-ai / aihot-featured)
      */
     suspend fun summarize(source: String): Result<SourceSummary> {
         val src = SummarySource.fromKey(source)
@@ -74,14 +75,15 @@ class SummaryRepository {
     }
 
     companion object {
-        /** 6 个支持的归档源 key,供 ViewModel / UI 遍历。 */
+        /** 7 个支持的归档源 key,供 ViewModel / UI 遍历。顺序对齐 More 页浏览组展示顺序。 */
         val SOURCE_KEYS = listOf(
             SummarySource.HACKERNEWS.key,
             SummarySource.GITHUB_TRENDING.key,
             SummarySource.HUGGINGFACE_PAPERS.key,
-            SummarySource.STORMZHANG_AI.key,
             SummarySource.PRODUCTHUNT.key,
-            SummarySource.RUNDOWN_AI.key
+            SummarySource.RUNDOWN_AI.key,
+            SummarySource.STORMZHANG_AI.key,
+            SummarySource.AIHOT_FEATURED.key
         )
 
         /** 源 key → 展示标题。 */

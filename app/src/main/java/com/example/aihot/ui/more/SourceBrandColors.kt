@@ -6,7 +6,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
 
 /**
- * Hub 七源品牌色 —— 更多页「浏览」组 48dp 图标块的固定品牌配色。
+ * Hub 八源品牌色 —— 更多页「浏览」组 48dp 图标块的固定品牌配色。
  *
  * 本文件是「颜色只走 colorScheme」纪律的集中例外(stormzhang 信源徽章沿用原站
  * hex 已有先例):品牌色是各源的识别记忆点,不随主题色板/动态取色变化。
@@ -20,13 +20,14 @@ import androidx.compose.ui.graphics.Color
  *  - HuggingFace: #FFB000 —— HuggingFace 品牌黄(深浅同值,图标用深色保对比)
  *  - ProductHunt: #DA552F —— PH 官方品牌橙红(logo 色)
  *  - TheRundownAi:#FFD400 —— beehiiv 平台主色黄(The Rundown AI 无强品牌色,取托管平台色)
+ *  - AiHot:       #003EC7 —— App 品牌 Future Blue(对齐 Color.kt BrandGradient 基色),自家源
  */
 
 /** 单源品牌色对:[container] 图标块实底色,[icon] 块上对比图标色。 */
 @Immutable
 data class SourceBrandColors(val container: Color, val icon: Color)
 
-/** 七源品牌色入口:更多页「浏览」组图标块按源取色(仅 GitHub 需深色变体)。 */
+/** 八源品牌色入口:更多页「浏览」组图标块按源取色(仅 GitHub 需深色变体)。 */
 object SourceBrand {
     /** HackerNews —— 品牌橙 #FF6600 + 白图标(还原 HN 标识观感)。 */
     val HackerNews = SourceBrandColors(container = Color(0xFFFF6600), icon = Color.White)
@@ -53,4 +54,7 @@ object SourceBrand {
 
     /** The Rundown AI —— beehiiv 主色黄 #FFD400 + 深色图标保对比(同 HuggingFace 套路)。 */
     val TheRundownAi = SourceBrandColors(container = Color(0xFFFFD400), icon = Color(0xFF1F1F1F))
+
+    /** AIHot 精选 —— 自家源,用 App 品牌 Future Blue #003EC7 + 白图标(对齐 BrandGradient 基色)。 */
+    val AiHot = SourceBrandColors(container = Color(0xFF003EC7), icon = Color.White)
 }

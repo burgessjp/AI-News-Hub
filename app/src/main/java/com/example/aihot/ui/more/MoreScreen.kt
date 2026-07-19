@@ -51,10 +51,12 @@ import com.example.aihot.ui.theme.AppText
  * user_hub_profile 原型。
  *
  * 结构(自顶向下,简洁直入):
- *  - 浏览组:HackerNews / GitHub Trending / LinuxDo / stormzhang AI / HuggingFace / Product Hunt
- *    —— 品牌色图标块行(固定品牌色,不随主题变化,收口于 [SourceBrand])
+ *  - 浏览组:HackerNews / GitHub Trending / LinuxDo / HuggingFace / Product Hunt / The Rundown AI
+ *    / stormzhang AI / AIHot 精选 —— 品牌色图标块行(固定品牌色,不随主题变化,收口于 [SourceBrand])
  *  - 偏好组(secondary 强调):设置 / 关于 —— 彩色图标块行
  *
+ * 「AIHot 精选」原为首页独立根 tab,现收进浏览组作为末位二级页(复用 FeaturedTab,
+ * UI 完全不变:今日热点 + 最新精选列表 + 「全部 ›」入口)。
  * 日报及其历史归档入口已移至「全部动态」页(精选 → 全部 → 日报,日报页内含历史归档按钮)。
  * 搜索入口亦在「全部动态」页顶栏(全部动态是搜索主场景)。
  */
@@ -67,6 +69,7 @@ fun MoreScreen(
     onOpenHuggingFacePapers: () -> Unit,
     onOpenProductHunt: () -> Unit,
     onOpenRundownAi: () -> Unit,
+    onOpenFeaturedHub: () -> Unit,
     onOpenBrowseHistory: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenAiService: () -> Unit,
@@ -114,15 +117,6 @@ fun MoreScreen(
             }
             item {
                 IconTileRow(
-                    icon = Icons.Filled.Newspaper,
-                    brand = SourceBrand.Stormzhang,
-                    title = "stormzhang AI 资讯",
-                    subtitle = "每日 AI 资讯聚合",
-                    onClick = onOpenStormzhangAiNews
-                )
-            }
-            item {
-                IconTileRow(
                     icon = Icons.Filled.School,
                     brand = SourceBrand.HuggingFace,
                     title = "HuggingFace Paper Trending",
@@ -145,9 +139,27 @@ fun MoreScreen(
                     brand = SourceBrand.TheRundownAi,
                     title = "The Rundown AI",
                     subtitle = "AI 日更 newsletter",
+                    onClick = onOpenRundownAi
+                )
+            }
+            item {
+                IconTileRow(
+                    icon = Icons.Filled.Newspaper,
+                    brand = SourceBrand.Stormzhang,
+                    title = "stormzhang AI 资讯",
+                    subtitle = "每日 AI 资讯聚合",
+                    onClick = onOpenStormzhangAiNews
+                )
+            }
+            item {
+                IconTileRow(
+                    icon = Icons.Filled.Whatshot,
+                    brand = SourceBrand.AiHot,
+                    title = "AIHot 精选",
+                    subtitle = "自家 AI 资讯精选",
                     // 浏览组末行不画发丝线,与下方「历史」组章节条留出干净间隔。
                     showDivider = false,
-                    onClick = onOpenRundownAi
+                    onClick = onOpenFeaturedHub
                 )
             }
 

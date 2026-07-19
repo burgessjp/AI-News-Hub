@@ -37,7 +37,7 @@ import com.example.aihot.ui.components.SettingsRow
 /**
  * 关于页 —— App 名/版本/数据源说明/项目链接/开源依赖清单。
  *
- * 数据来源:AI HOT、HackerNews、GitHub Trending、HuggingFace Papers、stormzhang AI、Product Hunt、The Rundown AI、LinuxDo 八源。
+ * 数据来源:AI HOT、AIHot 精选、HackerNews、GitHub Trending、HuggingFace Papers、stormzhang AI、Product Hunt、The Rundown AI、LinuxDo 九源。
  *
  * 链接统一走内置 WebView([onOpenUrl],计入浏览历史),不跳外部浏览器 ——
  * 与全 App openUrl 策略一致。
@@ -178,6 +178,7 @@ private fun BrandHeader(versionName: String) {
 
 private val dataSources = listOf(
     "AI HOT" to "https://aihot.virxact.com",
+    "AIHot 精选" to "https://aihot.virxact.com",
     "HackerNews" to "https://news.ycombinator.com",
     "GitHub Trending" to "https://github.com/trending",
     "HuggingFace Papers" to "https://huggingface.co/papers/trending",

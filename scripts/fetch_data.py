@@ -2,8 +2,8 @@
 """
 AIHot 「Hub」tab 浏览区域数据抓取脚本。
 
-复刻 App 端的抓取逻辑(见 app/src/main/java/com/example/aihot/data/ 下的 6 个
-Repository 与对应 model 类),把 6 个数据源解析成 JSON 落盘:
+复刻 App 端的抓取逻辑(见 app/src/main/java/com/example/aihot/data/ 下的各
+Repository 与对应 model 类),把 8 个数据源解析成 JSON 落盘:
 
   - hackernews         HackerNews Top Stories(两步拉取,Firebase API)
   - github-trending    GitHub Trending 仓库(HTML 抓取)
@@ -12,6 +12,7 @@ Repository 与对应 model 类),把 6 个数据源解析成 JSON 落盘:
   - huggingface-papers HuggingFace Trending Papers(HTML 抓取)
   - producthunt        Product Hunt 当日热门(GraphQL API,需 PRODUCT_HUNT_KEY)
   - rundown-ai         The Rundown AI newsletter(beehiiv 首页文章卡片墙,HTML 抓取)
+  - aihot-featured     AIHot 自家精选 TOP20(自有后端公开 API,仅供摘要卡消费)
 
 输出目录结构:
   <out-dir>/<source>/<YYYY-MM-DD>/<HH-MM>-data.json
@@ -26,8 +27,8 @@ Repository 与对应 model 类),把 6 个数据源解析成 JSON 落盘:
 
 AI 总结(需求 c):
   - 每源抓完调 ai_summary.summarize_source 生成简体中文要点,写入快照顶层 `ai_summary`。
-  - 总结 6 个稳定源(hackernews/github-trending/huggingface-papers/stormzhang-ai/
-    producthunt/rundown-ai),linuxdo 不做(对齐 App)。AI 调用失败仅 warn,不阻断落盘。
+  - 总结 7 个稳定源(hackernews/github-trending/huggingface-papers/stormzhang-ai/
+    producthunt/rundown-ai/aihot-featured),linuxdo 不做(对齐 App)。AI 调用失败仅 warn,不阻断落盘。
   - 需 3 个 AI 环境变量(AI_NEWS_HUB_AI_BASE_URL/_MODEL/_API_KEY)齐全;缺失则跳过总结。
     加 --no-summary 可显式跳过(本地调试用)。
 
@@ -752,6 +753,61 @@ def fetch_producthunt():
     return items, {}
 
 
+# ===== 数据源 8:AIHot 自家精选(aihot.virxact.com 公开 API) =====
+
+AIHOT_API_BASE = "https://aihot.virxact.com/api/public"
+
+
+def fetch_aihot_featured():
+    """
+    抓 AIHot 自家后端「精选」TOP20(对齐 App 端 NewsRepository.fetchItems(mode=SELECTED))。
+
+    与其余 7 个源的根本差异:这是**自有后端**,不是第三方站点。
+      - 数据是中文 AI 资讯精选(后端已聚合多源 RSS/X 等,人工/算法筛选),
+        字段对齐 App 端 NewsItem.kt 的 fromJson。
+      - 公开 API,无 token、无 Cloudflare、无 paywall,UA 必填(否则 nginx 403)。
+      - 仅取 TOP20(take=20),不分页(摘要卡够用,App 端二级页仍走实时分页接口)。
+
+    双通道说明:此归档仅供 App 摘要 Tab 第 7 张卡消费(ai_summary 由 ai_summary.py
+    生成);App「AIHot 精选」二级页本身继续实时拉后端分页接口,数据更新鲜。
+    """
+    text = fetch_text(
+        f"{AIHOT_API_BASE}/items?mode=selected&take=20",
+        extra_headers={
+            "Accept": "application/json",
+            "Accept-Language": "zh-CN",
+            # UA 必填:对齐 NewsRepository.kt,不带会被 nginx 403
+            "User-Agent": "AIHot-Pipeline/1.0 (https://aihot.virxact.com)",
+        },
+        expect_json=True,
+    )
+    root = json.loads(text)
+    raw_items = root.get("items") or []
+    items = []
+    for idx, it in enumerate(raw_items):
+        # id / title 必有(对齐 App 端 NewsItem.fromJson)
+        iid = (it.get("id") or "").strip()
+        title = (it.get("title") or "").strip()
+        if not iid or not title:
+            continue
+        items.append({
+            "rank": idx + 1,
+            "id": iid,
+            "title": title,
+            "titleEn": (it.get("title_en") or "").strip(),
+            "summary": (it.get("summary") or "").strip(),
+            "url": it.get("url") or "",
+            # 站内中文阅读页深链(App 端深链优先用 permalink)
+            "permalink": it.get("permalink") or "",
+            "source": it.get("source") or "",
+            "publishedAt": it.get("publishedAt") or "",
+            "category": it.get("category") or "",
+            "score": it.get("score", 0) or 0,
+            "selected": bool(it.get("selected", False)),
+        })
+    return items, {"endpoint": "/items?mode=selected&take=20", "count": len(items)}
+
+
 # ===== 数据源注册表:name → 抓取函数 =====
 
 SOURCES = {
@@ -762,6 +818,7 @@ SOURCES = {
     "huggingface-papers": fetch_huggingface_papers,
     "producthunt": fetch_producthunt,
     "rundown-ai": fetch_rundown_ai,
+    "aihot-featured": fetch_aihot_featured,
 }
 
 # 单源抓取最大重试次数(需求 a:失败重试,最多 3 次)。首次 + 2 次重试。

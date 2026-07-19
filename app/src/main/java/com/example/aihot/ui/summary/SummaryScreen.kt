@@ -79,7 +79,7 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * AI 摘要 Tab 根屏 —— 4 个归档源各占一页,[HorizontalPager] 左右滑动切换。
+ * AI 摘要 Tab 根屏 —— 7 个归档源各占一页,[HorizontalPager] 左右滑动切换。
  *
  * 每页一张全高卡片:
  *  - 品牌渐变卡头([BrandGradient],AI 特性专用):onPrimary 圆形底衬源图标
@@ -87,7 +87,7 @@ import java.util.Locale
  *  - 摘要正文(可滚动)条目化:两位序号(源强调色,Bold)+ 富文本行,序号与首行基线对齐
  *  - 底部「查看完整列表 →」(primary 加粗)
  * 顶部提示行右侧是页面指示器:当前页横向胶囊 / 未选中圆点,tween 过渡,可点跳页。
- * 4 张卡保持同构(同一产品语言),差异化只靠卡头图标与序号强调色。
+ * 7 张卡保持同构(同一产品语言),差异化只靠卡头图标与序号强调色。
  *
  * 数据来自 gitcode 每日归档快照顶层的 `ai_summary` 字段(由数据流水线预生成),App 端直接读取,
  * 不再运行时调用 AI API。
@@ -101,6 +101,7 @@ fun SummaryScreen(
     onOpenStormzhangAiNews: () -> Unit,
     onOpenProductHunt: () -> Unit,
     onOpenRundownAi: () -> Unit,
+    onOpenFeaturedHub: () -> Unit,
     // 页码状态由 MainActivity 上提持有:进二级页返回后保持所在卡片(见其内注释)
     pagerState: PagerState,
     reselectSignal: Int = 0,
@@ -110,14 +111,15 @@ fun SummaryScreen(
     val isRefreshing by vm.isRefreshing.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
-    // 卡片配置:key → (标题 / 图标 / 进入列表的回调)
+    // 卡片配置:key → (标题 / 图标 / 进入列表的回调)。顺序对齐 SOURCE_KEYS 与 More 页浏览组。
     val cards = listOf(
         SummaryCardSpec(SummaryRepository.SOURCE_KEYS[0], "HackerNews", Icons.Filled.Whatshot, onOpenHackerNews),
         SummaryCardSpec(SummaryRepository.SOURCE_KEYS[1], "GitHub Trending", Icons.Outlined.Apps, onOpenGitHubTrending),
         SummaryCardSpec(SummaryRepository.SOURCE_KEYS[2], "HuggingFace Papers", Icons.Filled.Science, onOpenHuggingFacePapers),
-        SummaryCardSpec(SummaryRepository.SOURCE_KEYS[3], "stormzhang AI 资讯", Icons.Filled.Bolt, onOpenStormzhangAiNews),
-        SummaryCardSpec(SummaryRepository.SOURCE_KEYS[4], "Product Hunt", Icons.Filled.RocketLaunch, onOpenProductHunt),
-        SummaryCardSpec(SummaryRepository.SOURCE_KEYS[5], "The Rundown AI", Icons.AutoMirrored.Filled.Article, onOpenRundownAi)
+        SummaryCardSpec(SummaryRepository.SOURCE_KEYS[3], "Product Hunt", Icons.Filled.RocketLaunch, onOpenProductHunt),
+        SummaryCardSpec(SummaryRepository.SOURCE_KEYS[4], "The Rundown AI", Icons.AutoMirrored.Filled.Article, onOpenRundownAi),
+        SummaryCardSpec(SummaryRepository.SOURCE_KEYS[5], "stormzhang AI 资讯", Icons.Filled.Bolt, onOpenStormzhangAiNews),
+        SummaryCardSpec(SummaryRepository.SOURCE_KEYS[6], "AIHot 精选", Icons.Filled.Whatshot, onOpenFeaturedHub)
     )
 
     // 重击当前 tab(reselectSignal 递增):滑回第一张卡并刷新全部源。
@@ -402,7 +404,7 @@ private fun SummaryCardHeader(
 
 /**
  * 源强调色 —— 卡头图标 tint 与条目序号的差异化锚点。
- * 4 张卡同构(同一产品语言),仅靠强调色与图标区分源。
+ * 7 张卡同构(同一产品语言),仅靠强调色与图标区分源。
  */
 @Composable
 private fun sourceAccentOf(source: String): Color {
@@ -414,6 +416,7 @@ private fun sourceAccentOf(source: String): Color {
         "stormzhang-ai" -> cs.secondary        // 品牌紫,贴「AI 资讯」语义
         "producthunt" -> cs.primary            // PH 品牌橙红由 SourceBrand 承载,卡片用 primary
         "rundown-ai" -> cs.secondary           // 品牌紫,贴「AI newsletter」语义(与 stormzhang 同系)
+        "aihot-featured" -> cs.primary         // 自家源,品牌 Future Blue 由 SourceBrand.AiHot 承载,卡片用 primary
         else -> cs.primary
     }
 }

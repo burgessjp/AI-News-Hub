@@ -149,6 +149,8 @@ private sealed interface Page {
     data object HuggingFacePapers : Page
     data object ProductHunt : Page
     data object RundownAi : Page
+    /** AIHot 精选 —— 原为独立根 tab,现改为从「更多」页进入的二级页(复用 FeaturedTab)。 */
+    data object FeaturedHub : Page
     data object BrowseHistory : Page
 }
 
@@ -176,6 +178,7 @@ private fun Page.toBundle(): Bundle = Bundle().apply {
         is Page.HuggingFacePapers -> putString("t", "HuggingFacePapers")
         is Page.ProductHunt -> putString("t", "ProductHunt")
         is Page.RundownAi -> putString("t", "RundownAi")
+        is Page.FeaturedHub -> putString("t", "FeaturedHub")
         is Page.BrowseHistory -> putString("t", "BrowseHistory")
     }
 }
@@ -201,6 +204,7 @@ private fun pageFromBundle(b: Bundle): Page? {
         "HuggingFacePapers" -> Page.HuggingFacePapers
         "ProductHunt" -> Page.ProductHunt
         "RundownAi" -> Page.RundownAi
+        "FeaturedHub" -> Page.FeaturedHub
         "BrowseHistory" -> Page.BrowseHistory
         else -> null
     }
@@ -236,7 +240,7 @@ private val pageStacksSaver = androidx.compose.runtime.saveable.Saver<
  * App 顶层路由 —— 多栈底部导航。
  *
  * 模型:
- *  - currentTab: 当前选中的 3 个根 tab 之一
+ *  - currentTab: 当前选中的 2 个根 tab 之一(摘要 / 更多)
  *  - pageStacks: 每个 tab 独立的二级页栈(栈空 = 处于根)
  *
  * 行为:
@@ -436,7 +440,8 @@ fun AIHotApp(openSettingsOnLaunch: Boolean = false) {
     // remember/rememberSaveable(实测 rememberPagerState 也随换页丢失),下层页重返
     // 组合时是全新状态 → 滚动位置/页码被重置。由本层持有即可跨 push/pop 存活;
     // 进程死亡后不保留(数据本身也会重拉,可接受)。
-    val featuredListState = rememberLazyListState()
+    // 注:「AIHot 精选」原为根 tab 时有独立的 featuredListState;改为二级页后
+    // 走 pageListStates.forPage(Page.FeaturedHub),不再上提。
     val summaryPagerState = rememberPagerState(pageCount = { SummaryRepository.SOURCE_KEYS.size })
     // 二级页滚动状态:以 Page 值(data class,可作 key)索引,页面弹出后清理。
     val pageListStates = remember { mutableMapOf<Page, LazyListState>() }
@@ -485,7 +490,6 @@ fun AIHotApp(openSettingsOnLaunch: Boolean = false) {
                         is Screen.Root -> TabRoot(
                             tab = s.tab,
                             reselectTick = reselectTick,
-                            featuredListState = featuredListState,
                             summaryPagerState = summaryPagerState,
                             onItemClick = { push(Page.Detail(it)) },
                             onOpenAll = { push(Page.All) },
@@ -496,6 +500,7 @@ fun AIHotApp(openSettingsOnLaunch: Boolean = false) {
                             onOpenHuggingFacePapers = { push(Page.HuggingFacePapers) },
                             onOpenProductHunt = { push(Page.ProductHunt) },
                             onOpenRundownAi = { push(Page.RundownAi) },
+                            onOpenFeaturedHub = { push(Page.FeaturedHub) },
                             onOpenBrowseHistory = { push(Page.BrowseHistory) },
                             onOpenUrl = openUrl,
                             onOpenSettings = { push(Page.Settings) },
@@ -517,6 +522,8 @@ fun AIHotApp(openSettingsOnLaunch: Boolean = false) {
                             onSelectSource = onSelectSource,
                             onBack = pop,
                             onItemClick = { push(Page.Detail(it)) },
+                            // 精选二级页头部的「全部 ›」入口 → 全部动态二级页
+                            onOpenAll = { push(Page.All) },
                             onOpenDaily = { push(Page.Daily) },
                             onOpenSearch = { push(Page.Search) },
                             onSelectDate = { push(Page.DailyDate(it)) },
@@ -578,7 +585,6 @@ private sealed interface Screen {
 private fun TabRoot(
     tab: AppTab,
     reselectTick: Int,
-    featuredListState: LazyListState,
     summaryPagerState: androidx.compose.foundation.pager.PagerState,
     onItemClick: (NewsItem) -> Unit,
     onOpenAll: () -> Unit,
@@ -589,6 +595,7 @@ private fun TabRoot(
     onOpenHuggingFacePapers: () -> Unit,
     onOpenProductHunt: () -> Unit,
     onOpenRundownAi: () -> Unit,
+    onOpenFeaturedHub: () -> Unit,
     onOpenBrowseHistory: () -> Unit,
     onOpenUrl: (String, String, String?) -> Unit,
     onOpenSettings: () -> Unit,
@@ -596,15 +603,6 @@ private fun TabRoot(
     onOpenAbout: () -> Unit
 ) {
     when (tab) {
-        AppTab.Featured -> FeaturedTab(
-            onItemClick = onItemClick,
-            // 「全部 ›」入口:跳转到全部动态二级页
-            onOpenAll = onOpenAll,
-            // 今日热点卡片链接到 AI HOT 阅读页,标注来源 "AI HOT"
-            onOpenUrl = { url, title -> onOpenUrl(url, title, "AI HOT") },
-            reselectSignal = reselectTick,
-            listState = featuredListState
-        )
         AppTab.Summary -> SummaryScreen(
             reselectSignal = reselectTick,
             pagerState = summaryPagerState,
@@ -613,7 +611,8 @@ private fun TabRoot(
             onOpenHuggingFacePapers = onOpenHuggingFacePapers,
             onOpenStormzhangAiNews = onOpenStormzhangAiNews,
             onOpenProductHunt = onOpenProductHunt,
-            onOpenRundownAi = onOpenRundownAi
+            onOpenRundownAi = onOpenRundownAi,
+            onOpenFeaturedHub = onOpenFeaturedHub
         )
         AppTab.More -> MoreScreen(
             onOpenHackerNews = onOpenHackerNews,
@@ -623,6 +622,7 @@ private fun TabRoot(
             onOpenHuggingFacePapers = onOpenHuggingFacePapers,
             onOpenProductHunt = onOpenProductHunt,
             onOpenRundownAi = onOpenRundownAi,
+            onOpenFeaturedHub = onOpenFeaturedHub,
             onOpenBrowseHistory = onOpenBrowseHistory,
             onOpenSettings = onOpenSettings,
             onOpenAiService = onOpenAiService,
@@ -648,6 +648,7 @@ private fun PageView(
     onSelectSource: (SourceMode) -> Unit,
     onBack: () -> Unit,
     onItemClick: (NewsItem) -> Unit,
+    onOpenAll: () -> Unit,
     onOpenDaily: () -> Unit,
     onOpenSearch: () -> Unit,
     onSelectDate: (String) -> Unit,
@@ -777,6 +778,17 @@ private fun PageView(
             onBack = onBack,
             onOpenUrl = { url, title -> onOpenUrl(url, title, "The Rundown AI") },
             onOpenSettings = onOpenSettings,
+            listState = pageListStates.forPage(page)
+        )
+        // AIHot 精选(原根 tab,现二级页):复用 FeaturedTab,UI 含今日热点 +
+        // 最新精选列表 + 「全部 ›」。顶栏带返回箭头(onBack),列表底部不预留底栏
+        // (二级页底栏不悬浮)。reselectSignal 传 0(非根 tab,无重击语义)。
+        Page.FeaturedHub -> FeaturedTab(
+            onItemClick = onItemClick,
+            onOpenAll = onOpenAll,
+            onOpenUrl = { url, title -> onOpenUrl(url, title, "AI HOT") },
+            onBack = onBack,
+            reselectSignal = 0,
             listState = pageListStates.forPage(page)
         )
         Page.BrowseHistory -> BrowseHistoryScreen(
