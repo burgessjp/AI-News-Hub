@@ -10,7 +10,7 @@ import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 
 /**
- * AI HOT 官方公开 API 客户端。
+ * `aihot.virxact.com` 公开 API 客户端(第三方服务,非本项目自有后端)。
  * 文档: https://aihot.virxact.com/agent (匿名免费,无需 token)
  *
  * 重要约定:

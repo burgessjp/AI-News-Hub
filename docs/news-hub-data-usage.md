@@ -3,7 +3,7 @@
 数据仓库:[gitcode.com/peng1818/AI-News-Hub-Data](https://gitcode.com/peng1818/AI-News-Hub-Data)
 分支:`news-hub-data`
 
-本仓库定时抓取 [AI News Hub](../) App「Hub」tab 浏览区域的 8 个数据源(7 个第三方源 + AIHot 自家后端精选 TOP20),解析成 JSON 后按日期归档。本文档说明数据结构、获取方式与消费示例。
+本仓库定时抓取 [AI News Hub](../) App「Hub」tab 浏览区域的 8 个数据源(7 个第三方站点源 + AIHot 精选 TOP20,后者来自第三方服务 aihot.virxact.com),解析成 JSON 后按日期归档。本文档说明数据结构、获取方式与消费示例。
 
 ## 更新频率
 
@@ -41,7 +41,7 @@ news-hub-data 分支/
 ├── rundown-ai/                          ← The Rundown AI newsletter 首页文章卡片墙(无 token)
 │   └── 2026-07-15/
 │       └── 08-00-data.json
-└── aihot-featured/                      ← AIHot 自家后端 /items?mode=selected&take=20(公开 API,无 token)
+└── aihot-featured/                      ← AIHot 精选(第三方服务 aihot.virxact.com /items?mode=selected&take=20,公开 API,无 token)
     └── 2026-07-15/
         └── 08-00-data.json
 ```
@@ -310,11 +310,11 @@ The Rundown AI(beehiiv 托管的头部英文 AI 日更 newsletter)首页文章�
 | `authors` | string | 作者段,如 `Zach Mink, +4`(+4 表示还有 4 位合著者);原样展示 |
 | `coverUrl` | string | 封面图 URL(beehiiv cdn-cgi 图,排除作者头像);无则为空 |
 
-### aihot-featured(AIHot 自家后端精选 TOP20)
+### aihot-featured(AIHot 精选 TOP20,第三方源)
 
-AIHot 自家后端 `aihot.virxact.com` 的「精选」列表 TOP20,来自 `/api/public/items?mode=selected&take=20` 公开 JSON API(无 token,UA 必填否则 nginx 403)。后端已聚合多源 RSS/X 等并人工/算法筛选,字段对齐 App 端 `NewsItem.fromJson`。
+第三方服务 `aihot.virxact.com` 的「精选」列表 TOP20,来自 `/api/public/items?mode=selected&take=20` 公开 JSON API(无 token,UA 必填否则 nginx 403)。该服务已聚合多源 RSS/X 等并人工/算法筛选,字段对齐 App 端 `NewsItem.fromJson`。
 
-> 📌 **此源特殊性**:与其它 7 个第三方源不同,aihot-featured 抓的是**自有后端**而非第三方站点。归档仅供 App 摘要 Tab 第 7 张卡消费(`ai_summary`);App「AIHot 精选」二级页本身继续实时拉后端分页接口(数据更新鲜),不走此归档。
+> 📌 **此源特殊性**:aihot-featured 与其它 7 个第三方源一样都是第三方源,但它是 App 唯一「只取归档供摘要 Tab、二级页仍走实时接口」的源。归档仅供 App 摘要 Tab 第 7 张卡消费(`ai_summary`);App「AIHot 精选」二级页本身继续实时拉该服务分页接口(数据更新鲜),不走此归档。
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
@@ -371,7 +371,7 @@ AIHot 自家后端 `aihot.virxact.com` 的「精选」列表 TOP20,来自 `/api/
 
 3. **频率与配额**:每天 1 次定时 + 偶发手动触发。不要高频轮询 raw URL,gitcode 有访问频率限制。客户端建议缓存 `index.json` 的 `updated_at` 判断是否需要刷新。
 
-4. **字段可能变化**:各源抓自第三方页面(GitHub Trending / HuggingFace / linux.do 等)或自有后端 API(aihot-featured),若对方改版/接口调整导致字段缺失,会在 `manifest.json` 的 error 中体现。字段语义遵循上述文档,新增字段不破坏旧消费者。
+4. **字段可能变化**:各源抓自第三方页面(GitHub Trending / HuggingFace / linux.do 等)或第三方 API(aihot-featured 来自 aihot.virxact.com),若对方改版/接口调整导致字段缺失,会在 `manifest.json` 的 error 中体现。字段语义遵循上述文档,新增字段不破坏旧消费者。
 
 5. **时区**:所有时间戳与文件名路径均为北京时间(UTC+8)。`fetched_at` / `run_at` 带显式 `+0800` 偏移,`_ms` 为 UTC Unix 毫秒(与时区无关)。
 

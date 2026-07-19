@@ -12,7 +12,7 @@ Repository 与对应 model 类),把 8 个数据源解析成 JSON 落盘:
   - huggingface-papers HuggingFace Trending Papers(HTML 抓取)
   - producthunt        Product Hunt 当日热门(GraphQL API,需 PRODUCT_HUNT_KEY)
   - rundown-ai         The Rundown AI newsletter(beehiiv 首页文章卡片墙,HTML 抓取)
-  - aihot-featured     AIHot 自家精选 TOP20(自有后端公开 API,仅供摘要卡消费)
+  - aihot-featured     AIHot 精选 TOP20(第三方服务 aihot.virxact.com 公开 API,仅供摘要卡消费)
 
 输出目录结构:
   <out-dir>/<source>/<YYYY-MM-DD>/<HH-MM>-data.json
@@ -756,20 +756,19 @@ def fetch_producthunt():
     return items, {}
 
 
-# ===== 数据源 8:AIHot 自家精选(aihot.virxact.com 公开 API) =====
+# ===== 数据源 8:AIHot 精选(aihot.virxact.com 公开 API,第三方源) =====
 
 AIHOT_API_BASE = "https://aihot.virxact.com/api/public"
 
 
 def fetch_aihot_featured():
     """
-    抓 AIHot 自家后端「精选」TOP20(对齐 App 端 NewsRepository.fetchItems(mode=SELECTED))。
+    抓第三方服务 `aihot.virxact.com` 的「精选」TOP20(对齐 App 端 NewsRepository.fetchItems(mode=SELECTED))。
 
-    与其余 7 个源的根本差异:这是**自有后端**,不是第三方站点。
-      - 数据是中文 AI 资讯精选(后端已聚合多源 RSS/X 等,人工/算法筛选),
-        字段对齐 App 端 NewsItem.kt 的 fromJson。
-      - 公开 API,无 token、无 Cloudflare、无 paywall,UA 必填(否则 nginx 403)。
-      - 仅取 TOP20(take=20),不分页(摘要卡够用,App 端二级页仍走实时分页接口)。
+    与其余 7 个源的差异:本源的数据已被第三方服务预聚合(多源 RSS/X 等,人工/算法筛选为
+    中文 AI 资讯),字段对齐 App 端 NewsItem.kt 的 fromJson;公开 API,无 token、无 Cloudflare、
+    无 paywall,UA 必填(否则 nginx 403)。仅取 TOP20(take=20),不分页(摘要卡够用,
+    App 端二级页仍走实时分页接口)。
 
     双通道说明:此归档仅供 App 摘要 Tab 第 7 张卡消费(ai_summary 由 ai_summary.py
     生成);App「AIHot 精选」二级页本身继续实时拉后端分页接口,数据更新鲜。

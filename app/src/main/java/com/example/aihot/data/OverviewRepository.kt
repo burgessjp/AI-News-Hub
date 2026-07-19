@@ -69,7 +69,7 @@ data class OverviewDigest(
  * 做跨源综合分析(今日热点 Top10,其中 AI 判定为突发重磅的条目带 breaking 标记)。
  *
  * 设计要点(复刻 [TranslationRepository] 范式):
- *  - 输入仅 7 个归档源快照(不接自有后端 /hot-topics、不接 LinuxDo 实时):每源取
+ *  - 输入仅 7 个归档源快照(不接 aihot.virxact.com /hot-topics、不接 LinuxDo 实时):每源取
  *    `ai_summary` 作上下文 + items 前 [ITEMS_PER_SOURCE] 条的标题/简介/互动指标;
  *  - 缓存键 = 北京日期 + 7 源 latest 路径指纹(路径含日期+时间,数据更新即失效),
  *    命中缓存时**连快照都不拉**,一天正常只生成 1-2 次;缓存单槽覆盖,不留历史;

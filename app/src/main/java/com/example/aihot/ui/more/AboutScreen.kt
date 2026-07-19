@@ -285,7 +285,7 @@ private class DataSource(
 
 /** 八源(原「AI HOT」与「AIHot 精选」同 URL 合并为一项)。 */
 private val dataSources: List<DataSource> = listOf(
-    DataSource("AIHot 精选", "自家 AI 资讯精选", "https://aihot.virxact.com"),
+    DataSource("AIHot 精选", "第三方 AI 资讯精选", "https://aihot.virxact.com"),
     DataSource("HackerNews", "技术圈热门讨论", "https://news.ycombinator.com"),
     DataSource("GitHub Trending", "热门开源仓库", "https://github.com/trending"),
     DataSource("HuggingFace Papers", "热门 AI 论文榜单", "https://huggingface.co/papers/trending"),

@@ -8,11 +8,11 @@
 
 **AIHot**（应用名 "AI News Hub"）—— Android AI 资讯聚合客户端。Kotlin + Jetpack Compose + Material3，单模块（`:app`），包名 / namespace / applicationId 均为 `com.example.aihot`。
 
-数据来源分两类：
+数据来源全部为第三方服务（App 端无自有后端）：
 
-- **自有后端**：`aihot.virxact.com` 公开 API（动态分页 `/items`、今日热点 `/hot-topics`、AI 日报 `/daily`、归档 `/dailies`）。其中 `/items?mode=selected` 的「精选 TOP20」也被数据流水线抓取落 gitcode 归档，供摘要 Tab 消费（见下「数据流水线」）。
+- **`aihot.virxact.com` 公开 API**（第三方 AI 资讯服务）：动态分页 `/items`、今日热点 `/hot-topics`、AI 日报 `/daily`、归档 `/dailies`。其中 `/items?mode=selected` 的「精选 TOP20」也被数据流水线抓取落 gitcode 归档，供摘要 Tab 消费（见下「数据流水线」）。
 - **Hub 浏览区 7 个第三方源**：HackerNews（Firebase API）、GitHub Trending、LinuxDo 热榜、stormzhang AI 资讯、HuggingFace Papers、Product Hunt（V2 GraphQL API，需 Developer Token）、The Rundown AI（beehiiv 托管的 AI newsletter，首页 HTML 抓取）。其中 6 个稳定源（除 LinuxDo）有 gitcode 归档数据；5 个（除 LinuxDo 与 Product Hunt）支持「实时抓取 / gitcode 归档」双模式切换（`SourceMode`），Product Hunt 因 Developer Token 不进 APK 仅走归档（LIVE 模式也回落归档），LinuxDo 始终实时。归档数据来自配套的数据流水线（见下「数据流水线」）。
-- **「AIHot 精选」双通道**：原首页独立根 tab，现收进 Hub 浏览区末位二级页（复用 `FeaturedTab`，UI 含今日热点 + 最新精选列表 + 「全部 ›」入口）。二级页继续实时拉自有后端分页接口；摘要 Tab 第 7 张卡走 gitcode 归档预生成的 `ai_summary`（流水线抓 `/items?mode=selected&take=20`）。不参与 `SourceMode` 切换（自有后端无归档双通道语义，照 LinuxDo「只实时」套路，仅摘要卡读归档）。
+- **「AIHot 精选」双通道**：原首页独立根 tab，现收进 Hub 浏览区末位二级页（复用 `FeaturedTab`，UI 含今日热点 + 最新精选列表 + 「全部 ›」入口）。二级页继续实时拉 `aihot.virxact.com` 分页接口；摘要 Tab 第 7 张卡走 gitcode 归档预生成的 `ai_summary`（流水线抓 `/items?mode=selected&take=20`）。不参与 `SourceMode` 切换（此源无归档双通道语义，照 LinuxDo「只实时」套路，仅摘要卡读归档）。
 
 功能面：今日总览 Tab（默认首页，端侧 AI 对 7 源归档榜单的当日综合分析：今日热点 Top10，其中 AI 判定为突发重磅的条目 ≤3 条、带 Breaking 标签特殊样式并计入 10 条总数，用户自配 key、当日指纹缓存）、摘要 Tab（7 个归档源当日 AI 中文要点）、历史摘要（更多页入口，按日期查看各源当日摘要）、AIHot 精选（今日热点 + 精选列表）/ 全部动态、AI 日报与归档、搜索（本地搜索历史 + 今日热点热词引导）、HN 评论树、AI 翻译（OpenAI 兼容服务，用户自配 key；选中翻译 + WebView 整页翻译）、内置 WebView（含阅读模式、整页翻译、网页下载、视频全屏）、浏览历史（Room）。
 
@@ -62,7 +62,7 @@ gradle/libs.versions.toml    版本目录（所有依赖版本集中在此）
 App「Hub」浏览区归档数据的生产端：抓 7 个第三方源 → AI 总结 → 推送到 gitcode 数据仓库 `peng1818/AI-News-Hub-Data` 的 `news-hub-data` 分支。数据格式详见 `docs/news-hub-data-usage.md`。
 
 - `pipeline.sh` —— 唯一编排入口（CI 与本地都调它）：执行前检测 4 个环境变量（缺任一直接 exit 1）：`AI_NEWS_HUB_AI_BASE_URL` / `AI_NEWS_HUB_AI_MODEL` / `AI_NEWS_HUB_AI_API_KEY` / `GITCODE_TOKEN`。
-- `fetch_data.py` —— 抓取 8 源落盘 `out/`（7 个第三方源 + AIHot 自有后端 `/items?mode=selected&take=20`）。单源独立重试 3 次（2s/4s），失败源跳过且 `index.json` latest 指针从上一次继承（客户端永远拿到有效数据）；≥1 源成功退出码即为 0。日期/路径统一北京时间（CI 设 `TZ=Asia/Shanghai`）。`index.json` 除 `latest` 外还维护 `history` 索引（source → date → 当日最后快照，合并上一次索引、每源只留最近 31 天且不早于 `HISTORY_START_DATE`=2026-07-18），供 App「历史摘要」按日期寻址。Product Hunt 源走 V2 GraphQL API，需可选环境变量 `PRODUCT_HUNT_KEY`（Developer Token；缺失该源失败跳过，不阻断其余源，也不在 `pipeline.sh` 的 4 个硬依赖 env 之列）。The Rundown AI 源抓首页文章卡片墙（jsoup HTML，无 token/无 CF 挑战）。AIHot 精选源调自有后端公开 JSON API（无 token，UA 必填）。
+- `fetch_data.py` —— 抓取 8 源落盘 `out/`（7 个第三方站点源 + AIHot 精选来自第三方服务 `aihot.virxact.com` 的 `/items?mode=selected&take=20`）。单源独立重试 3 次（2s/4s），失败源跳过且 `index.json` latest 指针从上一次继承（客户端永远拿到有效数据）；≥1 源成功退出码即为 0。日期/路径统一北京时间（CI 设 `TZ=Asia/Shanghai`）。`index.json` 除 `latest` 外还维护 `history` 索引（source → date → 当日最后快照，合并上一次索引、每源只留最近 31 天且不早于 `HISTORY_START_DATE`=2026-07-18），供 App「历史摘要」按日期寻址。Product Hunt 源走 V2 GraphQL API，需可选环境变量 `PRODUCT_HUNT_KEY`（Developer Token；缺失该源失败跳过，不阻断其余源，也不在 `pipeline.sh` 的 4 个硬依赖 env 之列）。The Rundown AI 源抓首页文章卡片墙（jsoup HTML，无 token/无 CF 挑战）。AIHot 精选源调 `aihot.virxact.com` 公开 JSON API（无 token，UA 必填）。
 - `ai_summary.py` —— 给 7 个稳定源（linuxdo 除外）生成简体中文要点写入快照顶层 `ai_summary` 字段（OpenAI 兼容调用，temperature 0.5）；失败仅 warn，不阻断落盘。
 - `push_data.py` —— 把 `out/` 提交推送到数据仓库（token 注入 URL，需 `GITCODE_TOKEN`）。
 - `backfill_history.py` —— history 索引维护脚本：重建 `index.json` 的 `history`（扫浅克隆里的既有日期目录，按 `write_index` 同款规则含起始日过滤）；`--prune` 删除仓库里早于 `HISTORY_START_DATE` 的日期目录（`_overlay` 只增不删，删除只能在此显式做）。2026-07-19 已执行回填 + 清理（历史自 07-18 起）；日常无需执行。
@@ -105,7 +105,7 @@ python3 scripts/fetch_data.py --out-dir out --no-summary --no-previous-index
 - `OverviewRepository`：总览 Tab 的数据源——端侧实时调用户自配 AI（经 `AiChatClient`），输入仅 7 个归档源当日快照（每源 `ai_summary` 作上下文 + items 前 8 条标题/简介/互动指标），输出严格 JSON（`ref="源key:序号"` 回源回填标题/URL，单一 items 列表 ≤10 条，其中 `breaking:true` 0-3 条、排最前并占 10 条名额）。缓存键 = 北京日期 + 7 源 latest 路径指纹（命中即不拉快照），单槽 `cacheDir/overview_digest.json` 覆盖、不留历史；read 超时放宽 120s；用量写 `AiUsageStore`。
 - `AiChatClient`：OpenAI 兼容 chat 调用统一出口（`${baseUrl}/chat/completions`，baseUrl 含版本段），App 内所有端侧 AI 功能都经此访问「设置 → AI 服务」里的用户配置。`chat()` 带可选 `readTimeoutSeconds`（默认 20s；长输出场景如总览综合分析由调用方放宽）。
 - `TranslationRepository`：运行时经 `AiChatClient` 调用户自配的 AI 服务（温度 0.3），SHA256 缓存到 `cacheDir` 文件，Mutex 按 key 防并发重复；成功后把 token 用量写入 `AiUsageStore`。`TranslateSelectionActivity` 响应 `ACTION_PROCESS_TEXT` 在系统选中菜单注册「译」；HN 评论翻译与 WebView 阅读模式「翻译本页」共用此仓库。
-- `NewsRepository`：自有后端 `/items`（cursor 分页）、`/hot-topics`、`/daily`、`/dailies`。
+- `NewsRepository`：第三方服务 `aihot.virxact.com` 的 `/items`（cursor 分页）、`/hot-topics`、`/daily`、`/dailies`。
 - 数据模型集中在 `NewsItem.kt` / `HackerNews.kt` / 各源单文件（`TrendingRepo.kt`、`LinuxDoTopic.kt`、`StormzhangAiNews.kt`、`HuggingFacePaper.kt`、`ProductHunt.kt`、`RundownAiArticle.kt`）；`NewsItem`、`HackerNewsStory` 用 `@Parcelize`。
 
 ### 持久化

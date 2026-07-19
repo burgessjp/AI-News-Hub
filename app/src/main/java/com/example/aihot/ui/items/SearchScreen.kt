@@ -74,7 +74,7 @@ import kotlinx.coroutines.launch
  * 输入 ≥2 字触发 /items?q= 搜索(300ms 防抖自动触发)。
  *
  * 查询为空时展示发现区([SearchDiscovery]):「搜索历史」(display_prefs 持久化,
- * 最近 10 条,可清空)+「热门」(今日热词,复用自有后端 /hot-topics)。
+ * 最近 10 条,可清空)+「热门」(今日热词,复用第三方服务 aihot.virxact.com 的 /hot-topics)。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
