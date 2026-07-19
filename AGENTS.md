@@ -67,6 +67,7 @@ App「Hub」浏览区归档数据的生产端：抓 7 个第三方源 → AI 总
 - `push_data.py` —— 把 `out/` 提交推送到数据仓库（token 注入 URL，需 `GITCODE_TOKEN`）。
 - `backfill_history.py` —— history 索引维护脚本：重建 `index.json` 的 `history`（扫浅克隆里的既有日期目录，按 `write_index` 同款规则含起始日过滤）；`--prune` 删除仓库里早于 `HISTORY_START_DATE` 的日期目录（`_overlay` 只增不删，删除只能在此显式做）。2026-07-19 已执行回填 + 清理（历史自 07-18 起）；日常无需执行。
 - `gen_icon.py` / `gen_icon_svg.py` + `icon.svg` —— 启动图标生成（PIL/NumPy；SVG 版依赖 macOS `qlmanage`）。
+- `gen_wordmark.py` —— 总览页顶栏 wordmark（`drawable/ic_wordmark.xml` + `values*/colors.xml`）生成：fontTools 把 Inter 字形的 "AI NEWS HUB" 转矢量路径，与「光环+核」图形合成 VectorDrawable；预览渲染优先 headless Chrome（缺省回落 `qlmanage`）。
 
 本地运行：
 

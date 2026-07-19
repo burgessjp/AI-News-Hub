@@ -1,6 +1,7 @@
 package com.example.aihot.ui.overview
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,11 +38,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.aihot.R
 import com.example.aihot.data.OverviewDigest
 import com.example.aihot.data.OverviewEntry
 import com.example.aihot.data.SummaryRepository
@@ -98,9 +101,17 @@ fun OverviewScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
-            // 一级根 tab 规格(对齐摘要/更多):品牌主标题 + 右侧日期 + 刷新
+            // 一级根 tab 规格(对齐摘要/更多):品牌 wordmark + 右侧日期 + 刷新
             AppTopBar(
                 title = "AI NEWS HUB",
+                titleContent = {
+                    // 品牌字标(矢量,深/浅主题自适应),替换原纯文字标题
+                    Image(
+                        painter = painterResource(R.drawable.ic_wordmark),
+                        contentDescription = "AI News Hub",
+                        modifier = Modifier.height(36.dp)
+                    )
+                },
                 horizontalPadding = 18.dp,
                 actions = {
                     // 刷新按钮在左(刷新中转圈),日期文案在右;

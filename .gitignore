@@ -41,3 +41,6 @@ repo/
 # Python 字节码缓存(本地运行脚本产生,不入库)
 __pycache__/
 *.pyc
+
+# Python 虚拟环境(scripts/gen_wordmark.py 等工具脚本的本地依赖)
+scripts/.venv/

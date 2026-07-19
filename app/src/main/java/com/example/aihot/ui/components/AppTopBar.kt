@@ -39,6 +39,10 @@ import com.example.aihot.ui.theme.AppText
  * @param horizontalPadding 顶栏内容(标题/导航图标/操作)的左右边距。
  *        默认 4dp 沿用 MD3 TopAppBar 内置留白;需要与列表内容对齐时(如精选 tab
  *        下方卡片用 18dp 边距)传入对应值,使 Logo / 日期与卡片左右边对齐。
+ *        注:无 navigationIcon 时 MD3 标题槽自带 16dp 左侧 inset,本组件已扣除,
+ *        标题实际起点就是 horizontalPadding(≤16dp 时保持 MD3 默认 16dp)。
+ * @param titleContent 非空时替换默认文字标题(如总览页的 wordmark 图片);
+ *        [title] 仍作为无障碍语义保留,调用方应在内容里体现。
  */
 /**
  * 顶栏标题字号标准值 —— 全 App 顶栏字号统一在此调整。
@@ -67,25 +71,36 @@ fun AppTopBar(
     subtitle: String? = null,
     titleFontSize: TextUnit = AppTopBarDefaults.titleFontSize,
     horizontalPadding: Dp = 4.dp,
+    titleContent: (@Composable () -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {}
 ) {
     // MD3 TopAppBar 自带 4dp 水平留白(navigationIcon 起点 / actions 终点距屏幕边 4dp)。
     // 这里在此基础上补足到 horizontalPadding:内容最终距屏幕边 = horizontalPadding。
     // 默认 4dp 时 extra=0,完全保持原行为,不影响其它页面。
     val extra = (horizontalPadding - 4.dp).coerceAtLeast(0.dp)
+    // 无 navigationIcon 时 MD3 标题槽自带 16dp 左侧 inset(TopAppBarTitleInset 12dp +
+    // 标题槽 4dp 水平 padding),需扣掉它标题才真正落在 horizontalPadding;
+    // horizontalPadding ≤ 16dp 时为 0,保持 MD3 默认 16dp 不变。
+    val titleExtra = (horizontalPadding - 16.dp).coerceAtLeast(0.dp)
     Column {
         TopAppBar(
             title = {
                 Column {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontSize = titleFontSize,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(start = if (navigationIcon == null) extra else 0.dp)
-                    )
+                    if (titleContent != null) {
+                        Box(modifier = Modifier.padding(start = if (navigationIcon == null) titleExtra else 0.dp)) {
+                            titleContent()
+                        }
+                    } else {
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontSize = titleFontSize,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(start = if (navigationIcon == null) titleExtra else 0.dp)
+                        )
+                    }
                     if (!subtitle.isNullOrBlank()) {
                         Text(
                             text = subtitle,
@@ -93,7 +108,7 @@ fun AppTopBar(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(start = if (navigationIcon == null) extra else 0.dp)
+                            modifier = Modifier.padding(start = if (navigationIcon == null) titleExtra else 0.dp)
                         )
                     }
                 }
