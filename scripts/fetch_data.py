@@ -16,6 +16,9 @@ Repository 与对应 model 类),把 8 个数据源解析成 JSON 落盘:
 
 输出目录结构:
   <out-dir>/<source>/<YYYY-MM-DD>/<HH-MM>-data.json
+  <out-dir>/index.json  顶层 latest(各源最新快照指针)+ history(按日期寻址的
+                        历史索引,每天指向当日最后一次快照;每源保留最近 31 天
+                        且不早于 HISTORY_START_DATE=2026-07-18)
 
 日期/时间统一用北京时间(UTC+8);CI 里设 TZ=Asia/Shanghai 即可。
 
@@ -881,20 +884,17 @@ def write_snapshot(out_dir, source_name, items, meta, now, ai_summary=None):
     return file_path
 
 
-def _scan_latest(out_dir, source_name):
+def _iter_snapshots(out_dir, source_name):
     """
-    扫描某源目录下所有 <YYYY-MM-DD>/<HH-MM>-data.json,返回最新的相对路径
-    (相对于源目录,如 "2026-07-15/00-44-data.json")。没有任何文件返回 None。
+    遍历某源目录下所有合法 <YYYY-MM-DD>/<HH-MM>-data.json,yield (date, time) 元组。
 
-    用于 index.json 的 latest 指针:跨天也能正确取到最新成功快照
-    (即使今天这次失败,昨天的仍是最新的)。
-
-    date / time 都用字典序排:YYYY-MM-DD 与 HH-MM 定宽格式下,字典序 == 时间序。
+    只接受定宽格式(日期目录形如 2026-07-15、文件名形如 08-00-data.json),
+    其余目录/文件一律跳过。latest 指针(_scan_latest)与历史索引(_scan_history)
+    共用这一套扫描与过滤逻辑。
     """
     src_root = os.path.join(out_dir, source_name)
     if not os.path.isdir(src_root):
-        return None
-    best = None  # (date, time) 元组,取最大
+        return
     for date_dir in os.listdir(src_root):
         full_date_dir = os.path.join(src_root, date_dir)
         if not os.path.isdir(full_date_dir):
@@ -907,13 +907,43 @@ def _scan_latest(out_dir, source_name):
             m = re.fullmatch(r"(\d{2}-\d{2})-data\.json", fname)
             if not m:
                 continue
-            time_str = m.group(1)
-            key = (date_dir, time_str)
-            if best is None or key > best:
-                best = key
+            yield date_dir, m.group(1)
+
+
+def _scan_latest(out_dir, source_name):
+    """
+    扫描某源目录下所有 <YYYY-MM-DD>/<HH-MM>-data.json,返回最新的相对路径
+    (相对于源目录,如 "2026-07-15/00-44-data.json")。没有任何文件返回 None。
+
+    用于 index.json 的 latest 指针:跨天也能正确取到最新成功快照
+    (即使今天这次失败,昨天的仍是最新的)。
+
+    date / time 都用字典序排:YYYY-MM-DD 与 HH-MM 定宽格式下,字典序 == 时间序。
+    """
+    best = None  # (date, time) 元组,取最大
+    for date_str, time_str in _iter_snapshots(out_dir, source_name):
+        key = (date_str, time_str)
+        if best is None or key > best:
+            best = key
     if best is None:
         return None
     return f"{best[0]}/{best[1]}-data.json"
+
+
+def _scan_history(out_dir, source_name):
+    """
+    扫描某源目录下所有合法 <YYYY-MM-DD>/<HH-MM>-data.json,返回 {date: relpath}
+    字典:每个日期取当天字典序最大(=最后一次)的快照,relpath 相对源目录
+    (如 "2026-07-15/00-44-data.json")。没有任何文件返回 {}。
+
+    用于 index.json 的 history 索引(App「历史摘要」按日期寻址当日快照)。
+    与 _scan_latest 同一套扫描逻辑(_iter_snapshots)与字典序 == 时间序前提。
+    """
+    last_of_day = {}  # date -> 当天最大 time
+    for date_str, time_str in _iter_snapshots(out_dir, source_name):
+        if date_str not in last_of_day or time_str > last_of_day[date_str]:
+            last_of_day[date_str] = time_str
+    return {d: f"{d}/{t}-data.json" for d, t in last_of_day.items()}
 
 
 # 上一次 index.json 的拉取地址(需求 a:失败源继承旧 latest 指针)。
@@ -924,19 +954,24 @@ DEFAULT_PREVIOUS_INDEX_URL = (
 )
 
 
-def load_previous_latest(url):
+def load_previous_index(url):
     """
-    拉取上一次的 index.json,返回 latest 字典(source → 相对路径)。失败返回 {}。
+    拉取上一次的 index.json,返回 (latest, history) 二元组:
+      latest  : source → 相对路径,失败源继承旧 latest 指针用;
+      history : source → {date: 相对路径},历史索引的合并基线。
+    任一字段缺失或拉取失败时,对应项返回 {}。
 
     需求 a:CI 是干净跑(每次只有本次产物),某源本次抓取失败时本地目录不存在,
     _scan_latest 会返回 None,导致 index.json 丢掉该源 —— 与 docs 承诺的
     「保留旧指向」不符。这里从 gitcode 拉上一次 index.json,失败源继承其指针,
-    让客户端永远能拿到有效数据。拉取本身失败(HTTP/解析)时优雅降级,等同于无旧 index。
+    让客户端永远能拿到有效数据。history 同理:CI 本地只有当天快照,历史日期索引
+    必须从旧 index 继承合并,否则 history 里永远只剩当天一条。
+    拉取本身失败(HTTP/解析)时优雅降级,等同于无旧 index。
 
     与 App 的 ArchiveHttpClient.fetchIndex 同源(都是 gitcode API raw),匿名公开读。
     """
     if not url:
-        return {}
+        return {}, {}
     try:
         text = fetch_text(
             url,
@@ -945,18 +980,40 @@ def load_previous_latest(url):
         )
         data = json.loads(text)
         latest = data.get("latest") or {}
-        if isinstance(latest, dict):
-            print(f"[INDEX] 拉到上次 index.json,{len(latest)} 个源旧指向")
-            return {k: v for k, v in latest.items() if isinstance(v, str) and v}
+        if not isinstance(latest, dict):
+            latest = {}
+        latest = {k: v for k, v in latest.items() if isinstance(v, str) and v}
+        # history 是双层结构(source → {date: relpath}),逐层过滤掉非法项
+        history = data.get("history") or {}
+        if not isinstance(history, dict):
+            history = {}
+        history = {
+            src: {d: p for d, p in dates.items()
+                  if isinstance(d, str) and d and isinstance(p, str) and p}
+            for src, dates in history.items()
+            if isinstance(src, str) and isinstance(dates, dict)
+        }
+        print(f"[INDEX] 拉到上次 index.json,{len(latest)} 个源旧指向")
+        return latest, history
     except Exception as e:
         print(f"[INDEX] 拉上次 index.json 失败,失败源将无法保留旧指向:"
               f"{type(e).__name__}: {e}", file=sys.stderr)
-    return {}
+    return {}, {}
 
 
-def write_index(out_dir, now, results, previous_latest=None):
+# App 端「历史摘要」只暴露最近 31 天,index.json 的 history 索引按此截断。
+# 仓库里更旧的日期目录保留不删(push_data.py 只增不删),只是不再被索引指向。
+HISTORY_RETENTION_DAYS = 31
+
+# 历史摘要的起始日期:更早的快照源覆盖不全(producthunt / rundown-ai / aihot-featured
+# 尚未接入),对应的日期目录已从数据仓库删除;history 索引一律不收录早于此日期的条目
+# (日期是定宽 YYYY-MM-DD 字符串,字典序 == 时间序,直接比较即可)。
+HISTORY_START_DATE = "2026-07-18"
+
+
+def write_index(out_dir, now, results, previous_latest=None, previous_history=None):
     """
-    写根目录 index.json:记录每个源最新成功快照的相对路径。
+    写根目录 index.json:各源最新快照指针(latest)+ 按日期寻址的历史索引(history)。
 
     结构:
       {
@@ -965,20 +1022,36 @@ def write_index(out_dir, now, results, previous_latest=None):
         "latest": {
           "github-trending": "2026-07-15/00-44-data.json",
           ...
+        },
+        "history": {
+          "github-trending": {
+            "2026-07-15": "2026-07-15/00-44-data.json",
+            "2026-07-14": "2026-07-14/00-45-data.json",
+            ...
+          },
+          ...
         }
       }
 
-    latest 的相对路径是「相对于源目录」的(如 2026-07-15/00-44-data.json),
+    latest / history 的相对路径都是「相对于源目录」的(如 2026-07-15/00-44-data.json),
     客户端拼上 <source>/ 前缀即得完整路径。
 
-    指针来源(需求 a 修复):
+    latest 指针来源(需求 a 修复):
       1) 优先扫本地 out/ 取最新成功快照(_scan_latest)—— 本次成功的源。
       2) 本地扫不到的源(本次抓取失败 → out/<source>/ 不存在),从 previous_latest
          (上一次 index.json 的 latest)继承旧指针 —— 让客户端永远拿到有效数据。
          previous_latest 为空(未拉到 / --no-previous-index)时该源直接缺省。
+
+    history 索引(App「历史摘要」按日期查看当日快照/ai_summary):
+      每源 merge(previous_history, 本地 _scan_history)—— 同日以本地新扫描为准
+      (覆盖旧指向);再过滤掉早于 HISTORY_START_DATE 的日期,按日期字符串倒序
+      只保留前 HISTORY_RETENTION_DAYS 天(dict 保持插入序,json.dump 后按日期倒序可读)。
+      previous_history 为空(--no-previous-index)时只含本地扫描结果,与 latest 同语义。
     """
     previous_latest = previous_latest or {}
+    previous_history = previous_history or {}
     latest = {}
+    history = {}
     for name in SOURCES:
         rel = _scan_latest(out_dir, name)
         if rel:
@@ -987,10 +1060,17 @@ def write_index(out_dir, now, results, previous_latest=None):
             # 本次失败:继承上次成功指向(需求 a)
             latest[name] = previous_latest[name]
             print(f"[INDEX] {name:<20} 本次失败,保留旧指向 {previous_latest[name]}")
+        # history:旧索引整体继承,本地新扫描覆盖同日;再按起始日过滤、倒序截断
+        merged = dict(previous_history.get(name) or {})
+        merged.update(_scan_history(out_dir, name))
+        keep = [d for d in sorted(merged, reverse=True)
+                if d >= HISTORY_START_DATE][:HISTORY_RETENTION_DAYS]
+        history[name] = {d: merged[d] for d in keep}
     index = {
         "updated_at": now.strftime("%Y-%m-%dT%H:%M:%S%z"),
         "updated_at_ms": int(now.timestamp() * 1000),
         "latest": latest,
+        "history": history,
     }
     index_path = os.path.join(out_dir, "index.json")
     with open(index_path, "w", encoding="utf-8") as f:
@@ -1030,10 +1110,12 @@ def main():
     else:
         targets = list(SOURCES.items())
 
-    # 需求 a:拉上一次 index.json,失败源将继承其 latest 指针(见 write_index)。
+    # 需求 a:拉上一次 index.json,失败源继承其 latest 指针、history 索引整体合并
+    # (见 write_index)。
     previous_latest = {}
+    previous_history = {}
     if args.previous_index_url and not args.no_previous_index:
-        previous_latest = load_previous_latest(args.previous_index_url)
+        previous_latest, previous_history = load_previous_index(args.previous_index_url)
 
     do_summary = not args.no_summary
     if do_summary and not ai_summary.config_ready():
@@ -1080,8 +1162,10 @@ def main():
     with open(manifest_path, "w", encoding="utf-8") as f:
         json.dump(manifest, f, ensure_ascii=False, indent=2)
 
-    # index.json:每个源最新成功快照的相对路径(本地扫最新;失败源继承 previous_latest)
-    index_path = write_index(args.out_dir, now, results, previous_latest=previous_latest)
+    # index.json:每源最新快照指针(本地扫最新;失败源继承 previous_latest)
+    # + 按日期寻址的历史索引(与 previous_history 合并后按保留期截断)
+    index_path = write_index(args.out_dir, now, results, previous_latest=previous_latest,
+                             previous_history=previous_history)
 
     ok_count = sum(1 for r in results.values() if r["status"] == "ok")
     print(f"\n汇总: {ok_count}/{len(results)} 源成功;manifest → {manifest_path};index → {index_path}")
