@@ -72,6 +72,7 @@ import com.example.aihot.ui.more.AiServiceScreen
 import com.example.aihot.ui.more.FontScale
 import com.example.aihot.ui.more.MoreScreen
 import com.example.aihot.ui.more.SettingsScreen
+import com.example.aihot.ui.more.SourcesScreen
 import com.example.aihot.ui.more.FontChoice
 import com.example.aihot.ui.more.ThemeMode
 import com.example.aihot.ui.overview.OverviewScreen
@@ -155,6 +156,8 @@ private sealed interface Page {
     data object RundownAi : Page
     /** AIHot 精选 —— 原为独立根 tab,现改为从「更多」页进入的二级页(复用 FeaturedTab)。 */
     data object FeaturedHub : Page
+    /** 信息源(Sources) —— Hub 浏览区独立页,聚合 7 个第三方源 + AIHot 精选入口。从「更多」页进入。 */
+    data object Sources : Page
     data object BrowseHistory : Page
     /** 历史摘要 —— 可选日期列表(归档 history 索引),从「更多」页进入。 */
     data object SummaryArchive : Page
@@ -187,6 +190,7 @@ private fun Page.toBundle(): Bundle = Bundle().apply {
         is Page.ProductHunt -> putString("t", "ProductHunt")
         is Page.RundownAi -> putString("t", "RundownAi")
         is Page.FeaturedHub -> putString("t", "FeaturedHub")
+        is Page.Sources -> putString("t", "Sources")
         is Page.BrowseHistory -> putString("t", "BrowseHistory")
         is Page.SummaryArchive -> putString("t", "SummaryArchive")
         is Page.SummaryDate -> { putString("t", "SummaryDate"); putString("date", date) }
@@ -215,6 +219,7 @@ private fun pageFromBundle(b: Bundle): Page? {
         "ProductHunt" -> Page.ProductHunt
         "RundownAi" -> Page.RundownAi
         "FeaturedHub" -> Page.FeaturedHub
+        "Sources" -> Page.Sources
         "BrowseHistory" -> Page.BrowseHistory
         "SummaryArchive" -> Page.SummaryArchive
         "SummaryDate" -> b.getString("date")?.let { Page.SummaryDate(it) }
@@ -519,6 +524,7 @@ fun AIHotApp(openSettingsOnLaunch: Boolean = false) {
                             onOpenProductHunt = { push(Page.ProductHunt) },
                             onOpenRundownAi = { push(Page.RundownAi) },
                             onOpenFeaturedHub = { push(Page.FeaturedHub) },
+                            onOpenSources = { push(Page.Sources) },
                             onOpenBrowseHistory = { push(Page.BrowseHistory) },
                             onOpenSummaryArchive = { push(Page.SummaryArchive) },
                             onOpenUrl = openUrl,
@@ -553,6 +559,14 @@ fun AIHotApp(openSettingsOnLaunch: Boolean = false) {
                             onOpenUrl = openUrl,
                             onTitleResolved = onTitleResolved,
                             onOpenSettings = { push(Page.Settings) },
+                            onOpenHackerNews = { push(Page.HackerNews) },
+                            onOpenGitHubTrending = { push(Page.GitHubTrending) },
+                            onOpenLinuxDo = { push(Page.LinuxDo) },
+                            onOpenStormzhangAiNews = { push(Page.StormzhangAiNews) },
+                            onOpenHuggingFacePapers = { push(Page.HuggingFacePapers) },
+                            onOpenProductHunt = { push(Page.ProductHunt) },
+                            onOpenRundownAi = { push(Page.RundownAi) },
+                            onOpenFeaturedHub = { push(Page.FeaturedHub) },
                             configStore = configStore,
                             aiConfig = aiConfig,
                             usageStore = usageStore,
@@ -618,6 +632,7 @@ private fun TabRoot(
     onOpenProductHunt: () -> Unit,
     onOpenRundownAi: () -> Unit,
     onOpenFeaturedHub: () -> Unit,
+    onOpenSources: () -> Unit,
     onOpenBrowseHistory: () -> Unit,
     onOpenSummaryArchive: () -> Unit,
     onOpenUrl: (String, String, String?) -> Unit,
@@ -644,14 +659,7 @@ private fun TabRoot(
             onOpenFeaturedHub = onOpenFeaturedHub
         )
         AppTab.More -> MoreScreen(
-            onOpenHackerNews = onOpenHackerNews,
-            onOpenGitHubTrending = onOpenGitHubTrending,
-            onOpenLinuxDo = onOpenLinuxDo,
-            onOpenStormzhangAiNews = onOpenStormzhangAiNews,
-            onOpenHuggingFacePapers = onOpenHuggingFacePapers,
-            onOpenProductHunt = onOpenProductHunt,
-            onOpenRundownAi = onOpenRundownAi,
-            onOpenFeaturedHub = onOpenFeaturedHub,
+            onOpenSources = onOpenSources,
             onOpenBrowseHistory = onOpenBrowseHistory,
             onOpenSummaryArchive = onOpenSummaryArchive,
             onOpenSettings = onOpenSettings,
@@ -689,6 +697,15 @@ private fun PageView(
     onOpenUrl: (String, String, String?) -> Unit,
     onTitleResolved: (String, String) -> Unit,
     onOpenSettings: () -> Unit,
+    // 信息源(Sources)二级页内的 8 个源入口回调
+    onOpenHackerNews: () -> Unit,
+    onOpenGitHubTrending: () -> Unit,
+    onOpenLinuxDo: () -> Unit,
+    onOpenStormzhangAiNews: () -> Unit,
+    onOpenHuggingFacePapers: () -> Unit,
+    onOpenProductHunt: () -> Unit,
+    onOpenRundownAi: () -> Unit,
+    onOpenFeaturedHub: () -> Unit,
     configStore: AiConfigStore,
     aiConfig: AiConfig,
     usageStore: AiUsageStore,
@@ -822,6 +839,19 @@ private fun PageView(
             onBack = onBack,
             reselectSignal = 0,
             listState = pageListStates.forPage(page)
+        )
+        // 信息源(Hub 浏览区)二级页:聚合 7 个第三方源 + AIHot 精选入口。
+        // 原 MoreScreen 的「浏览」组,现独立成页。源入口透传到各自 Screen。
+        Page.Sources -> SourcesScreen(
+            onBack = onBack,
+            onOpenHackerNews = onOpenHackerNews,
+            onOpenGitHubTrending = onOpenGitHubTrending,
+            onOpenLinuxDo = onOpenLinuxDo,
+            onOpenStormzhangAiNews = onOpenStormzhangAiNews,
+            onOpenHuggingFacePapers = onOpenHuggingFacePapers,
+            onOpenProductHunt = onOpenProductHunt,
+            onOpenRundownAi = onOpenRundownAi,
+            onOpenFeaturedHub = onOpenFeaturedHub
         )
         Page.BrowseHistory -> BrowseHistoryScreen(
             repo = browseHistoryRepo,
