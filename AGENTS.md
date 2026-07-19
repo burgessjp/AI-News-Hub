@@ -14,7 +14,7 @@
 - **Hub 浏览区 7 个第三方源**：HackerNews（Firebase API）、GitHub Trending、LinuxDo 热榜、stormzhang AI 资讯、HuggingFace Papers、Product Hunt（V2 GraphQL API，需 Developer Token）、The Rundown AI（beehiiv 托管的 AI newsletter，首页 HTML 抓取）。其中 6 个稳定源（除 LinuxDo）有 gitcode 归档数据；5 个（除 LinuxDo 与 Product Hunt）支持「实时抓取 / gitcode 归档」双模式切换（`SourceMode`），Product Hunt 因 Developer Token 不进 APK 仅走归档（LIVE 模式也回落归档），LinuxDo 始终实时。归档数据来自配套的数据流水线（见下「数据流水线」）。
 - **「AIHot 精选」双通道**：原首页独立根 tab，现收进 Hub 浏览区末位二级页（复用 `FeaturedTab`，UI 含今日热点 + 最新精选列表 + 「全部 ›」入口）。二级页继续实时拉自有后端分页接口；摘要 Tab 第 7 张卡走 gitcode 归档预生成的 `ai_summary`（流水线抓 `/items?mode=selected&take=20`）。不参与 `SourceMode` 切换（自有后端无归档双通道语义，照 LinuxDo「只实时」套路，仅摘要卡读归档）。
 
-功能面：今日总览 Tab（默认首页，端侧 AI 对 7 源归档榜单的当日综合分析：Breaking News ≤3 条 + 今日热点 Top10，用户自配 key、当日指纹缓存）、摘要 Tab（7 个归档源当日 AI 中文要点）、历史摘要（更多页入口，按日期查看各源当日摘要）、AIHot 精选（今日热点 + 精选列表）/ 全部动态、AI 日报与归档、搜索（本地搜索历史 + 今日热点热词引导）、HN 评论树、AI 翻译（OpenAI 兼容服务，用户自配 key；选中翻译 + WebView 整页翻译）、内置 WebView（含阅读模式、整页翻译、网页下载、视频全屏）、浏览历史（Room）。
+功能面：今日总览 Tab（默认首页，端侧 AI 对 7 源归档榜单的当日综合分析：今日热点 Top10，其中 AI 判定为突发重磅的条目 ≤3 条、带 Breaking 标签特殊样式并计入 10 条总数，用户自配 key、当日指纹缓存）、摘要 Tab（7 个归档源当日 AI 中文要点）、历史摘要（更多页入口，按日期查看各源当日摘要）、AIHot 精选（今日热点 + 精选列表）/ 全部动态、AI 日报与归档、搜索（本地搜索历史 + 今日热点热词引导）、HN 评论树、AI 翻译（OpenAI 兼容服务，用户自配 key；选中翻译 + WebView 整页翻译）、内置 WebView（含阅读模式、整页翻译、网页下载、视频全屏）、浏览历史（Room）。
 
 ## 仓库结构
 
@@ -101,7 +101,7 @@ python3 scripts/fetch_data.py --out-dir out --no-summary --no-previous-index
 - 无 DI 框架：Repository 在 ViewModel / Composable 内直接构造。
 - 双模式取数（`data/source/`）：5 个稳定源（HackerNews / GitHub Trending / stormzhang AI / HuggingFace Papers / The Rundown AI）各有 `XxxSource` 接口 + 实时 Repository + `XxxArchiveRepository`，ViewModel 按 `SourceMode`（DataStore `display_prefs` 的 `source_mode`，默认 LIVE）选择实现。归档走 `ArchiveHttpClient`（gitcode 官方 REST API raw 端点，不用 raw 直链——背后是 WAF 会 403；index.json 有 2 分钟内存缓存 + Mutex 并发去重）。归档模式失败直接显示 Error 态，**不回退实时**。**Product Hunt 特殊**：Developer Token 是服务端 secret 不进 APK，故只有 `ProductHuntArchiveRepository`（无实时 Repository），两种 `SourceMode` 都走归档——与「LinuxDo 不参与切换始终实时」对称，PH 是「只归档」。
 - `SummaryRepository`：AI 摘要 Tab 的摘要**不在 App 端运行时生成**，直接读归档快照顶层 `ai_summary` 字段（由数据流水线预生成）；`ai_summary` 缺失即失败态。「历史摘要」经 `summarizeOn(source, date)` / `availableDates()` 走 index.json 的 `history` 索引按日期寻址（`ArchiveHttpClient.fetchHistory()` + `fetchSnapshot(source, relPath)`，每源仅保留最近 31 天且自 2026-07-18 起）。
-- `OverviewRepository`：总览 Tab 的数据源——端侧实时调用户自配 AI（经 `AiChatClient`），输入仅 7 个归档源当日快照（每源 `ai_summary` 作上下文 + items 前 8 条标题/简介/互动指标），输出严格 JSON（`ref="源key:序号"` 回源回填标题/URL，Breaking 0-3 条 + Top10）。缓存键 = 北京日期 + 7 源 latest 路径指纹（命中即不拉快照），单槽 `cacheDir/overview_digest.json` 覆盖、不留历史；read 超时放宽 120s；用量写 `AiUsageStore`。
+- `OverviewRepository`：总览 Tab 的数据源——端侧实时调用户自配 AI（经 `AiChatClient`），输入仅 7 个归档源当日快照（每源 `ai_summary` 作上下文 + items 前 8 条标题/简介/互动指标），输出严格 JSON（`ref="源key:序号"` 回源回填标题/URL，单一 items 列表 ≤10 条，其中 `breaking:true` 0-3 条、排最前并占 10 条名额）。缓存键 = 北京日期 + 7 源 latest 路径指纹（命中即不拉快照），单槽 `cacheDir/overview_digest.json` 覆盖、不留历史；read 超时放宽 120s；用量写 `AiUsageStore`。
 - `AiChatClient`：OpenAI 兼容 chat 调用统一出口（`${baseUrl}/chat/completions`，baseUrl 含版本段），App 内所有端侧 AI 功能都经此访问「设置 → AI 服务」里的用户配置。`chat()` 带可选 `readTimeoutSeconds`（默认 20s；长输出场景如总览综合分析由调用方放宽）。
 - `TranslationRepository`：运行时经 `AiChatClient` 调用户自配的 AI 服务（温度 0.3），SHA256 缓存到 `cacheDir` 文件，Mutex 按 key 防并发重复；成功后把 token 用量写入 `AiUsageStore`。`TranslateSelectionActivity` 响应 `ACTION_PROCESS_TEXT` 在系统选中菜单注册「译」；HN 评论翻译与 WebView 阅读模式「翻译本页」共用此仓库。
 - `NewsRepository`：自有后端 `/items`（cursor 分页）、`/hot-topics`、`/daily`、`/dailies`。

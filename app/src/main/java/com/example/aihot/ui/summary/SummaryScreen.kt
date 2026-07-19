@@ -1,5 +1,6 @@
 package com.example.aihot.ui.summary
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,6 +24,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -104,13 +106,16 @@ fun SummaryScreen(
                 title = "AI 摘要",
                 horizontalPadding = 18.dp,
                 actions = {
-                    // 刷新按钮在左(刷新中转圈),日期文案在右
+                    // 刷新按钮在左(刷新中转圈),日期文案在右;
+                    // 转圈与按钮同占 32dp,保证与日期文案的间距两种状态下一致
                     if (isRefreshing) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.primary
-                        )
+                        Box(modifier = Modifier.size(32.dp), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     } else {
                         IconButton(onClick = { vm.refresh() }, modifier = Modifier.size(32.dp)) {
                             Icon(

@@ -23,36 +23,36 @@ import java.util.TimeZone
 class AiConfigMissingException : RuntimeException("ai_config_missing")
 
 /**
- * 今日总览单条(Breaking / Top10 共用)——AI 只给 ref 与一句话,标题/链接/指标
+ * 今日总览单条——AI 只给 ref、一句话与 breaking 标记,标题/链接/指标
  * 由客户端按 ref 回源数据回填(AI 不抄 URL,省 token 且避免编造链接)。
  *
  * @param source 归档源 key(供 UI 取源名徽章)
  * @param title 原标题(来自快照,非 AI 输出)
  * @param url 点击落地页(内置 WebView)
  * @param metrics 互动指标行(如 "得分 512 · 评论 389");无指标的源为空串
- * @param comment AI 给出的一句话(breaking=上榜理由,top10=关注点分析)
+ * @param comment AI 给出的一句话(为什么重要/值得关注什么)
+ * @param breaking 是否「突发重磅」(多源交叉/数据爆发/重大发布;UI 特殊样式 + 标签)
  */
 data class OverviewEntry(
     val source: String,
     val title: String,
     val url: String,
     val metrics: String,
-    val comment: String
+    val comment: String,
+    val breaking: Boolean
 )
 
 /**
  * 今日总览结果。
  *
- * @param breaking 0-3 条突发重磅(AI 判定没有就给空数组,UI 整模块隐藏)
- * @param top10 今日热点,按重要性排序
+ * @param items 今日热点 Top10(breaking 条目排在最前,全部条目共 ≤10 条)
  * @param generatedAt 本次生成时刻(毫秒)
  * @param dataFetchedAt 输入快照中最新的 fetched_at_ms(「数据截至」)
  * @param missingSources 本次未能加载的源 key(页脚标注)
  * @param fromCache 是否命中当日缓存(未新调 AI)
  */
 data class OverviewDigest(
-    val breaking: List<OverviewEntry>,
-    val top10: List<OverviewEntry>,
+    val items: List<OverviewEntry>,
     val generatedAt: Long,
     val dataFetchedAt: Long,
     val missingSources: List<String>,
@@ -66,7 +66,7 @@ data class OverviewDigest(
  *
  * 与 [SummaryRepository] 的关键差异:摘要是流水线预生成、App 只读;总览是**端侧实时
  * 调用**用户在「设置 → AI 服务」配置的服务([AiChatClient]),对 7 个归档源当日快照
- * 做跨源综合分析(Breaking News + 今日热点 Top10)。
+ * 做跨源综合分析(今日热点 Top10,其中 AI 判定为突发重磅的条目带 breaking 标记)。
  *
  * 设计要点(复刻 [TranslationRepository] 范式):
  *  - 输入仅 7 个归档源快照(不接自有后端 /hot-topics、不接 LinuxDo 实时):每源取
@@ -75,8 +75,8 @@ data class OverviewDigest(
  *    命中缓存时**连快照都不拉**,一天正常只生成 1-2 次;缓存单槽覆盖,不留历史;
  *  - [Mutex] 全局串行防并发重复生成;成功后 token 用量写 [AiUsageStore];
  *  - 生成输出长(数千 token),read 超时放宽到 120s(见 [AiChatClient.chat]);
- *  - AI 只输出 `ref="源key:序号"` + 一句话,标题/URL/指标由客户端按 ref 回填;
- *    无效 ref 丢弃,breaking 截断到 [MAX_BREAKING]、top10 截断到 [MAX_TOP]。
+ *  - AI 只输出 `ref="源key:序号"` + 一句话 + breaking 标记,标题/URL/指标由客户端
+ *    按 ref 回填;无效 ref 丢弃,breaking 截断到 [MAX_BREAKING]、列表截断到 [MAX_TOP]。
  */
 class OverviewRepository(context: Context) {
 
@@ -134,10 +134,9 @@ class OverviewRepository(context: Context) {
         runCatching { usageStore.record(config.model, result.promptTokens, result.completionTokens) }
 
         // 3) 解析 + ref 回填
-        val (breaking, top10) = parseResult(result.content, snapshots)
+        val items = parseResult(result.content, snapshots)
         val digest = OverviewDigest(
-            breaking = breaking,
-            top10 = top10,
+            items = items,
             generatedAt = System.currentTimeMillis(),
             dataFetchedAt = snapshots.values.maxOf { it.optLong("fetched_at_ms", 0L) },
             missingSources = SummaryRepository.SOURCE_KEYS - snapshots.keys,
@@ -226,30 +225,36 @@ class OverviewRepository(context: Context) {
 
     // ===== AI 输出解析 =====
 
-    /** 解析 AI 输出为 (breaking, top10);top10 为空视为解析失败抛异常。 */
+    /**
+     * 解析 AI 输出为统一的热点列表;items 为空视为解析失败抛异常。
+     * 兜底策略(prompt 已要求但模型未必严格遵守):
+     *  - breaking 标记截断到 [MAX_BREAKING] 条(超出的按提交顺序降级为普通条目);
+     *  - 按落地 URL 去重(同一事件同链接跨源同现);
+     *  - breaking 条目稳定排序到最前,整体截断到 [MAX_TOP]。
+     */
     private fun parseResult(
         content: String,
         snapshots: Map<String, JSONObject>
-    ): Pair<List<OverviewEntry>, List<OverviewEntry>> {
+    ): List<OverviewEntry> {
         val json = JSONObject(extractJson(content))
-        val breaking = parseEntries(json.optJSONArray("breaking"), "reason", snapshots).take(MAX_BREAKING)
-        // 兜底去重:prompt 已要求 breaking/top10 互斥(模型未必严格遵守),
-        // 按落地 URL 剔除与 breaking 重复的条目(同链接跨源同现也顺带去重),再截断
-        val breakingUrls = breaking.mapTo(HashSet()) { it.url }
-        val top10 = parseEntries(json.optJSONArray("top10"), "analysis", snapshots)
-            .filter { it.url !in breakingUrls }
+        val entries = parseEntries(json.optJSONArray("items"), snapshots)
+        if (entries.isEmpty()) throw RuntimeException("AI 输出解析失败(items 为空)")
+        var breakingLeft = MAX_BREAKING
+        val urls = HashSet<String>()
+        return entries.map { e ->
+                if (e.breaking && breakingLeft > 0) { breakingLeft--; e } else e.copy(breaking = false)
+            }
+            .filter { urls.add(it.url) }
+            .sortedByDescending { it.breaking }  // 稳定排序,不打乱同级重要性次序
             .take(MAX_TOP)
-        if (top10.isEmpty()) throw RuntimeException("AI 输出解析失败(top10 为空)")
-        return breaking to top10
     }
 
     /**
      * 解析条目数组:按 ref 回源数据回填标题/URL/指标,丢弃无效 ref(源不存在、
-     * 序号越界、重复)。commentKey: breaking 用 "reason",top10 用 "analysis"。
+     * 序号越界、重复)。breaking 标记直接采纳 AI 输出,截断在 [parseResult] 统一做。
      */
     private fun parseEntries(
         arr: JSONArray?,
-        commentKey: String,
         snapshots: Map<String, JSONObject>
     ): List<OverviewEntry> {
         if (arr == null) return emptyList()
@@ -271,7 +276,8 @@ class OverviewRepository(context: Context) {
                 title = item.title,
                 url = item.url,
                 metrics = item.metrics,
-                comment = o.optString(commentKey).trim()
+                comment = o.optString("analysis").trim(),
+                breaking = o.optBoolean("breaking")
             )
         }
     }
@@ -301,7 +307,8 @@ class OverviewRepository(context: Context) {
         return fmt.format(Date())
     }
 
-    /** 读缓存;仅当 cacheKey 匹配时返回(fromCache=true),否则 null。文件损坏等同未命中。 */
+    /** 读缓存;仅当 cacheKey 匹配时返回(fromCache=true),否则 null。文件损坏或
+     * 旧版结构(breaking/top10 双数组,无 items 字段)等同未命中,重新生成一次即可。 */
     private suspend fun readCached(key: String): OverviewDigest? = withContext(Dispatchers.IO) {
         val f = cacheFile ?: return@withContext null
         if (!f.exists()) return@withContext null
@@ -309,15 +316,14 @@ class OverviewRepository(context: Context) {
         if (root.optString("cacheKey") != key) return@withContext null
         runCatching {
             OverviewDigest(
-                breaking = readEntries(root.optJSONArray("breaking")),
-                top10 = readEntries(root.optJSONArray("top10")),
+                items = readEntries(root.optJSONArray("items")),
                 generatedAt = root.optLong("generatedAt", 0L),
                 dataFetchedAt = root.optLong("dataFetchedAt", 0L),
                 missingSources = readStringList(root.optJSONArray("missingSources")),
                 model = root.optString("model"),
                 totalTokens = root.optInt("totalTokens", 0),
                 fromCache = true
-            ).takeIf { it.top10.isNotEmpty() }
+            ).takeIf { it.items.isNotEmpty() }
         }.getOrNull()
     }
 
@@ -330,8 +336,7 @@ class OverviewRepository(context: Context) {
             .put("missingSources", JSONArray().apply { digest.missingSources.forEach { put(it) } })
             .put("model", digest.model)
             .put("totalTokens", digest.totalTokens)
-            .put("breaking", writeEntries(digest.breaking))
-            .put("top10", writeEntries(digest.top10))
+            .put("items", writeEntries(digest.items))
         // 文件 IO 走 IO 线程;写失败吞掉,缓存写不进不影响生成结果
         withContext(Dispatchers.IO) { runCatching { f.writeText(root.toString()) } }
     }
@@ -345,7 +350,8 @@ class OverviewRepository(context: Context) {
                 title = o.optString("title"),
                 url = o.optString("url"),
                 metrics = o.optString("metrics"),
-                comment = o.optString("comment")
+                comment = o.optString("comment"),
+                breaking = o.optBoolean("breaking")
             ).takeIf { it.title.isNotBlank() && it.url.isNotBlank() }
         }
     }
@@ -359,6 +365,7 @@ class OverviewRepository(context: Context) {
                     .put("url", e.url)
                     .put("metrics", e.metrics)
                     .put("comment", e.comment)
+                    .put("breaking", e.breaking)
             )
         }
     }
@@ -379,21 +386,23 @@ class OverviewRepository(context: Context) {
         /** 低于此源数不生成(数据太少,分析无意义)。 */
         const val MIN_SOURCES = 4
 
+        /** 「突发重磅」标记上限(占 Top10 名额,不额外增加条数)。 */
         const val MAX_BREAKING = 3
+
+        /** 热点列表总条数上限(breaking 与普通条目共计)。 */
         const val MAX_TOP = 10
 
         val SYSTEM_PROMPT = """
 你是「AI News Hub」今日总览栏目的主编。输入是 7 个资讯源的今日榜单:每源附 AI 要点摘要,以及排名前若干条目(序号、标题、简介、互动指标)。请基于全部数据做当天整体研判。
 
 严格输出一个 JSON 对象,不要输出任何解释文字,不要使用 markdown 代码围栏:
-{"breaking":[{"ref":"源key:序号","reason":"一句话,不超过40字"}],"top10":[{"ref":"源key:序号","analysis":"一句话,不超过40字"}]}
+{"items":[{"ref":"源key:序号","analysis":"一句话,不超过40字","breaking":true}]}
 
 规则:
-1. breaking 是「突发重磅」:多源交叉报道、互动数据(得分/评论/票数/star)显著爆发、或重大发布与行业事件。0 到 3 条;不够格就返回空数组,宁缺毋滥,绝不硬凑。
-2. top10 是今日最值得关注的条目,按重要性排序;尽量覆盖不同源与主题(模型发布/产品/研究论文/开源项目/行业动态),同一事件只留最重要的一条;数据不足 10 条时有多少给多少,至少 5 条。
-3. breaking 与 top10 不得重复:已入选 breaking 的条目不要再放进 top10。
-4. ref 必须原样照抄输入中的「源key:序号」(如 hackernews:2),不得编造;标题与链接由客户端按 ref 回填,你不要输出标题和 URL。
-5. reason/analysis 用简体中文,一句话说清「为什么重要/值得关注什么」,不要复述标题。
+1. items 是今日最值得关注的条目,按重要性排序,最多 10 条;尽量覆盖不同源与主题(模型发布/产品/研究论文/开源项目/行业动态),同一事件只留最重要的一条;数据不足 10 条时有多少给多少,至少 5 条。
+2. 其中「突发重磅」标 "breaking":true:多源交叉报道、互动数据(得分/评论/票数/star)显著爆发、或重大发布与行业事件。0 到 3 条,宁缺毋滥,绝不硬凑;其余条目一律 "breaking":false。breaking 条目排在 items 最前,同样计入 10 条总数。
+3. ref 必须原样照抄输入中的「源key:序号」(如 hackernews:2),不得编造;标题与链接由客户端按 ref 回填,你不要输出标题和 URL。
+4. analysis 用简体中文,一句话说清「为什么重要/值得关注什么」,不要复述标题。
 """.trimIndent()
     }
 }

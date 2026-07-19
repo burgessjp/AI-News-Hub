@@ -2,7 +2,6 @@ package com.example.aihot.ui.overview
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -54,7 +53,6 @@ import com.example.aihot.ui.components.RankBadge
 import com.example.aihot.ui.components.SectionHeader
 import com.example.aihot.ui.theme.AppAlpha
 import com.example.aihot.ui.theme.AppText
-import com.example.aihot.ui.theme.BrandGradient
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -63,8 +61,8 @@ import java.util.Locale
  * 今日总览 Tab 根屏 —— 端侧 AI 对 7 个归档源当日榜单的跨源综合分析。
  *
  * 结构:
- *  - Breaking News 模块(0-3 条,[BrandGradient] 高亮卡;AI 判定没有则整模块不渲染)
- *  - 今日热点 Top10([RankBadge] + 原标题 + 一句话分析 + 来源/互动指标)
+ *  - 今日热点 Top10([RankBadge] + 原标题 + 一句话分析 + 来源/互动指标;
+ *    AI 判定为突发重磅的条目带「Breaking」标签与 tertiary 强调卡面,计入 10 条总数)
  *  - 页脚:生成时间 / 数据截至 / 模型与 token 消耗 / 缺源标注
  *
  * 与「摘要」tab 的分工:摘要是流水线预生成的分源要点(只读归档);总览是端侧实时
@@ -100,18 +98,21 @@ fun OverviewScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
-            // 一级根 tab 规格(对齐摘要/更多):titleHero 主标题 + 右侧日期 + 刷新
+            // 一级根 tab 规格(对齐摘要/更多):品牌主标题 + 右侧日期 + 刷新
             AppTopBar(
-                title = "今日总览",
+                title = "AI NEWS HUB",
                 horizontalPadding = 18.dp,
                 actions = {
-                    // 刷新按钮在左(刷新中转圈),日期文案在右
+                    // 刷新按钮在左(刷新中转圈),日期文案在右;
+                    // 转圈与按钮同占 32dp,保证与日期文案的间距两种状态下一致
                     if (isRefreshing) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.primary
-                        )
+                        Box(modifier = Modifier.size(32.dp), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     } else {
                         IconButton(onClick = { vm.refresh() }, modifier = Modifier.size(32.dp)) {
                             Icon(
@@ -198,41 +199,13 @@ private fun OverviewContent(
         contentPadding = PaddingValues(bottom = BottomBarReservedHeight),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        // Breaking News:AI 返回空数组时整模块不渲染(不硬塞)
-        if (digest.breaking.isNotEmpty()) {
-            item(key = "breaking-header", contentType = "header") {
-                SectionHeader(
-                    title = "Breaking News",
-                    accent = MaterialTheme.colorScheme.tertiary,
-                    trailing = {
-                        Text(
-                            text = "AI 判定",
-                            style = AppText.caption,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                )
-            }
-            itemsIndexed(
-                digest.breaking,
-                key = { i, e -> "breaking-$i-${e.url}" },
-                contentType = { _, _ -> "breaking" }
-            ) { _, entry ->
-                BreakingCard(
-                    entry = entry,
-                    onClick = { onOpenUrl(entry.url, entry.title, SummaryRepository.titleOf(entry.source)) },
-                    modifier = Modifier.padding(horizontal = 18.dp)
-                )
-            }
-        }
-
         item(key = "top10-header", contentType = "header") {
-            SectionHeader(title = "今日热点 Top${digest.top10.size}")
+            SectionHeader(title = "今日热点 Top${digest.items.size}")
         }
         itemsIndexed(
-            digest.top10,
+            digest.items,
             key = { i, e -> "top-$i-${e.url}" },
-            contentType = { _, _ -> "top10" }
+            contentType = { _, e -> if (e.breaking) "top10-breaking" else "top10" }
         ) { index, entry ->
             TopEntryRow(
                 rank = index + 1,
@@ -248,60 +221,29 @@ private fun OverviewContent(
     }
 }
 
-/**
- * Breaking 卡 —— [BrandGradient] 高亮(AI 特性专用渐变),onPrimary 文字。
- * 点击进内置 WebView(统一经 openUrl 记录浏览历史)。
- */
+/** 「Breaking」标签 —— breaking 条目卡内的小胶囊(tertiary 实底,热度强调色)。 */
 @Composable
-private fun BreakingCard(
-    entry: OverviewEntry,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
+private fun BreakingTag(modifier: Modifier = Modifier) {
     val cs = MaterialTheme.colorScheme
-    Column(
+    Box(
         modifier = modifier
-            .fillMaxWidth()
-            .clip(MaterialTheme.shapes.medium)
-            .background(BrandGradient)
-            .clickable(onClick = onClick)
-            .padding(16.dp)
+            .clip(MaterialTheme.shapes.small)
+            .background(cs.tertiary)
+            .padding(horizontal = 6.dp, vertical = 2.dp)
     ) {
         Text(
-            text = entry.title,
-            style = AppText.titleItem,
+            text = "Breaking",
+            style = AppText.caption,
             fontWeight = FontWeight.Bold,
-            color = cs.onPrimary
+            color = cs.onTertiary
         )
-        if (entry.comment.isNotBlank()) {
-            Spacer(Modifier.height(6.dp))
-            Text(
-                text = entry.comment,
-                style = AppText.bodySmall,
-                color = cs.onPrimary.copy(alpha = AppAlpha.primaryEmphasis)
-            )
-        }
-        Spacer(Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            SourceChip(
-                title = SummaryRepository.titleOf(entry.source),
-                onGradient = true
-            )
-            if (entry.metrics.isNotBlank()) {
-                Spacer(Modifier.size(8.dp))
-                Text(
-                    text = entry.metrics,
-                    style = AppText.caption,
-                    color = cs.onPrimary.copy(alpha = AppAlpha.primaryEmphasis),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-        }
     }
 }
 
-/** Top10 行:排名徽章 + 原标题 + AI 一句话 + 来源/指标,与其它榜单屏同语言。 */
+/**
+ * Top10 行:排名徽章 + 原标题 + AI 一句话 + 来源/指标,与其它榜单屏同语言。
+ * breaking 条目特殊样式:tertiary 浅底 + 同色描边 + 「Breaking」标签。
+ */
 @Composable
 private fun TopEntryRow(
     rank: Int,
@@ -312,9 +254,12 @@ private fun TopEntryRow(
     val cs = MaterialTheme.colorScheme
     Surface(
         modifier = modifier.fillMaxWidth(),
-        color = cs.surfaceContainerLow,
+        color = if (entry.breaking) cs.tertiary.copy(alpha = AppAlpha.badgeOverlay) else cs.surfaceContainerLow,
         shape = MaterialTheme.shapes.medium,
-        border = BorderStroke(1.dp, cs.outlineVariant),
+        border = BorderStroke(
+            1.dp,
+            if (entry.breaking) cs.tertiary.copy(alpha = AppAlpha.badgeOutline) else cs.outlineVariant
+        ),
         tonalElevation = 0.dp,
         shadowElevation = 0.dp,
         onClick = onClick
@@ -323,6 +268,10 @@ private fun TopEntryRow(
             RankBadge(rank = rank, modifier = Modifier.padding(top = 1.dp))
             Spacer(Modifier.size(12.dp))
             Column(modifier = Modifier.weight(1f)) {
+                if (entry.breaking) {
+                    BreakingTag()
+                    Spacer(Modifier.height(4.dp))
+                }
                 Text(
                     text = entry.title,
                     style = AppText.body,
@@ -343,7 +292,7 @@ private fun TopEntryRow(
                 }
                 Spacer(Modifier.height(6.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    SourceChip(title = SummaryRepository.titleOf(entry.source), onGradient = false)
+                    SourceChip(title = SummaryRepository.titleOf(entry.source))
                     if (entry.metrics.isNotBlank()) {
                         Spacer(Modifier.size(8.dp))
                         Text(
@@ -360,19 +309,17 @@ private fun TopEntryRow(
     }
 }
 
-/** 来源徽章:渐变卡上用 onPrimary 底衬,普通卡上用 surfaceContainerHigh。 */
+/** 来源徽章:surfaceContainerHigh 底衬小胶囊。 */
 @Composable
-private fun SourceChip(title: String, onGradient: Boolean) {
+private fun SourceChip(title: String) {
     val cs = MaterialTheme.colorScheme
-    val bg = if (onGradient) cs.onPrimary.copy(alpha = AppAlpha.onPrimaryOverlay) else cs.surfaceContainerHigh
-    val fg = if (onGradient) cs.onPrimary else cs.onSurfaceVariant
     Box(
         modifier = Modifier
             .clip(CircleShape)
-            .background(bg)
+            .background(cs.surfaceContainerHigh)
             .padding(horizontal = 8.dp, vertical = 2.dp)
     ) {
-        Text(text = title, style = AppText.caption, color = fg, maxLines = 1)
+        Text(text = title, style = AppText.caption, color = cs.onSurfaceVariant, maxLines = 1)
     }
 }
 
