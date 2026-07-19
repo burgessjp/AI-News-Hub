@@ -1,142 +1,76 @@
 # AGENTS.md
 
-本文件面向 AI 编码代理，介绍本仓库的结构、构建方式与开发约定。阅读前无需任何项目背景。
-
-> 注：仓库另有 `CLAUDE.md`，内容与本文件大量重叠但可能滞后；以本文件为准。
-
-## 项目概述
+面向 AI 编码代理的项目约定。只写「猜不到 / 易踩坑 / 反默认」的内容，其余请直接读对应文件。
 
 **AIHot**（应用名 "AI News Hub"）—— Android AI 资讯聚合客户端。Kotlin + Jetpack Compose + Material3，单模块（`:app`），包名 / namespace / applicationId 均为 `com.example.aihot`。
 
-数据来源全部为第三方服务（App 端无自有后端）：
-
-- **`aihot.virxact.com` 公开 API**（第三方 AI 资讯服务）：动态分页 `/items`、今日热点 `/hot-topics`、AI 日报 `/daily`、归档 `/dailies`。其中 `/items?mode=selected` 的「精选 TOP20」也被数据流水线抓取落 gitcode 归档，供摘要 Tab 消费（见下「数据流水线」）。
-- **Hub 浏览区 7 个第三方源**：HackerNews（Firebase API）、GitHub Trending、LinuxDo 热榜、stormzhang AI 资讯、HuggingFace Papers、Product Hunt（V2 GraphQL API，需 Developer Token）、The Rundown AI（beehiiv 托管的 AI newsletter，首页 HTML 抓取）。其中 6 个稳定源（除 LinuxDo）有 gitcode 归档数据；5 个（除 LinuxDo 与 Product Hunt）支持「实时抓取 / gitcode 归档」双模式切换（`SourceMode`），Product Hunt 因 Developer Token 不进 APK 仅走归档（LIVE 模式也回落归档），LinuxDo 始终实时。归档数据来自配套的数据流水线（见下「数据流水线」）。
-- **「AIHot 精选」双通道**：原首页独立根 tab，现收进 Hub 浏览区末位二级页（复用 `FeaturedTab`，UI 含今日热点 + 最新精选列表 + 「全部 ›」入口）。二级页继续实时拉 `aihot.virxact.com` 分页接口；摘要 Tab 第 7 张卡走 gitcode 归档预生成的 `ai_summary`（流水线抓 `/items?mode=selected&take=20`）。不参与 `SourceMode` 切换（此源无归档双通道语义，照 LinuxDo「只实时」套路，仅摘要卡读归档）。
-
-功能面：今日总览 Tab（默认首页，端侧 AI 对 7 源归档榜单的当日综合分析：今日热点 Top10，其中 AI 判定为突发重磅的条目 ≤3 条、带 Breaking 标签特殊样式并计入 10 条总数，用户自配 key、当日指纹缓存）、摘要 Tab（7 个归档源当日 AI 中文要点）、历史摘要（更多页入口，按日期查看各源当日摘要）、AIHot 精选（今日热点 + 精选列表）/ 全部动态、AI 日报与归档、搜索（本地搜索历史 + 今日热点热词引导）、HN 评论树、AI 翻译（OpenAI 兼容服务，用户自配 key；选中翻译 + WebView 整页翻译）、内置 WebView（含阅读模式、整页翻译、网页下载、视频全屏）、浏览历史（Room）。
-
-## 仓库结构
-
-```
-app/                     唯一 Android 模块
-  src/main/java/com/example/aihot/
-    MainActivity.kt      自定义多栈导航 + Page/Screen 路由（不用 Navigation Compose）
-    data/                Repository、数据模型、Room、DataStore 配置
-    data/source/         SourceMode(LIVE/ARCHIVE)、ArchiveHttpClient、各源归档实现
-    ui/                  ViewModel 与 Screen，按功能分包（tabs/summary/overview/items/daily/more/
-                         webview/components/theme/anim/translate）
-  src/main/assets/       readability.js（Mozilla Readability 0.6，Apache-2.0，
-                         WebView 阅读模式提取正文用，经 evaluateJavascript 注入）
-scripts/                 Python 数据流水线 + 图标生成脚本（见「数据流水线」）
-.github/workflows/       build.yml / release.yml / fetch-data.yml
-docs/news-hub-data-usage.md  数据仓库（gitcode AI-News-Hub-Data）格式与消费方式文档
-gradle/libs.versions.toml    版本目录（所有依赖版本集中在此）
-```
-
-关键构建文件：根 `build.gradle.kts`（仅插件声明）、`app/build.gradle.kts`（签名/构建类型/依赖）、`settings.gradle.kts`、`gradle.properties`、`app/proguard-rules.pro`。
-
-## 构建与常用命令
+## 构建
 
 ```bash
-./gradlew assembleDebug        # 编译 debug（日常验证手段）
+./gradlew assembleDebug        # 日常验证手段（项目无单测、无 lint）
 ./gradlew installDebug         # 安装到设备
-./gradlew assembleRelease      # 编译 release（需签名配置，见「安全注意事项」）
-./gradlew installRelease
+./gradlew assembleRelease      # 需签名配置，见「安全红线」
 ```
 
-工具链：AGP 8.7.3、Kotlin 2.0.21（Compose 编译器插件）、KSP 2.0.21-1.0.28（Room）、JDK/JVM target 17、minSdk 24、compileSdk/targetSdk 35、Compose BOM 2024.12.01。版本改动只动 `gradle/libs.versions.toml`。
+**没有单元测试、没有 lint**（`app/src` 下只有 `main`）。改动后至少跑 `assembleDebug` 确认编译通过，再真机手测。工具链版本一律以 `gradle/libs.versions.toml` 为准，不在此重复。
 
-## 测试与验证
+## 编码约定（与默认不同，务必遵守）
 
-**没有单元测试、没有 lint 配置**（`app/src` 下只有 `main`）。验证方式就是 `assembleDebug` 编译通过 + 真机/模拟器手测。改动后至少跑 `./gradlew assembleDebug` 确认编译通过。
+- **注释用中文，代码/变量名用英文**（与存量代码一致）。
+- **不引入 Retrofit / Gson / Moshi**：网络一律 `OkHttpClient`，JSON 用内置 `org.json`，HTML 抓取用 jsoup。
+- **不用 Navigation Compose**（见下「导航」），**无 DI 框架**：Repository 在 ViewModel / Composable 内直接构造。
+- 字号一律 `AppText.xxx`、透明度一律 `AppAlpha.xxx`、圆角一律 `MaterialTheme.shapes` 或 `CircleShape`、颜色只走 `colorScheme`——不散落 `.sp`/`.alpha`/hex 字面量（源品牌色集中在 `ui/more/SourceBrandColors.kt` 是唯一例外）。列表排名/统计/章节条/骨架屏统一复用 `ui/components/` 现有组件，不新建私有拷贝。
+- 协程 + Flow：`StateFlow` 驱动 UI，`collectAsStateWithLifecycle` 订阅；网络在 Repository 内切 `Dispatchers.IO`；并发去重用 `Mutex.withLock`。
+- release 开启 R8 + shrinkResources；`com.example.aihot.data.**` 已全部保留（`app/proguard-rules.pro`），新增需反射/序列化保留的类时同步补规则。
 
-## CI/CD 与发布
+## 导航（MainActivity.kt，自实现多栈）
 
-- `.github/workflows/build.yml`：push / PR 到 main 时跑 `./gradlew assembleDebug` 并上传 debug APK 构件。
-- `.github/workflows/release.yml`：打 `v*` tag 触发。用 secrets 还原 keystore 与 `keystore.properties` → `assembleRelease` → 创建 GitHub Release 并附 APK。所需 secrets：`RELEASE_KEYSTORE_BASE64` / `RELEASE_STORE_PASSWORD` / `RELEASE_KEY_ALIAS` / `RELEASE_KEY_PASSWORD`。
-- `.github/workflows/fetch-data.yml`：数据流水线（见下节），每天北京时间 07:00 / 15:00 定时 + 手动触发。
+- 3 个根 tab（总览/摘要/更多）+ 每 tab 独立二级页栈；`Page` 是 sealed interface，经 `toBundle()`/`pageFromBundle()` + 自定义 `Saver` 挂 `rememberSaveable`，进程被杀可恢复。切 tab 保留各自栈。
+- ⚠️ **新增二级页必须同步加三处**：`Page` 子类、`toBundle`/`pageFromBundle` 分支、`PageView` 分支。
+- ⚠️ **含列表/页码的页，`LazyListState`/`PagerState` 一律在 `AIHotApp` 层持有并下传**——`AnimatedContent` 换页即销毁屏内 `remember`/`rememberSaveable`，屏内自持会丢滚动位置。不要在屏内 `rememberLazyListState()`。
+- ⚠️ 含 WebView 的页转场 override 为 `FADE`（横向位移会让 AndroidView 撕裂），其余约定见 `ui/anim/Motion.kt`。
+- `openUrl` 是打开网页的**唯一入口**（统一记录浏览历史 + push `Page.Web`），全 App 链接都走内置 WebView，不走外部浏览器。
+
+## 数据层（data/）
+
+- **双模式取数 `SourceMode`**（DataStore `display_prefs` 的 `source_mode`，默认 LIVE）：5 个稳定源（HackerNews / GitHub Trending / stormzhang AI / HuggingFace Papers / The Rundown AI）可切 LIVE / ARCHIVE。
+  - **Product Hunt 只归档**（Developer Token 是服务端 secret 不进 APK，两种模式都走归档），**LinuxDo 只实时**。
+  - 归档走 `ArchiveHttpClient`（gitcode **REST API raw 端点**，**不要**用 raw 直链——背后是 WAF 会 403）。
+  - **归档失败直接显示 Error 态，不回退实时**。
+- **摘要 Tab 不在 App 端生成 AI 摘要**，直接读归档快照顶层 `ai_summary` 字段（流水线预生成），缺失即失败态。
+- 端侧 AI（总览综合分析 / 翻译 / 系统选中译）统一经 `AiChatClient` 访问「设置 → AI 服务」里的用户配置。
+- 数据模型：`NewsItem` / `HackerNewsStory` 用 `@Parcelize`。
+
+## 持久化
+
+- DataStore：`display_prefs`（主题 / 动态取色 / 字体族 / 字号档位 / 源模式 / 搜索历史）、`ai_prefs`（全局 AI 服务配置 + 按「模型 × 月」聚合的 token 用量）。
+- Room（`aihot.db`，version 1，`fallbackToDestructiveMigration`）：仅浏览历史。
+- HN 列表缓存、翻译缓存为 `cacheDir` 下 JSON 文件。
 
 ## 数据流水线（scripts/）
 
-App「Hub」浏览区归档数据的生产端：抓 7 个第三方源 → AI 总结 → 推送到 gitcode 数据仓库 `peng1818/AI-News-Hub-Data` 的 `news-hub-data` 分支。数据格式详见 `docs/news-hub-data-usage.md`。
+`pipeline.sh` 是唯一编排入口（CI 与本地都调它）。缺这 4 个环境变量之一直接 `exit 1`：
 
-- `pipeline.sh` —— 唯一编排入口（CI 与本地都调它）：执行前检测 4 个环境变量（缺任一直接 exit 1）：`AI_NEWS_HUB_AI_BASE_URL` / `AI_NEWS_HUB_AI_MODEL` / `AI_NEWS_HUB_AI_API_KEY` / `GITCODE_TOKEN`。
-- `fetch_data.py` —— 抓取 8 源落盘 `out/`（7 个第三方站点源 + AIHot 精选来自第三方服务 `aihot.virxact.com` 的 `/items?mode=selected&take=20`）。单源独立重试 3 次（2s/4s），失败源跳过且 `index.json` latest 指针从上一次继承（客户端永远拿到有效数据）；≥1 源成功退出码即为 0。日期/路径统一北京时间（CI 设 `TZ=Asia/Shanghai`）。`index.json` 除 `latest` 外还维护 `history` 索引（source → date → 当日最后快照，合并上一次索引、每源只留最近 31 天且不早于 `HISTORY_START_DATE`=2026-07-18），供 App「历史摘要」按日期寻址。Product Hunt 源走 V2 GraphQL API，需可选环境变量 `PRODUCT_HUNT_KEY`（Developer Token；缺失该源失败跳过，不阻断其余源，也不在 `pipeline.sh` 的 4 个硬依赖 env 之列）。The Rundown AI 源抓首页文章卡片墙（jsoup HTML，无 token/无 CF 挑战）。AIHot 精选源调 `aihot.virxact.com` 公开 JSON API（无 token，UA 必填）。
-- `ai_summary.py` —— 给 7 个稳定源（linuxdo 除外）生成简体中文要点写入快照顶层 `ai_summary` 字段（OpenAI 兼容调用，temperature 0.5）；失败仅 warn，不阻断落盘。
-- `push_data.py` —— 把 `out/` 提交推送到数据仓库（token 注入 URL，需 `GITCODE_TOKEN`）。
-- `backfill_history.py` —— history 索引维护脚本：重建 `index.json` 的 `history`（扫浅克隆里的既有日期目录，按 `write_index` 同款规则含起始日过滤）；`--prune` 删除仓库里早于 `HISTORY_START_DATE` 的日期目录（`_overlay` 只增不删，删除只能在此显式做）。2026-07-19 已执行回填 + 清理（历史自 07-18 起）；日常无需执行。
-- `gen_icon.py` / `gen_icon_svg.py` + `icon.svg` —— 启动图标生成（PIL/NumPy；SVG 版依赖 macOS `qlmanage`）。
-- `gen_wordmark.py` —— 总览页顶栏 wordmark（`drawable/ic_wordmark.xml` + `values*/colors.xml`）生成：fontTools 把 Inter 字形的 "AI NEWS HUB" 转矢量路径，与「光环+核」图形合成 VectorDrawable；预览渲染优先 headless Chrome（缺省回落 `qlmanage`）。
-
-本地运行：
-
-```bash
-pip install -r scripts/requirements.txt   # requests / beautifulsoup4 / playwright
-python -m playwright install --with-deps chromium   # 仅 LinuxDo 源过 Cloudflare 需要
-export AI_NEWS_HUB_AI_BASE_URL=... AI_NEWS_HUB_AI_MODEL=... AI_NEWS_HUB_AI_API_KEY=... GITCODE_TOKEN=...
-export PRODUCT_HUNT_KEY=...               # 可选:Product Hunt Developer Token,缺失则该源失败跳过
-bash scripts/pipeline.sh
-# 本地干跑（跳过 AI 总结与旧 index 继承）：
-python3 scripts/fetch_data.py --out-dir out --no-summary --no-previous-index
+```
+AI_NEWS_HUB_AI_BASE_URL / AI_NEWS_HUB_AI_MODEL / AI_NEWS_HUB_AI_API_KEY / GITCODE_TOKEN
 ```
 
-`out/`、`repo/`（推送前浅克隆目录）、`__pycache__/` 均已 gitignore。已知风险：LinuxDo 套 Cloudflare 强挑战，CI 数据中心 IP 常被拦，单源失败属预期行为。
+- 抓 8 源（7 个第三方站点 + `aihot.virxact.com` 精选 `/items?mode=selected&take=20`）→ AI 总结 → 推送到 gitcode 数据仓库 `peng1818/AI-News-Hub-Data` 的 `news-hub-data` 分支。
+- 单源失败跳过且 `index.json` latest 指针从上一次继承（客户端永远拿到有效数据），≥1 源成功退出码即为 0。日期统一北京时间。
+- LinuxDo 套 Cloudflare 强挑战，CI 单源失败属预期行为。
+- 数据格式详见 `docs/news-hub-data-usage.md`；各脚本行为见脚本头注释。
 
-## App 架构
+## CI/CD
 
-### 导航（MainActivity.kt，不用 Navigation Compose）
+`.github/workflows/`：`build.yml`（PR 跑 `assembleDebug`）/ `release.yml`（`v*` tag 发版，从 secrets 还原 keystore）/ `fetch-data.yml`（每日定时跑数据流水线）。
 
-- 3 个根 tab（`AppTab`，entries 顺序即底栏顺序）：总览 `Overview`（默认首页）/ 摘要 `Summary` / 更多 `More`；`currentTab` + `pageStacks: Map<AppTab, List<Page>>` 每 tab 独立二级页栈，切 tab 保留各自栈。**重击当前 tab**：栈非空则清栈回根页；已在根则递增 `reselectTick`，根屏消费为「滚回顶部 + 刷新」（总览为缓存感知刷新：指纹未变零开销）。总览 tab 是端侧实时调用户自配 AI 的当日综合分析（`ui/overview/`），未配置 AI 服务时显示全屏引导（`ConfigMissing` → `Page.AiService`）。注：「更多」页首项为「信息源」聚合入口（`Page.Sources` → `ui/more/SourcesScreen.kt`，Hub 浏览区独立页，含 7 个第三方源 + AIHot 精选 8 个磁贴，原内嵌在 MoreScreen 的「浏览」组）；「AIHot 精选」原为根 tab `Featured`，现收进信息源页末位（`Page.FeaturedHub`，复用 `FeaturedTab`）。
-- `Page` 是 private sealed interface（Detail/Web/All/Daily/Search/Settings/AiService/About/HackerNews/HackerNewsComments/GitHubTrending/LinuxDo/StormzhangAiNews/HuggingFacePapers/ProductHunt/RundownAi/FeaturedHub/Sources/BrowseHistory/SummaryArchive/SummaryDate/DailyArchive/DailyDate），经 `toBundle()`/`pageFromBundle()` + 自定义 `Saver` 挂到 `rememberSaveable`，进程被杀可恢复。**新增二级页必须同步加：Page 子类、toBundle/pageFromBundle 分支、PageView 分支。**
-- 转场集中在 `ui/anim/Motion.kt`：常规导航走 `pageTransition()`（默认 PUSH＝横向位移+淡化，前进新页从右滑入、返回退出页在最上层滑出右缘即 `targetContentZIndex = -1f`；含 WebView 的页 override 为 FADE，AndroidView 位移/缩放会撕裂；tab 切换 NONE↔NONE 为错峰 crossfade），预测返回手势走 `predictivePopTransition()`（LinearEasing 与手指 1:1、按 `swipeEdge` 决定滑出方向、退出页 scaleOut 0.9 + 淡出；由 `MainActivity` 的 `seekMode`/`backSwipeEdge` 状态切换，新增二级页仍只需标注 `PageNavStyle`）。转场由 `SeekableTransitionState` + `rememberTransition` 驱动：普通导航 `animateTo`，预测返回手势期间按进度 `seekTo`。
-- **列表/页码滚动状态不上屏内自持**：`AnimatedContent` 换页即销毁页内 `remember`/`rememberSaveable`（实测 `rememberPagerState` 也会丢），下层页重返组合时滚动位置被重置。故 `LazyListState`/`PagerState` 一律在 `AIHotApp` 层持有（摘要 tab 的 `summaryPagerState`、总览 tab 的 `overviewListState` 上提；二级页含「AIHot 精选」复用的 FeaturedTab 按 `Page` 值存 `pageListStates` map、含 Pager 的页（历史摘要按日期页）存 `pagePagerStates` map，弹出即清理）并下传——新增含列表的页面时遵循同一约定，不要在屏内 `rememberLazyListState()`。
-- `WebViewScreen` 延迟挂载 WebView（`attachWeb`，进页 350ms 后才创建）：WebView factory 的主线程重活会吃掉进入转场的帧，实测转场被拉长且淡入目标是白屏；创建完成后经 `AnimatedVisibility` 淡入，避免硬切弹出。功能面：顶栏「更多」菜单（刷新/前进/后退/复制链接/在浏览器打开/关闭页面）+ 域名副标题、主帧失败错误态（`ErrorState` 重试）、长按图片/链接操作、HTML5 视频全屏（`onShowCustomView` 覆盖层）、http(s)/blob/data: 三类下载、字号跟随 `FontScale`（`textZoom`）、UA 基于系统 WebView UA 去 `wv` 标记伪装移动 Chrome。阅读模式与整页翻译在 `ui/webview/ReaderMode.kt`：注入 assets `readability.js` 提取正文套模板 `loadDataWithBaseURL` 渲染（baseUrl 带 `#aihot-reader` 哨兵 fragment，`onPageStarted` 据此判定阅读态；模板声明 `color-scheme` 自带暗色，避免算法深色叠加），「翻译本页」按块调 `TranslationRepository`，译文不改写原页，在 `ModalBottomSheet` 弹层（半屏起步、可拖拽全屏/拖下关闭）与原文对照展示、逐批渐进刷新（遵循「AI 服务」页翻译开关，总字符上限 12000）。
-- 返回键：根 `PredictiveBackHandler`（activity-compose 1.10+）pop 当前 tab 栈——手势滑动时实时预览上一级页面，松手完成 pop、中途取消回弹（API < 34 退化为普通返回动画）；`WebViewScreen` 内层 `BackHandler` 优先——网页有可退历史时先 `goBack()` 退网页历史，退到首页后才 pop 整页。Manifest 已开 `enableOnBackInvokedCallback`（Android 13/14 退回桌面预览；15+ 默认）。
-- 浮动药丸底栏：`Box` 叠层而非 `Scaffold(bottomBar)`；内容 edge-to-edge，底栏 overlay 在 BottomCenter，二级页 `AnimatedVisibility` 滑出；列表用 `BottomBarReservedHeight` 预留底部空间（二级页列表如「全部动态」经 `ItemsScreen(reserveBottomBarSpace=false)` 不再预留）。底栏容器为近实底（`AppAlpha.bottomBarSurface` 0.94，遮内容透出）+ 3dp 浮起阴影（卡片零阴影惯例的唯一例外）+ `glassEdge` 白描边。可见性跟随转场目标（`isRoot || navTransitionState.targetState is Screen.Root`）：预测返回手势 seek 向根页时底栏随转场滑入，不再在 pop 完成后突兀出现。
-- `openUrl` 是打开网页的唯一入口：在此统一记录浏览历史（Room），再 push `Page.Web`。全 App 链接（含关于页、HN 评论内 HTML 链接）都收进内置 WebView，不走外部浏览器；`MainActivity` 支持 `EXTRA_OPEN_SETTINGS` 启动直达设置页（系统选中翻译的「去设置」用）。
+## 安全红线
 
-### 数据层（data/）
+- **签名密钥绝不入库**：`*.jks`、`*.keystore`、`keystore.properties` 均已 gitignore；本地 release 需自行放 `keystore.properties` + `app/aihot-release.jks`，CI 从 secrets 还原。
+- **`GITCODE_TOKEN` 与流水线 AI 配置仅经环境变量注入**，代码里不得硬编码任何 key。
+- `network_security_config.xml` 全域名禁明文流量、仅系统 CA——不要为调试放开 cleartext。
+- AI / 翻译 key 由用户自填、存 App 私有目录（DataStore），不进 APK、不进日志、不上报。
 
-- 网络一律 `OkHttpClient`（connect 15s / read 20s / 浏览器 UA），**不引入 Retrofit**；JSON 用内置 `org.json`，**不引入 Gson/Moshi**；HTML 抓取用 jsoup（GitHub Trending / stormzhang / HuggingFace / The Rundown AI）。
-- 无 DI 框架：Repository 在 ViewModel / Composable 内直接构造。
-- 双模式取数（`data/source/`）：5 个稳定源（HackerNews / GitHub Trending / stormzhang AI / HuggingFace Papers / The Rundown AI）各有 `XxxSource` 接口 + 实时 Repository + `XxxArchiveRepository`，ViewModel 按 `SourceMode`（DataStore `display_prefs` 的 `source_mode`，默认 LIVE）选择实现。归档走 `ArchiveHttpClient`（gitcode 官方 REST API raw 端点，不用 raw 直链——背后是 WAF 会 403；index.json 有 2 分钟内存缓存 + Mutex 并发去重）。归档模式失败直接显示 Error 态，**不回退实时**。**Product Hunt 特殊**：Developer Token 是服务端 secret 不进 APK，故只有 `ProductHuntArchiveRepository`（无实时 Repository），两种 `SourceMode` 都走归档——与「LinuxDo 不参与切换始终实时」对称，PH 是「只归档」。
-- `SummaryRepository`：AI 摘要 Tab 的摘要**不在 App 端运行时生成**，直接读归档快照顶层 `ai_summary` 字段（由数据流水线预生成）；`ai_summary` 缺失即失败态。「历史摘要」经 `summarizeOn(source, date)` / `availableDates()` 走 index.json 的 `history` 索引按日期寻址（`ArchiveHttpClient.fetchHistory()` + `fetchSnapshot(source, relPath)`，每源仅保留最近 31 天且自 2026-07-18 起）。
-- `OverviewRepository`：总览 Tab 的数据源——端侧实时调用户自配 AI（经 `AiChatClient`），输入仅 7 个归档源当日快照（每源 `ai_summary` 作上下文 + items 前 8 条标题/简介/互动指标），输出严格 JSON（`ref="源key:序号"` 回源回填标题/URL，单一 items 列表 ≤10 条，其中 `breaking:true` 0-3 条、排最前并占 10 条名额）。缓存键 = 北京日期 + 7 源 latest 路径指纹（命中即不拉快照），单槽 `cacheDir/overview_digest.json` 覆盖、不留历史；read 超时放宽 120s；用量写 `AiUsageStore`。
-- `AiChatClient`：OpenAI 兼容 chat 调用统一出口（`${baseUrl}/chat/completions`，baseUrl 含版本段），App 内所有端侧 AI 功能都经此访问「设置 → AI 服务」里的用户配置。`chat()` 带可选 `readTimeoutSeconds`（默认 20s；长输出场景如总览综合分析由调用方放宽）。
-- `TranslationRepository`：运行时经 `AiChatClient` 调用户自配的 AI 服务（温度 0.3），SHA256 缓存到 `cacheDir` 文件，Mutex 按 key 防并发重复；成功后把 token 用量写入 `AiUsageStore`。`TranslateSelectionActivity` 响应 `ACTION_PROCESS_TEXT` 在系统选中菜单注册「译」；HN 评论翻译与 WebView 阅读模式「翻译本页」共用此仓库。
-- `NewsRepository`：第三方服务 `aihot.virxact.com` 的 `/items`（cursor 分页）、`/hot-topics`、`/daily`、`/dailies`。
-- 数据模型集中在 `NewsItem.kt` / `HackerNews.kt` / 各源单文件（`TrendingRepo.kt`、`LinuxDoTopic.kt`、`StormzhangAiNews.kt`、`HuggingFacePaper.kt`、`ProductHunt.kt`、`RundownAiArticle.kt`）；`NewsItem`、`HackerNewsStory` 用 `@Parcelize`。
+## 维护
 
-### 持久化
-
-- `SettingsStore`（DataStore `display_prefs`）：主题模式 / 动态取色（Material You，Android 12+）/ 字体族 / 字号档位（`FontScale`，缩放 `AppTextStyles`）/ 数据源模式 / 搜索历史（`search_history`，换行分隔、去重置顶、上限 10 条，仅用户明确提交搜索时记录）。
-- `AiConfigStore`（DataStore `ai_prefs`）：全局 AI 服务配置——服务商预设（DeepSeek/智谱 GLM/自定义，`AiProvider` 内置 baseUrl、模型列表与估算刊例价）+ apiKey/model + 自定义模型单价 + 翻译开关；首启从旧 `translation_prefs` 一次性迁移（baseUrl 自动补 `/v1`）。`AiUsageStore` 与其共用 `ai_prefs`：`usage_json` 按「模型 × 月」聚合 token 用量，设置页「用量与费用」区块按刊例价估算费用。
-- Room（`AppDatabase`，`aihot.db`，version 1，`fallbackToDestructiveMigration`）：仅浏览历史（`BrowseHistoryEntity/Dao/Repository`）。
-- HN 列表缓存与翻译缓存为 `cacheDir` 下的 JSON 文件。
-
-### 主题（ui/theme/）
-
-两层设计，遵循 "Synthetic Intelligence News" 设计系统（品牌双色：Future Blue `#003EC7` + Intelligence Purple `#6B38D4`，蓝→紫渐变只用于 AI 特性）：
-
-1. MD3 规范层（`Color.kt`/`Type.kt`/`Shape.kt`/`Theme.kt`）：Light/Dark 双色板；品牌色为默认，`AIHotTheme(dynamicColor=true)`（设置页开关，Android 12+）时改用壁纸派生色。蓝→紫品牌渐变收口在 `Color.kt` 的 `BrandGradient`（AI 特性专用：今日热点、AI 摘要卡头），调用方不自行拼 Brush。
-2. 语义层：`AppText.xxx`（9 个字号档）、`AppAlpha.xxx`（透明度），组件统一引用。`AppText` 是 `@Composable` 顶层属性，读 `LocalAppTextStyles` —— `AppTextStyles(fontFamily, fontScale)` 由 `AIHotTheme` 按设置构造（字体族跟随字体设置，字号随 `FontScale` 档位整体缩放），不再是硬编码 Inter 的 object。
-
-字体：Inter（SIL OFL 1.1，本地 4 字重 `res/font/inter_*.ttf`）；设置页可切 System/Serif/Monospace，经 `AIHotTheme(fontFamily=)` + `Typography.withFontFamily()` 全量替换（AppTextStyles 同源切换）。动画规范集中在 `ui/anim/Motion.kt`：常规转场只用 tween + MD3 emphasized 缓动，不用 spring/scale；预测返回手势例外——`predictivePopTransition()` 用 LinearEasing（与手指 1:1 跟手）+ scaleOut（对齐官方 Navigation3 默认规格）。
-
-## 编码约定
-
-- **注释用中文，代码/变量名用英文**（与存量代码一致）。
-- 字号一律 `AppText.xxx`、透明度一律 `AppAlpha.xxx`，不散落 `.sp` / `.alpha` 字面量；圆角一律 `MaterialTheme.shapes`（6/12/18/24/32）或 `CircleShape`；颜色只走 `colorScheme`——唯一例外是更多页源品牌色（集中收口在 `ui/more/SourceBrandColors.kt`）与 stormzhang 信源徽章（原站 hex）。
-- 列表排名/统计/章节条统一用 `ui/components/` 的 `RankBadge` / `StatBadge` / `SectionHeader`，骨架屏按列表结构选 `NewsCardSkeletonList`（时间列版）或 `RankRowSkeletonList`（徽章版），不再新建私有拷贝。
-- 协程 + Flow：`StateFlow` 驱动 UI，`collectAsStateWithLifecycle` 订阅；网络在 Repository 内切 `Dispatchers.IO`；并发去重用 `Mutex.withLock` 套路。
-- release 开启 R8 + shrinkResources；`com.example.aihot.data.**` 全部保留（`app/proguard-rules.pro`），新增需反射/序列化保留的类时同步补规则。
-- 改动导航、数据源模式、流水线行为时，同步更新本文件与相关文档注释。
-
-## 安全注意事项
-
-- **签名密钥绝不入库**：`*.jks`、`*.keystore`、`keystore.properties` 均已 gitignore；本地 release 构建需在仓库根放 `keystore.properties`（storeFile/storePassword/keyAlias/keyPassword，storeFile 按工程根相对路径解析）和 `app/aihot-release.jks`。CI 从 secrets 还原。
-- 翻译 API key 由用户自填、存 App 私有目录（DataStore），不进 APK、不进日志；不要把它打印或上报。
-- `GITCODE_TOKEN` 仅经环境变量注入，用于流水线推送；不要写入任何入库文件。
-- 网络策略：`network_security_config.xml` 全域名禁明文流量，仅系统 CA——不要为调试放开 cleartext。
-- 数据流水线的 AI 配置走 CI secrets / 本地 export，代码里不得硬编码任何 key。
+改动导航机制、数据源模式、流水线行为时，同步更新本文件与相关代码文档注释。
