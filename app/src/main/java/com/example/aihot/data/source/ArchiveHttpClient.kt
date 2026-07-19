@@ -14,7 +14,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 
 /**
- * gitcode 归档数据 HTTP 客户端 —— 4 个 Archive Repository 共用。
+ * gitcode 归档数据 HTTP 客户端 —— 各 Archive Repository / SummaryRepository / OverviewRepository 共用。
  *
  * 数据仓库:https://gitcode.com/peng1818/AI-News-Hub-Data
  * 分支:news-hub-data
@@ -22,6 +22,7 @@ import java.util.concurrent.TimeUnit
  *
  * 取数流程(对齐 docs/news-hub-data-usage.md):
  *  1. GET `index.json?ref=news-hub-data` → 读 `latest.<source>` 拿最新快照路径
+ *     (或读 `history.<source>.<date>` 拿指定日期的快照路径 —— 「历史摘要」用)
  *  2. 拼 `<API_BASE>/<source>/<相对路径>?ref=news-hub-data` GET 该快照 JSON
  *  3. 解析顶层 `fetched_at_ms` 与 `items[]`,交由各 Repository 做字段映射
  *
@@ -105,10 +106,9 @@ object ArchiveHttpClient {
     }
 
     /**
-     * 拉某源的归档快照,返回解析后的顶层 JSON(含 fetched_at_ms / items 等)。
+     * 拉某源的最新归档快照,返回解析后的顶层 JSON(含 fetched_at_ms / items 等)。
      *
      * @param source 源标识,对应 index.json 的 latest 键与目录名
-     *               (hackernews / github-trending / stormzhang-ai / huggingface-papers)
      * @return 该源最新快照的 JSON 对象;index 无该源或快照缺失抛 RuntimeException
      */
     suspend fun fetchLatestSnapshot(source: String): JSONObject = withContext(Dispatchers.IO) {
@@ -120,18 +120,69 @@ object ArchiveHttpClient {
             ?: throw RuntimeException("归档暂无 $source 数据(可能该源从未归档成功)")
 
         // 2) 拉该源最新快照(API raw 端点,带 ref 指定分支)
-        val snapshotUrl = "$API_BASE/$source/$relPath?ref=$REF"
-        val snapshotText = getRaw(snapshotUrl, "读取归档快照失败")
-        val snapshot = runCatching { JSONObject(snapshotText) }
-            .getOrElse { throw RuntimeException("归档快照 JSON 解析失败:$source") }
-
-        // 3) items 为空视为无数据
-        val items = snapshot.optJSONArray("items")
-        if (items == null || items.length() == 0) {
-            throw RuntimeException("归档暂无 $source 数据(快照 items 为空)")
-        }
-        snapshot
+        fetchSnapshot(source, relPath)
     }
+
+    /**
+     * 读 index.json 的 latest 指针表(与快照共享 2 分钟缓存),返回 source → 相对路径。
+     * 供 OverviewRepository 计算数据指纹(路径含日期+时间,数据更新即变化)——只读指针,
+     * 不拉快照本体。index 无 latest 字段时返回空 map。
+     */
+    suspend fun fetchLatestPaths(): Map<String, String> = withContext(Dispatchers.IO) {
+        val index = fetchIndex()
+        val latest = index.optJSONObject("latest") ?: return@withContext emptyMap()
+        val result = mutableMapOf<String, String>()
+        latest.keys().forEach { k ->
+            val v = latest.optString(k)
+            if (v.isNotBlank()) result[k] = v
+        }
+        result
+    }
+
+    /**
+     * 读 index.json 的 `history` 索引(与 latest 共享 2 分钟缓存),供「历史摘要」按日期寻址。
+     *
+     * @return source → (date → 相对源目录的快照路径);history 由流水线每次运行时合并写入,
+     * 每源仅保留最近 31 天且自 2026-07-18 起;旧版 index 无该字段时返回空 map(功能上线初期即如此)
+     */
+    suspend fun fetchHistory(): Map<String, Map<String, String>> = withContext(Dispatchers.IO) {
+        val index = fetchIndex()
+        val history = index.optJSONObject("history") ?: return@withContext emptyMap()
+        val result = mutableMapOf<String, Map<String, String>>()
+        history.keys().forEach { source ->
+            val dates = history.optJSONObject(source) ?: return@forEach
+            val dateMap = mutableMapOf<String, String>()
+            dates.keys().forEach { date ->
+                val rel = dates.optString(date)
+                if (rel.isNotBlank()) dateMap[date] = rel
+            }
+            if (dateMap.isNotEmpty()) result[source] = dateMap
+        }
+        result
+    }
+
+    /**
+     * 按相对路径拉某源的归档快照,返回解析后的顶层 JSON(历史日期寻址入口)。
+     *
+     * @param source 源标识(目录名)
+     * @param relPath 相对源目录的快照路径(形如 `2026-07-19/10-12-data.json`,
+     *                取自 latest / history 索引)
+     * @return 该快照的 JSON 对象;缺失或 items 为空抛 RuntimeException
+     */
+    suspend fun fetchSnapshot(source: String, relPath: String): JSONObject =
+        withContext(Dispatchers.IO) {
+            val snapshotUrl = "$API_BASE/$source/$relPath?ref=$REF"
+            val snapshotText = getRaw(snapshotUrl, "读取归档快照失败")
+            val snapshot = runCatching { JSONObject(snapshotText) }
+                .getOrElse { throw RuntimeException("归档快照 JSON 解析失败:$source") }
+
+            // items 为空视为无数据
+            val items = snapshot.optJSONArray("items")
+            if (items == null || items.length() == 0) {
+                throw RuntimeException("归档暂无 $source 数据(快照 items 为空)")
+            }
+            snapshot
+        }
 
     /** GET 一个 URL,返回响应正文;非 2xx 或空响应抛带 [hint] 的 RuntimeException。 */
     private fun getRaw(url: String, hint: String): String {

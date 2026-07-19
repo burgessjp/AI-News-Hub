@@ -14,6 +14,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -73,6 +74,9 @@ import com.example.aihot.ui.more.MoreScreen
 import com.example.aihot.ui.more.SettingsScreen
 import com.example.aihot.ui.more.FontChoice
 import com.example.aihot.ui.more.ThemeMode
+import com.example.aihot.ui.overview.OverviewScreen
+import com.example.aihot.ui.summary.SummaryArchiveScreen
+import com.example.aihot.ui.summary.SummaryDateScreen
 import com.example.aihot.ui.summary.SummaryScreen
 import com.example.aihot.ui.tabs.AllTab
 import com.example.aihot.ui.tabs.FeaturedTab
@@ -152,6 +156,10 @@ private sealed interface Page {
     /** AIHot 精选 —— 原为独立根 tab,现改为从「更多」页进入的二级页(复用 FeaturedTab)。 */
     data object FeaturedHub : Page
     data object BrowseHistory : Page
+    /** 历史摘要 —— 可选日期列表(归档 history 索引),从「更多」页进入。 */
+    data object SummaryArchive : Page
+    /** 历史摘要 —— 指定日期的 7 源摘要卡页(复用摘要卡片实现)。 */
+    data class SummaryDate(val date: String) : Page
 }
 
 /**
@@ -180,6 +188,8 @@ private fun Page.toBundle(): Bundle = Bundle().apply {
         is Page.RundownAi -> putString("t", "RundownAi")
         is Page.FeaturedHub -> putString("t", "FeaturedHub")
         is Page.BrowseHistory -> putString("t", "BrowseHistory")
+        is Page.SummaryArchive -> putString("t", "SummaryArchive")
+        is Page.SummaryDate -> { putString("t", "SummaryDate"); putString("date", date) }
     }
 }
 
@@ -206,6 +216,8 @@ private fun pageFromBundle(b: Bundle): Page? {
         "RundownAi" -> Page.RundownAi
         "FeaturedHub" -> Page.FeaturedHub
         "BrowseHistory" -> Page.BrowseHistory
+        "SummaryArchive" -> Page.SummaryArchive
+        "SummaryDate" -> b.getString("date")?.let { Page.SummaryDate(it) }
         else -> null
     }
 }
@@ -240,7 +252,7 @@ private val pageStacksSaver = androidx.compose.runtime.saveable.Saver<
  * App 顶层路由 —— 多栈底部导航。
  *
  * 模型:
- *  - currentTab: 当前选中的 2 个根 tab 之一(摘要 / 更多)
+ *  - currentTab: 当前选中的 3 个根 tab 之一(总览 / 摘要 / 更多)
  *  - pageStacks: 每个 tab 独立的二级页栈(栈空 = 处于根)
  *
  * 行为:
@@ -314,8 +326,8 @@ fun AIHotApp(openSettingsOnLaunch: Boolean = false) {
         }
     }
 
-    // 当前 tab + 每个 tab 的二级页栈
-    var currentTab by rememberSaveable { mutableStateOf(AppTab.Summary) }
+    // 当前 tab + 每个 tab 的二级页栈(默认「总览」——端侧 AI 当日分析,首屏即默认首页)
+    var currentTab by rememberSaveable { mutableStateOf(AppTab.Overview) }
     // 用 rememberSaveable 持久化导航栈,转屏/进程被杀后仍可恢复(需自定义 Saver,
     // 因 Page 含业务对象、AppTab 是 enum,默认 Bundle 无法直接存 Map)。
     var pageStacks by rememberSaveable(stateSaver = pageStacksSaver) {
@@ -443,11 +455,16 @@ fun AIHotApp(openSettingsOnLaunch: Boolean = false) {
     // 注:「AIHot 精选」原为根 tab 时有独立的 featuredListState;改为二级页后
     // 走 pageListStates.forPage(Page.FeaturedHub),不再上提。
     val summaryPagerState = rememberPagerState(pageCount = { SummaryRepository.SOURCE_KEYS.size })
+    // 总览 tab 的列表滚动状态(与 summaryPagerState 同层上提)
+    val overviewListState = rememberLazyListState()
     // 二级页滚动状态:以 Page 值(data class,可作 key)索引,页面弹出后清理。
     val pageListStates = remember { mutableMapOf<Page, LazyListState>() }
+    // 二级页 Pager 状态(历史摘要按日期页):与列表状态同上提、同清理。
+    val pagePagerStates = remember { mutableMapOf<Page, PagerState>() }
     LaunchedEffect(pageStacks) {
         val alive = pageStacks.values.flatten().toSet()
         pageListStates.keys.removeAll { it !in alive }
+        pagePagerStates.keys.removeAll { it !in alive }
     }
 
     AIHotTheme(
@@ -491,6 +508,7 @@ fun AIHotApp(openSettingsOnLaunch: Boolean = false) {
                             tab = s.tab,
                             reselectTick = reselectTick,
                             summaryPagerState = summaryPagerState,
+                            overviewListState = overviewListState,
                             onItemClick = { push(Page.Detail(it)) },
                             onOpenAll = { push(Page.All) },
                             onOpenHackerNews = { push(Page.HackerNews) },
@@ -502,6 +520,7 @@ fun AIHotApp(openSettingsOnLaunch: Boolean = false) {
                             onOpenRundownAi = { push(Page.RundownAi) },
                             onOpenFeaturedHub = { push(Page.FeaturedHub) },
                             onOpenBrowseHistory = { push(Page.BrowseHistory) },
+                            onOpenSummaryArchive = { push(Page.SummaryArchive) },
                             onOpenUrl = openUrl,
                             onOpenSettings = { push(Page.Settings) },
                             onOpenAiService = { push(Page.AiService) },
@@ -510,6 +529,7 @@ fun AIHotApp(openSettingsOnLaunch: Boolean = false) {
                         is Screen.Secondary -> PageView(
                             page = s.page,
                             pageListStates = pageListStates,
+                            pagePagerStates = pagePagerStates,
                             themeMode = themeMode,
                             onSelectTheme = onSelectTheme,
                             dynamicColor = dynamicColor,
@@ -527,6 +547,7 @@ fun AIHotApp(openSettingsOnLaunch: Boolean = false) {
                             onOpenDaily = { push(Page.Daily) },
                             onOpenSearch = { push(Page.Search) },
                             onSelectDate = { push(Page.DailyDate(it)) },
+                            onSelectSummaryDate = { push(Page.SummaryDate(it)) },
                             onOpenArchive = { push(Page.DailyArchive) },
                             onOpenComments = { push(Page.HackerNewsComments(it)) },
                             onOpenUrl = openUrl,
@@ -586,6 +607,7 @@ private fun TabRoot(
     tab: AppTab,
     reselectTick: Int,
     summaryPagerState: androidx.compose.foundation.pager.PagerState,
+    overviewListState: LazyListState,
     onItemClick: (NewsItem) -> Unit,
     onOpenAll: () -> Unit,
     onOpenHackerNews: () -> Unit,
@@ -597,12 +619,19 @@ private fun TabRoot(
     onOpenRundownAi: () -> Unit,
     onOpenFeaturedHub: () -> Unit,
     onOpenBrowseHistory: () -> Unit,
+    onOpenSummaryArchive: () -> Unit,
     onOpenUrl: (String, String, String?) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenAiService: () -> Unit,
     onOpenAbout: () -> Unit
 ) {
     when (tab) {
+        AppTab.Overview -> OverviewScreen(
+            onOpenUrl = onOpenUrl,
+            onOpenAiService = onOpenAiService,
+            listState = overviewListState,
+            reselectSignal = reselectTick
+        )
         AppTab.Summary -> SummaryScreen(
             reselectSignal = reselectTick,
             pagerState = summaryPagerState,
@@ -624,6 +653,7 @@ private fun TabRoot(
             onOpenRundownAi = onOpenRundownAi,
             onOpenFeaturedHub = onOpenFeaturedHub,
             onOpenBrowseHistory = onOpenBrowseHistory,
+            onOpenSummaryArchive = onOpenSummaryArchive,
             onOpenSettings = onOpenSettings,
             onOpenAiService = onOpenAiService,
             onOpenAbout = onOpenAbout
@@ -636,6 +666,7 @@ private fun TabRoot(
 private fun PageView(
     page: Page,
     pageListStates: MutableMap<Page, LazyListState>,
+    pagePagerStates: MutableMap<Page, PagerState>,
     themeMode: ThemeMode,
     onSelectTheme: (ThemeMode) -> Unit,
     dynamicColor: Boolean,
@@ -652,6 +683,7 @@ private fun PageView(
     onOpenDaily: () -> Unit,
     onOpenSearch: () -> Unit,
     onSelectDate: (String) -> Unit,
+    onSelectSummaryDate: (String) -> Unit,
     onOpenArchive: () -> Unit,
     onOpenComments: (HackerNewsStory) -> Unit,
     onOpenUrl: (String, String, String?) -> Unit,
@@ -797,9 +829,25 @@ private fun PageView(
             onOpenUrl = { url, title, source -> onOpenUrl(url, title, source) },
             listState = pageListStates.forPage(page)
         )
+        // 历史摘要:日期列表(history 索引)→ 当日 7 源摘要卡页(复用摘要卡片)。
+        // 纯归档语义,不参与 SourceMode 切换;卡片无「查看完整列表」出口。
+        Page.SummaryArchive -> SummaryArchiveScreen(
+            onSelectDate = onSelectSummaryDate,
+            onBack = onBack,
+            listState = pageListStates.forPage(page)
+        )
+        is Page.SummaryDate -> SummaryDateScreen(
+            date = page.date,
+            onBack = onBack,
+            pagerState = pagePagerStates.forPagePager(page)
+        )
     }
 }
 
 /** 取某个二级页持有的列表滚动状态(上提原因见 AIHotApp 内说明)。 */
 private fun MutableMap<Page, LazyListState>.forPage(page: Page): LazyListState =
     getOrPut(page) { LazyListState() }
+
+/** 取某个二级页持有的 Pager 状态(历史摘要按日期页;上提原因同列表状态)。 */
+private fun MutableMap<Page, PagerState>.forPagePager(page: Page): PagerState =
+    getOrPut(page) { PagerState { SummaryRepository.SOURCE_KEYS.size } }

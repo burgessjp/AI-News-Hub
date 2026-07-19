@@ -43,19 +43,23 @@ class AiChatClient {
      * @param system system prompt
      * @param user 用户输入文本
      * @param temperature 采样温度,默认 0.3(翻译等确定性场景)
+     * @param readTimeoutSeconds 本次请求的 read 超时(秒),默认跟随 client 的 20s;
+     * 长输出场景(如今日总览的综合分析,输出可达数千 token)由调用方显式放宽。
      */
     suspend fun chat(
         config: AiConfig,
         system: String,
         user: String,
-        temperature: Double = 0.3
-    ): Result<ChatResult> = runCatching { request(config, system, user, temperature) }
+        temperature: Double = 0.3,
+        readTimeoutSeconds: Long = 20
+    ): Result<ChatResult> = runCatching { request(config, system, user, temperature, readTimeoutSeconds) }
 
     private suspend fun request(
         config: AiConfig,
         system: String,
         user: String,
-        temperature: Double
+        temperature: Double,
+        readTimeoutSeconds: Long
     ): ChatResult = withContext(Dispatchers.IO) {
         val body = JSONObject().apply {
             put("model", config.model)
@@ -79,7 +83,9 @@ class AiChatClient {
             .post(body.toString().toRequestBody(jsonMedia))
             .build()
 
-        client.newCall(req).execute().use { resp ->
+        val callClient = if (readTimeoutSeconds == 20L) client
+        else client.newBuilder().readTimeout(readTimeoutSeconds, TimeUnit.SECONDS).build()
+        callClient.newCall(req).execute().use { resp ->
             if (!resp.isSuccessful) {
                 val errBody = runCatching { resp.body?.string().orEmpty() }.getOrDefault("")
                 throw RuntimeException("HTTP ${resp.code}${errBody.take(120).let { ": $it" }}")

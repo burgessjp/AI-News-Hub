@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Newspaper
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.RocketLaunch
 import androidx.compose.material.icons.filled.School
@@ -53,7 +54,8 @@ import com.example.aihot.ui.theme.AppText
  * 结构(自顶向下,简洁直入):
  *  - 浏览组:HackerNews / GitHub Trending / LinuxDo / HuggingFace / Product Hunt / The Rundown AI
  *    / stormzhang AI / AIHot 精选 —— 品牌色图标块行(固定品牌色,不随主题变化,收口于 [SourceBrand])
- *  - 偏好组(secondary 强调):设置 / 关于 —— 彩色图标块行
+ *  - 历史组(tertiary 强调):历史摘要 / 浏览历史 —— 彩色图标块行
+ *  - 偏好组(secondary 强调):AI 服务 / 设置 / 关于 —— 浅灰图标块行
  *
  * 「AIHot 精选」原为首页独立根 tab,现收进浏览组作为末位二级页(复用 FeaturedTab,
  * UI 完全不变:今日热点 + 最新精选列表 + 「全部 ›」入口)。
@@ -71,6 +73,7 @@ fun MoreScreen(
     onOpenRundownAi: () -> Unit,
     onOpenFeaturedHub: () -> Unit,
     onOpenBrowseHistory: () -> Unit,
+    onOpenSummaryArchive: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenAiService: () -> Unit,
     onOpenAbout: () -> Unit
@@ -163,8 +166,17 @@ fun MoreScreen(
                 )
             }
 
-            // 历史组 —— 浏览历史的独立入口
+            // 历史组 —— 历史摘要(按日期看各源归档摘要)/ 浏览历史
             item { SectionHeader("历史", accent = MaterialTheme.colorScheme.tertiary) }
+            item {
+                IconTileRow(
+                    icon = Icons.Filled.CalendarMonth,
+                    iconColor = IconAccent.Primary,
+                    title = "历史摘要",
+                    subtitle = "按日期查看各源当日 AI 摘要",
+                    onClick = onOpenSummaryArchive
+                )
+            }
             item {
                 IconTileRow(
                     icon = Icons.Filled.History,

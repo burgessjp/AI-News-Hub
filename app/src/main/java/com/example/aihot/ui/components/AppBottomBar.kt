@@ -16,8 +16,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.GridView
+import androidx.compose.material.icons.outlined.Insights
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -37,14 +39,15 @@ import com.example.aihot.ui.theme.AppAlpha
 import com.example.aihot.ui.theme.AppText
 
 /**
- * 根 tab 集合(摘要 / 更多)。
+ * 根 tab 集合(总览 / 摘要 / 更多,entries 顺序即底栏顺序)。
  *
  * 设计稿(参考 system_stream_editorial)用图标 FILL 区分选中态:
  *  - 选中:[selectedIcon] 实心(Filled)变体
  *  - 未选中:[icon] 描边(Outlined)变体
  *
+ * 「总览」是默认首页:端侧 AI 对 7 源归档榜单的当日综合分析(OverviewScreen)。
  * 「AIHot 精选」原为独立根 tab,现改为从「更多」页进入的二级页(Page.FeaturedHub),
- * 底栏精简为 2 项。精选 tab 的 Whatshot 图标语义迁移到 MoreScreen 浏览组入口。
+ * 精选 tab 的 Whatshot 图标语义迁移到 MoreScreen 浏览组入口。
  *
  * @param labelRes 显示文案的 string resource
  * @param icon 未选中时的描边图标(FILL 0)
@@ -55,6 +58,11 @@ enum class AppTab(
     val icon: ImageVector,
     val selectedIcon: ImageVector
 ) {
+    Overview(
+        R.string.tab_overview,
+        Icons.Outlined.Insights,
+        Icons.Filled.Insights
+    ),
     Summary(
         R.string.tab_summary,
         Icons.Outlined.AutoAwesome,
