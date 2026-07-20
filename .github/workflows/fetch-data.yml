@@ -1,15 +1,15 @@
 name: Fetch Hub Data
 
-# 每天北京时间 07:00 与 15:00 各抓一次「Hub」tab 浏览区域的 8 个数据源,解析成
+# 每天北京时间 07:30 与 15:00 各抓一次「Hub」tab 浏览区域的 8 个数据源,解析成
 # JSON 后提交到 gitcode 数据仓库的 news-hub-data 分支。
 #
-# cron 用 UTC:北京 07:00 = UTC 23:00(前一日的),北京 15:00 = UTC 07:00。
+# cron 用 UTC:北京 07:30 = UTC 23:30(前一日的),北京 15:00 = UTC 07:00。
 # 第二轮定在 15:00 而非 14:00:Product Hunt 的「Product of the Day」每天 UTC 07:01
 # (北京 15:01)上线,北京 15:00(UTC 07:00)跑时 PH API 日级聚合已能返回当日批次
 # (见 scripts/fetch_data.py 的 _ph_posted_after);定在 14:00(UTC 06:00)会拿空。
 #
 # GitHub cron 不保证准点,脚本内部按 TZ=Asia/Shanghai 取「真正执行时」的北京时间
-# 生成文件名日期/时间,因此即便延迟到 07:15 才跑,目录名仍是当天的 07-15,不会错位。
+# 生成文件名日期/时间,因此即便延迟到 07:45 才跑,目录名仍是当天的 07-45,不会错位。
 #
 # 失败策略(对齐 scripts/fetch_data.py):单源失败 3 次重试后被跳过,成功源照常提交;
 # 失败源的 index.json latest 指针从上一次 index.json 继承,客户端永远拿到有效数据。
@@ -24,7 +24,7 @@ name: Fetch Hub Data
 
 on:
   schedule:
-    - cron: '0 23 * * *'  # UTC 23:00 = 北京 次日 07:00
+    - cron: '30 23 * * *' # UTC 23:30 = 北京 次日 07:30
     - cron: '0 7 * * *'   # UTC 07:00 = 北京 15:00(PH 当日批次 07:01 上线,日级聚合已覆盖)
   workflow_dispatch:       # 支持手动触发,便于首次验证 / 临时补抓
 
