@@ -34,7 +34,7 @@ class DailyViewModel : ViewModel() {
         viewModelScope.launch {
             runCatching { repo.fetchDaily() }
                 .onSuccess { _latest.value = UiState.Success(it) }
-                .onFailure { _latest.value = UiState.Error(it.message ?: "未知错误") }
+                .onFailure { _latest.value = it.toUiError() }
         }
     }
 
@@ -43,7 +43,7 @@ class DailyViewModel : ViewModel() {
         viewModelScope.launch {
             runCatching { repo.fetchDailies() }
                 .onSuccess { _archive.value = UiState.Success(it) }
-                .onFailure { _archive.value = UiState.Error(it.message ?: "未知错误") }
+                .onFailure { _archive.value = it.toUiError() }
         }
     }
 
@@ -53,7 +53,7 @@ class DailyViewModel : ViewModel() {
         viewModelScope.launch {
             runCatching { repo.fetchDaily(date) }
                 .onSuccess { _selected.value = UiState.Success(it) }
-                .onFailure { _selected.value = UiState.Error(it.message ?: "未知错误") }
+                .onFailure { _selected.value = it.toUiError() }
         }
     }
 }

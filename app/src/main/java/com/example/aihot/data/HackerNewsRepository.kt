@@ -234,9 +234,9 @@ class HackerNewsRepository(
             .build()
         client.newCall(req).execute().use { resp ->
             if (!resp.isSuccessful) {
-                throw RuntimeException("HTTP ${resp.code}")
+                throw AppException.Network()
             }
-            return resp.body?.string() ?: throw RuntimeException("空响应")
+            return resp.body?.string() ?: throw AppException.Network()
         }
     }
 }

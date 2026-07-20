@@ -111,13 +111,13 @@ class HuggingFacePapersRepository(
             .build()
         client.newCall(req).execute().use { resp ->
             if (!resp.isSuccessful) {
-                throw RuntimeException("HTTP ${resp.code}")
+                throw AppException.Network()
             }
-            val html = resp.body?.string() ?: throw RuntimeException("空响应")
+            val html = resp.body?.string() ?: throw AppException.Network()
             // CF 挑战页检测:huggingface.co 套 Cloudflare,异常时返回 HTML 挑战页而非论文列表。
             // 常见特征:body 含 "Just a moment" 或标题为 CF 挑战页。
             if (html.contains("Just a moment", ignoreCase = true)) {
-                throw RuntimeException("被 Cloudflare 拦截,请稍后重试")
+                throw AppException.RateLimited()
             }
             lastRawHtml = html
             parse(html)

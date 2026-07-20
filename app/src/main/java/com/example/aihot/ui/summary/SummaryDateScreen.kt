@@ -78,7 +78,7 @@ fun SummaryDateScreen(
             SummaryHeaderRow(
                 currentPage = pagerState.currentPage,
                 pageCount = cards.size,
-                hint = "当日归档 · 左右滑动",
+                hint = "当日 AI 精选",
                 onDotClick = { i -> scope.launch { pagerState.animateScrollToPage(i) } }
             )
             HorizontalPager(

@@ -94,10 +94,10 @@ class HuggingFacePapersViewModel(application: Application) : AndroidViewModel(ap
             runCatching { currentRepo().fetch() }
                 .onSuccess { result ->
                     _state.value =
-                        if (result.papers.isEmpty()) UiState.Error("无内容") else UiState.Success(result.papers)
+                        if (result.papers.isEmpty()) UiState.Error("今日暂无内容", ErrorKind.NoData) else UiState.Success(result.papers)
                     _lastRefreshAt.value = result.fetchedAt
                 }
-                .onFailure { _state.value = UiState.Error(it.message ?: "未知错误") }
+                .onFailure { _state.value = it.toUiError() }
         }
     }
 
@@ -115,12 +115,12 @@ class HuggingFacePapersViewModel(application: Application) : AndroidViewModel(ap
             runCatching { currentRepo().forceRefresh() }
                 .onSuccess { result ->
                     _state.value =
-                        if (result.papers.isEmpty()) UiState.Error("无内容") else UiState.Success(result.papers)
+                        if (result.papers.isEmpty()) UiState.Error("今日暂无内容", ErrorKind.NoData) else UiState.Success(result.papers)
                     _lastRefreshAt.value = result.fetchedAt
                 }
                 .onFailure {
                     if (_state.value !is UiState.Success) {
-                        _state.value = UiState.Error(it.message ?: "未知错误")
+                        _state.value = it.toUiError()
                     }
                 }
             _isRefreshing.value = false
@@ -161,7 +161,7 @@ class HuggingFacePapersViewModel(application: Application) : AndroidViewModel(ap
                     if (it is ShortContentException) {
                         TranslationState.Error(TranslationState.TOO_SHORT)
                     } else {
-                        TranslationState.Error(it.message ?: "翻译失败")
+                        TranslationState.Error(it.toUiError().message)
                     }
                 }
             )

@@ -1,5 +1,6 @@
 package com.example.aihot.data.source
 
+import com.example.aihot.data.AppException
 import com.example.aihot.data.HackerNewsStory
 import com.example.aihot.data.HackerNewsTopStories
 import org.json.JSONObject
@@ -26,7 +27,7 @@ class HackerNewsArchiveRepository : HackerNewsSource {
         val snapshot = ArchiveHttpClient.fetchLatestSnapshot(SOURCE_KEY)
         val fetchedAt = snapshot.optLong("fetched_at_ms", System.currentTimeMillis())
         val items = snapshot.optJSONArray("items")
-            ?: throw RuntimeException("归档 hackernews 快照无 items")
+            ?: throw AppException.NoData()
         val stories = (0 until items.length()).mapNotNull { i ->
             val obj = items.optJSONObject(i) ?: return@mapNotNull null
             val id = obj.optLong("id", -1L)
@@ -43,7 +44,7 @@ class HackerNewsArchiveRepository : HackerNewsSource {
                 kids = emptyList()
             )
         }
-        if (stories.isEmpty()) throw RuntimeException("归档暂无 hackernews 数据")
+        if (stories.isEmpty()) throw AppException.NoData()
         return HackerNewsTopStories(fetchedAt, stories)
     }
 

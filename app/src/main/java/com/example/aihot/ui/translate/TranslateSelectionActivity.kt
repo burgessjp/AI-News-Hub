@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import com.example.aihot.data.ShortContentException
 import com.example.aihot.data.AiConfigStore
 import com.example.aihot.data.TranslationRepository
+import com.example.aihot.ui.toUiError
 import com.example.aihot.ui.theme.AIHotTheme
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.flow.first
@@ -125,14 +126,14 @@ private fun TranslateSheet(
             state = TranslateState.Error(ErrorKind.CONFIG_MISSING)
             return@LaunchedEffect
         }
-        runCatching { repo.translate(text, config).getOrThrow() }
-            .onSuccess { state = TranslateState.Success(it) }
-            .onFailure { t ->
-                state = TranslateState.Error(
-                    if (t is ShortContentException) ErrorKind.TOO_SHORT else ErrorKind.GENERIC,
-                    t.message
-                )
-            }
+            runCatching { repo.translate(text, config).getOrThrow() }
+                .onSuccess { state = TranslateState.Success(it) }
+                .onFailure { t ->
+                    state = TranslateState.Error(
+                        if (t is ShortContentException) ErrorKind.TOO_SHORT else ErrorKind.GENERIC,
+                        if (t is ShortContentException) null else t.toUiError().message
+                    )
+                }
     }
 
     ModalBottomSheet(

@@ -1,5 +1,6 @@
 package com.example.aihot.data.source
 
+import com.example.aihot.data.AppException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -99,7 +100,7 @@ object ArchiveHttpClient {
         // 2) 走网络刷新(仅一次,并发其余调用在此等待后复用结果)
         val text = getRaw(INDEX_URL, "读取归档索引失败")
         val parsed = runCatching { JSONObject(text) }
-            .getOrElse { throw RuntimeException("归档 index.json 解析失败") }
+            .getOrElse { throw AppException.ServerError() }
         indexCache = parsed
         indexCacheAt = System.currentTimeMillis()
         parsed
@@ -115,9 +116,9 @@ object ArchiveHttpClient {
         // 1) 读 index.json(带 2 分钟缓存 + 并发去重,见 fetchIndex)拿最新路径
         val index = fetchIndex()
         val latest = index.optJSONObject("latest")
-            ?: throw RuntimeException("归档 index.json 无 latest 字段")
+            ?: throw AppException.ServerError()
         val relPath = latest.optString(source).takeIf { it.isNotBlank() }
-            ?: throw RuntimeException("归档暂无 $source 数据(可能该源从未归档成功)")
+            ?: throw AppException.NoData()
 
         // 2) 拉该源最新快照(API raw 端点,带 ref 指定分支)
         fetchSnapshot(source, relPath)
@@ -174,18 +175,21 @@ object ArchiveHttpClient {
             val snapshotUrl = "$API_BASE/$source/$relPath?ref=$REF"
             val snapshotText = getRaw(snapshotUrl, "读取归档快照失败")
             val snapshot = runCatching { JSONObject(snapshotText) }
-                .getOrElse { throw RuntimeException("归档快照 JSON 解析失败:$source") }
+                .getOrElse { throw AppException.ServerError() }
 
             // items 为空视为无数据
             val items = snapshot.optJSONArray("items")
             if (items == null || items.length() == 0) {
-                throw RuntimeException("归档暂无 $source 数据(快照 items 为空)")
+                throw AppException.NoData()
             }
             snapshot
         }
 
-    /** GET 一个 URL,返回响应正文;非 2xx 或空响应抛带 [hint] 的 RuntimeException。 */
-    private fun getRaw(url: String, hint: String): String {
+    /**
+     * GET 一个 URL,返回响应正文;非 2xx 或空响应抛 [AppException.Network]。
+     * [hint] 仅用于日志诊断(toUiError 会把原始异常记入 logcat)。
+     */
+    private fun getRaw(url: String, @Suppress("UNUSED_PARAMETER") hint: String): String {
         val req = Request.Builder()
             .url(url)
             .header("User-Agent", UA)
@@ -193,10 +197,10 @@ object ArchiveHttpClient {
             .build()
         client.newCall(req).execute().use { resp ->
             if (!resp.isSuccessful) {
-                throw RuntimeException("$hint:HTTP ${resp.code}")
+                throw AppException.Network()
             }
             return resp.body?.string()?.takeIf { it.isNotBlank() }
-                ?: throw RuntimeException("$hint:空响应")
+                ?: throw AppException.Network()
         }
     }
 }

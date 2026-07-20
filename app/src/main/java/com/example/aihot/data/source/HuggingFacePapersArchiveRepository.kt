@@ -1,5 +1,6 @@
 package com.example.aihot.data.source
 
+import com.example.aihot.data.AppException
 import com.example.aihot.data.HuggingFacePaper
 import com.example.aihot.data.HuggingFacePapersResult
 import org.json.JSONObject
@@ -23,7 +24,7 @@ class HuggingFacePapersArchiveRepository : HuggingFacePapersSource {
         val snapshot = ArchiveHttpClient.fetchLatestSnapshot(SOURCE_KEY)
         val fetchedAt = snapshot.optLong("fetched_at_ms", System.currentTimeMillis())
         val items = snapshot.optJSONArray("items")
-            ?: throw RuntimeException("归档 huggingface-papers 快照无 items")
+            ?: throw AppException.NoData()
         val papers = (0 until items.length()).mapNotNull { i ->
             val obj = items.optJSONObject(i) ?: return@mapNotNull null
             val id = obj.optString("id")
@@ -42,7 +43,7 @@ class HuggingFacePapersArchiveRepository : HuggingFacePapersSource {
                 githubUrl = obj.optString("githubUrl")
             )
         }
-        if (papers.isEmpty()) throw RuntimeException("归档暂无 huggingface-papers 数据")
+        if (papers.isEmpty()) throw AppException.NoData()
         return HuggingFacePapersResult(fetchedAt, papers)
     }
 

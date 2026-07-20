@@ -106,9 +106,9 @@ class RundownAiRepository(
             .build()
         client.newCall(req).execute().use { resp ->
             if (!resp.isSuccessful) {
-                throw RuntimeException("HTTP ${resp.code}")
+                throw AppException.Network()
             }
-            val html = resp.body?.string() ?: throw RuntimeException("空响应")
+            val html = resp.body?.string() ?: throw AppException.Network()
             lastRawHtml = html
             parse(html)
         }

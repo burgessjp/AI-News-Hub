@@ -47,10 +47,10 @@ class LinuxDoHotViewModel(application: Application) : AndroidViewModel(applicati
             runCatching { repo.fetch() }
                 .onSuccess { result ->
                     _state.value =
-                        if (result.topics.isEmpty()) UiState.Error("无内容") else UiState.Success(result.topics)
+                        if (result.topics.isEmpty()) UiState.Error("今日暂无内容", ErrorKind.NoData) else UiState.Success(result.topics)
                     _lastRefreshAt.value = result.fetchedAt
                 }
-                .onFailure { _state.value = UiState.Error(it.message ?: "未知错误") }
+                .onFailure { _state.value = it.toUiError() }
         }
     }
 
@@ -68,12 +68,12 @@ class LinuxDoHotViewModel(application: Application) : AndroidViewModel(applicati
             runCatching { repo.forceRefresh() }
                 .onSuccess { result ->
                     _state.value =
-                        if (result.topics.isEmpty()) UiState.Error("无内容") else UiState.Success(result.topics)
+                        if (result.topics.isEmpty()) UiState.Error("今日暂无内容", ErrorKind.NoData) else UiState.Success(result.topics)
                     _lastRefreshAt.value = result.fetchedAt
                 }
                 .onFailure {
                     if (_state.value !is UiState.Success) {
-                        _state.value = UiState.Error(it.message ?: "未知错误")
+                        _state.value = it.toUiError()
                     }
                 }
             _isRefreshing.value = false

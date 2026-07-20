@@ -66,11 +66,11 @@ class SummaryRepository {
 
         // 拉归档快照(fetchLatestSnapshot 内部已切 IO,返回整个顶层 JSONObject,含 ai_summary)
         val snapshot = runCatching { ArchiveHttpClient.fetchLatestSnapshot(src.key) }
-            .getOrElse { return Result.failure(RuntimeException("归档数据拉取失败:${it.message}")) }
+            .getOrElse { return Result.failure(it) }
 
         val aiSummary = snapshot.optString("ai_summary").orEmpty().trim()
         if (aiSummary.isBlank()) {
-            return Result.failure(RuntimeException("该源今日暂无 AI 摘要"))
+            return Result.failure(AppException.NoData())
         }
         val fetchedAt = snapshot.optLong("fetched_at_ms", 0L)
         return Result.success(SourceSummary(text = aiSummary, fetchedAtMs = fetchedAt))
@@ -88,16 +88,16 @@ class SummaryRepository {
             ?: return Result.failure(IllegalArgumentException("未知源:$source"))
 
         val history = runCatching { ArchiveHttpClient.fetchHistory() }
-            .getOrElse { return Result.failure(RuntimeException("归档索引拉取失败:${it.message}")) }
+            .getOrElse { return Result.failure(it) }
         val relPath = history[src.key]?.get(date)
-            ?: return Result.failure(RuntimeException("该源 $date 无归档数据"))
+            ?: return Result.failure(AppException.NoData())
 
         val snapshot = runCatching { ArchiveHttpClient.fetchSnapshot(src.key, relPath) }
-            .getOrElse { return Result.failure(RuntimeException("归档数据拉取失败:${it.message}")) }
+            .getOrElse { return Result.failure(it) }
 
         val aiSummary = snapshot.optString("ai_summary").orEmpty().trim()
         if (aiSummary.isBlank()) {
-            return Result.failure(RuntimeException("该源当日暂无 AI 摘要"))
+            return Result.failure(AppException.NoData())
         }
         val fetchedAt = snapshot.optLong("fetched_at_ms", 0L)
         return Result.success(SourceSummary(text = aiSummary, fetchedAtMs = fetchedAt))

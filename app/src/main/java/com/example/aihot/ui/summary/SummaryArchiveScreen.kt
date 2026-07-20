@@ -90,7 +90,7 @@ fun SummaryArchiveScreen(
                     if (s.data.isEmpty()) {
                         EmptyState(
                             title = "暂无历史摘要",
-                            subtitle = "流水线每天 07:00 / 15:00(北京时间)归档\n历史索引自功能上线起累积(最近 31 天)",
+                            subtitle = "每天 07:00 / 15:00(北京时间)更新\n历史记录自功能上线起累积(最近 31 天)",
                             icon = Icons.Outlined.Inventory2
                         )
                     } else {

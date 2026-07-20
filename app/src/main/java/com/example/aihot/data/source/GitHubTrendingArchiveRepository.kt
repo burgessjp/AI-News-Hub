@@ -1,5 +1,6 @@
 package com.example.aihot.data.source
 
+import com.example.aihot.data.AppException
 import com.example.aihot.data.TrendingRepo
 import com.example.aihot.data.TrendingResult
 import org.json.JSONObject
@@ -23,7 +24,7 @@ class GitHubTrendingArchiveRepository : GitHubTrendingSource {
         val snapshot = ArchiveHttpClient.fetchLatestSnapshot(SOURCE_KEY)
         val fetchedAt = snapshot.optLong("fetched_at_ms", System.currentTimeMillis())
         val items = snapshot.optJSONArray("items")
-            ?: throw RuntimeException("归档 github-trending 快照无 items")
+            ?: throw AppException.NoData()
         val repos = (0 until items.length()).mapNotNull { i ->
             val obj = items.optJSONObject(i) ?: return@mapNotNull null
             TrendingRepo(
@@ -39,7 +40,7 @@ class GitHubTrendingArchiveRepository : GitHubTrendingSource {
                 starsToday = obj.optInt("starsToday", 0)
             )
         }
-        if (repos.isEmpty()) throw RuntimeException("归档暂无 github-trending 数据")
+        if (repos.isEmpty()) throw AppException.NoData()
         return TrendingResult(fetchedAt, repos)
     }
 

@@ -104,7 +104,7 @@ fun HuggingFacePapersScreen(
         translationStates.values.firstOrNull { it is TranslationState.Error && it.message == TranslationState.CONFIG_MISSING }
             ?.let {
                 val r = snackbarHostState.showSnackbar(
-                    message = "请先在 设置 → 翻译 中配置 API",
+                    message = "请先在 设置 → 翻译 中配置翻译服务",
                     actionLabel = "去设置"
                 )
                 if (r == SnackbarResult.ActionPerformed) onOpenSettings()

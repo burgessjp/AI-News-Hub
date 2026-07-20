@@ -108,15 +108,15 @@ class LinuxDoHotRepository(
             .build()
         client.newCall(req).execute().use { resp ->
             if (!resp.isSuccessful) {
-                throw RuntimeException("HTTP ${resp.code}")
+                throw AppException.Network()
             }
-            val raw = resp.body?.string() ?: throw RuntimeException("空响应")
+            val raw = resp.body?.string() ?: throw AppException.Network()
             // CF 挑战页检测:linux.do 套 Cloudflare,异常时返回 HTML 挑战页而非 JSON。
             // 常见特征:body 以 "<" 开头(<html / <!doctype)或含 "Just a moment"。
             // 此时给出明确错误,而非让 JSONObject 解析抛泛泛的"非 JSON"。
             val trimmed = raw.trimStart()
             if (trimmed.startsWith("<") || raw.contains("Just a moment", ignoreCase = true)) {
-                throw RuntimeException("被 Cloudflare 拦截,请稍后重试")
+                throw AppException.RateLimited()
             }
             lastRawJson = raw
             parse(raw)
@@ -133,7 +133,7 @@ class LinuxDoHotRepository(
      */
     private fun parse(rawJson: String): List<LinuxDoTopic> {
         val root = runCatching { JSONObject(rawJson) }.getOrNull()
-            ?: throw RuntimeException("响应非 JSON")
+            ?: throw AppException.ServerError()
         val usersById = root.optJSONArray("users")?.let { arr ->
             (0 until arr.length()).associate { arr.getJSONObject(it).optInt("id") to arr.getJSONObject(it) }
         } ?: emptyMap()

@@ -94,11 +94,11 @@ class HackerNewsViewModel(application: Application) : AndroidViewModel(applicati
                 .onSuccess { result ->
                     // 空结果视为「无内容」而非错误:模块整体隐藏。
                     _state.value =
-                        if (result.stories.isEmpty()) UiState.Error("无内容") else UiState.Success(result.stories)
+                        if (result.stories.isEmpty()) UiState.Error("今日暂无内容", ErrorKind.NoData) else UiState.Success(result.stories)
                     // 记录数据落盘时刻(缓存命中也会更新),供顶栏显示「上次刷新」。
                     _lastRefreshAt.value = result.fetchedAt
                 }
-                .onFailure { _state.value = UiState.Error(it.message ?: "未知错误") }
+                .onFailure { _state.value = it.toUiError() }
         }
     }
 
@@ -118,13 +118,13 @@ class HackerNewsViewModel(application: Application) : AndroidViewModel(applicati
             runCatching { currentRepo().forceRefresh(limit = 20) }
                 .onSuccess { result ->
                     _state.value =
-                        if (result.stories.isEmpty()) UiState.Error("无内容") else UiState.Success(result.stories)
+                        if (result.stories.isEmpty()) UiState.Error("今日暂无内容", ErrorKind.NoData) else UiState.Success(result.stories)
                     _lastRefreshAt.value = result.fetchedAt
                 }
                 .onFailure {
                     // 有旧数据就保留(保可用),无数据才显示错误。
                     if (_state.value !is UiState.Success) {
-                        _state.value = UiState.Error(it.message ?: "未知错误")
+                        _state.value = it.toUiError()
                     }
                 }
             _isRefreshing.value = false
@@ -153,7 +153,7 @@ class HackerNewsViewModel(application: Application) : AndroidViewModel(applicati
                     if (it is ShortContentException) {
                         TranslationState.Error(TranslationState.TOO_SHORT)
                     } else {
-                        TranslationState.Error(it.message ?: "翻译失败")
+                        TranslationState.Error(it.toUiError().message)
                     }
                 }
             )

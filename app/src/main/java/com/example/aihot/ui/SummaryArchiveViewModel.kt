@@ -43,7 +43,7 @@ class SummaryArchiveViewModel(application: Application) : AndroidViewModel(appli
         viewModelScope.launch {
             _dates.value = runCatching { summaryRepo.availableDates() }.fold(
                 onSuccess = { UiState.Success(it) },
-                onFailure = { UiState.Error(it.message ?: "加载失败") }
+                onFailure = { it.toUiError() }
             )
         }
     }
@@ -58,7 +58,7 @@ class SummaryArchiveViewModel(application: Application) : AndroidViewModel(appli
                 async {
                     val state: UiState<SourceSummary> = summaryRepo.summarizeOn(key, date).fold(
                         onSuccess = { UiState.Success(it) },
-                        onFailure = { UiState.Error(it.message ?: "加载失败") }
+                        onFailure = { it.toUiError() }
                     )
                     _dateStates.value = _dateStates.value + (key to state)
                 }
@@ -72,7 +72,7 @@ class SummaryArchiveViewModel(application: Application) : AndroidViewModel(appli
             _dateStates.value = _dateStates.value + (source to UiState.Loading as UiState<SourceSummary>)
             val state: UiState<SourceSummary> = summaryRepo.summarizeOn(source, date).fold(
                 onSuccess = { UiState.Success(it) },
-                onFailure = { UiState.Error(it.message ?: "加载失败") }
+                onFailure = { it.toUiError() }
             )
             _dateStates.value = _dateStates.value + (source to state)
         }

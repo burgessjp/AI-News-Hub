@@ -75,7 +75,7 @@ fun DailyArchiveScreen(
                 is UiState.Loading -> com.example.aihot.ui.components.NewsCardSkeletonList(count = 6)
                 is UiState.Error -> ErrorState(
                     message = s.message,
-                    title = "归档加载失败",
+                    title = "加载失败",
                     onRetry = { vm.loadArchive() }
                 )
                 is UiState.Success -> {

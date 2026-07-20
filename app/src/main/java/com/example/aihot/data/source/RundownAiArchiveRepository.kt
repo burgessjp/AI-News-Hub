@@ -1,5 +1,6 @@
 package com.example.aihot.data.source
 
+import com.example.aihot.data.AppException
 import com.example.aihot.data.RundownAiArticle
 
 /**
@@ -22,12 +23,12 @@ class RundownAiArchiveRepository : RundownAiSource {
         val snapshot = ArchiveHttpClient.fetchLatestSnapshot(SOURCE_KEY)
         val fetchedAt = snapshot.optLong("fetched_at_ms", System.currentTimeMillis())
         val items = snapshot.optJSONArray("items")
-            ?: throw RuntimeException("归档 rundown-ai 快照无 items")
+            ?: throw AppException.NoData()
         val articles = (0 until items.length()).mapNotNull { i ->
             val obj = items.optJSONObject(i) ?: return@mapNotNull null
             RundownAiArticle.fromJson(obj, fallbackRank = i + 1)
         }
-        if (articles.isEmpty()) throw RuntimeException("归档暂无 rundown-ai 数据")
+        if (articles.isEmpty()) throw AppException.NoData()
         return RundownAiResult(fetchedAt, articles)
     }
 

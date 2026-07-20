@@ -34,7 +34,7 @@ class HotTopicsViewModel : ViewModel() {
                     _state.value =
                         if (list.isEmpty()) UiState.Error("无热点") else UiState.Success(list)
                 }
-                .onFailure { _state.value = UiState.Error(it.message ?: "未知错误") }
+                .onFailure { _state.value = it.toUiError() }
         }
     }
 }

@@ -1,5 +1,6 @@
 package com.example.aihot.data.source
 
+import com.example.aihot.data.AppException
 import com.example.aihot.data.StormzhangAiNews
 import com.example.aihot.data.StormzhangAiNewsResult
 import org.json.JSONObject
@@ -25,7 +26,7 @@ class StormzhangAiNewsArchiveRepository : StormzhangAiNewsSource {
         val fetchedAt = snapshot.optLong("fetched_at_ms", System.currentTimeMillis())
         val pageDate = snapshot.optString("pageDate")
         val items = snapshot.optJSONArray("items")
-            ?: throw RuntimeException("归档 stormzhang-ai 快照无 items")
+            ?: throw AppException.NoData()
         val news = (0 until items.length()).mapNotNull { i ->
             val obj = items.optJSONObject(i) ?: return@mapNotNull null
             val url = obj.optString("url")
@@ -41,7 +42,7 @@ class StormzhangAiNewsArchiveRepository : StormzhangAiNewsSource {
                 time = obj.optString("time")
             )
         }
-        if (news.isEmpty()) throw RuntimeException("归档暂无 stormzhang-ai 数据")
+        if (news.isEmpty()) throw AppException.NoData()
         return StormzhangAiNewsResult(fetchedAt, news, pageDate)
     }
 

@@ -1,9 +1,11 @@
 package com.example.aihot.ui.overview
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.aihot.data.AiConfigMissingException
+import com.example.aihot.data.AppException
 import com.example.aihot.data.OverviewDigest
 import com.example.aihot.data.OverviewRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,6 +23,8 @@ import kotlinx.coroutines.launch
 sealed interface OverviewState {
     data object Loading : OverviewState
     data object ConfigMissing : OverviewState
+    /** 今日内容尚未生成(归档源不足),与 [Error] 区分:语义是空态而非出错。 */
+    data object NoData : OverviewState
     data class Error(val message: String) : OverviewState
     data class Success(val digest: OverviewDigest) : OverviewState
 }
@@ -65,9 +69,14 @@ class OverviewViewModel(application: Application) : AndroidViewModel(application
             repo.loadDigest(force = force).fold(
                 onSuccess = { _state.value = OverviewState.Success(it) },
                 onFailure = { e ->
+                    Log.w("UiError", "总览加载失败: ${e.message ?: "(no message)"}", e)
                     _state.value = when (e) {
                         is AiConfigMissingException -> OverviewState.ConfigMissing
-                        else -> OverviewState.Error(e.message ?: "生成失败")
+                        is AppException.NoData -> OverviewState.NoData
+                        is AppException.Network -> OverviewState.Error("网络异常,请检查连接后重试")
+                        is AppException.AiService -> OverviewState.Error("AI 服务暂时不可用,请稍后重试")
+                        is AppException.RateLimited -> OverviewState.Error("访问受限,请稍后重试")
+                        else -> OverviewState.Error("总览生成失败,请稍后重试")
                     }
                 }
             )

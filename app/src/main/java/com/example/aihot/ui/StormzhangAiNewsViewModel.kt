@@ -78,11 +78,11 @@ class StormzhangAiNewsViewModel(application: Application) : AndroidViewModel(app
             runCatching { currentRepo().fetch() }
                 .onSuccess { result ->
                     _state.value =
-                        if (result.news.isEmpty()) UiState.Error("无内容") else UiState.Success(result.news)
+                        if (result.news.isEmpty()) UiState.Error("今日暂无内容", ErrorKind.NoData) else UiState.Success(result.news)
                     _lastRefreshAt.value = result.fetchedAt
                     _pageDate.value = result.pageDate
                 }
-                .onFailure { _state.value = UiState.Error(it.message ?: "未知错误") }
+                .onFailure { _state.value = it.toUiError() }
         }
     }
 
@@ -100,13 +100,13 @@ class StormzhangAiNewsViewModel(application: Application) : AndroidViewModel(app
             runCatching { currentRepo().forceRefresh() }
                 .onSuccess { result ->
                     _state.value =
-                        if (result.news.isEmpty()) UiState.Error("无内容") else UiState.Success(result.news)
+                        if (result.news.isEmpty()) UiState.Error("今日暂无内容", ErrorKind.NoData) else UiState.Success(result.news)
                     _lastRefreshAt.value = result.fetchedAt
                     _pageDate.value = result.pageDate
                 }
                 .onFailure {
                     if (_state.value !is UiState.Success) {
-                        _state.value = UiState.Error(it.message ?: "未知错误")
+                        _state.value = it.toUiError()
                     }
                 }
             _isRefreshing.value = false

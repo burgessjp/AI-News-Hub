@@ -207,8 +207,8 @@ fun SettingsScreen(
                 )
             }
 
-            // 缓存 section —— 一键清理网页缓存/Cookie/图片缓存/浏览历史/搜索历史等可恢复数据
-            item { SectionHeader("缓存") }
+            // 数据清理 section —— 一键清理已加载的网页/图片/浏览历史/搜索历史等可恢复数据
+            item { SectionHeader("数据清理") }
             item {
                 CacheSection(cacheSizeBytes = cacheSizeBytes, onClearCache = onClearCache)
             }
@@ -240,7 +240,7 @@ private fun CacheSection(cacheSizeBytes: Long, onClearCache: () -> Unit) {
     SettingsRow(
         icon = Icons.Filled.CleaningServices,
         iconAccent = MaterialTheme.colorScheme.primary,
-        title = "清理缓存",
+        title = "清理浏览数据",
         subtitle = "当前占用 ${CacheManager.formatSize(cacheSizeBytes)}",
         showDivider = false,
         showChevron = false,
@@ -249,9 +249,9 @@ private fun CacheSection(cacheSizeBytes: Long, onClearCache: () -> Unit) {
     if (confirmClear) {
         AlertDialog(
             onDismissRequest = { confirmClear = false },
-            title = { Text("清理缓存") },
+            title = { Text("清理浏览数据") },
             text = {
-                Text("将清理网页缓存、Cookie、图片缓存、浏览历史与搜索历史等可恢复数据,不影响你的设置和 AI 配置。")
+                Text("将清理已加载的网页、图片、浏览历史与搜索历史等可恢复数据,不影响你的设置和 AI 配置。")
             },
             confirmButton = {
                 TextButton(onClick = {

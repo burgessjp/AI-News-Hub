@@ -124,7 +124,7 @@ class OverviewRepository(context: Context) {
             }.awaitAll().mapNotNull { (k, v) -> v?.let { k to it } }.toMap()
         }
         if (snapshots.size < MIN_SOURCES) {
-            throw RuntimeException("归档数据不足(仅 ${snapshots.size}/${SummaryRepository.SOURCE_KEYS.size} 源可用)")
+            throw AppException.NoData()
         }
 
         // 2) 组 prompt 并调用(长输出,read 超时放宽;温度 0.5 对齐流水线摘要)
@@ -238,7 +238,7 @@ class OverviewRepository(context: Context) {
     ): List<OverviewEntry> {
         val json = JSONObject(extractJson(content))
         val entries = parseEntries(json.optJSONArray("items"), snapshots)
-        if (entries.isEmpty()) throw RuntimeException("AI 输出解析失败(items 为空)")
+        if (entries.isEmpty()) throw AppException.AiService()
         var breakingLeft = MAX_BREAKING
         val urls = HashSet<String>()
         return entries.map { e ->
@@ -287,7 +287,7 @@ class OverviewRepository(context: Context) {
         val s = content.trim()
         val start = s.indexOf('{')
         val end = s.lastIndexOf('}')
-        if (start < 0 || end <= start) throw RuntimeException("AI 输出解析失败(非 JSON)")
+        if (start < 0 || end <= start) throw AppException.AiService()
         return s.substring(start, end + 1)
     }
 

@@ -84,7 +84,7 @@ class ItemsViewModel : ViewModel() {
                 _isLoadingMore.value = false
                 runCatching { repo.fetchItems(mode = f.mode, category = f.category, query = f.query) }
                     .onSuccess { page -> applyPage(page, replace = true); emit(UiState.Success(_items.value)) }
-                    .onFailure { emit(UiState.Error(it.message ?: "未知错误")) }
+                    .onFailure { emit(it.toUiError()) }
             }
         }
         // 终态(成功/失败)到达即结束下拉刷新转圈;Loading 不清,避免闪断

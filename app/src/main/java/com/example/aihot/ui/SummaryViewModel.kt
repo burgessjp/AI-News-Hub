@@ -60,7 +60,7 @@ class SummaryViewModel(application: Application) : AndroidViewModel(application)
                     val result = summaryRepo.summarize(key)
                     val state: UiState<SourceSummary> = result.fold(
                         onSuccess = { UiState.Success(it) },
-                        onFailure = { UiState.Error(it.message ?: "生成失败") }
+                        onFailure = { it.toUiError() }
                     )
                     _states.value = _states.value + (key to state)
                 }
@@ -79,7 +79,7 @@ class SummaryViewModel(application: Application) : AndroidViewModel(application)
             val result = summaryRepo.summarize(source)
             val state: UiState<SourceSummary> = result.fold(
                 onSuccess = { UiState.Success(it) },
-                onFailure = { UiState.Error(it.message ?: "生成失败") }
+                onFailure = { it.toUiError() }
             )
             _states.value = _states.value + (source to state)
         }

@@ -50,6 +50,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.example.aihot.data.SourceSummary
 import com.example.aihot.data.SummaryRepository
+import com.example.aihot.ui.ErrorKind
 import com.example.aihot.ui.UiState
 import com.example.aihot.ui.anim.Motion
 import com.example.aihot.ui.components.ShimmerBox
@@ -103,7 +104,7 @@ internal fun summaryCardSpecs(onOpenFor: (source: String) -> (() -> Unit)?): Lis
 internal fun SummaryHeaderRow(
     currentPage: Int,
     pageCount: Int,
-    hint: String = "基于每日归档 · 左右滑动",
+    hint: String = "每日 AI 精选",
     onDotClick: (Int) -> Unit = {}
 ) {
     val cs = MaterialTheme.colorScheme
@@ -187,6 +188,7 @@ internal fun SummaryCardPage(
                     is UiState.Loading -> SummarySkeleton()
                     is UiState.Error -> SummaryError(
                         message = state.message,
+                        kind = state.kind,
                         onRetry = onRetry
                     )
                     is UiState.Success -> SummaryBody(text = state.data.text, accent = accent)
@@ -384,8 +386,11 @@ private fun SummarySkeleton() {
 @Composable
 private fun SummaryError(
     message: String,
-    onRetry: () -> Unit
+    onRetry: () -> Unit,
+    kind: ErrorKind = ErrorKind.Unknown
 ) {
+    // NoData 时显示空态文案;其他 kind 显示错误态文案
+    val title = if (kind == ErrorKind.NoData) "今日摘要尚未生成" else "摘要暂时没加载出来"
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -400,7 +405,7 @@ private fun SummaryError(
         )
         Spacer(Modifier.size(8.dp))
         Text(
-            text = "摘要暂时没加载出来",
+            text = title,
             style = AppText.bodySmall,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface

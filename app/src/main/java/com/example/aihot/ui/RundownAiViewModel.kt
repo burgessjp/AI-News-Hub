@@ -88,10 +88,10 @@ class RundownAiViewModel(application: Application) : AndroidViewModel(applicatio
             runCatching { currentRepo().fetch() }
                 .onSuccess { result ->
                     _state.value =
-                        if (result.articles.isEmpty()) UiState.Error("无内容") else UiState.Success(result.articles)
+                        if (result.articles.isEmpty()) UiState.Error("今日暂无内容", ErrorKind.NoData) else UiState.Success(result.articles)
                     _lastRefreshAt.value = result.fetchedAt
                 }
-                .onFailure { _state.value = UiState.Error(it.message ?: "未知错误") }
+                .onFailure { _state.value = it.toUiError() }
         }
     }
 
@@ -109,12 +109,12 @@ class RundownAiViewModel(application: Application) : AndroidViewModel(applicatio
             runCatching { currentRepo().forceRefresh() }
                 .onSuccess { result ->
                     _state.value =
-                        if (result.articles.isEmpty()) UiState.Error("无内容") else UiState.Success(result.articles)
+                        if (result.articles.isEmpty()) UiState.Error("今日暂无内容", ErrorKind.NoData) else UiState.Success(result.articles)
                     _lastRefreshAt.value = result.fetchedAt
                 }
                 .onFailure {
                     if (_state.value !is UiState.Success) {
-                        _state.value = UiState.Error(it.message ?: "未知错误")
+                        _state.value = it.toUiError()
                     }
                 }
             _isRefreshing.value = false
@@ -155,7 +155,7 @@ class RundownAiViewModel(application: Application) : AndroidViewModel(applicatio
                     if (it is ShortContentException) {
                         TranslationState.Error(TranslationState.TOO_SHORT)
                     } else {
-                        TranslationState.Error(it.message ?: "翻译失败")
+                        TranslationState.Error(it.toUiError().message)
                     }
                 }
             )

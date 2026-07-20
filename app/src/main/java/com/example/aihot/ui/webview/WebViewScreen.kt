@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.util.Log
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
@@ -556,7 +557,7 @@ fun WebViewScreen(
                                     ) {
                                         // 主帧 HTTP 错误(404/500 等)同样进错误态
                                         if (request.isForMainFrame) {
-                                            loadError = "HTTP ${errorResponse.statusCode}"
+                                            loadError = "网页加载失败(${errorResponse.statusCode})"
                                         }
                                     }
                                 }
@@ -758,7 +759,7 @@ fun WebViewScreen(
         AlertDialog(
             onDismissRequest = { showAiConfigDialog = false },
             title = { Text("未配置 AI 服务") },
-            text = { Text("整页翻译使用「设置 → AI 服务」里的服务配置,请先填写 API Key 与模型。") },
+            text = { Text("整页翻译使用「设置 → AI 服务」里的服务配置,请先完成服务与模型设置。") },
             confirmButton = {
                 TextButton(onClick = {
                     showAiConfigDialog = false
@@ -966,7 +967,8 @@ private fun enqueueDownload(context: Context, params: DownloadParams) {
         Toast.makeText(context, "开始下载:$filename", Toast.LENGTH_SHORT).show()
     } catch (e: Exception) {
         // 兜底:非法 URI / 权限 / 路径等任何异常都不再让 App 崩溃
-        Toast.makeText(context, "下载失败:${e.message ?: "未知错误"}", Toast.LENGTH_SHORT).show()
+        Log.w("Download", "下载失败", e)
+        Toast.makeText(context, "下载失败,请稍后重试", Toast.LENGTH_SHORT).show()
     }
 }
 
@@ -1093,7 +1095,8 @@ private fun saveBlob(context: Context, filename: String, mimetype: String?, data
         }
         Toast.makeText(context, "已保存:$displayName", Toast.LENGTH_SHORT).show()
     } catch (e: Exception) {
-        Toast.makeText(context, "保存失败:${e.message ?: "未知错误"}", Toast.LENGTH_SHORT).show()
+        Log.w("Save", "保存失败", e)
+        Toast.makeText(context, "保存失败,请稍后重试", Toast.LENGTH_SHORT).show()
     }
 }
 

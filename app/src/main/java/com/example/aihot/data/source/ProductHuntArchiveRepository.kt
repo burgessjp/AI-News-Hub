@@ -1,5 +1,6 @@
 package com.example.aihot.data.source
 
+import com.example.aihot.data.AppException
 import com.example.aihot.data.ProductHunt
 import org.json.JSONObject
 
@@ -24,12 +25,12 @@ class ProductHuntArchiveRepository : ProductHuntSource {
         val snapshot = ArchiveHttpClient.fetchLatestSnapshot(SOURCE_KEY)
         val fetchedAt = snapshot.optLong("fetched_at_ms", System.currentTimeMillis())
         val items = snapshot.optJSONArray("items")
-            ?: throw RuntimeException("归档 producthunt 快照无 items")
+            ?: throw AppException.NoData()
         val products = (0 until items.length()).mapNotNull { i ->
             val obj = items.optJSONObject(i) ?: return@mapNotNull null
             ProductHunt.fromJson(obj, fallbackRank = i + 1)
         }
-        if (products.isEmpty()) throw RuntimeException("归档暂无 producthunt 数据")
+        if (products.isEmpty()) throw AppException.NoData()
         return ProductHuntResult(fetchedAt, products)
     }
 

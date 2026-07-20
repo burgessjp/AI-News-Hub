@@ -134,7 +134,7 @@ fun HackerNewsCommentsScreen(
         if (titleMissing || commentMissing) {
             configMissingNotified = true
             val r = snackbarHostState.showSnackbar(
-                message = "请先在 设置 → 翻译 中配置 API",
+                message = "请先在 设置 → 翻译 中配置翻译服务",
                 actionLabel = "去设置"
             )
             if (r == androidx.compose.material3.SnackbarResult.ActionPerformed) onOpenSettings()

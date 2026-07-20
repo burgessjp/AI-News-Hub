@@ -99,10 +99,10 @@ class GitHubTrendingViewModel(application: Application) : AndroidViewModel(appli
             runCatching { currentRepo().fetch() }
                 .onSuccess { result ->
                     _state.value =
-                        if (result.repos.isEmpty()) UiState.Error("无内容") else UiState.Success(result.repos)
+                        if (result.repos.isEmpty()) UiState.Error("今日暂无内容", ErrorKind.NoData) else UiState.Success(result.repos)
                     _lastRefreshAt.value = result.fetchedAt
                 }
-                .onFailure { _state.value = UiState.Error(it.message ?: "未知错误") }
+                .onFailure { _state.value = it.toUiError() }
         }
     }
 
@@ -122,12 +122,12 @@ class GitHubTrendingViewModel(application: Application) : AndroidViewModel(appli
             runCatching { currentRepo().forceRefresh() }
                 .onSuccess { result ->
                     _state.value =
-                        if (result.repos.isEmpty()) UiState.Error("无内容") else UiState.Success(result.repos)
+                        if (result.repos.isEmpty()) UiState.Error("今日暂无内容", ErrorKind.NoData) else UiState.Success(result.repos)
                     _lastRefreshAt.value = result.fetchedAt
                 }
                 .onFailure {
                     if (_state.value !is UiState.Success) {
-                        _state.value = UiState.Error(it.message ?: "未知错误")
+                        _state.value = it.toUiError()
                     }
                 }
             _isRefreshing.value = false
@@ -156,7 +156,7 @@ class GitHubTrendingViewModel(application: Application) : AndroidViewModel(appli
                     if (it is ShortContentException) {
                         TranslationState.Error(TranslationState.TOO_SHORT)
                     } else {
-                        TranslationState.Error(it.message ?: "翻译失败")
+                        TranslationState.Error(it.toUiError().message)
                     }
                 }
             )

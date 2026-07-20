@@ -87,14 +87,13 @@ class AiChatClient {
         else client.newBuilder().readTimeout(readTimeoutSeconds, TimeUnit.SECONDS).build()
         callClient.newCall(req).execute().use { resp ->
             if (!resp.isSuccessful) {
-                val errBody = runCatching { resp.body?.string().orEmpty() }.getOrDefault("")
-                throw RuntimeException("HTTP ${resp.code}${errBody.take(120).let { ": $it" }}")
+                throw AppException.AiService()
             }
             val root = JSONObject(resp.body?.string().orEmpty())
             val content = root.optJSONArray("choices")?.optJSONObject(0)?.optJSONObject("message")
                 ?.optString("content")?.trim()
                 ?.takeIf { it.isNotBlank() }
-                ?: throw RuntimeException("响应解析失败")
+                ?: throw AppException.AiService()
             val usage = root.optJSONObject("usage")
             ChatResult(
                 content = content,

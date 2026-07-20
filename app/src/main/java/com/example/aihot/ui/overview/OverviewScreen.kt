@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.HourglassEmpty
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -152,16 +153,24 @@ fun OverviewScreen(
                 is OverviewState.Loading -> OverviewLoading()
                 is OverviewState.ConfigMissing -> EmptyState(
                     title = "配置 AI 服务后可用",
-                    subtitle = "「今日总览」由你在 设置 → AI 服务 配置的服务实时生成\n(每天 1-2 次,结果当日缓存)",
+                    subtitle = "「今日总览」由你在 设置 → AI 服务 配置的服务实时生成\n(每天 1-2 次,当日再次打开瞬时呈现)",
                     icon = Icons.Outlined.AutoAwesome,
                     actionLabel = "去设置",
                     onAction = onOpenAiService,
                     modifier = Modifier.padding(bottom = BottomBarReservedHeight)
                 )
+                is OverviewState.NoData -> EmptyState(
+                    title = "今日总览尚未生成",
+                    subtitle = "今天的内容还在准备中,请稍后再来",
+                    icon = Icons.Outlined.HourglassEmpty,
+                    actionLabel = "重试",
+                    onAction = { vm.load() },
+                    modifier = Modifier.padding(bottom = BottomBarReservedHeight)
+                )
                 is OverviewState.Error -> ErrorState(
                     message = s.message,
                     onRetry = { vm.load() },
-                    title = "总览生成失败",
+                    title = "总览加载失败",
                     modifier = Modifier.padding(bottom = BottomBarReservedHeight)
                 )
                 is OverviewState.Success -> OverviewContent(
@@ -191,7 +200,7 @@ private fun OverviewLoading() {
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            text = "首次生成约需半分钟,之后当日缓存秒开",
+            text = "首次生成约需半分钟,当天再次打开瞬时呈现",
             style = AppText.caption,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -355,8 +364,8 @@ private fun OverviewFooter(digest: OverviewDigest) {
         Spacer(Modifier.height(2.dp))
         Text(
             text = buildString {
-                append("基于 7 源当日归档")
-                if (digest.totalTokens > 0) append(" · 消耗 token ${digest.totalTokens}")
+                append("基于 7 源当日内容")
+                if (digest.totalTokens > 0) append(" · AI 用量 ${digest.totalTokens}")
                 if (digest.missingSources.isNotEmpty()) {
                     append(" · 缺 ${digest.missingSources.joinToString("、") { SummaryRepository.titleOf(it) }}")
                 }

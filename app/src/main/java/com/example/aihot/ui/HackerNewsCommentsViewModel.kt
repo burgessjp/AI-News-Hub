@@ -83,7 +83,7 @@ class HackerNewsCommentsViewModel(application: Application) : AndroidViewModel(a
                     roots.addAll(list.map { Node(it) })
                     emitFlattened()
                 }
-                .onFailure { _state.value = UiState.Error(it.message ?: "未知错误") }
+                .onFailure { _state.value = it.toUiError() }
         }
     }
 
@@ -128,7 +128,7 @@ class HackerNewsCommentsViewModel(application: Application) : AndroidViewModel(a
                     }
                     .onFailure {
                         node.childrenLoading = false
-                        node.childrenError = it.message ?: "未知错误"
+                        node.childrenError = it.toUiError().message
                         emitFlattened()
                     }
             }
@@ -175,7 +175,7 @@ class HackerNewsCommentsViewModel(application: Application) : AndroidViewModel(a
                     if (it is ShortContentException) {
                         TranslationState.Error(TranslationState.TOO_SHORT)
                     } else {
-                        TranslationState.Error(it.message ?: "翻译失败")
+                        TranslationState.Error(it.toUiError().message)
                     }
                 }
             )

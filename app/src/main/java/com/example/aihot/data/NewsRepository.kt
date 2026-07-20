@@ -59,7 +59,7 @@ class NewsRepository {
             since?.takeIf { it.isNotBlank() }?.let { add("since" to it) }
             cursor?.takeIf { it.isNotBlank() }?.let { add("cursor" to enc(it)) }
         }
-        val root = getJson("$base/items", params) ?: throw RuntimeException("响应解析失败")
+        val root = getJson("$base/items", params) ?: throw AppException.ServerError()
         val arr = root.optJSONArray("items") ?: JSONArray()
         val items = (0 until arr.length()).map { NewsItem.fromJson(arr.getJSONObject(it)) }
         NewsPage(
@@ -88,14 +88,14 @@ class NewsRepository {
     /** 最新日报(date=null)或指定日期日报(YYYY-MM-DD)。 */
     suspend fun fetchDaily(date: String? = null): DailyReport = withContext(Dispatchers.IO) {
         val url = if (date.isNullOrBlank()) "$base/daily" else "$base/daily/${enc(date)}"
-        val root = getJson(url, emptyList()) ?: throw RuntimeException("响应解析失败")
+        val root = getJson(url, emptyList()) ?: throw AppException.ServerError()
         parseDaily(root)
     }
 
     /** 日报归档索引(默认 30 期,上限 180)。 */
     suspend fun fetchDailies(take: Int = 30): List<DailySummary> = withContext(Dispatchers.IO) {
         val root = getJson("$base/dailies", listOf("take" to take.coerceIn(1, 180).toString()))
-            ?: throw RuntimeException("响应解析失败")
+            ?: throw AppException.ServerError()
         val arr = root.optJSONArray("items") ?: JSONArray()
         (0 until arr.length()).map { i ->
             val o = arr.getJSONObject(i)
@@ -169,11 +169,9 @@ class NewsRepository {
             .build()
         client.newCall(req).execute().use { resp ->
             if (!resp.isSuccessful) {
-                val msg = runCatching { JSONObject(resp.body?.string().orEmpty()).optString("error") }
-                    .getOrNull()?.takeIf { it.isNotBlank() }
-                throw RuntimeException("HTTP ${resp.code}${msg?.let { ": $it" } ?: ""}")
+                throw AppException.Network()
             }
-            return resp.body?.string() ?: throw RuntimeException("空响应")
+            return resp.body?.string() ?: throw AppException.Network()
         }
     }
 
