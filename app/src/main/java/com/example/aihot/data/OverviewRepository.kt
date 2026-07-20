@@ -32,6 +32,9 @@ class AiConfigMissingException : RuntimeException("ai_config_missing")
  * @param metrics 互动指标行(如 "得分 512 · 评论 389");无指标的源为空串
  * @param comment AI 给出的一句话(为什么重要/值得关注什么)
  * @param breaking 是否「突发重磅」(多源交叉/数据爆发/重大发布;UI 特殊样式 + 标签)
+ * @param breakingReason Breaking 专属「推荐理由」(为什么是突发/影响面有多大),
+ *   仅 breaking=true 时有;普通条目为空串。与 [comment] 语义区分:comment=重要性,
+ *   breakingReason=突发性
  */
 data class OverviewEntry(
     val source: String,
@@ -39,7 +42,8 @@ data class OverviewEntry(
     val url: String,
     val metrics: String,
     val comment: String,
-    val breaking: Boolean
+    val breaking: Boolean,
+    val breakingReason: String = ""
 )
 
 /**
@@ -127,18 +131,26 @@ class OverviewRepository(context: Context) {
             throw AppException.NoData()
         }
 
+        // 「今天」以**数据侧日期**为准:取 7 源快照里最新的 fetched_at_ms 对应的北京日期。
+        // 这样在数据流水线尚未跑当天的清晨,不会因本机日期超前于数据日期而产不出任何 breaking。
+        val dataDateMs = snapshots.values.maxOf { it.optLong("fetched_at_ms", 0L) }
+        val dataToday = beijingDateKeyOfMs(dataDateMs)
+
         // 2) 组 prompt 并调用(长输出,read 超时放宽;温度 0.5 对齐流水线摘要)
-        val user = snapshots.entries.joinToString("\n\n") { (k, snap) -> buildSection(k, snap) }
+        val user = buildString {
+            append("数据日期(北京):").append(dataToday).append("\n\n")
+            append(snapshots.entries.joinToString("\n\n") { (k, snap) -> buildSection(k, snap) })
+        }
         val result = chatClient.chat(config, SYSTEM_PROMPT, user, temperature = 0.5, readTimeoutSeconds = 120)
             .getOrThrow()
         runCatching { usageStore.record(config.model, result.promptTokens, result.completionTokens) }
 
         // 3) 解析 + ref 回填
-        val items = parseResult(result.content, snapshots)
+        val items = parseResult(result.content, snapshots, dataToday)
         val digest = OverviewDigest(
             items = items,
             generatedAt = System.currentTimeMillis(),
-            dataFetchedAt = snapshots.values.maxOf { it.optLong("fetched_at_ms", 0L) },
+            dataFetchedAt = dataDateMs,
             missingSources = SummaryRepository.SOURCE_KEYS - snapshots.keys,
             model = config.model,
             totalTokens = result.promptTokens + result.completionTokens,
@@ -150,7 +162,7 @@ class OverviewRepository(context: Context) {
 
     // ===== prompt 组装 =====
 
-    /** 单源输入段:标题行 + AI 要点(上下文)+ 编号条目(标题/简介/指标,不带 URL)。 */
+    /** 单源输入段:标题行 + AI 要点(上下文)+ 编号条目(标题/简介/指标/发布日期,不带 URL)。 */
     private fun buildSection(source: String, snapshot: JSONObject): String {
         val sb = StringBuilder()
         sb.append("## ").append(source).append("(").append(SummaryRepository.titleOf(source)).append(")")
@@ -161,38 +173,47 @@ class OverviewRepository(context: Context) {
             sb.append("\n[").append(item.index).append("] ").append(item.title)
             if (item.blurb.isNotEmpty()) sb.append(" — ").append(item.blurb.take(60))
             if (item.metrics.isNotEmpty()) sb.append(" | ").append(item.metrics)
+            // 日期(北京 MM-dd)给 AI 判断「今天」用,时效兜底在 parseEntries 客户端二次校验
+            if (item.dateKey.length >= 10) sb.append(" | ").append(item.dateKey.substring(5))
         }
         return sb.toString()
     }
 
-    /** 输入条目的统一视图:index 即 prompt 里的序号(供 AI ref 引用)。 */
+    /** 输入条目的统一视图:index 即 prompt 里的序号(供 AI ref 引用)。
+     *  [dateKey] 为条目的北京日期(yyyy-MM-dd),用于「只推今天的 breaking」时效兜底;
+     *  无 item 级日期的源用快照顶层 fetched_at_ms 近似,均失败则为空串(按非今天处理)。 */
     private data class ItemView(
         val index: Int,
         val title: String,
         val url: String,
         val metrics: String,
-        val blurb: String
+        val blurb: String,
+        val dateKey: String
     )
 
     /** 从快照 items 提取前 [limit] 条,字段映射对齐 docs/news-hub-data-usage.md 各源结构。 */
     private fun extractItems(source: String, snapshot: JSONObject, limit: Int = ITEMS_PER_SOURCE): List<ItemView> {
         val items = snapshot.optJSONArray("items") ?: return emptyList()
         val n = minOf(limit, items.length())
+        // 无 item 级日期的源用快照顶层落盘时刻近似(北京时间日期)
+        val fallbackDateKey = beijingDateKeyOfMs(snapshot.optLong("fetched_at_ms", 0L))
         return (0 until n).mapNotNull { i ->
             val o = items.optJSONObject(i) ?: return@mapNotNull null
             val view = when (source) {
                 "hackernews" -> ItemView(
                     i, o.optString("title"), o.optString("target_url"),
-                    "得分 ${o.optInt("score")} · 评论 ${o.optInt("descendants")}", ""
+                    "得分 ${o.optInt("score")} · 评论 ${o.optInt("descendants")}", "",
+                    beijingDateKeyOfMs(o.optLong("time", 0L) * 1000L)
                 )
                 "github-trending" -> ItemView(
                     i, "${o.optString("owner")}/${o.optString("name")}", o.optString("url"),
                     "今日 star +${o.optInt("starsToday")} · 累计 ${fmtCount(o.optInt("totalStars"))}",
-                    o.optString("description")
+                    o.optString("description"), fallbackDateKey
                 )
                 "huggingface-papers" -> ItemView(
                     i, o.optString("title"), o.optString("url"),
-                    "upvotes ${o.optInt("upvotes")}", o.optString("summary")
+                    "upvotes ${o.optInt("upvotes")}", o.optString("summary"),
+                    beijingDateKeyOfEnDate(o.optString("published"))
                 )
                 "producthunt" -> ItemView(
                     i, o.optString("name"), o.optString("url"),
@@ -201,21 +222,25 @@ class OverviewRepository(context: Context) {
                         val r = o.optInt("dailyRank")
                         if (r > 0) append(" · 日榜#$r")
                     },
-                    o.optString("tagline")
+                    o.optString("tagline"),
+                    beijingDateKeyOfIso(o.optString("createdAt"))
                 )
                 "rundown-ai" -> ItemView(
                     i, o.optString("title"), o.optString("url"),
-                    "", o.optString("subtitle")
+                    "", o.optString("subtitle"), fallbackDateKey
                 )
                 "stormzhang-ai" -> ItemView(
                     i, o.optString("summary"), o.optString("url"),
-                    "信源 ${o.optString("source")}", o.optString("english")
+                    "信源 ${o.optString("source")}", o.optString("english"),
+                    // "2026-07-15 20:00" 北京时间无时区,直接取前 10 字符(yyyy-MM-dd)
+                    o.optString("time").trim().takeIf { it.length >= 10 }?.substring(0, 10) ?: ""
                 )
                 "aihot-featured" -> ItemView(
                     i, o.optString("title"),
                     o.optString("permalink").ifBlank { o.optString("url") },
                     "权重 ${o.optInt("score")} · ${o.optString("source")}",
-                    o.optString("summary")
+                    o.optString("summary"),
+                    beijingDateKeyOfIso(o.optString("publishedAt"))
                 )
                 else -> null
             }
@@ -223,26 +248,66 @@ class OverviewRepository(context: Context) {
         }
     }
 
+    /** Unix 毫秒 → 北京日期(yyyy-MM-dd);0 或负数返回空串。 */
+    private fun beijingDateKeyOfMs(epochMs: Long): String {
+        if (epochMs <= 0L) return ""
+        return runCatching {
+            val fmt = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+            fmt.timeZone = TimeZone.getTimeZone("GMT+08:00")
+            fmt.format(Date(epochMs))
+        }.getOrDefault("")
+    }
+
+    /** ISO UTC 字符串(如 2026-07-18T07:01:00Z)→ 北京日期;解析失败返回空串。 */
+    private fun beijingDateKeyOfIso(iso: String): String {
+        val s = iso.trim()
+        if (s.isEmpty()) return ""
+        return runCatching {
+            java.time.Instant.parse(s).atZone(java.time.ZoneOffset.UTC)
+                .withZoneSameInstant(java.time.ZoneId.of("Asia/Shanghai"))
+                .toLocalDate().toString()
+        }.getOrDefault("")
+    }
+
+    /** 英文月份格式日期(如 "Jul 8, 2026")→ 北京日期;解析失败返回空串。 */
+    private fun beijingDateKeyOfEnDate(text: String): String {
+        val s = text.trim()
+        if (s.isEmpty()) return ""
+        return runCatching {
+            val fmt = SimpleDateFormat("MMM d, yyyy", Locale.US)
+            fmt.timeZone = TimeZone.getTimeZone("GMT+08:00")
+            val ms = fmt.parse(s)?.time ?: return@runCatching ""
+            val out = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+            out.timeZone = TimeZone.getTimeZone("GMT+08:00")
+            out.format(Date(ms))
+        }.getOrDefault("")
+    }
+
     // ===== AI 输出解析 =====
 
     /**
      * 解析 AI 输出为统一的热点列表;items 为空视为解析失败抛异常。
      * 兜底策略(prompt 已要求但模型未必严格遵守):
+     *  - **时效硬约束**:breaking 条目的北京日期必须等于数据日期 [today],非当日的
+     *    强制降级为普通条目(防流水线失败保留机制把过期快照推成突发);
      *  - breaking 标记截断到 [MAX_BREAKING] 条(超出的按提交顺序降级为普通条目);
      *  - 按落地 URL 去重(同一事件同链接跨源同现);
      *  - breaking 条目稳定排序到最前,整体截断到 [MAX_TOP]。
+     *
+     * @param today 数据日期(7 源快照里最新 fetched_at_ms 的北京日期,非本机当天)
      */
     private fun parseResult(
         content: String,
-        snapshots: Map<String, JSONObject>
+        snapshots: Map<String, JSONObject>,
+        today: String
     ): List<OverviewEntry> {
         val json = JSONObject(extractJson(content))
-        val entries = parseEntries(json.optJSONArray("items"), snapshots)
+        val entries = parseEntries(json.optJSONArray("items"), snapshots, today)
         if (entries.isEmpty()) throw AppException.AiService()
         var breakingLeft = MAX_BREAKING
         val urls = HashSet<String>()
         return entries.map { e ->
-                if (e.breaking && breakingLeft > 0) { breakingLeft--; e } else e.copy(breaking = false)
+                if (e.breaking && breakingLeft > 0) { breakingLeft--; e } else e.copy(breaking = false, breakingReason = "")
             }
             .filter { urls.add(it.url) }
             .sortedByDescending { it.breaking }  // 稳定排序,不打乱同级重要性次序
@@ -251,11 +316,15 @@ class OverviewRepository(context: Context) {
 
     /**
      * 解析条目数组:按 ref 回源数据回填标题/URL/指标,丢弃无效 ref(源不存在、
-     * 序号越界、重复)。breaking 标记直接采纳 AI 输出,截断在 [parseResult] 统一做。
+     * 序号越界、重复)。breaking 标记先经**时效兜底**(非 [today] 强制 false),再由
+     * [parseResult] 统一截断到 [MAX_BREAKING]。
+     *
+     * @param today 数据日期(yyyy-MM-dd),用于 breaking 时效校验
      */
     private fun parseEntries(
         arr: JSONArray?,
-        snapshots: Map<String, JSONObject>
+        snapshots: Map<String, JSONObject>,
+        today: String
     ): List<OverviewEntry> {
         if (arr == null) return emptyList()
         val seen = mutableSetOf<String>()
@@ -271,13 +340,17 @@ class OverviewRepository(context: Context) {
             // 序号必须落在 prompt 实际给出的前 ITEMS_PER_SOURCE 条内,防 AI 引用未提供的条目
             val item = extractItems(source, snapshot).getOrNull(index) ?: return@mapNotNull null
             if (item.url.isBlank()) return@mapNotNull null
+            // 时效硬约束:AI 标 breaking 但日期不是今天的,强制降级(防过期数据上突发位)
+            val aiBreaking = o.optBoolean("breaking")
+            val isBreaking = aiBreaking && item.dateKey == today && item.dateKey.isNotEmpty()
             OverviewEntry(
                 source = source,
                 title = item.title,
                 url = item.url,
                 metrics = item.metrics,
                 comment = o.optString("analysis").trim(),
-                breaking = o.optBoolean("breaking")
+                breaking = isBreaking,
+                breakingReason = if (isBreaking) o.optString("breakingReason").trim() else ""
             )
         }
     }
@@ -351,7 +424,8 @@ class OverviewRepository(context: Context) {
                 url = o.optString("url"),
                 metrics = o.optString("metrics"),
                 comment = o.optString("comment"),
-                breaking = o.optBoolean("breaking")
+                breaking = o.optBoolean("breaking"),
+                breakingReason = o.optString("breakingReason")
             ).takeIf { it.title.isNotBlank() && it.url.isNotBlank() }
         }
     }
@@ -366,6 +440,7 @@ class OverviewRepository(context: Context) {
                     .put("metrics", e.metrics)
                     .put("comment", e.comment)
                     .put("breaking", e.breaking)
+                    .put("breakingReason", e.breakingReason)
             )
         }
     }
@@ -393,16 +468,17 @@ class OverviewRepository(context: Context) {
         const val MAX_TOP = 10
 
         val SYSTEM_PROMPT = """
-你是「AI News Hub」今日总览栏目的主编。输入是 7 个资讯源的今日榜单:每源附 AI 要点摘要,以及排名前若干条目(序号、标题、简介、互动指标)。请基于全部数据做当天整体研判。
+你是「AI News Hub」今日总览栏目的主编。输入是 7 个资讯源的今日榜单:每源附 AI 要点摘要,以及排名前若干条目(序号、标题、简介、互动指标、北京日期 MM-DD)。请基于全部数据做当天整体研判。
 
 严格输出一个 JSON 对象,不要输出任何解释文字,不要使用 markdown 代码围栏:
-{"items":[{"ref":"源key:序号","analysis":"一句话,不超过40字","breaking":true}]}
+{"items":[{"ref":"源key:序号","analysis":"一句话,不超过40字","breaking":true,"breakingReason":"为什么是突发,40字内"}]}
 
 规则:
 1. items 是今日最值得关注的条目,按重要性排序,最多 10 条;尽量覆盖不同源与主题(模型发布/产品/研究论文/开源项目/行业动态),同一事件只留最重要的一条;数据不足 10 条时有多少给多少,至少 5 条。
-2. 其中「突发重磅」标 "breaking":true:多源交叉报道、互动数据(得分/评论/票数/star)显著爆发、或重大发布与行业事件。0 到 3 条,宁缺毋滥,绝不硬凑;其余条目一律 "breaking":false。breaking 条目排在 items 最前,同样计入 10 条总数。
+2. 其中「突发重磅」标 "breaking":true:多源交叉报道、互动数据(得分/评论/票数/star)显著爆发、或重大发布与行业事件。0 到 3 条,宁缺毋滥,绝不硬凑;其余条目一律 "breaking":false。breaking 条目排在 items 最前,同样计入 10 条总数。**时效硬约束**:输入顶部已给出「数据日期(北京)」,仅条目末尾的北京日期等于该值的条目才可标 breaking;过期条目即便互动数据爆发也一律 false(客户端会二次校验日期,不符会强制降级,且不补 breakingReason)。
 3. ref 必须原样照抄输入中的「源key:序号」(如 hackernews:2),不得编造;标题与链接由客户端按 ref 回填,你不要输出标题和 URL。
 4. analysis 用简体中文,一句话说清「为什么重要/值得关注什么」,不要复述标题。
+5. breaking=true 的条目必须给出 breakingReason,简体中文,一句话说明「为什么是突发/影响面有多大」,≤40 字,不复述 analysis;breaking=false 时 breakingReason 留空字符串。
 """.trimIndent()
     }
 }

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -262,7 +263,7 @@ private fun BreakingTag(modifier: Modifier = Modifier) {
 
 /**
  * Top10 行:排名徽章 + 原标题 + AI 一句话 + 来源/指标,与其它榜单屏同语言。
- * breaking 条目特殊样式:tertiary 浅底 + 同色描边 + 「Breaking」标签。
+ * breaking 条目特殊样式:tertiary 浅底 + 同色描边 + 「Breaking」标签 + 「推荐理由」块。
  */
 @Composable
 private fun TopEntryRow(
@@ -307,6 +308,35 @@ private fun TopEntryRow(
                         style = AppText.bodySmall,
                         color = cs.onSurfaceVariant,
                         maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                // Breaking 专属「推荐理由」:仅 breaking 且有理由时展示,
+                // 图标 + 文字标签(tertiary 强调色,与 BreakingTag 同色系)+ ≤3 行正文。
+                // 与 comment 语义区分:comment=为什么重要,推荐理由=为什么是突发。
+                if (entry.breaking && entry.breakingReason.isNotBlank()) {
+                    Spacer(Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Outlined.AutoAwesome,
+                            contentDescription = null,
+                            tint = cs.tertiary,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text = "推荐理由",
+                            style = AppText.caption,
+                            fontWeight = FontWeight.SemiBold,
+                            color = cs.tertiary
+                        )
+                    }
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = entry.breakingReason,
+                        style = AppText.bodySmall,
+                        color = cs.onSurfaceVariant,
+                        maxLines = 3,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
