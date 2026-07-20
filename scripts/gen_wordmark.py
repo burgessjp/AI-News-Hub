@@ -9,10 +9,13 @@ AIHot 总览页 wordmark(Logo 字标)生成器。
     与 Compose 侧 BrandGradient(primary→secondary)同套色值
 
 输出(入库资源,重新运行即重新生成):
-  - app/src/main/res/drawable/ic_wordmark.xml      VectorDrawable(字标文字已转路径)
-  - app/src/main/res/values/colors.xml             wordmark 浅色配色
-  - app/src/main/res/values-night/colors.xml       wordmark 深色配色
-  - /tmp/wordmark_preview_{light,dark}.png         qlmanage 渲染预览
+  - app/src/main/res/drawable/ic_wordmark.xml        浅色变体(VectorDrawable,文字已转路径)
+  - app/src/main/res/drawable/ic_wordmark_dark.xml   深色变体
+  - /tmp/wordmark_preview_{light,dark}.png           渲染预览
+
+深/浅双变体的原因:App 的深色模式可在设置页自选(Compose 层 AIHotTheme 决定),
+values-night 资源限定符只跟随系统 night mode,感知不到应用内设置;故色值直接
+写进两份 drawable,运行时由调用方按 colorScheme 选择(见 ui/components/BrandWordmark.kt)。
 
 依赖:fontTools(pip install fontTools,见 scripts/requirements.txt);
 预览渲染依赖 macOS qlmanage(与 gen_icon_svg.py 相同)。
@@ -121,8 +124,11 @@ def gradient_stops_xml(stops, indent):
     )
 
 
-def build_vector(glyphs, ai_span, total_w):
-    """生成 VectorDrawable XML(颜色全部走 @color,深/浅自适应)。"""
+def build_vector(glyphs, ai_span, total_w, theme):
+    """生成指定主题变体的 VectorDrawable XML(色值硬编码,不走 values-night:
+    应用内自选深色模式在 Compose 层,资源系统感知不到,运行时再选变体文件)。"""
+    g0, g1 = GRADIENT[theme]
+    text_color = WORDMARK_TEXT[theme]
     ring = arc_path(MARK_CX, MARK_CY, RING_R, -110, 130, 1, 1)  # 右下留 ~120° 开口
     dot = circle_path(MARK_CX, MARK_CY, DOT_R)
     hl = circle_path(MARK_CX + HL_DX, MARK_CY + HL_DY, HL_R)
@@ -135,7 +141,7 @@ def build_vector(glyphs, ai_span, total_w):
             <gradient android:type="linear"
                 android:startX="{gx1:g}" android:startY="{gy1:g}"
                 android:endX="{gx2:g}" android:endY="{gy2:g}">
-{gradient_stops_xml([(0.0, "@color/wordmark_gradient_start"), (1.0, "@color/wordmark_gradient_end")], 16)}
+{gradient_stops_xml([(0.0, g0), (1.0, g1)], 16)}
             </gradient>
         </aapt:attr>
     </path>
@@ -155,7 +161,7 @@ def build_vector(glyphs, ai_span, total_w):
     <path android:pathData="{hl}" android:fillColor="#FFFFFF" android:fillAlpha="0.92"/>
 '''
     ]
-    ai_g = [(0.0, "@color/wordmark_gradient_start"), (1.0, "@color/wordmark_gradient_end")]
+    ai_g = [(0.0, g0), (1.0, g1)]
     for data, fill in glyphs:
         if fill == "gradient":
             paths.append(f'''    <path android:pathData="{data}">
@@ -169,9 +175,9 @@ def build_vector(glyphs, ai_span, total_w):
     </path>
 ''')
         else:
-            paths.append(f'    <path android:pathData="{data}" android:fillColor="@color/wordmark_text"/>\n')
+            paths.append(f'    <path android:pathData="{data}" android:fillColor="{text_color}"/>\n')
     return f'''<?xml version="1.0" encoding="utf-8"?>
-<!-- 总览页 wordmark("AI NEWS HUB" Logo 字标)—— 由 scripts/gen_wordmark.py 生成,勿手改 -->
+<!-- 总览页 wordmark("AI NEWS HUB" Logo 字标,{theme} 变体)—— 由 scripts/gen_wordmark.py 生成,勿手改 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:aapt="http://schemas.android.com/aapt"
     android:width="{total_w / 4:.1f}dp"
@@ -256,27 +262,12 @@ def main():
     if args.preview_only:
         return
 
-    drawable = os.path.join(RES, "drawable", "ic_wordmark.xml")
-    os.makedirs(os.path.dirname(drawable), exist_ok=True)
-    with open(drawable, "w") as f:
-        f.write(build_vector(glyphs, ai_span, total_w))
-    print(f"drawable -> {drawable}")
-
-    for qualifier, theme in (("values", "light"), ("values-night", "dark")):
-        g0, g1 = GRADIENT[theme]
-        path = os.path.join(RES, qualifier, "colors.xml")
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, "w") as f:
-            f.write(f'''<?xml version="1.0" encoding="utf-8"?>
-<!-- 总览页 wordmark 配色({theme})—— 由 scripts/gen_wordmark.py 生成;
-     色值与 ui/theme/Color.kt {"浅色" if theme == "light" else "深色"}色板的 primary/secondary/onSurface 保持一致 -->
-<resources>
-    <color name="wordmark_gradient_start">{g0}</color>
-    <color name="wordmark_gradient_end">{g1}</color>
-    <color name="wordmark_text">{WORDMARK_TEXT[theme]}</color>
-</resources>
-''')
-        print(f"colors   -> {path}")
+    for theme, name in (("light", "ic_wordmark"), ("dark", "ic_wordmark_dark")):
+        drawable = os.path.join(RES, "drawable", f"{name}.xml")
+        os.makedirs(os.path.dirname(drawable), exist_ok=True)
+        with open(drawable, "w") as f:
+            f.write(build_vector(glyphs, ai_span, total_w, theme))
+        print(f"drawable -> {drawable}")
 
 
 if __name__ == "__main__":

@@ -1,7 +1,6 @@
 package com.example.aihot.ui.overview
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -40,20 +40,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.aihot.R
 import com.example.aihot.data.OverviewDigest
 import com.example.aihot.data.OverviewEntry
 import com.example.aihot.data.SummaryRepository
 import com.example.aihot.ui.EmptyState
 import com.example.aihot.ui.ErrorState
 import com.example.aihot.ui.components.AppTopBar
-import com.example.aihot.ui.components.BottomBarReservedHeight
+import com.example.aihot.ui.components.BottomBarPillHeight
+import com.example.aihot.ui.components.BrandWordmark
 import com.example.aihot.ui.components.RankBadge
 import com.example.aihot.ui.components.SectionHeader
 import com.example.aihot.ui.theme.AppAlpha
@@ -107,12 +106,8 @@ fun OverviewScreen(
             AppTopBar(
                 title = "AI NEWS HUB",
                 titleContent = {
-                    // 品牌字标(矢量,深/浅主题自适应),替换原纯文字标题
-                    Image(
-                        painter = painterResource(R.drawable.ic_wordmark),
-                        contentDescription = "AI News Hub",
-                        modifier = Modifier.height(36.dp)
-                    )
+                    // 品牌字标(矢量,跟随设置页自选的深/浅主题),替换原纯文字标题
+                    BrandWordmark(modifier = Modifier.height(44.dp))
                 },
                 horizontalPadding = 18.dp,
                 actions = {
@@ -149,6 +144,11 @@ fun OverviewScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                // 列表可滚入药丸 TAB 之下,但可视区不超出药丸底缘
+                // (与 MainActivity 底栏定位一致:navigationBarsPadding + 距底 16dp),
+                // 内容不再透出到药丸与系统导航栏之间的间隙
+                .navigationBarsPadding()
+                .padding(bottom = 16.dp)
         ) {
             when (val s = state) {
                 is OverviewState.Loading -> OverviewLoading()
@@ -157,22 +157,19 @@ fun OverviewScreen(
                     subtitle = "「今日总览」由你在 设置 → AI 服务 配置的服务实时生成\n(每天 1-2 次,当日再次打开瞬时呈现)",
                     icon = Icons.Outlined.AutoAwesome,
                     actionLabel = "去设置",
-                    onAction = onOpenAiService,
-                    modifier = Modifier.padding(bottom = BottomBarReservedHeight)
+                    onAction = onOpenAiService
                 )
                 is OverviewState.NoData -> EmptyState(
                     title = "今日总览尚未生成",
                     subtitle = "今天的内容还在准备中,请稍后再来",
                     icon = Icons.Outlined.HourglassEmpty,
                     actionLabel = "重试",
-                    onAction = { vm.load() },
-                    modifier = Modifier.padding(bottom = BottomBarReservedHeight)
+                    onAction = { vm.load() }
                 )
                 is OverviewState.Error -> ErrorState(
                     message = s.message,
                     onRetry = { vm.load() },
-                    title = "总览加载失败",
-                    modifier = Modifier.padding(bottom = BottomBarReservedHeight)
+                    title = "总览加载失败"
                 )
                 is OverviewState.Success -> OverviewContent(
                     digest = s.digest,
@@ -217,7 +214,9 @@ private fun OverviewContent(
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = BottomBarReservedHeight),
+        // 末项可停到药丸之上:药丸高 + 16dp 呼吸空间
+        // (列表本身可滚入药丸之下,容器已按药丸底缘裁剪)
+        contentPadding = PaddingValues(bottom = BottomBarPillHeight + 16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         item(key = "top10-header", contentType = "header") {

@@ -1,6 +1,5 @@
 package com.example.aihot.ui.more
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -34,12 +33,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.aihot.R
 import com.example.aihot.ui.components.AppTopBar
 import com.example.aihot.ui.components.BottomBarReservedHeight
+import com.example.aihot.ui.components.BrandWordmark
 import com.example.aihot.ui.components.SectionHeader
 import com.example.aihot.ui.theme.AppAlpha
 import com.example.aihot.ui.theme.AppText
@@ -71,15 +69,11 @@ fun MoreScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
-            // 与总览页一致:品牌 wordmark 图片标题(矢量,深/浅主题自适应)
+            // 与总览页一致:品牌 wordmark 图片标题(矢量,跟随设置页自选的深/浅主题)
             AppTopBar(
                 title = "AI News Hub",
                 titleContent = {
-                    Image(
-                        painter = painterResource(R.drawable.ic_wordmark),
-                        contentDescription = "AI News Hub",
-                        modifier = Modifier.height(36.dp)
-                    )
+                    BrandWordmark(modifier = Modifier.height(44.dp))
                 },
                 horizontalPadding = 18.dp
             )

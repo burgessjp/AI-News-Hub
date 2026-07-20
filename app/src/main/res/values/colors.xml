@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- 总览页 wordmark 配色(light)—— 由 scripts/gen_wordmark.py 生成;
-     色值与 ui/theme/Color.kt 浅色色板的 primary/secondary/onSurface 保持一致 -->
-<resources>
-    <color name="wordmark_gradient_start">#003EC7</color>
-    <color name="wordmark_gradient_end">#6B38D4</color>
-    <color name="wordmark_text">#141B2B</color>
-</resources>

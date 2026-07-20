@@ -85,6 +85,16 @@ enum class AppTab(
 val BottomBarReservedHeight = 120.dp
 
 /**
+ * 药丸自身高度(不含距底 margin 与导航栏 inset):
+ * icon 22dp + 图标/文字间距 2dp + 文字行高 ~16dp + 容器 vertical padding 12dp×2。
+ *
+ * 用途:列表允许滚入药丸之下、但要把可视区收在药丸底缘时(总览页),容器底部
+ * padding 用 navigationBarsPadding + 16dp(与 MainActivity 底栏定位一致),
+ * 列表 contentPadding 用本值 + 间距让末项能停到药丸之上。
+ */
+val BottomBarPillHeight = 64.dp
+
+/**
  * 浮动药丸底栏 —— 对齐 "Synthetic Intelligence News" 设计系统
  * (参考 system_stream_editorial 原型底栏)。
  *
