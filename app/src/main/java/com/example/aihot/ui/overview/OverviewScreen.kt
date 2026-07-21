@@ -311,33 +311,35 @@ private fun TopEntryRow(
                     )
                 }
                 // Breaking 专属「推荐理由」:仅 breaking 且有理由时展示,
-                // 图标 + 文字标签(tertiary 强调色,与 BreakingTag 同色系)+ ≤3 行正文。
+                // 图标 + 「推荐理由」标签 + 正文挤在一行(图标+标签固定,正文 weight 占满
+                // 剩余宽度并支持多行省略)。三者同档字号同 lineHeight,多行时顶对齐不错位。
                 // 与 comment 语义区分:comment=为什么重要,推荐理由=为什么是突发。
                 if (entry.breaking && entry.breakingReason.isNotBlank()) {
-                    Spacer(Modifier.height(8.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Spacer(Modifier.height(6.dp))
+                    Row(verticalAlignment = Alignment.Top) {
                         Icon(
                             Icons.Outlined.AutoAwesome,
                             contentDescription = null,
                             tint = cs.tertiary,
-                            modifier = Modifier.size(14.dp)
+                            modifier = Modifier.size(13.dp)
                         )
                         Spacer(Modifier.width(4.dp))
                         Text(
                             text = "推荐理由",
-                            style = AppText.caption,
+                            style = AppText.bodySmall,
                             fontWeight = FontWeight.SemiBold,
                             color = cs.tertiary
                         )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text = entry.breakingReason,
+                            style = AppText.bodySmall,
+                            color = cs.onSurfaceVariant,
+                            modifier = Modifier.weight(1f),
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        text = entry.breakingReason,
-                        style = AppText.bodySmall,
-                        color = cs.onSurfaceVariant,
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis
-                    )
                 }
                 Spacer(Modifier.height(6.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
