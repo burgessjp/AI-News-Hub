@@ -314,13 +314,12 @@ private fun TopEntryRow(
                     )
                 }
                 // Breaking 专属「推荐理由」:仅 breaking 且有理由时展示。
-                // 整段(图标+标签+正文)用 Surface 包成「卡中卡」内嵌面板:surface 实底
-                // (比 Breaking 卡的半透红底更实) + small 圆角 + tertiary 描边呼应卡调。
-                // 这样与上面 comment 的灰文字形成明显的「独立面板 vs 行内文字」层次,
-                // 又不会像 tertiaryContainer 那样过深(本项目 tertiaryContainer 是火焰实色 #BF3003)。
-                // 内部:单个 Text(annotatedString),「推荐理由」标签 tertiary/SemiBold + 正文
-                // onSurfaceVariant,正文换行顺着标签后自然流(单 TextView 效果)。
-                // 与 comment 语义区分:comment=为什么重要,推荐理由=为什么是突发。
+                // 整段(图标+标签+正文)用 Surface 包成「卡中卡」内嵌面板:tertiary 半透红
+                // 底(badgeOverlayStrong 0.20f,比 Breaking 卡底 0.12f 略深一档)+ small 圆角,
+                // 同色系融入卡背景又能看出是子区域。内部单个 Text(annotatedString),
+                // 「推荐理由」标签 tertiary/SemiBold + 正文 onSurfaceVariant,正文换行顺着
+                // 标签后自然流(单 TextView 效果)。与 comment 语义区分:comment=为什么重要,
+                // 推荐理由=为什么是突发。
                 if (entry.breaking && entry.breakingReason.isNotBlank()) {
                     Spacer(Modifier.height(6.dp))
                     val reason = remember(entry.breakingReason, cs.tertiary) {
@@ -332,9 +331,8 @@ private fun TopEntryRow(
                         }
                     }
                     Surface(
-                        color = cs.surface,
+                        color = cs.tertiary.copy(alpha = AppAlpha.badgeOverlayStrong),
                         shape = MaterialTheme.shapes.small,
-                        border = BorderStroke(1.dp, cs.tertiary.copy(alpha = AppAlpha.badgeOutline)),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
