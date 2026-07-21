@@ -314,15 +314,16 @@ private fun TopEntryRow(
                     )
                 }
                 // Breaking 专属「推荐理由」:仅 breaking 且有理由时展示。
-                // 整段(图标+标签+正文)用 tertiaryContainer 底 + small 圆角包成独立色块,
-                // 与上面 comment 的灰文字拉开层次(呼应 Breaking 卡 tertiary 调)。
-                // 底/字走 Material 配对的 tertiaryContainer/onTertiaryContainer(对齐 RankBadge
-                // 第 2-3 名),对比度有保证;「推荐理由」标签用 tertiary 实色 + SemiBold 做锚点。
-                // 内部:单个 Text(annotatedString),正文换行顺着标签后自然流(单 TextView 效果)。
+                // 整段(图标+标签+正文)用 Surface 包成「卡中卡」内嵌面板:surface 实底
+                // (比 Breaking 卡的半透红底更实) + small 圆角 + tertiary 描边呼应卡调。
+                // 这样与上面 comment 的灰文字形成明显的「独立面板 vs 行内文字」层次,
+                // 又不会像 tertiaryContainer 那样过深(本项目 tertiaryContainer 是火焰实色 #BF3003)。
+                // 内部:单个 Text(annotatedString),「推荐理由」标签 tertiary/SemiBold + 正文
+                // onSurfaceVariant,正文换行顺着标签后自然流(单 TextView 效果)。
                 // 与 comment 语义区分:comment=为什么重要,推荐理由=为什么是突发。
                 if (entry.breaking && entry.breakingReason.isNotBlank()) {
                     Spacer(Modifier.height(6.dp))
-                    val reason = remember(entry.breakingReason, cs.tertiary, cs.onTertiaryContainer) {
+                    val reason = remember(entry.breakingReason, cs.tertiary) {
                         buildAnnotatedString {
                             withStyle(SpanStyle(color = cs.tertiary, fontWeight = FontWeight.SemiBold)) {
                                 append("推荐理由 ")
@@ -331,8 +332,9 @@ private fun TopEntryRow(
                         }
                     }
                     Surface(
-                        color = cs.tertiaryContainer,
+                        color = cs.surface,
                         shape = MaterialTheme.shapes.small,
+                        border = BorderStroke(1.dp, cs.tertiary.copy(alpha = AppAlpha.badgeOutline)),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
@@ -349,7 +351,7 @@ private fun TopEntryRow(
                             Text(
                                 text = reason,
                                 style = AppText.bodySmall,
-                                color = cs.onTertiaryContainer,
+                                color = cs.onSurfaceVariant,
                                 modifier = Modifier.weight(1f),
                                 maxLines = 3,
                                 overflow = TextOverflow.Ellipsis
