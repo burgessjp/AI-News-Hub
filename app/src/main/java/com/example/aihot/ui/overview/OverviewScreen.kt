@@ -40,8 +40,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -311,11 +314,20 @@ private fun TopEntryRow(
                     )
                 }
                 // Breaking 专属「推荐理由」:仅 breaking 且有理由时展示,
-                // 图标 + 「推荐理由」标签 + 正文挤在一行(图标+标签固定,正文 weight 占满
-                // 剩余宽度并支持多行省略)。三者同档字号同 lineHeight,多行时顶对齐不错位。
-                // 与 comment 语义区分:comment=为什么重要,推荐理由=为什么是突发。
+                // 图标 + 单个 Text(annotatedString):「推荐理由」标签 tertiary/SemiBold,
+                // 紧接正文 onSurfaceVariant,正文换行时顺着标签后自然流(单 TextView 效果,
+                // 不是两个 Text 各占一块)。与 comment 语义区分:comment=为什么重要,
+                // 推荐理由=为什么是突发。
                 if (entry.breaking && entry.breakingReason.isNotBlank()) {
                     Spacer(Modifier.height(6.dp))
+                    val reason = remember(entry.breakingReason, cs.tertiary) {
+                        buildAnnotatedString {
+                            withStyle(SpanStyle(color = cs.tertiary, fontWeight = FontWeight.SemiBold)) {
+                                append("推荐理由 ")
+                            }
+                            append(entry.breakingReason)
+                        }
+                    }
                     Row(verticalAlignment = Alignment.Top) {
                         Icon(
                             Icons.Outlined.AutoAwesome,
@@ -325,14 +337,7 @@ private fun TopEntryRow(
                         )
                         Spacer(Modifier.width(4.dp))
                         Text(
-                            text = "推荐理由",
-                            style = AppText.bodySmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = cs.tertiary
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        Text(
-                            text = entry.breakingReason,
+                            text = reason,
                             style = AppText.bodySmall,
                             color = cs.onSurfaceVariant,
                             modifier = Modifier.weight(1f),
