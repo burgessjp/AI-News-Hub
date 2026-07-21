@@ -313,14 +313,16 @@ private fun TopEntryRow(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
-                // Breaking 专属「推荐理由」:仅 breaking 且有理由时展示,
-                // 图标 + 单个 Text(annotatedString):「推荐理由」标签 tertiary/SemiBold,
-                // 紧接正文 onSurfaceVariant,正文换行时顺着标签后自然流(单 TextView 效果,
-                // 不是两个 Text 各占一块)。与 comment 语义区分:comment=为什么重要,
-                // 推荐理由=为什么是突发。
+                // Breaking 专属「推荐理由」:仅 breaking 且有理由时展示。
+                // 整段(图标+标签+正文)用 tertiaryContainer 底 + small 圆角包成独立色块,
+                // 与上面 comment 的灰文字拉开层次(呼应 Breaking 卡 tertiary 调)。
+                // 底/字走 Material 配对的 tertiaryContainer/onTertiaryContainer(对齐 RankBadge
+                // 第 2-3 名),对比度有保证;「推荐理由」标签用 tertiary 实色 + SemiBold 做锚点。
+                // 内部:单个 Text(annotatedString),正文换行顺着标签后自然流(单 TextView 效果)。
+                // 与 comment 语义区分:comment=为什么重要,推荐理由=为什么是突发。
                 if (entry.breaking && entry.breakingReason.isNotBlank()) {
                     Spacer(Modifier.height(6.dp))
-                    val reason = remember(entry.breakingReason, cs.tertiary) {
+                    val reason = remember(entry.breakingReason, cs.tertiary, cs.onTertiaryContainer) {
                         buildAnnotatedString {
                             withStyle(SpanStyle(color = cs.tertiary, fontWeight = FontWeight.SemiBold)) {
                                 append("推荐理由 ")
@@ -328,22 +330,31 @@ private fun TopEntryRow(
                             append(entry.breakingReason)
                         }
                     }
-                    Row(verticalAlignment = Alignment.Top) {
-                        Icon(
-                            Icons.Outlined.AutoAwesome,
-                            contentDescription = null,
-                            tint = cs.tertiary,
-                            modifier = Modifier.size(13.dp)
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        Text(
-                            text = reason,
-                            style = AppText.bodySmall,
-                            color = cs.onSurfaceVariant,
-                            modifier = Modifier.weight(1f),
-                            maxLines = 3,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                    Surface(
+                        color = cs.tertiaryContainer,
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            Icon(
+                                Icons.Outlined.AutoAwesome,
+                                contentDescription = null,
+                                tint = cs.tertiary,
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                text = reason,
+                                style = AppText.bodySmall,
+                                color = cs.onTertiaryContainer,
+                                modifier = Modifier.weight(1f),
+                                maxLines = 3,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
                 }
                 Spacer(Modifier.height(6.dp))
