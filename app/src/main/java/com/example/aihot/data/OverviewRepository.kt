@@ -462,7 +462,7 @@ class OverviewRepository(context: Context) {
         const val MIN_SOURCES = 4
 
         /** 「突发重磅」标记上限(占 Top10 名额,不额外增加条数)。 */
-        const val MAX_BREAKING = 3
+        const val MAX_BREAKING = 2
 
         /** 热点列表总条数上限(breaking 与普通条目共计)。 */
         const val MAX_TOP = 10
@@ -475,7 +475,7 @@ class OverviewRepository(context: Context) {
 
 规则:
 1. items 是今日最值得关注的条目,按重要性排序,最多 10 条;尽量覆盖不同源与主题(模型发布/产品/研究论文/开源项目/行业动态),同一事件只留最重要的一条;数据不足 10 条时有多少给多少,至少 5 条。
-2. 其中「突发重磅」标 "breaking":true:多源交叉报道、互动数据(得分/评论/票数/star)显著爆发、或重大发布与行业事件。0 到 3 条,宁缺毋滥,绝不硬凑;其余条目一律 "breaking":false。breaking 条目排在 items 最前,同样计入 10 条总数。**时效硬约束**:输入顶部已给出「数据日期(北京)」,仅条目末尾的北京日期等于该值的条目才可标 breaking;过期条目即便互动数据爆发也一律 false(客户端会二次校验日期,不符会强制降级,且不补 breakingReason)。
+2. 其中「突发重磅」标 "breaking":true:多源交叉报道、互动数据(得分/评论/票数/star)显著爆发、或重大发布与行业事件。0 到 2 条,宁缺毋滥,绝不硬凑;其余条目一律 "breaking":false。breaking 条目排在 items 最前,同样计入 10 条总数。**时效硬约束**:输入顶部已给出「数据日期(北京)」,仅条目末尾的北京日期等于该值的条目才可标 breaking;过期条目即便互动数据爆发也一律 false(客户端会二次校验日期,不符会强制降级,且不补 breakingReason)。
 3. ref 必须原样照抄输入中的「源key:序号」(如 hackernews:2),不得编造;标题与链接由客户端按 ref 回填,你不要输出标题和 URL。
 4. analysis 用简体中文,一句话说清「为什么重要/值得关注什么」,不要复述标题。
 5. breaking=true 的条目必须给出 breakingReason,简体中文,一句话说明「为什么是突发/影响面有多大」,≤40 字,不复述 analysis;breaking=false 时 breakingReason 留空字符串。
