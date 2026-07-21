@@ -11,7 +11,7 @@ package com.example.aihot.ui.theme
  * 档位说明:
  *  - [primaryEmphasis]:  primary 弱化(文字、渐变终点)        0.85f
  *  - [badgeOverlay]:     徽章/药丸半透明底(primary/分档色)   0.12f
- *  - [badgeOverlayStrong]: 卡内子区域强调底(比 badgeOverlay 略深,同色系层次) 0.20f
+ *  - [badgeOverlayStrong]: 卡内子区域强调底(比 badgeOverlay 略深,同色系层次) 0.16f
  *  - [onPrimaryOverlay]: onPrimary 半透明底(深底浅 chip)     0.18f
  *  - [barOverlay]:       顶栏毛玻璃半透明底                 0.72f
  *  - [bottomBarSurface]: 底栏近实底(遮内容透出)            0.94f
@@ -32,8 +32,8 @@ object AppAlpha {
 
     /** 卡内子区域强调底 —— 比 [badgeOverlay] 略深但仍属浅色层次,用于「卡中卡」内嵌面板
      *  (如 Breaking 卡内的推荐理由块):与卡底同色系,融入不突兀,又能看出是子区域。
-     *  与 [badgeOverlay] 分档:卡底用浅档(0.12f),卡内子区域用本档(0.20f)显层次。 */
-    const val badgeOverlayStrong: Float = 0.20f
+     *  与 [badgeOverlay] 分档:卡底用浅档(0.12f),卡内子区域用本档(0.16f)显层次。 */
+    const val badgeOverlayStrong: Float = 0.16f
 
     /** onPrimary 半透明底 —— 用于深色背景(onPrimary)上的浅色 chip。
      *  不与 [badgeOverlay] 合并:两者基色语义相反(深底浮浅 vs 浅底浮深)。 */
