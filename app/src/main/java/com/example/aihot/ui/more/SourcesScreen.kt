@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Article
 import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.Business
 import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Newspaper
 import androidx.compose.material.icons.filled.RocketLaunch
@@ -26,9 +27,9 @@ import com.example.aihot.ui.components.AppTopBarDefaults
 /**
  * 信息源(Sources)二级页 —— Hub 浏览区的独立出口,从「更多」页 push 进入。
  *
- * 原 MoreScreen 的「浏览」组(8 个源磁贴)整体迁移至此:7 个第三方源 + AIHot 精选。
+ * 原 MoreScreen 的「浏览」组(8 个源磁贴)整体迁移至此:8 个第三方源 + AIHot 精选。
  *  - HackerNews / GitHub Trending / LinuxDo / HuggingFace Paper Trending / Product Hunt
- *    / The Rundown AI / stormzhang AI 资讯 —— 品牌色图标块(固定品牌色,收口于 [SourceBrand])
+ *    / The Rundown AI / OpenAI x Anthropic / stormzhang AI 资讯 —— 品牌色图标块(固定品牌色,收口于 [SourceBrand])
  *  - AIHot 精选 —— 末位入口(复用 FeaturedTab,UI 含今日热点 + 最新精选 + 「全部 ›」)
  *
  * 二级页惯例:顶栏带返回箭头、标题用 secondaryTitleFontSize,列表不预留浮动底栏
@@ -44,6 +45,7 @@ fun SourcesScreen(
     onOpenHuggingFacePapers: () -> Unit,
     onOpenProductHunt: () -> Unit,
     onOpenRundownAi: () -> Unit,
+    onOpenOpenAiAnthropicNews: () -> Unit,
     onOpenFeaturedHub: () -> Unit
 ) {
     Scaffold(
@@ -117,6 +119,15 @@ fun SourcesScreen(
                     title = "The Rundown AI",
                     subtitle = "AI 日更 newsletter",
                     onClick = onOpenRundownAi
+                )
+            }
+            item {
+                IconTileRow(
+                    icon = Icons.Filled.Business,
+                    brand = SourceBrand.OpenAiAnthropicNews,
+                    title = "OpenAI x Anthropic",
+                    subtitle = "OpenAI + Anthropic 厂商动态",
+                    onClick = onOpenOpenAiAnthropicNews
                 )
             }
             item {

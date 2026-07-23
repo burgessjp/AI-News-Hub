@@ -262,6 +262,12 @@ class OverviewRepository(context: Context) {
                     o.optString("summary"),
                     beijingDateKeyOfIso(o.optString("publishedAt"))
                 )
+                "openai-anthropic-news" -> ItemView(
+                    i, o.optString("title"), o.optString("url"),
+                    "厂商 ${o.optString("vendor")} · ${o.optString("category")}",
+                    o.optString("summary"),
+                    beijingDateKeyOfIso(o.optString("publishedAt"))
+                )
                 else -> null
             }
             view?.takeIf { it.title.isNotBlank() }

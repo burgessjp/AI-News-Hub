@@ -43,7 +43,7 @@ import java.util.Locale
  *
  * 卡片实现(spec / 顶部提示行 / 单张源摘要页)收口在 [SummaryCard.kt],
  * 与「历史摘要」按日期页(SummaryDateScreen)共用;本屏只负责顶栏、刷新与
- * reselect 消费。7 张卡保持同构(同一产品语言),差异化只靠卡头图标与序号强调色。
+ * reselect 消费。8 张卡保持同构(同一产品语言),差异化只靠卡头图标与序号强调色。
  *
  * 数据来自 gitcode 每日归档快照顶层的 `ai_summary` 字段(由数据流水线预生成),App 端直接读取,
  * 不再运行时调用 AI API。
@@ -57,6 +57,7 @@ fun SummaryScreen(
     onOpenStormzhangAiNews: () -> Unit,
     onOpenProductHunt: () -> Unit,
     onOpenRundownAi: () -> Unit,
+    onOpenOpenAiAnthropicNews: () -> Unit,
     onOpenFeaturedHub: () -> Unit,
     // 页码状态由 MainActivity 上提持有:进二级页返回后保持所在卡片(见其内注释)
     pagerState: PagerState,
@@ -76,6 +77,7 @@ fun SummaryScreen(
             "producthunt" -> onOpenProductHunt
             "rundown-ai" -> onOpenRundownAi
             "stormzhang-ai" -> onOpenStormzhangAiNews
+            "openai-anthropic-news" -> onOpenOpenAiAnthropicNews
             "aihot-featured" -> onOpenFeaturedHub
             else -> null
         }
