@@ -47,7 +47,7 @@ import com.example.aihot.ui.theme.AppText
  * user_hub_profile 原型。
  *
  * 结构(自顶向下,简洁直入):
- *  - 信息源入口:点开 [SourcesScreen] 二级页(Hub 浏览区,7 个第三方源 + AIHot 精选,
+ *  - 信息源入口:点开 [SourcesScreen] 二级页(Hub 浏览区,8 个第三方源 + AIHot 精选,
  *    原内嵌在更多页的「浏览」组,现独立成页)
  *  - 历史组(tertiary 强调):历史摘要 / 浏览历史 —— 彩色图标块行
  *  - 偏好组(secondary 强调):AI 服务 / 设置 / 关于 —— 浅灰图标块行
@@ -84,14 +84,14 @@ fun MoreScreen(
             // 底部预留浮动药丸底栏高度(MoreTab 是根 tab,底栏悬浮)
             contentPadding = PaddingValues(bottom = BottomBarReservedHeight)
         ) {
-            // 信息源入口 —— 进入 Hub 浏览区独立页(SourcesScreen):7 个第三方源 + AIHot 精选。
+            // 信息源入口 —— 进入 Hub 浏览区独立页(SourcesScreen):8 个第三方源 + AIHot 精选。
             // 用 primary 强调色块(聚合入口非单一源,不挂品牌色),与下方「历史」组同档。
             item {
                 IconTileRow(
                     icon = Icons.Filled.Hub,
                     iconColor = IconAccent.Primary,
                     title = "信息源",
-                    subtitle = "7+1 个 AI 资讯源聚合",
+                    subtitle = "8+1 个 AI 资讯源聚合",
                     showDivider = false,
                     onClick = onOpenSources
                 )

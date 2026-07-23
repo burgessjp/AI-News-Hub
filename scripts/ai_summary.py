@@ -44,8 +44,8 @@ TEMPERATURE = 0.5
 # 自带重试 3 次(对齐 fetch_data 主链路的重试上限);失败间隔 2s/4s
 MAX_ATTEMPTS = 3
 
-# App 端只对这 7 个源做摘要(linuxdo 不稳定,排除)
-SUMMARY_SOURCES = ("hackernews", "github-trending", "huggingface-papers", "stormzhang-ai", "producthunt", "rundown-ai", "aihot-featured")
+# App 端只对这 8 个源做摘要(linuxdo 不稳定,排除)
+SUMMARY_SOURCES = ("hackernews", "github-trending", "huggingface-papers", "stormzhang-ai", "producthunt", "rundown-ai", "aihot-featured", "openai-anthropic-news")
 
 
 # ===== system prompt =====
@@ -159,6 +159,23 @@ AIHOT_FEATURED_PROMPT = """你是一位资深 AI 行业资讯编辑。用户提�
 
 【禁止】不要照抄摘要原文；不要输出 markdown 代码块标记或解释性文字；不要「以上是…」「希望对你有帮助」等套话；不要输出前后缀（如「以下是今日…简报」这类引导句）。直接给出 JSON 数组。"""
 
+OPENAI_ANTHROPIC_NEWS_PROMPT = """你是一位资深 AI 厂商动态观察者。请把用户提供的 OpenAI 与 Anthropic 近期官方动态，整理成一份中文厂商动态简报。
+
+【背景】这是两家头部 AI 公司的官方博客/新闻（OpenAI 与 Anthropic 各自标注 vendor），输入含标题、英文摘要、分类（如 Product/Research/Announcements）。内容都是一手官方信息，请基于标题与摘要归纳，不要臆测细节。
+
+【语言要求】必须输出简体中文。公司名、产品名、模型名（如 GPT、Claude、Codex）、人名等专有名词保留原文，不要音译。
+
+【输出格式】只输出一个 JSON 数组，6 到 10 个对象，不要输出任何其它内容。每个对象两个字段：
+{"title": "事件标题", "desc": "用 2-3 句中文说明这是哪家厂商（OpenAI/Anthropic）做了什么、有什么影响，必要时在末尾标注厂商（如「（OpenAI）」）"}
+
+【内容要求】
+- 按重要性排序：新模型发布、重大产品更新、融资/政策放前面，常规案例、活动、教程靠后；
+- 抓住硬事实（谁发布了什么），不要展开没有依据的推测；
+- 同一厂商的多条动态可按主题合并；
+- 两家厂商对比性动态（如同期发布竞品模型）可合并成一条对比。
+
+【禁止】不要输出英文正文；不要逐字翻译摘要；不要输出 markdown 代码块标记或解释性文字；不要「以上是…」「希望对你有帮助」等套话；不要输出前后缀（如「以下是今日…简报」这类引导句）。直接给出 JSON 数组。"""
+
 SYSTEM_PROMPTS = {
     "hackernews": HACKERNEWS_PROMPT,
     "github-trending": GITHUB_PROMPT,
@@ -167,6 +184,7 @@ SYSTEM_PROMPTS = {
     "producthunt": PRODUCTHUNT_PROMPT,
     "rundown-ai": RUNDOWN_AI_PROMPT,
     "aihot-featured": AIHOT_FEATURED_PROMPT,
+    "openai-anthropic-news": OPENAI_ANTHROPIC_NEWS_PROMPT,
 }
 
 
@@ -279,6 +297,29 @@ def _fmt_aihot_featured(items):
     return "以下是今日 AIHot 精选热门（按后端 score 排序）：\n" + "\n".join(lines)
 
 
+def _fmt_openai_anthropic_news(items):
+    """top 15,每条「• [vendor] title（category）：summary」(对齐 App OPENAI_ANTHROPIC_NEWS.load)。
+
+    OpenAI(RSS)与 Anthropic(HTML)合并源,输入含英文标题/摘要 + vendor/category 标注。
+    附 vendor/category 让 AI 感知厂商归属与分类(不强制按某字段排序,本身已按时间倒序)。
+    """
+    lines = []
+    for n in items[:15]:
+        title = (n.get("title") or "").strip()
+        if not title:
+            continue
+        vendor = (n.get("vendor") or "").strip()
+        category = (n.get("category") or "").strip()
+        summary = (n.get("summary") or "").strip()
+        prefix = f"• [{vendor}]" if vendor else "•"
+        meta = f"（{category}）" if category else ""
+        if summary:
+            lines.append(f"{prefix} {title}{meta}：{summary}")
+        else:
+            lines.append(f"{prefix} {title}{meta}")
+    return "以下是近期 OpenAI / Anthropic 的官方动态（按发布时间倒序）：\n" + "\n".join(lines)
+
+
 USER_PROMPT_BUILDERS = {
     "hackernews": _fmt_hackernews,
     "github-trending": _fmt_github_trending,
@@ -287,6 +328,7 @@ USER_PROMPT_BUILDERS = {
     "producthunt": _fmt_producthunt,
     "rundown-ai": _fmt_rundown_ai,
     "aihot-featured": _fmt_aihot_featured,
+    "openai-anthropic-news": _fmt_openai_anthropic_news,
 }
 
 

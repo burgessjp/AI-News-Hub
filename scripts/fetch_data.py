@@ -3,16 +3,17 @@
 AIHot 「Hub」tab 浏览区域数据抓取脚本。
 
 复刻 App 端的抓取逻辑(见 app/src/main/java/com/example/aihot/data/ 下的各
-Repository 与对应 model 类),把 8 个数据源解析成 JSON 落盘:
+Repository 与对应 model 类),把 9 个数据源解析成 JSON 落盘:
 
-  - hackernews         HackerNews Top Stories(两步拉取,Firebase API)
-  - github-trending    GitHub Trending 仓库(HTML 抓取)
-  - linuxdo            LinuxDo 热榜(Discourse JSON)
-  - stormzhang-ai      stormzhang AI 资讯(HTML 抓取)
-  - huggingface-papers HuggingFace Trending Papers(HTML 抓取)
-  - producthunt        Product Hunt 当日热门(GraphQL API,需 PRODUCT_HUNT_KEY)
-  - rundown-ai         The Rundown AI newsletter(beehiiv 首页文章卡片墙,HTML 抓取)
-  - aihot-featured     AIHot 精选 TOP20(第三方服务 aihot.virxact.com 公开 API,仅供摘要卡消费)
+  - hackernews           HackerNews Top Stories(两步拉取,Firebase API)
+  - github-trending      GitHub Trending 仓库(HTML 抓取)
+  - linuxdo              LinuxDo 热榜(Discourse JSON)
+  - stormzhang-ai        stormzhang AI 资讯(HTML 抓取)
+  - huggingface-papers   HuggingFace Trending Papers(HTML 抓取)
+  - producthunt          Product Hunt 当日热门(GraphQL API,需 PRODUCT_HUNT_KEY)
+  - rundown-ai           The Rundown AI newsletter(beehiiv 首页文章卡片墙,HTML 抓取)
+  - aihot-featured       AIHot 精选 TOP20(第三方服务 aihot.virxact.com 公开 API,仅供摘要卡消费)
+  - openai-anthropic-news OpenAI x Anthropic 厂商动态(OpenAI RSS + Anthropic HTML 合并源)
 
 输出目录结构:
   <out-dir>/<source>/<YYYY-MM-DD>/<HH-MM>-data.json
@@ -810,6 +811,186 @@ def fetch_aihot_featured():
     return items, {"endpoint": "/items?mode=selected&take=20", "count": len(items)}
 
 
+# ===== 数据源 9:OpenAI x Anthropic 厂商动态(OpenAI RSS + Anthropic HTML 合并源) =====
+
+# OpenAI RSS 与 Anthropic HTML 列表页的合并源。两家头部 AI 厂商的官方动态,
+# 用户最关心的「发版/研究/政策」第一手来源,补齐现有源无厂商一方的缺口。
+OPENAI_RSS_URL = "https://openai.com/news/rss.xml"
+ANTHROPIC_NEWS_URL = "https://www.anthropic.com/news"
+
+# 合并后保留的最新条目数(用户确认:最多 20 条)
+VENDOR_NEWS_MAX = 20
+
+# Anthropic 列表页日期格式(Jul 22, 2026)
+_ANTHROPIC_DATE_RE = re.compile(r"^([A-Z][a-z]{2})\s+(\d{1,2}),\s*(\d{4})$")
+_ANTHROPIC_MONTHS = {
+    "Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4, "May": 5, "Jun": 6,
+    "Jul": 7, "Aug": 8, "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12,
+}
+
+
+def _anthropic_date_to_iso(s):
+    """Anthropic 列表页日期 'Jul 22, 2026' → ISO '2026-07-22'。无法解析返回空串。"""
+    m = _ANTHROPIC_DATE_RE.match(s.strip())
+    if not m:
+        return ""
+    mon = _ANTHROPIC_MONTHS.get(m.group(1))
+    if not mon:
+        return ""
+    return f"{int(m.group(3)):04d}-{mon:02d}-{int(m.group(2)):02d}"
+
+
+def _fetch_openai_rss_items():
+    """拉 OpenAI RSS,返回 item dict 列表(未编号)。失败抛异常,交由重试机制处理。"""
+    from email.utils import parsedate_to_datetime
+    xml = fetch_text(
+        OPENAI_RSS_URL,
+        extra_headers={
+            "Accept": "application/rss+xml,application/xml,text/xml",
+            "Accept-Language": "en-US,en;q=0.9",
+        },
+    )
+    soup = BeautifulSoup(xml, "xml")
+    items = []
+    for it in soup.find_all("item"):
+        title = it.find("title").get_text(strip=True) if it.find("title") else ""
+        link = it.find("link").get_text(strip=True) if it.find("link") else ""
+        if not title or not link:
+            continue
+        desc = it.find("description")
+        summary = desc.get_text(strip=True) if desc else ""
+        cat = it.find("category")
+        category = cat.get_text(strip=True) if cat else ""
+        pub = it.find("pubDate")
+        pub_text = pub.get_text(strip=True) if pub else ""
+        published_at = ""
+        if pub_text:
+            try:
+                dt = parsedate_to_datetime(pub_text)
+                if dt is not None:
+                    published_at = dt.strftime("%Y-%m-%dT%H:%M:%S%z").replace("+0000", "Z")
+            except (TypeError, ValueError):
+                pass
+        items.append({
+            "title": title,
+            "url": link,
+            "summary": summary,
+            "vendor": "OpenAI",
+            "category": category,
+            "publishedAt": published_at,
+        })
+    return items
+
+
+def _fetch_anthropic_html_items():
+    """抓 Anthropic 新闻列表页 HTML,返回 item dict 列表(未编号)。
+
+    页面 SSR 渲染,两种卡片格式(均在一个 <a href="/news/..."> 锚点内):
+      - 大卡(featured):「Category | Date | Title | Summary」4 段
+      - 列表项:         「Date | Category | Title」3 段(无 summary)
+    解析策略:按日期正则定位 date 段,而非依赖 Next.js 动态 class(不稳定)。
+    失败抛异常,交由重试机制处理。
+    """
+    html = fetch_text(
+        ANTHROPIC_NEWS_URL,
+        extra_headers={
+            "Accept": "text/html,application/xhtml+xml",
+            "Accept-Language": "en-US,en;q=0.9",
+        },
+    )
+    soup = BeautifulSoup(html, "html.parser")
+    items = []
+    for el in soup.select('a[href^="/news/"]'):
+        href = (el.get("href") or "").strip().split("?")[0].split("#")[0]
+        # 跳过落地页自身(/news)与无 slug 的导航项
+        slug = href.removeprefix("/news/").strip("/")
+        if not slug or slug == "hard-questions":
+            continue
+
+        parts = [p.strip() for p in el.get_text(" | ", strip=True).split("|")]
+        cat = date_s = title = summary = ""
+        # 列表项:Date | Category | Title [ | Summary? ]
+        if len(parts) >= 3 and _ANTHROPIC_DATE_RE.match(parts[0]):
+            date_s, cat = parts[0], parts[1]
+            title = parts[2]
+            summary = " | ".join(parts[3:]) if len(parts) > 3 else ""
+        # 大卡:Category | Date | Title | Summary
+        elif len(parts) >= 4 and _ANTHROPIC_DATE_RE.match(parts[1]):
+            cat, date_s = parts[0], parts[1]
+            title = parts[2]
+            summary = " | ".join(parts[3:])
+        else:
+            continue
+
+        if not title:
+            continue
+        items.append({
+            "title": title,
+            "url": f"https://www.anthropic.com{href}",
+            "summary": summary,
+            "vendor": "Anthropic",
+            "category": cat,
+            "publishedAt": _anthropic_date_to_iso(date_s),
+        })
+    return items
+
+
+def fetch_openai_anthropic_news():
+    """
+    合并源:OpenAI RSS(openai.com/news/rss.xml)+ Anthropic HTML(anthropic.com/news)。
+    对齐 App 端 OpenAiAnthropicNews.fromJson 与 OverviewRepository 的 when 分支。
+
+    两家无官方聚合 feed,此处分别抓取后合并;任一失败不影响另一家(各自独立 try,
+    失败的记 stderr 警告后跳过,两家全失败才抛异常触发源级重试)。
+
+    合并后按 publishedAt 倒序、取最新 20 条,统一编号 rank(对齐用户确认的上限)。
+
+    字段命名 camelCase,对齐 App 端 model 与总览页 ItemView 映射:
+      rank / title / url / summary / vendor / category / publishedAt
+    """
+    merged = []
+    errors = []
+    for label, fetcher in (("OpenAI", _fetch_openai_rss_items),
+                           ("Anthropic", _fetch_anthropic_html_items)):
+        try:
+            merged.extend(fetcher())
+        except Exception as e:  # 单家失败不阻断另一家
+            print(f"[WARN] {label} 抓取失败,跳过:{type(e).__name__}: {e}", file=sys.stderr)
+            errors.append(label)
+
+    if not merged:
+        # 两家全失败 → 抛异常让 fetch_with_retry 重试(最终落盘走 index 继承兜底)
+        raise RuntimeError(f"OpenAI 与 Anthropic 均抓取失败:{', '.join(errors) or '未知错误'}")
+
+    # 去重(以 url 路径 slug 为 key,两家不会撞,但各自 feed 内可能重复)
+    seen_keys = set()
+    deduped = []
+    for it in merged:
+        key = it["url"].rstrip("/").rsplit("/", 1)[-1]
+        if key in seen_keys:
+            continue
+        seen_keys.add(key)
+        deduped.append(it)
+
+    # 按 publishedAt 倒序(无日期的排最后,用空串保证可比较)
+    deduped.sort(key=lambda x: x.get("publishedAt") or "", reverse=True)
+
+    # 取最新 20 条,统一编号 rank
+    top = deduped[:VENDOR_NEWS_MAX]
+    items = []
+    for idx, it in enumerate(top):
+        items.append({
+            "rank": idx + 1,
+            "title": it["title"],
+            "url": it["url"],
+            "summary": it.get("summary", ""),
+            "vendor": it.get("vendor", ""),
+            "category": it.get("category", ""),
+            "publishedAt": it.get("publishedAt", ""),
+        })
+    return items, {"feedTitle": "OpenAI x Anthropic 官方动态"}
+
+
 # ===== 数据源注册表:name → 抓取函数 =====
 
 SOURCES = {
@@ -821,6 +1002,7 @@ SOURCES = {
     "producthunt": fetch_producthunt,
     "rundown-ai": fetch_rundown_ai,
     "aihot-featured": fetch_aihot_featured,
+    "openai-anthropic-news": fetch_openai_anthropic_news,
 }
 
 # 单源抓取最大重试次数(需求 a:失败重试,最多 3 次)。首次 + 2 次重试。

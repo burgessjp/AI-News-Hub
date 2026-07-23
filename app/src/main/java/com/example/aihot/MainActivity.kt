@@ -65,6 +65,7 @@ import com.example.aihot.ui.items.HuggingFacePapersScreen
 import com.example.aihot.ui.items.LinuxDoHotScreen
 import com.example.aihot.ui.items.ProductHuntScreen
 import com.example.aihot.ui.items.RundownAiScreen
+import com.example.aihot.ui.items.OpenAiAnthropicNewsScreen
 import com.example.aihot.ui.items.StormzhangAiNewsScreen
 import com.example.aihot.ui.items.SearchScreen
 import com.example.aihot.ui.more.AboutScreen
@@ -154,6 +155,7 @@ private sealed interface Page {
     data object HuggingFacePapers : Page
     data object ProductHunt : Page
     data object RundownAi : Page
+    data object OpenAiAnthropicNews : Page
     /** AIHot 精选 —— 原为独立根 tab,现改为从「更多」页进入的二级页(复用 FeaturedTab)。 */
     data object FeaturedHub : Page
     /** 信息源(Sources) —— Hub 浏览区独立页,聚合 7 个第三方源 + AIHot 精选入口。从「更多」页进入。 */
@@ -189,6 +191,7 @@ private fun Page.toBundle(): Bundle = Bundle().apply {
         is Page.HuggingFacePapers -> putString("t", "HuggingFacePapers")
         is Page.ProductHunt -> putString("t", "ProductHunt")
         is Page.RundownAi -> putString("t", "RundownAi")
+        is Page.OpenAiAnthropicNews -> putString("t", "OpenAiAnthropicNews")
         is Page.FeaturedHub -> putString("t", "FeaturedHub")
         is Page.Sources -> putString("t", "Sources")
         is Page.BrowseHistory -> putString("t", "BrowseHistory")
@@ -218,6 +221,7 @@ private fun pageFromBundle(b: Bundle): Page? {
         "HuggingFacePapers" -> Page.HuggingFacePapers
         "ProductHunt" -> Page.ProductHunt
         "RundownAi" -> Page.RundownAi
+        "OpenAiAnthropicNews" -> Page.OpenAiAnthropicNews
         "FeaturedHub" -> Page.FeaturedHub
         "Sources" -> Page.Sources
         "BrowseHistory" -> Page.BrowseHistory
@@ -523,6 +527,7 @@ fun AIHotApp(openSettingsOnLaunch: Boolean = false) {
                             onOpenHuggingFacePapers = { push(Page.HuggingFacePapers) },
                             onOpenProductHunt = { push(Page.ProductHunt) },
                             onOpenRundownAi = { push(Page.RundownAi) },
+                            onOpenOpenAiAnthropicNews = { push(Page.OpenAiAnthropicNews) },
                             onOpenFeaturedHub = { push(Page.FeaturedHub) },
                             onOpenSources = { push(Page.Sources) },
                             onOpenBrowseHistory = { push(Page.BrowseHistory) },
@@ -566,6 +571,7 @@ fun AIHotApp(openSettingsOnLaunch: Boolean = false) {
                             onOpenHuggingFacePapers = { push(Page.HuggingFacePapers) },
                             onOpenProductHunt = { push(Page.ProductHunt) },
                             onOpenRundownAi = { push(Page.RundownAi) },
+                            onOpenOpenAiAnthropicNews = { push(Page.OpenAiAnthropicNews) },
                             onOpenFeaturedHub = { push(Page.FeaturedHub) },
                             configStore = configStore,
                             aiConfig = aiConfig,
@@ -631,6 +637,7 @@ private fun TabRoot(
     onOpenHuggingFacePapers: () -> Unit,
     onOpenProductHunt: () -> Unit,
     onOpenRundownAi: () -> Unit,
+    onOpenOpenAiAnthropicNews: () -> Unit,
     onOpenFeaturedHub: () -> Unit,
     onOpenSources: () -> Unit,
     onOpenBrowseHistory: () -> Unit,
@@ -656,6 +663,7 @@ private fun TabRoot(
             onOpenStormzhangAiNews = onOpenStormzhangAiNews,
             onOpenProductHunt = onOpenProductHunt,
             onOpenRundownAi = onOpenRundownAi,
+            onOpenOpenAiAnthropicNews = onOpenOpenAiAnthropicNews,
             onOpenFeaturedHub = onOpenFeaturedHub
         )
         AppTab.More -> MoreScreen(
@@ -705,6 +713,7 @@ private fun PageView(
     onOpenHuggingFacePapers: () -> Unit,
     onOpenProductHunt: () -> Unit,
     onOpenRundownAi: () -> Unit,
+    onOpenOpenAiAnthropicNews: () -> Unit,
     onOpenFeaturedHub: () -> Unit,
     configStore: AiConfigStore,
     aiConfig: AiConfig,
@@ -829,6 +838,12 @@ private fun PageView(
             onOpenSettings = onOpenSettings,
             listState = pageListStates.forPage(page)
         )
+        Page.OpenAiAnthropicNews -> OpenAiAnthropicNewsScreen(
+            onBack = onBack,
+            onOpenUrl = { url, title -> onOpenUrl(url, title, "OpenAI x Anthropic") },
+            onOpenSettings = onOpenSettings,
+            listState = pageListStates.forPage(page)
+        )
         // AIHot 精选(原根 tab,现二级页):复用 FeaturedTab,UI 含今日热点 +
         // 最新精选列表 + 「全部 ›」。顶栏带返回箭头(onBack),列表底部不预留底栏
         // (二级页底栏不悬浮)。reselectSignal 传 0(非根 tab,无重击语义)。
@@ -851,6 +866,7 @@ private fun PageView(
             onOpenHuggingFacePapers = onOpenHuggingFacePapers,
             onOpenProductHunt = onOpenProductHunt,
             onOpenRundownAi = onOpenRundownAi,
+            onOpenOpenAiAnthropicNews = onOpenOpenAiAnthropicNews,
             onOpenFeaturedHub = onOpenFeaturedHub
         )
         Page.BrowseHistory -> BrowseHistoryScreen(

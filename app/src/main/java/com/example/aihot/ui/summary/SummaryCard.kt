@@ -25,6 +25,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.Article
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Business
 import androidx.compose.material.icons.filled.RocketLaunch
 import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Whatshot
@@ -90,11 +91,12 @@ internal fun summaryCardSpecs(onOpenFor: (source: String) -> (() -> Unit)?): Lis
     return listOf(
         SummaryCardSpec(keys[0], "HackerNews", Icons.Filled.Whatshot, onOpenFor(keys[0])),
         SummaryCardSpec(keys[1], "GitHub Trending", Icons.Outlined.Apps, onOpenFor(keys[1])),
-        SummaryCardSpec(keys[2], "HuggingFace Papers", Icons.Filled.Science, onOpenFor(keys[2])),
-        SummaryCardSpec(keys[3], "Product Hunt", Icons.Filled.RocketLaunch, onOpenFor(keys[3])),
-        SummaryCardSpec(keys[4], "The Rundown AI", Icons.AutoMirrored.Filled.Article, onOpenFor(keys[4])),
-        SummaryCardSpec(keys[5], "stormzhang AI 资讯", Icons.Filled.Bolt, onOpenFor(keys[5])),
-        SummaryCardSpec(keys[6], "AIHot 精选", Icons.Filled.Whatshot, onOpenFor(keys[6]))
+        SummaryCardSpec(keys[2], "OpenAI x Anthropic", Icons.Filled.Business, onOpenFor(keys[2])),
+        SummaryCardSpec(keys[3], "HuggingFace Papers", Icons.Filled.Science, onOpenFor(keys[3])),
+        SummaryCardSpec(keys[4], "Product Hunt", Icons.Filled.RocketLaunch, onOpenFor(keys[4])),
+        SummaryCardSpec(keys[5], "The Rundown AI", Icons.AutoMirrored.Filled.Article, onOpenFor(keys[5])),
+        SummaryCardSpec(keys[6], "stormzhang AI 资讯", Icons.Filled.Bolt, onOpenFor(keys[6])),
+        SummaryCardSpec(keys[7], "AIHot 精选", Icons.Filled.Whatshot, onOpenFor(keys[7]))
     )
 }
 
@@ -305,6 +307,7 @@ private fun sourceAccentOf(source: String): Color {
         "stormzhang-ai" -> cs.secondary        // 品牌紫,贴「AI 资讯」语义
         "producthunt" -> cs.primary            // PH 品牌橙红由 SourceBrand 承载,卡片用 primary
         "rundown-ai" -> cs.secondary           // 品牌紫,贴「AI newsletter」语义(与 stormzhang 同系)
+        "openai-anthropic-news" -> cs.tertiary // 暖橙,呼应 OpenAI 品牌绿与厂商动态热度语义
         "aihot-featured" -> cs.primary         // 自家源,品牌 Future Blue 由 SourceBrand.AiHot 承载,卡片用 primary
         else -> cs.primary
     }
