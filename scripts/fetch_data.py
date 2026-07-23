@@ -852,13 +852,14 @@ def fetch_with_retry(name, fn, limit_hn=None):
     raise last_exc
 
 
-def write_snapshot(out_dir, source_name, items, meta, now, ai_summary=None):
+def write_snapshot(out_dir, source_name, items, meta, now, ai_summary_v2=None):
     """
     落盘单源快照:<out-dir>/<source>/<YYYY-MM-DD>/<HH-MM>-data.json。
-    顶层结构:source / fetched_at(ISO CST)/ fetched_at_ms / count / items / meta / ai_summary?。
+    顶层结构:source / fetched_at(ISO CST)/ fetched_at_ms / count / items / meta / ai_summary_v2?。
 
-    ai_summary(需求 c):非空时写入顶层 `ai_summary` 字段(简体中文要点)。
-    调用 AI 失败或源不支持(linuxdo)时传 None,该字段直接省略。
+    ai_summary_v2:AI 摘要对象列表(list[dict],每项含 title + desc),非空时写入顶层
+    `ai_summary_v2` 字段。调用 AI 失败或源不支持(linuxdo)时传 None,该字段直接省略。
+    App 端同时兼容旧的纯文本 `ai_summary`(历史快照),新快照只写 v2。
     """
     date_str = now.strftime("%Y-%m-%d")
     time_str = now.strftime("%H-%M")
@@ -875,9 +876,9 @@ def write_snapshot(out_dir, source_name, items, meta, now, ai_summary=None):
     # 把抓取附带元信息(如 stormzhang 的 pageDate)拍扁进顶层,方便消费
     for k, v in (meta or {}).items():
         payload.setdefault(k, v)
-    # AI 总结(需求 c):非空才写,保持与无总结时的结构兼容
-    if ai_summary:
-        payload["ai_summary"] = ai_summary
+    # AI 总结:非空才写,保持与无总结时的结构兼容
+    if ai_summary_v2:
+        payload["ai_summary_v2"] = ai_summary_v2
     with open(file_path, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2)
     return file_path
@@ -1137,12 +1138,12 @@ def main():
             items, meta = fetch_with_retry(name, fn, limit_hn=args.limit_hn)
 
             # 需求 c:每源抓完做 AI 总结(失败仅 warn,不阻断落盘)
-            ai_text = None
+            ai_v2 = None
             if do_summary:
-                ai_text = ai_summary.summarize_source(name, items)
+                ai_v2 = ai_summary.summarize_source(name, items)
 
-            file_path = write_snapshot(args.out_dir, name, items, meta, now, ai_summary=ai_text)
-            extra = "(含 AI 摘要)" if ai_text else ""
+            file_path = write_snapshot(args.out_dir, name, items, meta, now, ai_summary_v2=ai_v2)
+            extra = "(含 AI 摘要)" if ai_v2 else ""
             print(f"[OK]   {name:<20} {len(items):>4} 条{extra} → {file_path}")
             results[name] = {"status": "ok", "count": len(items), "file": file_path}
         except Exception as e:

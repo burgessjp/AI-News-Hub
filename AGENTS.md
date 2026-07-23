@@ -37,7 +37,7 @@
   - **Product Hunt 只归档**（Developer Token 是服务端 secret 不进 APK，两种模式都走归档），**LinuxDo 只实时**。
   - 归档走 `ArchiveHttpClient`（gitcode **REST API raw 端点**，**不要**用 raw 直链——背后是 WAF 会 403）。
   - **归档失败直接显示 Error 态，不回退实时**。
-- **摘要 Tab 不在 App 端生成 AI 摘要**，直接读归档快照顶层 `ai_summary` 字段（流水线预生成），缺失即失败态。
+- **摘要 Tab 不在 App 端生成 AI 摘要**，直接读归档快照顶层 `ai_summary_v2` 字段（JSON 数组，每项含 `title`+`desc`，流水线预生成），兼容回退旧纯文本 `ai_summary`（历史快照），两者都缺失即失败态。
 - 端侧 AI（总览综合分析 / 翻译 / 系统选中译）统一经 `AiChatClient` 访问「设置 → AI 服务」里的用户配置。
 - 数据模型：`NewsItem` / `HackerNewsStory` 用 `@Parcelize`。
 

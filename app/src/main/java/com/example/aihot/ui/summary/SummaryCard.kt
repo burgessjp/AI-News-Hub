@@ -49,6 +49,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.example.aihot.data.SourceSummary
+import com.example.aihot.data.SummaryContent
+import com.example.aihot.data.SummaryItem
 import com.example.aihot.data.SummaryRepository
 import com.example.aihot.ui.ErrorKind
 import com.example.aihot.ui.UiState
@@ -191,7 +193,7 @@ internal fun SummaryCardPage(
                         kind = state.kind,
                         onRetry = onRetry
                     )
-                    is UiState.Success -> SummaryBody(text = state.data.text, accent = accent)
+                    is UiState.Success -> SummaryBody(content = state.data.content, accent = accent)
                 }
             }
 
@@ -310,11 +312,51 @@ private fun sourceAccentOf(source: String): Color {
 
 /**
  * 摘要正文 —— 条目化排版:每行一条,两位序号(01、02……源强调色 Bold)
- * 与正文首行基线对齐,条目间距 12dp。每行解析 **加粗** 标记成富文本
- * (标题加粗 + 正文常规),bullet 符号 trim 掉,由序号取代条目标记。
+ * 与正文首行基线对齐,条目间距 12dp。
+ *
+ * 两种数据格式视觉等价:
+ * - [SummaryContent.Structured]:每项 title(加粗)+ desc(常规)拼成一行富文本;
+ * - [SummaryContent.Plain]:整段纯文本按行切分,解析 **加粗** 标记(bullet 符号 trim 掉)。
  */
 @Composable
-private fun SummaryBody(text: String, accent: Color) {
+private fun SummaryBody(content: SummaryContent, accent: Color) {
+    when (content) {
+        is SummaryContent.Structured -> SummaryItems(items = content.items, accent = accent)
+        is SummaryContent.Plain -> SummaryPlainText(text = content.text, accent = accent)
+    }
+}
+
+/** v2 结构化条目渲染:title 加粗作导语,desc 常规作正文,同行基线对齐。 */
+@Composable
+private fun SummaryItems(items: List<SummaryItem>, accent: Color) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(vertical = 4.dp)
+    ) {
+        itemsIndexed(items) { index, item ->
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = "%02d".format(index + 1),
+                    style = AppText.bodySmall,
+                    fontWeight = FontWeight.Bold,
+                    color = accent,
+                    modifier = Modifier.alignByBaseline()
+                )
+                Text(
+                    text = renderItemLine(item.title, item.desc),
+                    style = AppText.body,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.alignByBaseline()
+                )
+            }
+        }
+    }
+}
+
+/** v1 纯文本渲染:沿用旧的按行切分 + renderRichLine 逻辑。 */
+@Composable
+private fun SummaryPlainText(text: String, accent: Color) {
     val lines = text.lines().filter { it.isNotBlank() }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -338,6 +380,21 @@ private fun SummaryBody(text: String, accent: Color) {
                 )
             }
         }
+    }
+}
+
+/**
+ * 把单条 [SummaryItem] 拼成 [AnnotatedString]:title(SemiBold)+ desc(Normal)。
+ *
+ * title 与 desc 之间用全角冒号「：」连接,视觉上对齐 v1 纯文本「**标题**：描述」的观感,
+ * 保证新旧格式切换时用户感知一致。
+ */
+private fun renderItemLine(title: String, desc: String): AnnotatedString {
+    val boldStyle = SpanStyle(fontWeight = FontWeight.SemiBold)
+    return buildAnnotatedString {
+        withStyle(boldStyle) { append(title) }
+        append("：")
+        append(desc)
     }
 }
 

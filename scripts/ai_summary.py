@@ -3,13 +3,16 @@
 数据源 AI 总结(对齐 App 端 SummaryRepository.kt)。
 
 抓取脚本每跑完一个源,调用本模块把该源本次落盘的 items 喂给 OpenAI 兼容
-服务,生成一份简体中文要点,作为 `ai_summary` 字段写进快照顶层。
+服务,生成一份简体中文要点,作为 `ai_summary_v2` 字段写进快照顶层。
+
+`ai_summary_v2` 是 JSON 数组,每个对象含 `title`(一句话标题)与 `desc`
+(2-3 句描述),替代旧的纯文本 `ai_summary`(已停用,App 端兼容回退)。
 
 设计要点(复刻 App):
   - 总结 7 个稳定源:hackernews / github-trending / huggingface-papers /
     stormzhang-ai / producthunt / rundown-ai / aihot-featured。linuxdo 受 Cloudflare 影响不稳定,App 也没纳入,这里跳过。
-  - 7 个 system prompt 与 user prompt 格式化器逐字搬自
-    SummaryRepository.kt(lines 102-150 / 165-231),已经过 App 端打磨,不改字。
+  - 7 个 system prompt 要求模型只输出 JSON 数组(无 markdown / 无解释);
+    user prompt 格式化器搬自 App SummaryRepository.kt(lines 102-150)。
   - temperature=0.5(对齐 App 的 requestSummary);读取超时 30s。
   - 配置走环境变量:AI_NEWS_HUB_AI_BASE_URL / AI_NEWS_HUB_AI_MODEL /
     AI_NEWS_HUB_AI_API_KEY(由 pipeline.sh 在执行前统一检测)。
@@ -17,10 +20,12 @@
 
 用法(独立调用,主要供 fetch_data.py 内部 import):
   from ai_summary import summarize_source, SUMMARY_SOURCES
-  text = summarize_source("hackernews", items)  # 返回 str 或 None
+  items = summarize_source("hackernews", raw_items)  # 返回 list[dict] 或 None
 """
 
+import json
 import os
+import re
 import sys
 import time
 
@@ -43,17 +48,17 @@ MAX_ATTEMPTS = 3
 SUMMARY_SOURCES = ("hackernews", "github-trending", "huggingface-papers", "stormzhang-ai", "producthunt", "rundown-ai", "aihot-featured")
 
 
-# ===== system prompt(逐字搬自 SummaryRepository.kt lines 165-231) =====
+# ===== system prompt =====
 #
-# 通用骨架:每条用「**加粗标题**：2-3 句简述」;专有名词保留原文;输出简体中文;
-# 6-10 条;禁套话。各源再定制侧重点。这些 prompt 在 App 端已迭代过,不改动字。
+# 通用骨架:只输出 JSON 数组(6-10 个对象,每个含 title + desc);专有名词保留原文;
+# 简体中文;禁套话、禁 markdown 代码块、禁解释性文字。各源再定制侧重点。
 
 HACKERNEWS_PROMPT = """你是一位资深技术编辑与 HackerNews 社区观察者。请把用户提供的 HackerNews 当日热门条目，整理成一份高质量的中文技术简报。
 
 【语言要求】必须输出简体中文。即使输入标题是英文，正文也用中文表达；项目名、公司名、技术术语、人名等专有名词保留原文，不要音译。
 
-【输出格式】6 到 10 条要点，每条格式如下：
-• **一句话概括标题**：用 2-3 句中文说明这件事是什么、为什么值得关注或开发者反应如何。
+【输出格式】只输出一个 JSON 数组，6 到 10 个对象，不要输出任何其它内容。每个对象两个字段：
+{"title": "一句话概括标题", "desc": "用 2-3 句中文说明这件事是什么、为什么值得关注或开发者反应如何"}
 
 【内容要求】
 - 按得分热度排序，重要的放前面；
@@ -61,56 +66,56 @@ HACKERNEWS_PROMPT = """你是一位资深技术编辑与 HackerNews 社区观察
 - 合并同一事件的多条讨论；
 - 高分且评论多的条目适当多写。
 
-【禁止】不要输出英文；不要「以上是…」「希望对你有帮助」等套话；不要额外解释你做了什么；不要输出引号或前后缀。直接给出要点列表。"""
+【禁止】不要输出英文；不要输出 markdown 代码块标记（```）、不要输出解释性文字、前后缀或引导句（如「以下是今日…简报」）；不要「以上是…」「希望对你有帮助」等套话。直接给出 JSON 数组。"""
 
 GITHUB_PROMPT = """你是一位开源生态观察者。请把用户提供的 GitHub Trending 当日热门仓库，整理成一份中文开源动态简报。
 
 【语言要求】必须输出简体中文。仓库 owner/name、技术名词保留原文，不要翻译。
 
-【输出格式】6 到 10 条，每条格式如下：
-• **owner/name（一句话价值定位）**：用 2-3 句中文说明这个项目解决什么问题、适用场景，以及今日新增 star 反映的热度趋势。
+【输出格式】只输出一个 JSON 数组，6 到 10 个对象，不要输出任何其它内容。每个对象两个字段：
+{"title": "owner/name（一句话价值定位）", "desc": "用 2-3 句中文说明这个项目解决什么问题、适用场景，以及今日新增 star 反映的热度趋势"}
 
 【内容要求】
 - 结合描述和语言推断项目价值，不要只复述描述；
 - 今日新增 star 多的排前面；
 - 同类项目可合并成一条并对比。
 
-【禁止】不要输出英文正文；不要套话；直接给出要点列表。"""
+【禁止】不要输出英文正文；不要输出 markdown 代码块标记或解释性文字；不要套话。直接给出 JSON 数组。"""
 
 PAPERS_PROMPT = """你是一位 AI 研究前沿解读员。请把用户提供的 HuggingFace Trending Papers，整理成一份中文论文速读简报。
 
 【语言要求】必须输出简体中文。论文标题先给中文意译，括号内附英文原标题；模型名、方法名、数据集名等专有名词保留原文。
 
-【输出格式】6 到 10 条，每条格式如下：
-• **中文标题（English Title，↑upvote）**：用 2-3 句中文说明这篇论文研究什么问题、方法亮点、可能的影响。
+【输出格式】只输出一个 JSON 数组，6 到 10 个对象，不要输出任何其它内容。每个对象两个字段：
+{"title": "中文标题（English Title，↑upvote）", "desc": "用 2-3 句中文说明这篇论文研究什么问题、方法亮点、可能的影响"}
 
 【内容要求】
 - upvote 高的排前面；
 - 避免堆砌术语，用普通开发者能懂的话解释；
 - 同一方向的论文可合并对比。
 
-【禁止】不要输出全英文；不要逐字翻译摘要；不要「以上是…」「希望对你有帮助」等套话；不要额外解释你做了什么；不要输出引号或前后缀（如「以下是今日…简报」这类引导句）。直接给出要点列表。"""
+【禁止】不要输出全英文；不要逐字翻译摘要；不要输出 markdown 代码块标记或解释性文字；不要「以上是…」「希望对你有帮助」等套话；不要输出前后缀（如「以下是今日…简报」这类引导句）。直接给出 JSON 数组。"""
 
 STORMZHANG_PROMPT = """你是一位 AI 行业资讯编辑。用户提供的已是中文 AI 资讯摘要（来自 Hacker News / Reddit / Product Hunt / The Rundown AI / TLDR AI 等多个信源），请重新归纳成一份结构清晰的中文要点清单。
 
 【语言要求】输出简体中文。
 
-【输出格式】6 到 10 条，每条格式如下：
-• **事件标题**：用 2-3 句说明核心事实，并在末尾标注信源（如「（来源：Reddit）」）。
+【输出格式】只输出一个 JSON 数组，6 到 10 个对象，不要输出任何其它内容。每个对象两个字段：
+{"title": "事件标题", "desc": "用 2-3 句说明核心事实，并在末尾标注信源（如「（来源：Reddit）」）"}
 
 【内容要求】
 - 按主题去重合并：同一事件的多条合成一条，保留最完整的信息；
 - 突出产品发布、融资、模型更新、政策等硬事实；
 - 按重要性排序。
 
-【禁止】不要照抄原文；不要套话；直接给出要点列表。"""
+【禁止】不要照抄原文；不要输出 markdown 代码块标记或解释性文字；不要套话。直接给出 JSON 数组。"""
 
 PRODUCTHUNT_PROMPT = """你是一位资深产品观察者与 Product Hunt 社区编辑。请把用户提供的 Product Hunt 当日热门产品，整理成一份中文产品发现简报。
 
 【语言要求】必须输出简体中文。产品名、公司名保留原文，不翻译；产品定位（tagline）用中文意译，保留原意。
 
-【输出格式】6 到 10 条要点，每条格式如下：
-• **产品名（一句话价值定位）**：用 2-3 句中文说明它解决什么问题、面向谁、有什么亮点（AI/开发者工具/效率等），并在末尾标注热度（如「（↑upvote，💬评论）」）。
+【输出格式】只输出一个 JSON 数组，6 到 10 个对象，不要输出任何其它内容。每个对象两个字段：
+{"title": "产品名（一句话价值定位）", "desc": "用 2-3 句中文说明它解决什么问题、面向谁、有什么亮点（AI/开发者工具/效率等），并在末尾标注热度（如「（↑upvote，💬评论）」）"}
 
 【内容要求】
 - 按 upvote 热度排序，重要的放前面；
@@ -118,7 +123,7 @@ PRODUCTHUNT_PROMPT = """你是一位资深产品观察者与 Product Hunt 社区
 - 同类产品（如多个 AI 工具）可合并对比；
 - 明显是 AI/开发者相关的产品适当多写，纯消费类一句话带过。
 
-【禁止】不要输出英文正文；不要逐字翻译 tagline；不要「以上是…」「希望对你有帮助」等套话；不要额外解释你做了什么；不要输出引号或前后缀（如「以下是今日…简报」这类引导句）。直接给出要点列表。"""
+【禁止】不要输出英文正文；不要逐字翻译 tagline；不要输出 markdown 代码块标记或解释性文字；不要「以上是…」「希望对你有帮助」等套话；不要输出前后缀（如「以下是今日…简报」这类引导句）。直接给出 JSON 数组。"""
 
 RUNDOWN_AI_PROMPT = """你是一位资深 AI 行业观察者与英文 newsletter 解读者。请把用户提供的 The Rundown AI 近期 newsletter 标题列表，整理成一份中文 AI 动态简报。
 
@@ -126,8 +131,8 @@ RUNDOWN_AI_PROMPT = """你是一位资深 AI 行业观察者与英文 newsletter
 
 【语言要求】必须输出简体中文。公司名、产品名、模型名、人名等专有名词保留原文，不要音译。
 
-【输出格式】6 到 10 条要点，每条格式如下：
-• **事件标题**：用 2-3 句中文说明这件事是什么、为什么值得关注（结合标题与 PLUS 副标题的信息）。
+【输出格式】只输出一个 JSON 数组，6 到 10 个对象，不要输出任何其它内容。每个对象两个字段：
+{"title": "事件标题", "desc": "用 2-3 句中文说明这件事是什么、为什么值得关注（结合标题与 PLUS 副标题的信息）"}
 
 【内容要求】
 - 按事件重要性排序，重大发布（新模型、融资、政策、独家访谈）放前面；
@@ -135,7 +140,7 @@ RUNDOWN_AI_PROMPT = """你是一位资深 AI 行业观察者与英文 newsletter
 - 同一主题的多期 newsletter 可合并成一条；
 - 工具类条目（PLUS 副标题）一句话带过即可，重点放在主事件。
 
-【禁止】不要输出英文正文；不要逐字翻译标题；不要「以上是…」「希望对你有帮助」等套话；不要额外解释你做了什么；不要输出引号或前后缀（如「以下是今日…简报」这类引导句）。直接给出要点列表。"""
+【禁止】不要输出英文正文；不要逐字翻译标题；不要输出 markdown 代码块标记或解释性文字；不要「以上是…」「希望对你有帮助」等套话；不要输出前后缀（如「以下是今日…简报」这类引导句）。直接给出 JSON 数组。"""
 
 AIHOT_FEATURED_PROMPT = """你是一位资深 AI 行业资讯编辑。用户提供的已是中文 AI 资讯精选（来自 AIHot 后端聚合的多源 RSS/X 等，已人工/算法筛选），请重新归纳成一份结构清晰的中文要点清单。
 
@@ -143,8 +148,8 @@ AIHOT_FEATURED_PROMPT = """你是一位资深 AI 行业资讯编辑。用户提�
 
 【语言要求】输出简体中文。公司名、产品名、模型名、人名等专有名词保留原文。
 
-【输出格式】6 到 10 条要点，每条格式如下：
-• **事件标题**：用 2-3 句说明核心事实，必要时在末尾标注信源（如「（来源：TechCrunch）」）。
+【输出格式】只输出一个 JSON 数组，6 到 10 个对象，不要输出任何其它内容。每个对象两个字段：
+{"title": "事件标题", "desc": "用 2-3 句说明核心事实，必要时在末尾标注信源（如「（来源：TechCrunch）」）"}
 
 【内容要求】
 - 按主题去重合并：同一事件的多条合成一条，保留最完整的信息；
@@ -152,7 +157,7 @@ AIHOT_FEATURED_PROMPT = """你是一位资深 AI 行业资讯编辑。用户提�
 - 按重要性排序，重大事件放前面；
 - score 高的条目适当多写（score 反映后端筛选权重）。
 
-【禁止】不要照抄摘要原文；不要「以上是…」「希望对你有帮助」等套话；不要额外解释你做了什么；不要输出引号或前后缀（如「以下是今日…简报」这类引导句）。直接给出要点列表。"""
+【禁止】不要照抄摘要原文；不要输出 markdown 代码块标记或解释性文字；不要「以上是…」「希望对你有帮助」等套话；不要输出前后缀（如「以下是今日…简报」这类引导句）。直接给出 JSON 数组。"""
 
 SYSTEM_PROMPTS = {
     "hackernews": HACKERNEWS_PROMPT,
@@ -291,10 +296,48 @@ def config_ready():
     return all(os.getenv(k) for k in (ENV_BASE_URL, ENV_MODEL, ENV_API_KEY))
 
 
+def _parse_summary_json(content):
+    """
+    把 AI 返回的文本解析成摘要对象列表(list[dict],每项含非空 title 与 desc)。
+
+    模型有时会把 JSON 包在 ```json ... ``` 代码块里,或在首尾混入解释性文字,
+    这里做容错:先剥除 ``` 代码块围栏,再截取第一个 '[' 到最后一个 ']' 之间的
+    内容做 json.loads。解析成功后过滤掉 title/desc 为空的项。
+
+    返回 list[dict];解析失败或过滤后为空时抛 RuntimeError(由调用方重试)。
+    """
+    if not content:
+        raise RuntimeError("AI 响应 content 为空")
+    # 剥除 markdown 代码块围栏(```json ... ``` 或 ``` ... ```)
+    stripped = re.sub(r"^```(?:json)?\s*", "", content.strip(), flags=re.IGNORECASE).rstrip("`").strip()
+    # 截取最外层数组 [ ... ](应对模型前后混入解释文字的情况)
+    start, end = stripped.find("["), stripped.rfind("]")
+    if start == -1 or end == -1 or end <= start:
+        raise RuntimeError(f"AI 响应未找到 JSON 数组:{content[:120]}")
+    payload = stripped[start:end + 1]
+    try:
+        data = json.loads(payload)
+    except json.JSONDecodeError as e:
+        raise RuntimeError(f"AI 响应 JSON 解析失败:{e}:{content[:120]}")
+    if not isinstance(data, list) or not data:
+        raise RuntimeError(f"AI 响应非非空数组:{content[:120]}")
+    items = []
+    for obj in data:
+        if not isinstance(obj, dict):
+            continue
+        title = (obj.get("title") or "").strip()
+        desc = (obj.get("desc") or "").strip()
+        if title and desc:
+            items.append({"title": title, "desc": desc})
+    if not items:
+        raise RuntimeError(f"AI 响应解析后无有效条目:{content[:120]}")
+    return items
+
+
 def _request_summary(system_prompt, user_prompt, base_url, model, api_key):
     """
     发起一次 OpenAI 兼容 `/v1/chat/completions` 请求(对齐 App 的 requestSummary)。
-    返回 choices[0].message.content 的去空白文本。失败抛异常。
+    返回解析后的摘要对象列表(list[dict],每项含 title + desc)。失败抛异常。
     """
     url = f"{base_url.rstrip('/')}/v1/chat/completions"
     body = {
@@ -320,14 +363,12 @@ def _request_summary(system_prompt, user_prompt, base_url, model, api_key):
     if not choices:
         raise RuntimeError(f"AI 响应无 choices:{str(data)[:120]}")
     content = (((choices[0].get("message") or {}).get("content")) or "").strip()
-    if not content:
-        raise RuntimeError(f"AI 响应 content 为空:{str(data)[:120]}")
-    return content
+    return _parse_summary_json(content)
 
 
 def summarize_source(source, items):
     """
-    给某源的本次 items 生成中文 AI 摘要。返回 str,失败返回 None。
+    给某源的本次 items 生成中文 AI 摘要。返回 list[dict](每项含 title + desc),失败返回 None。
 
     - 不支持的源(linuxdo / 未知)→ 直接返回 None,不算错。
     - 空 items → 返回 None(没东西可总结)。
@@ -352,9 +393,9 @@ def summarize_source(source, items):
     last_err = None
     for attempt in range(1, MAX_ATTEMPTS + 1):
         try:
-            text = _request_summary(system_prompt, user_prompt, base_url, model, api_key)
-            print(f"[AI]   {source:<20} 摘要 {len(text)} 字(第 {attempt} 次成功)")
-            return text
+            parsed = _request_summary(system_prompt, user_prompt, base_url, model, api_key)
+            print(f"[AI]   {source:<20} 摘要 {len(parsed)} 条(第 {attempt} 次成功)")
+            return parsed
         except Exception as e:
             last_err = e
             print(f"[AI]   {source:<20} 第 {attempt}/{MAX_ATTEMPTS} 次失败:{type(e).__name__}: {e}",

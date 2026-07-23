@@ -1,5 +1,6 @@
 package com.example.aihot.data
 
+import org.json.JSONObject
 import com.example.aihot.data.source.ArchiveHttpClient
 
 /**
@@ -9,8 +10,26 @@ import com.example.aihot.data.source.ArchiveHttpClient
  * 与「摘要生成时刻」区分:用户关心的是「这份数据是哪天的」,而非「AI 何时跑的」。
  */
 data class SourceSummary(
-    val text: String,
+    val content: SummaryContent,
     val fetchedAtMs: Long
+)
+
+/**
+ * 摘要正文。兼容两种数据格式:
+ * - [Structured]:新格式 `ai_summary_v2`(JSON 数组,每项含 title + desc),数据流水线只产出这种;
+ * - [Plain]:旧格式 `ai_summary`(纯文本 `• **标题**：描述` 串),仅历史快照存在,作回退。
+ */
+sealed interface SummaryContent {
+    /** v2:结构化条目列表。 */
+    data class Structured(val items: List<SummaryItem>) : SummaryContent
+    /** v1:整段纯文本(含 markdown 加粗与 bullet)。 */
+    data class Plain(val text: String) : SummaryContent
+}
+
+/** v2 摘要的单个条目:title 为加粗导语,desc 为 2-3 句正文。 */
+data class SummaryItem(
+    val title: String,
+    val desc: String
 )
 
 /**
@@ -18,7 +37,8 @@ data class SourceSummary(
  *
  * 摘要正文本身不再由 App 生成,而是直接读数据流水线
  * ([scripts/ai_summary.py](../../../../../../scripts/ai_summary.py))在抓取时
- * 写入快照顶层的 `ai_summary` 字段。这里只保留 key / title 用于 UI 展示与反查。
+ * 写入快照顶层的 `ai_summary_v2` 字段(JSON 数组);历史快照仅有旧 `ai_summary`
+ * 纯文本,作回退。这里只保留 key / title 用于 UI 展示与反查。
  */
 private enum class SummarySource(val key: String, val title: String) {
     HACKERNEWS("hackernews", "HackerNews"),
@@ -36,19 +56,20 @@ private enum class SummarySource(val key: String, val title: String) {
 }
 
 /**
- * AI 摘要 Repository —— 读取各归档源当日快照里预生成的 `ai_summary` 字段。
+ * AI 摘要 Repository —— 读取各归档源当日快照里预生成的 `ai_summary_v2` 字段。
  *
  * 摘要由数据流水线在抓取时生成(OpenAI 兼容调用 + 7 个针对各源定制的 system prompt,
- * 实现见 `scripts/ai_summary.py`),写入快照顶层 `ai_summary`。App 端不再运行时调用
- * AI API,直接读字段即可 —— 快照本身就是缓存(gitcode CDN + [ArchiveHttpClient] 的
- * index.json 2 分钟 TTL),无需额外的本地缓存或锁。
+ * 实现见 `scripts/ai_summary.py`),写入快照顶层 `ai_summary_v2`(JSON 数组,每项含
+ * title + desc)。App 端不再运行时调用 AI API,直接读字段即可 —— 快照本身就是缓存
+ * (gitcode CDN + [ArchiveHttpClient] 的 index.json 2 分钟 TTL),无需额外的本地缓存或锁。
  *
  * - 数据始终取自 gitcode 归档([ArchiveHttpClient] 每日快照),与全局
  *   [com.example.aihot.data.source.SourceMode] 无关 —— 归档数据稳定、代表「今日」,
  *   适合做每日摘要;实时源波动大、用户可直接看列表。
  * - 「历史摘要」经 [summarizeOn] / [availableDates] 走 index.json 的 `history` 索引
  *   按日期寻址(流水线每源仅保留最近 31 天),同样与 SourceMode 无关。
- * - `ai_summary` 缺失(当天流水线 AI 调用失败 / 源不支持)时返回失败,UI 显示「暂无摘要 + 重试」。
+ * - 同时兼容两种格式:优先读结构化 `ai_summary_v2`,缺失则回退旧纯文本 `ai_summary`
+ *   (仅历史快照);两者都缺失(当天流水线 AI 调用失败 / 源不支持)时返回失败,UI 显示「暂无摘要 + 重试」。
  * - 不再依赖任何 AI 服务配置:无 baseUrl/apiKey/model 依赖,无需 [AiConfigStore]。
  */
 class SummaryRepository {
@@ -64,16 +85,13 @@ class SummaryRepository {
         val src = SummarySource.fromKey(source)
             ?: return Result.failure(IllegalArgumentException("未知源:$source"))
 
-        // 拉归档快照(fetchLatestSnapshot 内部已切 IO,返回整个顶层 JSONObject,含 ai_summary)
+        // 拉归档快照(fetchLatestSnapshot 内部已切 IO,返回整个顶层 JSONObject,含 ai_summary_v2 / ai_summary)
         val snapshot = runCatching { ArchiveHttpClient.fetchLatestSnapshot(src.key) }
             .getOrElse { return Result.failure(it) }
 
-        val aiSummary = snapshot.optString("ai_summary").orEmpty().trim()
-        if (aiSummary.isBlank()) {
-            return Result.failure(AppException.NoData())
+        return parseSummary(snapshot).map { content ->
+            SourceSummary(content = content, fetchedAtMs = snapshot.optLong("fetched_at_ms", 0L))
         }
-        val fetchedAt = snapshot.optLong("fetched_at_ms", 0L)
-        return Result.success(SourceSummary(text = aiSummary, fetchedAtMs = fetchedAt))
     }
 
     /**
@@ -95,12 +113,37 @@ class SummaryRepository {
         val snapshot = runCatching { ArchiveHttpClient.fetchSnapshot(src.key, relPath) }
             .getOrElse { return Result.failure(it) }
 
-        val aiSummary = snapshot.optString("ai_summary").orEmpty().trim()
-        if (aiSummary.isBlank()) {
-            return Result.failure(AppException.NoData())
+        return parseSummary(snapshot).map { content ->
+            SourceSummary(content = content, fetchedAtMs = snapshot.optLong("fetched_at_ms", 0L))
         }
-        val fetchedAt = snapshot.optLong("fetched_at_ms", 0L)
-        return Result.success(SourceSummary(text = aiSummary, fetchedAtMs = fetchedAt))
+    }
+
+    /**
+     * 从归档快照顶层解析摘要正文(兼容两种格式):
+     * - 优先读 `ai_summary_v2`(JSON 数组,每项 title + desc)→ [SummaryContent.Structured];
+     * - 回退读 `ai_summary`(纯文本)→ [SummaryContent.Plain];
+     * - 都缺失或为空 → 失败 [AppException.NoData]。
+     */
+    private fun parseSummary(snapshot: JSONObject): Result<SummaryContent> {
+        // 优先 v2 结构化数组
+        val v2 = snapshot.optJSONArray("ai_summary_v2")
+        if (v2 != null && v2.length() > 0) {
+            val items = (0 until v2.length()).mapNotNull { i ->
+                val obj = v2.optJSONObject(i) ?: return@mapNotNull null
+                val title = obj.optString("title").orEmpty().trim()
+                val desc = obj.optString("desc").orEmpty().trim()
+                if (title.isNotEmpty() && desc.isNotEmpty()) SummaryItem(title, desc) else null
+            }
+            if (items.isNotEmpty()) {
+                return Result.success(SummaryContent.Structured(items))
+            }
+        }
+        // 回退 v1 纯文本(仅历史快照存在)
+        val text = snapshot.optString("ai_summary").orEmpty().trim()
+        if (text.isNotBlank()) {
+            return Result.success(SummaryContent.Plain(text))
+        }
+        return Result.failure(AppException.NoData())
     }
 
     /**

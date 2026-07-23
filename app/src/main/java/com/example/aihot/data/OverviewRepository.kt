@@ -166,7 +166,7 @@ class OverviewRepository(context: Context) {
     private fun buildSection(source: String, snapshot: JSONObject): String {
         val sb = StringBuilder()
         sb.append("## ").append(source).append("(").append(SummaryRepository.titleOf(source)).append(")")
-        val aiSummary = snapshot.optString("ai_summary").trim()
+        val aiSummary = readAiSummary(snapshot)
         if (aiSummary.isNotEmpty()) sb.append("\nAI 要点:").append(aiSummary)
         sb.append("\n条目:")
         extractItems(source, snapshot).forEach { item ->
@@ -177,6 +177,26 @@ class OverviewRepository(context: Context) {
             if (item.dateKey.length >= 10) sb.append(" | ").append(item.dateKey.substring(5))
         }
         return sb.toString()
+    }
+
+    /**
+     * 读取快照顶层的 AI 要点并拍平成纯文本供 prompt 上下文用:
+     * - 优先 `ai_summary_v2`(JSON 数组),把每项 title + desc 拼成「title：desc」分号串;
+     * - 回退 `ai_summary`(旧纯文本,仅历史快照)。
+     * 都缺失返回空串。
+     */
+    private fun readAiSummary(snapshot: JSONObject): String {
+        val v2 = snapshot.optJSONArray("ai_summary_v2")
+        if (v2 != null && v2.length() > 0) {
+            val parts = (0 until v2.length()).mapNotNull { i ->
+                val obj = v2.optJSONObject(i) ?: return@mapNotNull null
+                val title = obj.optString("title").trim()
+                val desc = obj.optString("desc").trim()
+                if (title.isNotEmpty() && desc.isNotEmpty()) "$title：$desc" else null
+            }
+            if (parts.isNotEmpty()) return parts.joinToString("；")
+        }
+        return snapshot.optString("ai_summary").trim()
     }
 
     /** 输入条目的统一视图:index 即 prompt 里的序号(供 AI ref 引用)。

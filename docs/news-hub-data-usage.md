@@ -157,7 +157,7 @@ print(hn['items'][0]['title'])
 - **日期 → 当日最后一次快照**:键为北京时间日期(`YYYY-MM-DD`);一天抓两次时,当天较早的那份不进索引。
 - **每源只保留最近 31 天,且不早于 2026-07-18**(历史摘要功能起始日;更早的快照源覆盖不全,日期目录已从仓库删除——`backfill_history.py --prune` 执行,推送的 `_overlay` 只增不删,删除只能显式做)。
 - `relpath` 与 `latest` 一样是**相对于源目录**的,消费方式相同:拼上 `<源>/` 前缀后走 gitcode raw API(见上「文件直链」),如 `hackernews/2026-07-19/10-12-data.json`。
-- **用途**:App「历史摘要」按日期查看当日快照与 `ai_summary`;其它消费方亦可据此按日回溯。
+- **用途**:App「历史摘要」按日期查看当日快照与 `ai_summary_v2`;其它消费方亦可据此按日回溯。
 
 ## 单个数据文件的通用结构
 
@@ -170,7 +170,10 @@ print(hn['items'][0]['title'])
   "fetched_at_ms": 1784073612000,
   "count": 25,
   "items": [ ... ],
-  "ai_summary": "• **owner/name（价值定位）**：... 中文 AI 要点 ..."
+  "ai_summary_v2": [
+    { "title": "owner/name(价值定位)", "desc": "... 中文 AI 要点 ..." },
+    { "title": "...", "desc": "..." }
+  ]
 }
 ```
 
@@ -181,7 +184,7 @@ print(hn['items'][0]['title'])
 | `fetched_at_ms` | 抓取时刻,Unix 毫秒时间戳 |
 | `count` | `items` 数组长度 |
 | `items` | 该源的条目数组,结构因源而异(见下) |
-| `ai_summary` | 本次数据的简体中文 AI 要点(6-10 条加粗小标题形式)。仅 7 个稳定源有(hackernews / github-trending / huggingface-papers / stormzhang-ai / producthunt / rundown-ai / aihot-featured);linuxdo 不做,AI 调用失败时该字段缺省 |
+| `ai_summary_v2` | 本次数据的简体中文 AI 要点,JSON 数组(6-10 个对象,每个含 `title` 加粗导语 + `desc` 2-3 句正文)。仅 7 个稳定源有(hackernews / github-trending / huggingface-papers / stormzhang-ai / producthunt / rundown-ai / aihot-featured);linuxdo 不做,AI 调用失败时该字段缺省。**新快照只写 `ai_summary_v2`**;旧快照仅有 `ai_summary`(纯文本 `• **标题**：描述` 串),App 兼容回退 |
 
 部分源会有额外顶层字段(如 stormzhang-ai 带 `pageDate`)。
 
@@ -314,7 +317,7 @@ The Rundown AI(beehiiv 托管的头部英文 AI 日更 newsletter)首页文章�
 
 第三方服务 `aihot.virxact.com` 的「精选」列表 TOP20,来自 `/api/public/items?mode=selected&take=20` 公开 JSON API(无 token,UA 必填否则 nginx 403)。该服务已聚合多源 RSS/X 等并人工/算法筛选,字段对齐 App 端 `NewsItem.fromJson`。
 
-> 📌 **此源特殊性**:aihot-featured 与其它 7 个第三方源一样都是第三方源,但它是 App 唯一「只取归档供摘要 Tab、二级页仍走实时接口」的源。归档仅供 App 摘要 Tab 第 7 张卡消费(`ai_summary`);App「AIHot 精选」二级页本身继续实时拉该服务分页接口(数据更新鲜),不走此归档。
+> 📌 **此源特殊性**:aihot-featured 与其它 7 个第三方源一样都是第三方源,但它是 App 唯一「只取归档供摘要 Tab、二级页仍走实时接口」的源。归档仅供 App 摘要 Tab 第 7 张卡消费(`ai_summary_v2`,兼容旧 `ai_summary`);App「AIHot 精选」二级页本身继续实时拉该服务分页接口(数据更新鲜),不走此归档。
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
