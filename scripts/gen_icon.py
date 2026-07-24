@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AIHot launcher icon generator.
+AI News Hub launcher icon generator.
 
 Design: "AI Flame"
   - Background: diagonal gradient dark-teal (top-left) -> near-black (bottom-right)

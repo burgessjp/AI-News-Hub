@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# AIHot 数据流水线(需求 b):抓数据 → AI 总结 → 推仓库。
+# AI News Hub 数据流水线(需求 b):抓数据 → AI 总结 → 推仓库。
 #
 # 这是 CI 的唯一入口(.github/workflows/fetch-data.yml 只调本脚本),
 # 也可在本地手工跑:`bash scripts/pipeline.sh`。

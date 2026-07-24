@@ -16,11 +16,11 @@ val keystoreProperties = Properties().apply {
 }
 
 android {
-    namespace = "com.example.aihot"
+    namespace = "com.peng.ainewshub"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.aihot"
+        applicationId = "com.peng.ainewshub"
         minSdk = 24
         targetSdk = 35
         versionCode = 1

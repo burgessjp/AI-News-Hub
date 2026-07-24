@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-AIHot 「Hub」tab 浏览区域数据抓取脚本。
+AI News Hub「Hub」tab 浏览区域数据抓取脚本。
 
-复刻 App 端的抓取逻辑(见 app/src/main/java/com/example/aihot/data/ 下的各
+复刻 App 端的抓取逻辑(见 app/src/main/java/com/peng/ainewshub/data/ 下的各
 Repository 与对应 model 类),把 9 个数据源解析成 JSON 落盘:
 
   - hackernews           HackerNews Top Stories(两步拉取,Firebase API)

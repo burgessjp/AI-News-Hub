@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AIHot launcher icon generator (SVG-based, hand-crafted design).
+AI News Hub launcher icon generator (SVG-based, hand-crafted design).
 
 Design: "光环 + 核" (open energy ring + glowing core)
   - 圆角方形深蓝紫→近黑 背景（对齐 App dark theme）

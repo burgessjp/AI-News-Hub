@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AIHot 总览页 wordmark(Logo 字标)生成器。
+AI News Hub 总览页 wordmark(Logo 字标)生成器。
 
 设计:品牌「光环 + 核」图形(icon.svg 同源)+ Inter 字体的 "AI NEWS HUB" 字标
   - 左侧开口能量环 + 发光核,环描边走品牌双色渐变(Future Blue → Intelligence Purple)
@@ -13,7 +13,7 @@ AIHot 总览页 wordmark(Logo 字标)生成器。
   - app/src/main/res/drawable/ic_wordmark_dark.xml   深色变体
   - /tmp/wordmark_preview_{light,dark}.png           渲染预览
 
-深/浅双变体的原因:App 的深色模式可在设置页自选(Compose 层 AIHotTheme 决定),
+深/浅双变体的原因:App 的深色模式可在设置页自选(Compose 层 AiNewsHubTheme 决定),
 values-night 资源限定符只跟随系统 night mode,感知不到应用内设置;故色值直接
 写进两份 drawable,运行时由调用方按 colorScheme 选择(见 ui/components/BrandWordmark.kt)。
 

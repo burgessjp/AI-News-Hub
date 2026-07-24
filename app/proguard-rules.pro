@@ -37,8 +37,8 @@
 -keep class androidx.lifecycle.** { *; }
 
 # ---- 数据模型（反序列化 / 序列化保留字段名）----
--keep class com.example.aihot.data.** { *; }
--keepclassmembers class com.example.aihot.data.** { *; }
+-keep class com.peng.ainewshub.data.** { *; }
+-keepclassmembers class com.peng.ainewshub.data.** { *; }
 
 # ---- 通用保护 ----
 -keepattributes Signature, *Annotation*, InnerClasses, EnclosingMethod, RuntimeVisibleAnnotations, RuntimeVisibleParameterAnnotations, AnnotationDefault

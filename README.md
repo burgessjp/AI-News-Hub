@@ -1,11 +1,11 @@
-# AIHot · AI News Hub
+# AI News Hub
 
 > 一个把「AI 圈今天发生了什么」装进一个 Android App 的资讯聚合客户端。
 
-AIHot（应用名 **AI News Hub**）聚合了多个高质量的 AI 信息源——HackerNews、GitHub Trending、HuggingFace Papers、Product Hunt、stormzhang AI 资讯、The Rundown AI、LinuxDo 热榜，以及 `aihot.virxact.com` 提供的「AIHot 精选」与 AI 日报——并在此基础上叠加端侧 AI 的「今日总览」「中文摘要」「整页翻译」等能力，让用户在一个应用里就能读完 AI 圈当日动态。
+**AI News Hub** 聚合了多个高质量的 AI 信息源——HackerNews、GitHub Trending、HuggingFace Papers、Product Hunt、stormzhang AI 资讯、The Rundown AI、LinuxDo 热榜，以及 `aihot.virxact.com` 提供的「AIHot 精选」与 AI 日报——并在此基础上叠加端侧 AI 的「今日总览」「中文摘要」「整页翻译」等能力，让用户在一个应用里就能读完 AI 圈当日动态。
 
 - 技术栈：Kotlin + Jetpack Compose + Material 3
-- 单模块工程，包名 `com.example.aihot`
+- 单模块工程，包名 `com.peng.ainewshub`
 - 目标 Android 7.0（API 24）及以上
 
 ---
@@ -61,7 +61,7 @@ AIHot（应用名 **AI News Hub**）聚合了多个高质量的 AI 信息源—�
 
 ## 📱 下载与安装
 
-- **直接安装**：在 [Releases](../../releases) 页下载最新 APK（`AIHot-*-release.apk`）传到手机安装。
+- **直接安装**：在 [Releases](../../releases) 页下载最新 APK（`app-release.apk`）传到手机安装。
 - **从源码构建**：见下文。
 
 > 应用未上架应用商店，APK 直装即可。Android 8+ 首次安装需在系统设置里允许「安装未知来源应用」。
@@ -114,7 +114,7 @@ CI（GitHub Actions）从仓库 secrets 还原 keystore，打 `v*` tag 自动出
 
 ## 🔑 配置 AI 服务
 
-AIHot 的所有 AI 能力（今日总览、翻译）**不内置任何 key**，由用户在应用内填入：
+AI News Hub 的所有 AI 能力（今日总览、翻译）**不内置任何 key**，由用户在应用内填入：
 
 打开 App → **更多 → AI 服务**，选择服务商预设（DeepSeek / 智谱 GLM / 自定义 OpenAI 兼容服务）→ 填入 API Key 与模型名 → 保存。
 
@@ -141,7 +141,7 @@ AIHot 的所有 AI 能力（今日总览、翻译）**不内置任何 key**，�
 
 ```
 app/                       唯一 Android 模块
-  src/main/java/com/example/aihot/
+  src/main/java/com/peng/ainewshub/
     MainActivity.kt        自定义多栈导航 + 页面路由（不用 Navigation Compose）
     data/                  Repository、数据模型、Room、DataStore、数据源双模式
     ui/                    ViewModel + Compose Screen，按功能分包
