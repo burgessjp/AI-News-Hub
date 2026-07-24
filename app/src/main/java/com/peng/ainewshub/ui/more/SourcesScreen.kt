@@ -4,33 +4,40 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Article
-import androidx.compose.material.icons.filled.Code
-import androidx.compose.material.icons.filled.Business
-import androidx.compose.material.icons.filled.Forum
-import androidx.compose.material.icons.filled.Newspaper
-import androidx.compose.material.icons.filled.RocketLaunch
-import androidx.compose.material.icons.filled.School
-import androidx.compose.material.icons.filled.Whatshot
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.peng.ainewshub.ui.components.AppTopBar
 import com.peng.ainewshub.ui.components.AppTopBarDefaults
+import kotlinx.coroutines.launch
+import org.burnoutcrew.reorderable.ReorderableItem
+import org.burnoutcrew.reorderable.detectReorderAfterLongPress
+import org.burnoutcrew.reorderable.rememberReorderableLazyListState
+import org.burnoutcrew.reorderable.reorderable
 
 /**
  * 信息源(Sources)二级页 —— Hub 浏览区的独立出口,从「更多」页 push 进入。
  *
- * 原 MoreScreen 的「浏览」组(8 个源磁贴)整体迁移至此:8 个第三方源 + AIHot 精选。
- *  - HackerNews / GitHub Trending / LinuxDo / HuggingFace Paper Trending / Product Hunt
- *    / The Rundown AI / OpenAI x Anthropic / stormzhang AI 资讯 —— 品牌色图标块(固定品牌色,收口于 [SourceBrand])
- *  - AIHot 精选 —— 末位入口(复用 FeaturedTab,UI 含今日热点 + 最新精选 + 「全部 ›」)
+ * 列出 8 个源(HackerNews / GitHub Trending / OpenAI×Anthropic / HuggingFace Papers /
+ * Product Hunt / The Rundown AI / AIHot 精选 / stormzhang AI),元数据来自 [sourceMeta]。
+ *
+ * **可拖拽自定义顺序**:长按某行进入拖拽,松手即落位并持久化(存 [SettingsStore.sourceOrderFlow])。
+ * 顺序变化后摘要 Tab 跟随,关于页固定默认顺序。LinuxDo 暂下线(不含于此)。
  *
  * 二级页惯例:顶栏带返回箭头、标题用 secondaryTitleFontSize,列表不预留浮动底栏
  * (二级页底栏不悬浮)。无章节条(顶栏标题即「信息源」,再加章节条重复)。
@@ -38,21 +45,42 @@ import com.peng.ainewshub.ui.components.AppTopBarDefaults
 @Composable
 fun SourcesScreen(
     onBack: () -> Unit,
-    onOpenHackerNews: () -> Unit,
-    onOpenGitHubTrending: () -> Unit,
-    onOpenLinuxDo: () -> Unit,
-    onOpenStormzhangAiNews: () -> Unit,
-    onOpenHuggingFacePapers: () -> Unit,
-    onOpenProductHunt: () -> Unit,
-    onOpenRundownAi: () -> Unit,
-    onOpenOpenAiAnthropicNews: () -> Unit,
-    onOpenFeaturedHub: () -> Unit
+    /** 点击源行回调,key 来自 [SourceKeys](如 "hackernews")。 */
+    onOpen: (String) -> Unit
 ) {
+    val context = LocalContext.current
+    val settingsStore = remember(context) { SettingsStore(context) }
+    val scope = rememberCoroutineScope()
+
+    // 数据未加载完前用空列表占位(不渲染任何 item),DataStore 读完后直接用真实用户顺序渲染 ——
+    // 避免先用默认顺序渲染再切到用户顺序,被 ReorderableItem 的 animateItemPlacement 播成
+    // 每次进入页面的位移动画。空 → 8 项是「新增 item」(无源位置可比),不会播位移动画。
+    val storedOrder by settingsStore.sourceOrderFlow.collectAsStateWithLifecycle(initialValue = emptyList())
+
+    // 本地可编辑副本:拖拽时即时更新 onMove,松手 onDragEnd 后持久化。
+    // 首次数据到达时初始化;此后仅由拖拽驱动(不再因 storedOrder 重置而抖动 ——
+    // 因为本页是 storedOrder 的唯一写入方,数据加载完成后值不会变)。
+    var localOrder by remember { mutableStateOf(storedOrder) }
+    LaunchedEffect(storedOrder) { localOrder = storedOrder }
+
+    val reorderState = rememberReorderableLazyListState(
+        onMove = { from, to ->
+            localOrder = localOrder.toMutableList().apply {
+                add(to.index, removeAt(from.index))
+            }
+        },
+        onDragEnd = { _, _ ->
+            // 拖拽结束持久化;延迟捕获 localOrder 最新值(此时 onMove 已更新完毕)
+            scope.launch { settingsStore.updateSourceOrder(localOrder) }
+        }
+    )
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             AppTopBar(
                 title = "信息源",
+                subtitle = "长按拖动可调整顺序",
                 titleFontSize = AppTopBarDefaults.secondaryTitleFontSize,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -63,91 +91,27 @@ fun SourcesScreen(
         }
     ) { padding ->
         LazyColumn(
-            modifier = Modifier.fillMaxWidth().padding(padding),
+            state = reorderState.listState,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(padding)
+                .reorderable(reorderState)
+                .detectReorderAfterLongPress(reorderState),
             // 二级页底栏不悬浮,无需预留 BottomBarReservedHeight
             contentPadding = PaddingValues(bottom = 18.dp)
         ) {
-            item {
-                IconTileRow(
-                    icon = Icons.Filled.Whatshot,
-                    brand = SourceBrand.HackerNews,
-                    title = "HackerNews",
-                    subtitle = "HackerNews 热门榜单",
-                    onClick = onOpenHackerNews
-                )
-            }
-            item {
-                IconTileRow(
-                    icon = Icons.Filled.Code,
-                    brand = SourceBrand.GitHub,
-                    title = "GitHub Trending",
-                    subtitle = "GitHub 热门仓库",
-                    onClick = onOpenGitHubTrending
-                )
-            }
-            item {
-                IconTileRow(
-                    icon = Icons.Filled.Forum,
-                    brand = SourceBrand.LinuxDo,
-                    title = "LinuxDo 热榜",
-                    subtitle = "L 站热门话题",
-                    onClick = onOpenLinuxDo
-                )
-            }
-            item {
-                IconTileRow(
-                    icon = Icons.Filled.School,
-                    brand = SourceBrand.HuggingFace,
-                    title = "HuggingFace Paper Trending",
-                    subtitle = "热门 AI 论文榜单",
-                    onClick = onOpenHuggingFacePapers
-                )
-            }
-            item {
-                IconTileRow(
-                    icon = Icons.Filled.RocketLaunch,
-                    brand = SourceBrand.ProductHunt,
-                    title = "Product Hunt",
-                    subtitle = "每日新产品榜单",
-                    onClick = onOpenProductHunt
-                )
-            }
-            item {
-                IconTileRow(
-                    icon = Icons.AutoMirrored.Filled.Article,
-                    brand = SourceBrand.TheRundownAi,
-                    title = "The Rundown AI",
-                    subtitle = "AI 日更 newsletter",
-                    onClick = onOpenRundownAi
-                )
-            }
-            item {
-                IconTileRow(
-                    icon = Icons.Filled.Business,
-                    brand = SourceBrand.OpenAiAnthropicNews,
-                    title = "OpenAI x Anthropic",
-                    subtitle = "OpenAI + Anthropic 厂商动态",
-                    onClick = onOpenOpenAiAnthropicNews
-                )
-            }
-            item {
-                IconTileRow(
-                    icon = Icons.Filled.Newspaper,
-                    brand = SourceBrand.Stormzhang,
-                    title = "stormzhang AI 资讯",
-                    subtitle = "每日 AI 资讯聚合",
-                    onClick = onOpenStormzhangAiNews
-                )
-            }
-            item {
-                IconTileRow(
-                    icon = Icons.Filled.Whatshot,
-                    brand = SourceBrand.AiHot,
-                    title = "AIHot 精选",
-                    subtitle = "自家 AI 资讯精选",
-                    showDivider = false,
-                    onClick = onOpenFeaturedHub
-                )
+            itemsIndexed(localOrder, key = { _, key -> key }) { idx, key ->
+                val meta = sourceMeta(key)
+                ReorderableItem(reorderState, key = key) { isDragging ->
+                    IconTileRow(
+                        icon = meta.icon,
+                        brand = meta.brand,
+                        title = meta.title,
+                        subtitle = meta.subtitle,
+                        showDivider = idx != localOrder.lastIndex,
+                        onClick = { onOpen(key) }
+                    )
+                }
             }
         }
     }

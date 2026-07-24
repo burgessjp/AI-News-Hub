@@ -22,14 +22,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.automirrored.filled.Article
 import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Bolt
-import androidx.compose.material.icons.filled.Business
-import androidx.compose.material.icons.filled.RocketLaunch
-import androidx.compose.material.icons.filled.Science
-import androidx.compose.material.icons.filled.Whatshot
-import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -52,11 +45,11 @@ import androidx.compose.ui.unit.dp
 import com.peng.ainewshub.data.SourceSummary
 import com.peng.ainewshub.data.SummaryContent
 import com.peng.ainewshub.data.SummaryItem
-import com.peng.ainewshub.data.SummaryRepository
 import com.peng.ainewshub.ui.ErrorKind
 import com.peng.ainewshub.ui.UiState
 import com.peng.ainewshub.ui.anim.Motion
 import com.peng.ainewshub.ui.components.ShimmerBox
+import com.peng.ainewshub.ui.more.sourceMeta
 import com.peng.ainewshub.ui.theme.AppAlpha
 import com.peng.ainewshub.ui.theme.AppText
 import com.peng.ainewshub.ui.theme.BrandGradient
@@ -81,23 +74,20 @@ internal data class SummaryCardSpec(
 )
 
 /**
- * 7 张摘要卡的统一配置。顺序对齐 [SummaryRepository.SOURCE_KEYS] 与 More 页浏览组。
+ * 各摘要卡的统一配置。标题 / 图标 / 品牌色由 [sourceMeta] 单点定义,顺序跟随传入的 [keys]
+ * (用户在「信息源」页自定义的顺序,默认全集顺序)。
  *
+ * @param keys 卡片顺序(源 key 列表,来自 SummaryViewModel.sourceKeys)
  * @param onOpenFor 按源 key 给「查看完整列表」回调;返回 null 则该卡不显示底部出口
- * (历史摘要按日期页:列表页展示的是今日数据,从历史跳转语义不符,故隐藏)
+ * (历史摘要按日期页:列表页展示的是当日数据,从历史跳转语义不符,故隐藏)
  */
-internal fun summaryCardSpecs(onOpenFor: (source: String) -> (() -> Unit)?): List<SummaryCardSpec> {
-    val keys = SummaryRepository.SOURCE_KEYS
-    return listOf(
-        SummaryCardSpec(keys[0], "HackerNews", Icons.Filled.Whatshot, onOpenFor(keys[0])),
-        SummaryCardSpec(keys[1], "GitHub Trending", Icons.Outlined.Apps, onOpenFor(keys[1])),
-        SummaryCardSpec(keys[2], "OpenAI x Anthropic", Icons.Filled.Business, onOpenFor(keys[2])),
-        SummaryCardSpec(keys[3], "HuggingFace Papers", Icons.Filled.Science, onOpenFor(keys[3])),
-        SummaryCardSpec(keys[4], "Product Hunt", Icons.Filled.RocketLaunch, onOpenFor(keys[4])),
-        SummaryCardSpec(keys[5], "The Rundown AI", Icons.AutoMirrored.Filled.Article, onOpenFor(keys[5])),
-        SummaryCardSpec(keys[6], "stormzhang AI 资讯", Icons.Filled.Bolt, onOpenFor(keys[6])),
-        SummaryCardSpec(keys[7], "AIHot 精选", Icons.Filled.Whatshot, onOpenFor(keys[7]))
-    )
+@Composable
+internal fun summaryCardSpecs(
+    keys: List<String>,
+    onOpenFor: @Composable (source: String) -> (() -> Unit)?
+): List<SummaryCardSpec> = keys.map { key ->
+    val meta = sourceMeta(key)
+    SummaryCardSpec(meta.key, meta.title, meta.icon, onOpenFor(key))
 }
 
 /**

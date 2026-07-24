@@ -73,6 +73,7 @@ import com.peng.ainewshub.ui.more.AiServiceScreen
 import com.peng.ainewshub.ui.more.FontScale
 import com.peng.ainewshub.ui.more.MoreScreen
 import com.peng.ainewshub.ui.more.SettingsScreen
+import com.peng.ainewshub.ui.more.SourceKeys
 import com.peng.ainewshub.ui.more.SourcesScreen
 import com.peng.ainewshub.ui.more.FontChoice
 import com.peng.ainewshub.ui.more.ThemeMode
@@ -855,19 +856,23 @@ private fun PageView(
             reselectSignal = 0,
             listState = pageListStates.forPage(page)
         )
-        // 信息源(Hub 浏览区)二级页:聚合 7 个第三方源 + AIHot 精选入口。
-        // 原 MoreScreen 的「浏览」组,现独立成页。源入口透传到各自 Screen。
+        // 信息源(Hub 浏览区)二级页:聚合 8 源(可拖拽自定义顺序)。
+        // 单回调 onOpen(key) 按源 key 分发到各 Page;key 来自 SourceKeys。
         Page.Sources -> SourcesScreen(
             onBack = onBack,
-            onOpenHackerNews = onOpenHackerNews,
-            onOpenGitHubTrending = onOpenGitHubTrending,
-            onOpenLinuxDo = onOpenLinuxDo,
-            onOpenStormzhangAiNews = onOpenStormzhangAiNews,
-            onOpenHuggingFacePapers = onOpenHuggingFacePapers,
-            onOpenProductHunt = onOpenProductHunt,
-            onOpenRundownAi = onOpenRundownAi,
-            onOpenOpenAiAnthropicNews = onOpenOpenAiAnthropicNews,
-            onOpenFeaturedHub = onOpenFeaturedHub
+            onOpen = { key ->
+                when (key) {
+                    SourceKeys.HACKERNEWS -> onOpenHackerNews()
+                    SourceKeys.GITHUB_TRENDING -> onOpenGitHubTrending()
+                    SourceKeys.OPENAI_ANTHROPIC_NEWS -> onOpenOpenAiAnthropicNews()
+                    SourceKeys.HUGGINGFACE_PAPERS -> onOpenHuggingFacePapers()
+                    SourceKeys.PRODUCTHUNT -> onOpenProductHunt()
+                    SourceKeys.RUNDOWN_AI -> onOpenRundownAi()
+                    SourceKeys.AIHOT_FEATURED -> onOpenFeaturedHub()
+                    SourceKeys.STORMZHANG_AI -> onOpenStormzhangAiNews()
+                    else -> Unit
+                }
+            }
         )
         Page.BrowseHistory -> BrowseHistoryScreen(
             repo = browseHistoryRepo,

@@ -1,0 +1,111 @@
+package com.peng.ainewshub.ui.more
+
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Article
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Business
+import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.RocketLaunch
+import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.Whatshot
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
+import androidx.compose.ui.graphics.vector.ImageVector
+
+/**
+ * Hub 八源元数据单点定义 —— 信息源页 / 摘要 Tab / 关于页三处的源顺序、图标、标题、
+ * 副标题、品牌色、跳转 URL 统一收口于此,消除此前三处各自硬编码、顺序互不一致、
+ * About 漏 OpenAI×Anthropic 等问题。
+ *
+ * LinuxDo 暂时下线(三处 UI 入口均不展示),底层代码([com.peng.ainewshub.ui.items.LinuxDoHotScreen]
+ * / Page.LinuxDo 等)保留,故此处刻意不含 LinuxDo,待恢复时补回。
+ *
+ * - **默认顺序** [DEFAULT_SOURCE_ORDER]:HackerNews → GitHub Trending → OpenAI×Anthropic
+ *   → HuggingFace Papers → Product Hunt → The Rundown AI → AIHot 精选 → stormzhang AI。
+ *   此为全 App 默认顺序,信息源页可拖拽自定义(持久化于 [SettingsStore.sourceOrderFlow]),
+ *   摘要 Tab 跟随用户顺序,关于页固定用此默认顺序。
+ * - **源 key**:与归档源 key(见 [com.peng.ainewshub.data.SummaryRepository])完全一致,
+ *   摘要 Tab / PagerState pageCount 均按 key 列表驱动。
+ * - **品牌色**:[brand] 复用 [SourceBrand](颜色收口仍归 SourceBrandColors.kt,本文件只引用)。
+ */
+@Immutable
+data class SourceMeta(
+    val key: String,
+    val icon: ImageVector,
+    /** 品牌色块(SourceBrand.GitHub 为 @Composable 属性,故本字段在 Composable 上下文求值后存入)。 */
+    val brand: SourceBrandColors,
+    val title: String,
+    val subtitle: String,
+    /** 关于页「数据来源」跳转 URL(走内置 WebView)。 */
+    val url: String
+)
+
+/**
+ * 八源查表(key → 元数据)。未知 key 抛出,确保调用方传 key 时编译期覆盖完整。
+ * 需在 Composable 上下文调用(SourceBrand.GitHub 读取深浅色主题)。
+ */
+@Composable
+fun sourceMeta(key: String): SourceMeta = when (key) {
+    SourceKeys.HACKERNEWS -> SourceMeta(
+        key, Icons.Filled.Whatshot, SourceBrand.HackerNews,
+        "HackerNews", "HackerNews 热门榜单", "https://news.ycombinator.com"
+    )
+    SourceKeys.GITHUB_TRENDING -> SourceMeta(
+        key, Icons.Filled.Code, SourceBrand.GitHub,
+        "GitHub Trending", "GitHub 热门仓库", "https://github.com/trending"
+    )
+    SourceKeys.OPENAI_ANTHROPIC_NEWS -> SourceMeta(
+        key, Icons.Filled.Business, SourceBrand.OpenAiAnthropicNews,
+        "OpenAI x Anthropic", "OpenAI + Anthropic 厂商动态", "https://openai.com"
+    )
+    SourceKeys.HUGGINGFACE_PAPERS -> SourceMeta(
+        key, Icons.Filled.School, SourceBrand.HuggingFace,
+        "HuggingFace Paper Trending", "热门 AI 论文榜单", "https://huggingface.co/papers/trending"
+    )
+    SourceKeys.PRODUCTHUNT -> SourceMeta(
+        key, Icons.Filled.RocketLaunch, SourceBrand.ProductHunt,
+        "Product Hunt", "每日新产品榜单", "https://www.producthunt.com"
+    )
+    SourceKeys.RUNDOWN_AI -> SourceMeta(
+        key, Icons.AutoMirrored.Filled.Article, SourceBrand.TheRundownAi,
+        "The Rundown AI", "AI 日更 newsletter", "https://www.therundown.ai"
+    )
+    SourceKeys.AIHOT_FEATURED -> SourceMeta(
+        key, Icons.Filled.Whatshot, SourceBrand.AiHot,
+        "AIHot 精选", "自家 AI 资讯精选", "https://aihot.virxact.com"
+    )
+    SourceKeys.STORMZHANG_AI -> SourceMeta(
+        key, Icons.Filled.Bolt, SourceBrand.Stormzhang,
+        "stormzhang AI 资讯", "每日 AI 资讯聚合", "https://news.stormzhang.ai"
+    )
+    else -> error("未知源 key: $key")
+}
+
+/** 八源 key 字面量集中定义,避免散落字符串。 */
+object SourceKeys {
+    const val HACKERNEWS = "hackernews"
+    const val GITHUB_TRENDING = "github-trending"
+    const val OPENAI_ANTHROPIC_NEWS = "openai-anthropic-news"
+    const val HUGGINGFACE_PAPERS = "huggingface-papers"
+    const val PRODUCTHUNT = "producthunt"
+    const val RUNDOWN_AI = "rundown-ai"
+    const val AIHOT_FEATURED = "aihot-featured"
+    const val STORMZHANG_AI = "stormzhang-ai"
+}
+
+/**
+ * 全 App 默认源顺序(8 源,不含 LinuxDo)。
+ *
+ * 用户在「信息源」页拖拽后的自定义顺序持久化于 [SettingsStore.sourceOrderFlow],
+ * 读取时会以本常量为兜底(只保留已知 key + 补全缺失 key 到末尾)。
+ */
+val DEFAULT_SOURCE_ORDER: List<String> = listOf(
+    SourceKeys.HACKERNEWS,
+    SourceKeys.GITHUB_TRENDING,
+    SourceKeys.OPENAI_ANTHROPIC_NEWS,
+    SourceKeys.HUGGINGFACE_PAPERS,
+    SourceKeys.PRODUCTHUNT,
+    SourceKeys.RUNDOWN_AI,
+    SourceKeys.AIHOT_FEATURED,
+    SourceKeys.STORMZHANG_AI
+)
