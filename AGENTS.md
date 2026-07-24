@@ -38,12 +38,15 @@
   - 归档走 `ArchiveHttpClient`（gitcode **REST API raw 端点**，**不要**用 raw 直链——背后是 WAF 会 403）。
   - **归档失败直接显示 Error 态，不回退实时**。
 - **摘要 Tab 不在 App 端生成 AI 摘要**，直接读归档快照顶层 `ai_summary_v2` 字段（JSON 数组，每项含 `title`+`desc`，流水线预生成），兼容回退旧纯文本 `ai_summary`（历史快照），两者都缺失即失败态。
+- **源元数据 / 顺序单点定义** `ui/more/SourceMeta.kt`：8 源（HackerNews / GitHub Trending / OpenAI×Anthropic / HuggingFace Papers / Product Hunt / The Rundown AI / AIHot 精选 / stormzhang AI）的 key / icon / 品牌色 / 标题 / 副标题 / URL 集中于此，`DEFAULT_SOURCE_ORDER` 为默认顺序。信息源页 / 摘要 Tab / 关于页三处都从 `sourceMeta(key)` 派生，不再各自硬编码。
+  - 用户在「信息源」页长按拖拽自定义顺序（reorderable 库），持久化于 `display_prefs` 的 `source_order` 键；**摘要 Tab 跟随用户顺序**（`SummaryViewModel.sourceKeys` 读 `SettingsStore.sourceOrderFlow`），**关于页固定默认顺序**。
+  - **LinuxDo 暂时下线**：三处 UI 入口（信息源页 / 摘要 Tab / 关于页）均不展示，但底层代码（`Page.LinuxDo` / `LinuxDoHotScreen` / VM / Repo / 数据模型 / `SourceBrand.LinuxDo`）保留，恢复时在 `SourceMeta`/`DEFAULT_SOURCE_ORDER` 补回即可。
 - 端侧 AI（总览综合分析 / 翻译 / 系统选中译）统一经 `AiChatClient` 访问「设置 → AI 服务」里的用户配置。
 - 数据模型：`NewsItem` / `HackerNewsStory` 用 `@Parcelize`。
 
 ## 持久化
 
-- DataStore：`display_prefs`（主题 / 动态取色 / 字体族 / 字号档位 / 源模式 / 搜索历史）、`ai_prefs`（全局 AI 服务配置 + 按「模型 × 月」聚合的 token 用量）。
+- DataStore：`display_prefs`（主题 / 动态取色 / 字体族 / 字号档位 / 源模式 / 搜索历史 / 信息源顺序 `source_order`）、`ai_prefs`（全局 AI 服务配置 + 按「模型 × 月」聚合的 token 用量）。
 - Room（`ainewshub.db`，version 1，`fallbackToDestructiveMigration`）：仅浏览历史。
 - HN 列表缓存、翻译缓存为 `cacheDir` 下 JSON 文件。
 

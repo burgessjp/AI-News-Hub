@@ -66,10 +66,12 @@ fun SummaryScreen(
 ) {
     val states by vm.states.collectAsStateWithLifecycle()
     val isRefreshing by vm.isRefreshing.collectAsStateWithLifecycle()
+    val sourceKeys by vm.sourceKeys.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
-    // 卡片配置:key → (标题 / 图标 / 进入列表的回调)。顺序对齐 SOURCE_KEYS 与 More 页浏览组。
-    val cards = summaryCardSpecs { source ->
+    // 卡片配置:key → (标题 / 图标 / 进入列表的回调)。顺序跟随 sourceKeys(用户在「信息源」
+    // 页拖拽自定义的顺序)。标题 / 图标来自 sourceMeta 单点定义。
+    val cards = summaryCardSpecs(sourceKeys) { source ->
         when (source) {
             "hackernews" -> onOpenHackerNews
             "github-trending" -> onOpenGitHubTrending

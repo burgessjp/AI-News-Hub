@@ -23,6 +23,9 @@ import kotlinx.coroutines.runBlocking
  *
  * [sourceMode] 控制 Hub 4 个稳定源(HackerNews / GitHub Trending / stormzhang AI /
  * HuggingFace Papers)从实时抓取还是 gitcode 归档取数,默认 [SourceMode.LIVE]。
+ *
+ * [sourceOrderFlow] 持久化用户在「信息源」页拖拽自定义的 8 源顺序(默认
+ * [DEFAULT_SOURCE_ORDER]),摘要 Tab 跟随该顺序;关于页固定默认顺序不跟随。
  */
 private val Context.displayDataStore: DataStore<Preferences> by preferencesDataStore("display_prefs")
 
@@ -109,6 +112,35 @@ class SettingsStore(context: Context) {
         dataStore.edit { it.remove(KEY_SEARCH_HISTORY) }
     }
 
+    // ===== 信息源顺序 =====
+
+    /**
+     * 信息源顺序流 —— 用户在「信息源」页拖拽自定义的 8 源排列,默认 [DEFAULT_SOURCE_ORDER]。
+     *
+     * 存储格式:换行分隔的源 key 字符串(与搜索历史同模式,规避 stringListPreferencesKey)。
+     * 读取容错:只保留 [DEFAULT_SOURCE_ORDER] 中已知 key(过滤历史脏数据/已下线源如 LinuxDo),
+     * 再把缺失的 key 按默认顺序补到末尾 —— 保证旧用户升级 / 未来新增源时不丢条目、
+     * 数据迁移无需写脚本。
+     */
+    val sourceOrderFlow: Flow<List<String>> = dataStore.data.map { p ->
+        val stored = p[KEY_SOURCE_ORDER].orEmpty()
+            .split('\n').map { it.trim() }.filter { it.isNotEmpty() }
+        val known = DEFAULT_SOURCE_ORDER.toSet()
+        val ordered = stored.filter { it in known }
+        // 去重(保留首次出现)+ 补全缺失 key 到末尾
+        val seen = linkedSetOf<String>()
+        ordered.forEach { seen.add(it) }
+        DEFAULT_SOURCE_ORDER.forEach { if (it !in seen) seen.add(it) }
+        seen.toList()
+    }
+
+    /** 持久化用户拖拽后的源顺序(8 源 key 的全排列)。 */
+    suspend fun updateSourceOrder(order: List<String>) {
+        dataStore.edit { p ->
+            p[KEY_SOURCE_ORDER] = order.joinToString("\n")
+        }
+    }
+
     /**
      * 同步读取数据源模式 —— 供 ViewModel 在构造期(init 属性)非协程上下文取值。
      *
@@ -127,6 +159,7 @@ class SettingsStore(context: Context) {
         val KEY_FONT_SCALE = stringPreferencesKey("font_scale")
         val KEY_SOURCE_MODE = stringPreferencesKey("source_mode")
         val KEY_SEARCH_HISTORY = stringPreferencesKey("search_history")
+        val KEY_SOURCE_ORDER = stringPreferencesKey("source_order")
         const val MAX_SEARCH_HISTORY = 10
     }
 }

@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.peng.ainewshub.data.SummaryRepository
 import com.peng.ainewshub.ui.SummaryArchiveViewModel
 import com.peng.ainewshub.ui.UiState
 import com.peng.ainewshub.ui.components.AppTopBar
@@ -53,8 +54,8 @@ fun SummaryDateScreen(
 
     LaunchedEffect(date) { vm.loadDate(date) }
 
-    // 历史页无列表出口:onOpenFor 一律 null(见 summaryCardSpecs 注释)
-    val cards = summaryCardSpecs { null }
+    // 历史页用全集固定顺序(不跟随用户自定义顺序),无列表出口:onOpenFor 一律 null
+    val cards = summaryCardSpecs(SummaryRepository.SOURCE_KEYS) { null }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,

@@ -163,7 +163,17 @@ class SummaryRepository {
     }
 
     companion object {
-        /** 8 个支持的归档源 key,供 ViewModel / UI 遍历。顺序对齐 More 页浏览组展示顺序。 */
+        /**
+         * 8 个支持的归档源 key(全集),供 OverviewRepository 等需要遍历所有归档源的场合。
+         *
+         * 顺序即全 App 默认源顺序(对齐 [com.peng.ainewshub.ui.more.DEFAULT_SOURCE_ORDER]):
+         * HackerNews → GitHub Trending → OpenAI×Anthropic → HuggingFace Papers →
+         * Product Hunt → The Rundown AI → AIHot 精选 → stormzhang AI。
+         *
+         * **注意**:摘要 Tab 的实际展示顺序跟随用户在「信息源」页拖拽自定义的顺序
+         * (见 [com.peng.ainewshub.ui.more.SettingsStore.sourceOrderFlow]),
+         * 应经 [orderedSourceKeys] 获取,不要直接用本常量当展示顺序。
+         */
         val SOURCE_KEYS = listOf(
             SummarySource.HACKERNEWS.key,
             SummarySource.GITHUB_TRENDING.key,
@@ -171,8 +181,8 @@ class SummaryRepository {
             SummarySource.HUGGINGFACE_PAPERS.key,
             SummarySource.PRODUCTHUNT.key,
             SummarySource.RUNDOWN_AI.key,
-            SummarySource.STORMZHANG_AI.key,
-            SummarySource.AIHOT_FEATURED.key
+            SummarySource.AIHOT_FEATURED.key,
+            SummarySource.STORMZHANG_AI.key
         )
 
         /** 源 key → 展示标题。 */

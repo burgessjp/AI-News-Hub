@@ -44,9 +44,10 @@ import com.peng.ainewshub.ui.theme.AppText
 /**
  * 关于页 —— App 名/版本/数据源说明/项目链接/开源依赖清单。
  *
- * 数据来源:AIHot 精选、HackerNews、GitHub Trending、HuggingFace Papers、stormzhang AI、
- * Product Hunt、The Rundown AI、LinuxDo 八源(原「AI HOT」与「AIHot 精选」同指
- * aihot.virxact.com,合并为一项避免冗余)。
+ * 数据来源 8 源(与信息源页 / 摘要 Tab 一致,元数据来自 [sourceMeta],顺序固定用
+ * [DEFAULT_SOURCE_ORDER] 不跟随用户自定义):HackerNews、GitHub Trending、
+ * OpenAI×Anthropic、HuggingFace Papers、Product Hunt、The Rundown AI、AIHot 精选、
+ * stormzhang AI。LinuxDo 暂下线。
  *
  * 链接统一走内置 WebView([onOpenUrl],计入浏览历史),不跳外部浏览器 ——
  * 与全 App openUrl 策略一致。
@@ -89,15 +90,17 @@ fun AboutScreen(onBack: () -> Unit, onOpenUrl: (String, String) -> Unit) {
             // 品牌头(全页唯一卡片,品牌渐变)
             item { BrandHeader(versionName = versionName) }
 
-            // 数据来源 —— 轻量行(无图标,文字弱化)
+            // 数据来源 —— 轻量行(无图标,文字弱化)。顺序固定用 DEFAULT_SOURCE_ORDER,
+            // 不跟随用户在「信息源」页的自定义顺序(关于页是 App 静态说明)。
             item { SectionHeader("数据来源") }
-            dataSources.forEachIndexed { idx, src ->
+            DEFAULT_SOURCE_ORDER.forEachIndexed { idx, key ->
                 item {
+                    val src = sourceMeta(key)
                     InfoRow(
                         title = src.title,
                         subtitle = src.subtitle,
                         onClick = { onOpenUrl(src.url, src.title) },
-                        showDivider = idx != dataSources.lastIndex
+                        showDivider = idx != DEFAULT_SOURCE_ORDER.lastIndex
                     )
                 }
             }
@@ -275,25 +278,6 @@ private fun LicenseBadge(license: String) {
         )
     }
 }
-
-/** 数据来源项 —— 标题 + 中文说明 + 跳转 URL(无图标,文字弱化呈现)。 */
-private class DataSource(
-    val title: String,
-    val subtitle: String,
-    val url: String
-)
-
-/** 八源(原「AI HOT」与「AIHot 精选」同 URL 合并为一项)。 */
-private val dataSources: List<DataSource> = listOf(
-    DataSource("AIHot 精选", "第三方 AI 资讯精选", "https://aihot.virxact.com"),
-    DataSource("HackerNews", "技术圈热门讨论", "https://news.ycombinator.com"),
-    DataSource("GitHub Trending", "热门开源仓库", "https://github.com/trending"),
-    DataSource("HuggingFace Papers", "热门 AI 论文榜单", "https://huggingface.co/papers/trending"),
-    DataSource("stormzhang AI", "每日 AI 资讯聚合", "https://news.stormzhang.ai"),
-    DataSource("Product Hunt", "每日新产品榜单", "https://www.producthunt.com"),
-    DataSource("The Rundown AI", "AI 日更 newsletter", "https://www.therundown.ai"),
-    DataSource("LinuxDo", "L 站热门话题", "https://linux.do")
-)
 
 private val deps = listOf(
     "Jetpack Compose & Material 3" to "Apache-2.0",
