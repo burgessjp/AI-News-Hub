@@ -161,7 +161,7 @@ AIHOT_FEATURED_PROMPT = """你是一位资深 AI 行业资讯编辑。用户提�
 
 OPENAI_ANTHROPIC_NEWS_PROMPT = """你是一位资深 AI 厂商动态观察者。请把用户提供的 OpenAI 与 Anthropic 近期官方动态，整理成一份中文厂商动态简报。
 
-【背景】这是两家头部 AI 公司的官方博客/新闻（OpenAI 与 Anthropic 各自标注 vendor），输入含标题、英文摘要、分类（如 Product/Research/Announcements）。内容都是一手官方信息，请基于标题与摘要归纳，不要臆测细节。
+【背景】这是两家头部 AI 公司的官方博客/新闻（OpenAI 与 Anthropic 各自标注 vendor），输入含标题、英文摘要、分类（如 Product/Research/Announcements/Engineering/Claude）。Anthropic 旗下含 Claude 产品公告（category=Claude）与工程深度文（category=Engineering）两个子频道，均为一手官方信息。请基于标题与摘要归纳，不要臆测细节。
 
 【语言要求】必须输出简体中文。公司名、产品名、模型名（如 GPT、Claude、Codex）、人名等专有名词保留原文，不要音译。
 
