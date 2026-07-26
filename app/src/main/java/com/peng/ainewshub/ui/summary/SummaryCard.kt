@@ -3,7 +3,6 @@ package com.peng.ainewshub.ui.summary
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -22,11 +21,9 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -52,17 +49,17 @@ import com.peng.ainewshub.ui.components.ShimmerBox
 import com.peng.ainewshub.ui.more.sourceMeta
 import com.peng.ainewshub.ui.theme.AppAlpha
 import com.peng.ainewshub.ui.theme.AppText
-import com.peng.ainewshub.ui.theme.BrandGradient
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 /**
- * 摘要卡片共享件 —— 摘要 Tab(当日)与「历史摘要」按日期页(归档)共用的卡片实现。
+ * 摘要页共享件 —— 摘要 Tab(当日)与「历史摘要」按日期页(归档)共用的单页实现。
  *
- * 从 SummaryScreen 抽出:卡片 spec、顶部提示行+页面指示器、单张源摘要页(渐变卡头 +
- * 条目化正文 + 底部出口)。两屏保持同构(同一产品语言),差异仅在数据来源
- * (latest 快照 vs history 索引按日期寻址)与底部出口(历史页无「查看完整列表」)。
+ * 从 SummaryScreen 抽出:页 spec、顶部提示行+页面指示器(历史页 pager 用)、
+ * 单张源摘要页(紧凑扁头 + 条目化正文 + 底部出口,平铺无卡片)。两屏保持同构
+ * (同一产品语言),差异仅在数据来源(latest 快照 vs history 索引按日期寻址)
+ * 与底部出口(历史页无「查看完整列表」)。
  */
 
 /** 卡片配置:key → (标题 / 图标 / 进入列表的回调;历史页传 null 隐藏底部出口)。 */
@@ -143,13 +140,13 @@ internal fun SummaryHeaderRow(
 }
 
 /**
- * 单张源摘要页 —— 一张全高卡片(描边圆角),内含:
- *  - 品牌渐变卡头([SummaryCardHeader]):源图标 + 源名 + 数据时刻
+ * 单张源摘要页 —— 平铺整页(无卡片容器、无渐变带),内含:
+ *  - 紧凑扁头([SummaryPageHeader]):源图标(源强调色)+ 源名 + 数据时刻,下接发丝线
  *  - 中部:摘要正文(可纵向滚动),按 state 分支
- *  - 底部:「查看完整列表 →」按钮(spec.onOpen 非空才显示;历史页隐藏)
+ *  - 底部:发丝线 +「查看完整列表 →」按钮(spec.onOpen 非空才显示;历史页隐藏)
  *
- * 底部按钮区用独立 Surface 吸收自己的点击,不依赖卡片整体点击
- * (pager 页面整页可滑,按钮区单独可点)。
+ * 底部按钮区用独立 clickable Row 吸收自己的点击,不依赖整页点击
+ * (历史页 pager 页面整页可滑,按钮区单独可点)。
  */
 @Composable
 internal fun SummaryCardPage(
@@ -159,80 +156,63 @@ internal fun SummaryCardPage(
 ) {
     val cs = MaterialTheme.colorScheme
     val accent = sourceAccentOf(spec.source)
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = cs.surfaceContainerLow,
-        shape = MaterialTheme.shapes.medium,
-        border = BorderStroke(1.dp, cs.outlineVariant),
-        tonalElevation = 0.dp,
-        shadowElevation = 0.dp
-    ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            // 品牌渐变卡头(Surface 按卡片 shapes.medium 裁切,上圆角自然贴合)
-            SummaryCardHeader(spec = spec, state = state, accent = accent)
+    Column(modifier = Modifier.fillMaxSize()) {
+        SummaryPageHeader(spec = spec, state = state, accent = accent)
+        SummaryHairline()
 
-            // 中部:摘要正文(可滚动),按 state 分支
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-            ) {
-                when (state) {
-                    is UiState.Loading -> SummarySkeleton()
-                    is UiState.Error -> SummaryError(
-                        message = state.message,
-                        kind = state.kind,
-                        onRetry = onRetry
-                    )
-                    is UiState.Success -> SummaryBody(content = state.data.content, accent = accent)
-                }
+        // 中部:摘要正文(可滚动),按 state 分支
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+        ) {
+            when (state) {
+                is UiState.Loading -> SummarySkeleton()
+                is UiState.Error -> SummaryError(
+                    message = state.message,
+                    kind = state.kind,
+                    onRetry = onRetry
+                )
+                is UiState.Success -> SummaryBody(content = state.data.content, accent = accent)
             }
+        }
 
-            // 底部:查看完整列表按钮(primary 加粗;不随源强调色,保持出口一致)
-            val onOpen = spec.onOpen
-            if (onOpen != null) {
-                Surface(
-                    onClick = onOpen,
-                    color = cs.surfaceContainerLow,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "查看完整列表",
-                            style = AppText.body,
-                            fontWeight = FontWeight.Bold,
-                            color = cs.primary,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowForward,
-                            contentDescription = "查看完整列表",
-                            tint = cs.primary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
+        // 底部:查看完整列表按钮(primary 加粗;不随源强调色,保持出口一致)
+        val onOpen = spec.onOpen
+        if (onOpen != null) {
+            SummaryHairline()
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onOpen)
+                    .padding(vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "查看完整列表",
+                    style = AppText.body,
+                    fontWeight = FontWeight.Bold,
+                    color = cs.primary,
+                    modifier = Modifier.weight(1f)
+                )
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowForward,
+                    contentDescription = "查看完整列表",
+                    tint = cs.primary,
+                    modifier = Modifier.size(18.dp)
+                )
             }
         }
     }
 }
 
 /**
- * 品牌渐变卡头 —— 约 66-72dp 高的 [BrandGradient] 横带(上圆角随卡片 shapes.medium)。
- *
- * 卡头内:onPrimary 圆形底衬源图标(tint 用源强调色)+ 源名(onPrimary,titleItem
- * 自带 SemiBold)+ 数据时刻(onPrimary 85%);右侧 AutoAwesome 弱化白小图标强化 AI 语义。
- * 文字/底衬一律走 onPrimary 系:浅色模式是白字压深渐变,深色模式是深字压浅渐变,
- * 两种模式对比度都有保证(与今日热点渐变头同一处理)。
+ * 紧凑扁头 —— 一行高:源图标(源强调色 tint)+ 源名 + 右侧数据时刻(caption)。
+ * 取代原 BrandGradient 渐变卡头:蓝紫渐变焦点已收口到总览页头条(AI 特性专用),
+ * 摘要页不再逐源重复渐变带,纵向空间让给正文。
  */
 @Composable
-private fun SummaryCardHeader(
+private fun SummaryPageHeader(
     spec: SummaryCardSpec,
     state: UiState<SourceSummary>,
     accent: Color
@@ -241,46 +221,41 @@ private fun SummaryCardHeader(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(BrandGradient)
-            .padding(horizontal = 16.dp, vertical = 16.dp),
+            .padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .size(34.dp)
-                .clip(CircleShape)
-                .background(cs.onPrimary),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                spec.icon,
-                contentDescription = null,
-                tint = accent,
-                modifier = Modifier.size(18.dp)
-            )
-        }
-        Spacer(Modifier.size(10.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = spec.title,
-                style = AppText.titleItem,
-                color = cs.onPrimary
-            )
-            if (state is UiState.Success) {
-                Text(
-                    text = "数据时刻：${formatFetchedAt(state.data.fetchedAtMs)}",
-                    style = AppText.caption,
-                    color = cs.onPrimary.copy(alpha = AppAlpha.primaryEmphasis)
-                )
-            }
-        }
         Icon(
-            Icons.Filled.AutoAwesome,
+            spec.icon,
             contentDescription = null,
-            tint = cs.onPrimary.copy(alpha = AppAlpha.primaryEmphasis),
+            tint = accent,
             modifier = Modifier.size(18.dp)
         )
+        Spacer(Modifier.size(8.dp))
+        Text(
+            text = spec.title,
+            style = AppText.titleItem,
+            color = cs.onSurface,
+            modifier = Modifier.weight(1f)
+        )
+        if (state is UiState.Success) {
+            Text(
+                text = "数据时刻：${formatFetchedAt(state.data.fetchedAtMs)}",
+                style = AppText.caption,
+                color = cs.onSurfaceVariant
+            )
+        }
     }
+}
+
+/** 页内发丝线 —— 扁头下缘 / 底部出口上缘(0.5dp outlineVariant,与总览页同语言)。 */
+@Composable
+private fun SummaryHairline() {
+    Spacer(
+        Modifier
+            .fillMaxWidth()
+            .height(0.5.dp)
+            .background(MaterialTheme.colorScheme.outlineVariant)
+    )
 }
 
 /**

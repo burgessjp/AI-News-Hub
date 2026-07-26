@@ -464,6 +464,7 @@ fun AiNewsHubApp(openSettingsOnLaunch: Boolean = false) {
     // 进程死亡后不保留(数据本身也会重拉,可接受)。
     // 注:「AIHot 精选」原为根 tab 时有独立的 featuredListState;改为二级页后
     // 走 pageListStates.forPage(Page.FeaturedHub),不再上提。
+    // 摘要 tab 的 Pager 状态(顶部源 chips 与内容 Pager 双向同步,共用此状态)
     val summaryPagerState = rememberPagerState(pageCount = { SummaryRepository.SOURCE_KEYS.size })
     // 总览 tab 的列表滚动状态(与 summaryPagerState 同层上提)
     val overviewListState = rememberLazyListState()
