@@ -1,7 +1,6 @@
 package com.peng.ainewshub.ui
 
 import android.util.Log
-import com.peng.ainewshub.data.AiConfigMissingException
 import com.peng.ainewshub.data.AppException
 import com.peng.ainewshub.data.ShortContentException
 import java.io.IOException
@@ -32,8 +31,7 @@ enum class ErrorKind {
  * - 友好文案根据异常类型决定(用户看不到任何技术词);
  * - 原始诊断 message(如 "HTTP 404"、"index.json 无 latest 字段")写进 logcat,
  *   开发者调试不损失信息;
- * - [AiConfigMissingException] / [ShortContentException] 不在本函数处理
- *   (它们走专门的 ConfigMissing 引导态 / TOO_SHORT 短路)。
+ * - [ShortContentException] 不在本函数处理(走 TOO_SHORT 短路)。
  */
 fun Throwable.toUiError(): UiState.Error {
     Log.w("UiError", "原始诊断: ${message ?: "(no message)"}", this)
@@ -43,7 +41,6 @@ fun Throwable.toUiError(): UiState.Error {
         is AppException.ServerError  -> UiState.Error("服务暂不可用,请稍后重试", ErrorKind.ServerError)
         is AppException.AiService    -> UiState.Error("AI 服务暂时不可用,请稍后重试", ErrorKind.AiService)
         is AppException.RateLimited  -> UiState.Error("访问受限,请稍后重试", ErrorKind.RateLimited)
-        is AiConfigMissingException  -> UiState.Error("未配置 AI 服务", ErrorKind.AiService)
         is ShortContentException     -> UiState.Error("内容过短", ErrorKind.Unknown)
         // OkHttp/IO 层抛出的连接失败、超时、SSL 异常等,统一归 Network
         is IOException               -> UiState.Error("网络异常,请检查连接后重试", ErrorKind.Network)

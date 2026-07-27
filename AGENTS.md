@@ -38,10 +38,11 @@
   - 归档走 `ArchiveHttpClient`（gitcode **REST API raw 端点**，**不要**用 raw 直链——背后是 WAF 会 403）。
   - **归档失败直接显示 Error 态，不回退实时**。
 - **摘要 Tab 不在 App 端生成 AI 摘要**，直接读归档快照顶层 `ai_summary_v2` 字段（JSON 数组，每项含 `title`+`desc`，流水线预生成），兼容回退旧纯文本 `ai_summary`（历史快照），两者都缺失即失败态。
+- **总览 Tab 同样不在 App 端调 AI**，直接读 `index.json` 顶层 `latest_overview` 字段（流水线 `scripts/overview_summary.py` 预生成的跨源综合分析，含 Top10 items + breaking 标记）。App 端 `OverviewRepository` 只做反序列化，不再有端侧 AI 调用 / 缓存 / ConfigMissing 引导态。字段缺失走 NoData 空态。
 - **源元数据 / 顺序单点定义** `ui/more/SourceMeta.kt`：8 源（HackerNews / GitHub Trending / OpenAI×Anthropic / HuggingFace Papers / Product Hunt / The Rundown AI / AIHot 精选 / stormzhang AI）的 key / icon / 品牌色 / 标题 / 副标题 / URL 集中于此，`DEFAULT_SOURCE_ORDER` 为默认顺序。信息源页 / 摘要 Tab / 关于页三处都从 `sourceMeta(key)` 派生，不再各自硬编码。
   - 用户在「信息源」页长按拖拽自定义顺序（reorderable 库），持久化于 `display_prefs` 的 `source_order` 键；**摘要 Tab 跟随用户顺序**（`SummaryViewModel.sourceKeys` 读 `SettingsStore.sourceOrderFlow`），**关于页固定默认顺序**。
   - **LinuxDo 暂时下线**：三处 UI 入口（信息源页 / 摘要 Tab / 关于页）均不展示，但底层代码（`Page.LinuxDo` / `LinuxDoHotScreen` / VM / Repo / 数据模型 / `SourceBrand.LinuxDo`）保留，恢复时在 `SourceMeta`/`DEFAULT_SOURCE_ORDER` 补回即可。
-- 端侧 AI（总览综合分析 / 翻译 / 系统选中译）统一经 `AiChatClient` 访问「设置 → AI 服务」里的用户配置。
+- 端侧 AI（翻译 / 系统选中译）统一经 `AiChatClient` 访问「设置 → AI 服务」里的用户配置。
 - 数据模型：`NewsItem` / `HackerNewsStory` 用 `@Parcelize`。
 
 ## 持久化
@@ -58,8 +59,8 @@
 AI_NEWS_HUB_AI_BASE_URL / AI_NEWS_HUB_AI_MODEL / AI_NEWS_HUB_AI_API_KEY / GITCODE_TOKEN
 ```
 
-- 抓 8 源（7 个第三方站点 + `aihot.virxact.com` 精选 `/items?mode=selected&take=20`）→ AI 总结 → 推送到 gitcode 数据仓库 `peng1818/AI-News-Hub-Data` 的 `news-hub-data` 分支。
-- 单源失败跳过且 `index.json` latest 指针从上一次继承（客户端永远拿到有效数据），≥1 源成功退出码即为 0。日期统一北京时间。
+- 抓 8 源（7 个第三方站点 + `aihot.virxact.com` 精选 `/items?mode=selected&take=20`）→ 各源 AI 摘要（`ai_summary.py`，写入快照顶层 `ai_summary_v2`）+ 跨源总览（`overview_summary.py`，写入 `index.json` 顶层 `latest_overview`）→ 推送到 gitcode 数据仓库 `peng1818/AI-News-Hub-Data` 的 `news-hub-data` 分支。
+- 单源失败跳过且 `index.json` latest 指针从上一次继承（客户端永远拿到有效数据）；总览 AI 生成失败时 `latest_overview` 同样继承上一次。≥1 源成功退出码即为 0。日期统一北京时间。
 - LinuxDo 套 Cloudflare 强挑战，CI 单源失败属预期行为。
 - 数据格式详见 `docs/news-hub-data-usage.md`；各脚本行为见脚本头注释。
 

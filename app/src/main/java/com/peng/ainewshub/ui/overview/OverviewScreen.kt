@@ -67,25 +67,22 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * 今日总览 Tab 根屏 —— 端侧 AI 对多个归档源当日榜单的跨源综合分析。
+ * 今日总览 Tab 根屏 —— 流水线预生成的跨源综合分析(读归档 latest_overview 字段)。
  *
  * 结构(A+B 混合编辑风,去卡片化):
  *  - 头条 Hero:第 1 条(breaking 条目数据层已排最前)以 [BrandGradient] 通栏
- *    大字号呈现,无圆角无描边;渐变属 AI 特性专用,本页整体即端侧 AI 特性,合规
+ *    大字号呈现,无圆角无描边;渐变属 AI 特性专用,本页整体即 AI 特性,合规
  *  - 2~10 名平铺列表:无卡片容器,行间 0.5dp 发丝线(缩进对齐文字列);
  *    breaking 条目整行 tertiary 浅底通栏 + 「Breaking」标签,推荐理由改左侧
  *    2dp 竖条引述块;与浅底带相邻的行间不画分隔线,由色带边缘自然分隔
- *  - 页脚:生成时间 / 数据截至 / 模型与 token 消耗 / 缺源标注
+ *  - 页脚:生成时间 / 数据截至 / 缺源标注
  *
- * 与「摘要」tab 的分工:摘要是流水线预生成的分源要点(只读归档);总览是端侧实时
- * 调用用户自配 AI 的整体研判(见 [com.peng.ainewshub.data.OverviewRepository]),
- * 未配置 AI 服务时显示全屏引导([OverviewState.ConfigMissing])。
+ * 与「摘要」tab 同范式:都读流水线预生成的归档字段,App 端不再调 AI。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OverviewScreen(
     onOpenUrl: (url: String, title: String, source: String) -> Unit,
-    onOpenAiService: () -> Unit,
     // 列表状态由 MainActivity 上提持有:切 tab / 进二级页返回后保持滚动位置
     listState: LazyListState,
     reselectSignal: Int = 0,
@@ -160,13 +157,6 @@ fun OverviewScreen(
         ) {
             when (val s = state) {
                 is OverviewState.Loading -> OverviewLoading()
-                is OverviewState.ConfigMissing -> EmptyState(
-                    title = "配置 AI 服务后可用",
-                    subtitle = "「今日总览」由你在 设置 → AI 服务 配置的服务实时生成\n(每天 1-2 次,当日再次打开瞬时呈现)",
-                    icon = Icons.Outlined.AutoAwesome,
-                    actionLabel = "去设置",
-                    onAction = onOpenAiService
-                )
                 is OverviewState.NoData -> EmptyState(
                     title = "今日总览尚未生成",
                     subtitle = "今天的内容还在准备中,请稍后再来",
@@ -200,14 +190,8 @@ private fun OverviewLoading() {
         CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
         Spacer(Modifier.height(16.dp))
         Text(
-            text = "AI 正在分析今日各源榜单…",
+            text = "正在加载今日总览…",
             style = AppText.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(Modifier.height(4.dp))
-        Text(
-            text = "首次生成约需半分钟,当天再次打开瞬时呈现",
-            style = AppText.caption,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
@@ -536,7 +520,7 @@ private fun OverviewFooter(digest: OverviewDigest) {
     ) {
         Text(
             text = buildString {
-                append("由 ${digest.model} 生成于 ${formatClock(digest.generatedAt)}")
+                append("生成于 ${formatClock(digest.generatedAt)}")
                 if (digest.dataFetchedAt > 0) append(" · 数据截至 ${formatFetchedAt(digest.dataFetchedAt)}")
             },
             style = AppText.caption,
@@ -546,7 +530,6 @@ private fun OverviewFooter(digest: OverviewDigest) {
         Text(
             text = buildString {
                 append("基于 ${SummaryRepository.SOURCE_KEYS.size} 源当日内容")
-                if (digest.totalTokens > 0) append(" · AI 用量 ${digest.totalTokens}")
                 if (digest.missingSources.isNotEmpty()) {
                     append(" · 缺 ${digest.missingSources.joinToString("、") { SummaryRepository.titleOf(it) }}")
                 }

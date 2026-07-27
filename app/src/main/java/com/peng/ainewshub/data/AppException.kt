@@ -9,7 +9,6 @@ package com.peng.ainewshub.data
  * 开发者也能在 logcat 里看到原诊断信息。
  *
  * 与既有专用异常的关系:
- *  - [AiConfigMissingException](AI 未配置)走 OverviewViewModel.ConfigMissing 引导态,独立
  *  - [ShortContentException](翻译原文过短)走 TranslationState.TOO_SHORT,独立
  *  - 其余 data 层 throw 全部改用本 sealed hierarchy 表达分类
  */

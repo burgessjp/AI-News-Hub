@@ -141,6 +141,15 @@ object ArchiveHttpClient {
     }
 
     /**
+     * 读 index.json 顶层的 `latest_overview` 字段(今日总览,流水线预生成的跨源综合分析)。
+     * 与 latest/history 共享 2 分钟缓存。字段缺失或无 items 时返回 null
+     * (语义:今日总览尚未生成,UI 走 NoData 态)。OverviewRepository 据此反序列化为 OverviewDigest。
+     */
+    suspend fun fetchLatestOverview(): JSONObject? = withContext(Dispatchers.IO) {
+        fetchIndex().optJSONObject("latest_overview")?.takeIf { it.has("items") }
+    }
+
+    /**
      * 读 index.json 的 `history` 索引(与 latest 共享 2 分钟缓存),供「历史摘要」按日期寻址。
      *
      * @return source → (date → 相对源目录的快照路径);history 由流水线每次运行时合并写入,

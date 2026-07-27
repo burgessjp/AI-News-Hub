@@ -64,13 +64,27 @@ news-hub-data 分支/
     "huggingface-papers": "2026-07-15/08-00-data.json",
     "producthunt": "2026-07-15/08-00-data.json",
     "rundown-ai": "2026-07-15/08-00-data.json",
-    "aihot-featured": "2026-07-15/08-00-data.json"
+    "aihot-featured": "2026-07-15/08-00-data.json",
+    "openai-anthropic-news": "2026-07-15/08-00-data.json"
   },
   "history": {
     "hackernews": {
       "2026-07-19": "2026-07-19/10-12-data.json",
       "2026-07-18": "2026-07-18/15-00-data.json"
     }
+  },
+  "latest_overview": {
+    "generatedAt": 1784073612000,
+    "dataFetchedAt": 1784073600000,
+    "missingSources": ["openai-anthropic-news"],
+    "items": [
+      {
+        "source": "hackernews",
+        "title": "...", "url": "...", "metrics": "得分 630 · 评论 61",
+        "comment": "AI 写的一句话重要性",
+        "breaking": false, "breakingReason": ""
+      }
+    ]
   }
 }
 ```
@@ -78,6 +92,8 @@ news-hub-data 分支/
 `latest` 里的路径是**相对于源目录**的。注意上例中 linuxdo 指向了前一天 —— 这是设计行为:某源当天抓取失败时,`index.json` 会保留它最后一次成功的指向,客户端永远能拿到有效数据。
 
 `history` 是按日期寻址的历史索引(`{源名: {日期: relpath}}`,上例仅示意一个源,实际每源都有;只收录 2026-07-18 起的日期),详见下文「按日期取历史快照」。
+
+`latest_overview` 是**今日总览**(流水线预生成的跨源综合分析,详见下文「今日总览 latest_overview」)。App 首页「总览」tab 直接读这个字段,不再端侧调 AI。
 
 **第二步:拼完整路径拉数据。** `index.latest.<源>` 前面加上 `<源>/` 即得完整路径。
 
@@ -159,6 +175,42 @@ print(hn['items'][0]['title'])
 - `relpath` 与 `latest` 一样是**相对于源目录**的,消费方式相同:拼上 `<源>/` 前缀后走 gitcode raw API(见上「文件直链」),如 `hackernews/2026-07-19/10-12-data.json`。
 - **用途**:App「历史摘要」按日期查看当日快照与 `ai_summary_v2`;其它消费方亦可据此按日回溯。
 
+## 今日总览(latest_overview 字段)
+
+`index.json` 顶层还有 `latest_overview` 字段——**今日总览**,流水线在抓取后做跨源综合分析预生成,App 首页「总览」tab 直接读这个字段(不再端侧调 AI)。
+
+```json
+{
+  "latest_overview": {
+    "generatedAt": 1784073612000,
+    "dataFetchedAt": 1784073600000,
+    "missingSources": ["openai-anthropic-news"],
+    "items": [
+      {
+        "source": "hackernews",
+        "title": "PGSimCity - How PostgreSQL Works",
+        "url": "https://...",
+        "metrics": "得分 630 · 评论 61",
+        "comment": "AI 写的一句话重要性",
+        "breaking": false,
+        "breakingReason": ""
+      }
+    ]
+  }
+}
+```
+
+| 字段 | 说明 |
+|------|------|
+| `generatedAt` | 流水线生成时刻,Unix 毫秒时间戳 |
+| `dataFetchedAt` | 输入快照里最大的 `fetched_at_ms`(「数据截至」) |
+| `missingSources` | 本次生成时未能加载的源 key 数组(页脚标注用) |
+| `items` | 今日热点 Top10,breaking 条目排最前。每项含 `source`/`title`/`url`/`metrics`(从快照回填的最终值) + `comment`(AI 写的一句话) + `breaking` + `breakingReason`(仅 breaking=true 有) |
+
+**与单源 `ai_summary_v2` 的区别**:`ai_summary_v2` 是各源快照内的分源要点(8 个独立摘要);`latest_overview` 是跨 8 源的综合研判(1 个总榜),AI 会按跨源归一化热度档位排序、合并同事件、标 breaking。
+
+**失败保留**:本次总览 AI 生成失败时,`latest_overview` 继承上一次的值(同 `latest` 指针的失败保留机制),避免一次失败导致 App 端总览空掉。字段完全缺失时,App 走「今日总览尚未生成」空态。
+
 ## 单个数据文件的通用结构
 
 每个 `<HH-MM>-data.json` 顶层结构相同:
@@ -184,7 +236,7 @@ print(hn['items'][0]['title'])
 | `fetched_at_ms` | 抓取时刻,Unix 毫秒时间戳 |
 | `count` | `items` 数组长度 |
 | `items` | 该源的条目数组,结构因源而异(见下) |
-| `ai_summary_v2` | 本次数据的简体中文 AI 要点,JSON 数组(6-10 个对象,每个含 `title` 加粗导语 + `desc` 2-3 句正文)。仅 7 个稳定源有(hackernews / github-trending / huggingface-papers / stormzhang-ai / producthunt / rundown-ai / aihot-featured);linuxdo 不做,AI 调用失败时该字段缺省。**新快照只写 `ai_summary_v2`**;旧快照仅有 `ai_summary`(纯文本 `• **标题**：描述` 串),App 兼容回退 |
+| `ai_summary_v2` | 本次数据的简体中文 AI 要点,JSON 数组(6-10 个对象,每个含 `title` 加粗导语 + `desc` 2-3 句正文)。8 个稳定源都有(hackernews / github-trending / openai-anthropic-news / huggingface-papers / stormzhang-ai / producthunt / rundown-ai / aihot-featured);linuxdo 不做,AI 调用失败时该字段缺省。**新快照只写 `ai_summary_v2`**;旧快照仅有 `ai_summary`(纯文本 `• **标题**：描述` 串),App 兼容回退 |
 
 部分源会有额外顶层字段(如 stormzhang-ai 带 `pageDate`)。
 
@@ -317,7 +369,7 @@ The Rundown AI(beehiiv 托管的头部英文 AI 日更 newsletter)首页文章�
 
 第三方服务 `aihot.virxact.com` 的「精选」列表 TOP20,来自 `/api/public/items?mode=selected&take=20` 公开 JSON API(无 token,UA 必填否则 nginx 403)。该服务已聚合多源 RSS/X 等并人工/算法筛选,字段对齐 App 端 `NewsItem.fromJson`。
 
-> 📌 **此源特殊性**:aihot-featured 与其它 7 个第三方源一样都是第三方源,但它是 App 唯一「只取归档供摘要 Tab、二级页仍走实时接口」的源。归档仅供 App 摘要 Tab 第 7 张卡消费(`ai_summary_v2`,兼容旧 `ai_summary`);App「AIHot 精选」二级页本身继续实时拉该服务分页接口(数据更新鲜),不走此归档。
+> 📌 **此源特殊性**:aihot-featured 与其它第三方源一样都是第三方源,但它是 App 唯一「只取归档供摘要 Tab、二级页仍走实时接口」的源。归档仅供 App 摘要 Tab 消费(`ai_summary_v2`,兼容旧 `ai_summary`);App「AIHot 精选」二级页本身继续实时拉该服务分页接口(数据更新鲜),不走此归档。
 
 | 字段 | 类型 | 说明 |
 |------|------|------|

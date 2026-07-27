@@ -652,7 +652,6 @@ private fun TabRoot(
     when (tab) {
         AppTab.Overview -> OverviewScreen(
             onOpenUrl = onOpenUrl,
-            onOpenAiService = onOpenAiService,
             listState = overviewListState,
             reselectSignal = reselectTick
         )
