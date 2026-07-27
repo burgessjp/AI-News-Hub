@@ -58,7 +58,6 @@ import com.peng.ainewshub.ui.components.AppTopBar
 import com.peng.ainewshub.ui.components.BottomBarPillHeight
 import com.peng.ainewshub.ui.components.BrandWordmark
 import com.peng.ainewshub.ui.components.RankBadge
-import com.peng.ainewshub.ui.components.SectionHeader
 import com.peng.ainewshub.ui.theme.AppAlpha
 import com.peng.ainewshub.ui.theme.AppText
 import com.peng.ainewshub.ui.theme.BrandGradient
@@ -210,10 +209,6 @@ private fun OverviewContent(
         // (列表本身可滚入药丸之下,容器已按药丸底缘裁剪)
         contentPadding = PaddingValues(bottom = BottomBarPillHeight + 16.dp)
     ) {
-        item(key = "top10-header", contentType = "header") {
-            SectionHeader(title = "今日热点 Top${digest.items.size}")
-        }
-
         // 头条 Hero:第 1 条(breaking 条目数据层已排最前)BrandGradient 通栏大字号
         digest.items.firstOrNull()?.let { first ->
             item(key = "hero-${first.url}", contentType = "hero") {
