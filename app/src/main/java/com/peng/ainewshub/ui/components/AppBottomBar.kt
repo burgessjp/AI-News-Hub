@@ -45,7 +45,7 @@ import com.peng.ainewshub.ui.theme.AppText
  *  - 选中:[selectedIcon] 实心(Filled)变体
  *  - 未选中:[icon] 描边(Outlined)变体
  *
- * 「总览」是默认首页:端侧 AI 对 7 源归档榜单的当日综合分析(OverviewScreen)。
+ * 「总览」是默认首页:端侧 AI 对全部归档源榜单的当日综合分析(OverviewScreen)。
  * 「AIHot 精选」原为独立根 tab,现改为从「更多」页进入的二级页(Page.FeaturedHub),
  * 精选 tab 的 Whatshot 图标语义迁移到 MoreScreen 浏览组入口。
  *

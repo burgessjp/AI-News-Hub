@@ -19,8 +19,8 @@ import kotlinx.coroutines.launch
  * 纯归档语义,与全局 SourceMode 无关。
  *
  * 两级页各取一流:
- *  - [dates]:可选日期列表(7 源 history 的日期并集,附当天有数据的源数);
- *  - [dateStates]:指定日期的 7 源摘要,按源独立 Loading/Error/Success。
+     *  - [dates]:可选日期列表(全源 history 的日期并集,附当天有数据的源数);
+     *  - [dateStates]:指定日期的全源摘要,按源独立 Loading/Error/Success。
  *    日期详情页用 `viewModel(key = "summary-date-$date")` 按日期隔离实例
  *    (同 DailyDateScreen 套路),避免换日期时闪现上一日期内容。
  */
@@ -32,7 +32,7 @@ class SummaryArchiveViewModel(application: Application) : AndroidViewModel(appli
     private val _dates = MutableStateFlow<UiState<List<Pair<String, Int>>>>(UiState.Loading)
     val dates: StateFlow<UiState<List<Pair<String, Int>>>> = _dates.asStateFlow()
 
-    /** 指定日期的 7 源摘要状态,key = source(对齐 SummaryRepository.SOURCE_KEYS)。 */
+    /** 指定日期的全源摘要状态,key = source(对齐 SummaryRepository.SOURCE_KEYS)。 */
     private val _dateStates = MutableStateFlow<Map<String, UiState<SourceSummary>>>(emptyMap())
     val dateStates: StateFlow<Map<String, UiState<SourceSummary>>> = _dateStates.asStateFlow()
 
@@ -48,7 +48,7 @@ class SummaryArchiveViewModel(application: Application) : AndroidViewModel(appli
         }
     }
 
-    /** 并发拉取指定日期的 7 源摘要。每源独立失败,不互相拖累。 */
+    /** 并发拉取指定日期的全源摘要。每源独立失败,不互相拖累。 */
     fun loadDate(date: String) {
         if (_dateStates.value.isNotEmpty()) return
         _dateStates.value =

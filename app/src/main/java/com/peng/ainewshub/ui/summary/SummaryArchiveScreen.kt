@@ -44,9 +44,9 @@ import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 
 /**
- * 历史摘要 —— 可选日期列表(index.json `history` 索引:7 源日期并集,倒序)。
+ * 历史摘要 —— 可选日期列表(index.json `history` 索引:全源日期并集,倒序)。
  *
- * 点击某天进入该日的 7 源摘要卡页([SummaryDateScreen])。视觉对齐「历史日报」
+ * 点击某天进入该日的全源摘要卡页([SummaryDateScreen])。视觉对齐「历史日报」
  * (DailyArchiveScreen):左栏相对日期 + 周几,右栏当天有归档的源数,行间发丝线。
  *
  * 纯归档语义,与全局 SourceMode 无关(同摘要 Tab);history 每源仅保留最近 31 天,

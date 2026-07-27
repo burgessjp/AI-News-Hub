@@ -159,12 +159,12 @@ private sealed interface Page {
     data object OpenAiAnthropicNews : Page
     /** AIHot 精选 —— 原为独立根 tab,现改为从「更多」页进入的二级页(复用 FeaturedTab)。 */
     data object FeaturedHub : Page
-    /** 信息源(Sources) —— Hub 浏览区独立页,聚合 7 个第三方源 + AIHot 精选入口。从「更多」页进入。 */
+    /** 信息源(Sources) —— Hub 浏览区独立页,聚合 8 个源全集入口。从「更多」页进入。 */
     data object Sources : Page
     data object BrowseHistory : Page
     /** 历史摘要 —— 可选日期列表(归档 history 索引),从「更多」页进入。 */
     data object SummaryArchive : Page
-    /** 历史摘要 —— 指定日期的 7 源摘要卡页(复用摘要卡片实现)。 */
+    /** 历史摘要 —— 指定日期的全源摘要卡页(复用摘要卡片实现)。 */
     data class SummaryDate(val date: String) : Page
 }
 
@@ -881,7 +881,7 @@ private fun PageView(
             onOpenUrl = { url, title, source -> onOpenUrl(url, title, source) },
             listState = pageListStates.forPage(page)
         )
-        // 历史摘要:日期列表(history 索引)→ 当日 7 源摘要卡页(复用摘要卡片)。
+        // 历史摘要:日期列表(history 索引)→ 当日全源摘要卡页(复用摘要卡片)。
         // 纯归档语义,不参与 SourceMode 切换;卡片无「查看完整列表」出口。
         Page.SummaryArchive -> SummaryArchiveScreen(
             onSelectDate = onSelectSummaryDate,

@@ -67,7 +67,7 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * 今日总览 Tab 根屏 —— 端侧 AI 对 7 个归档源当日榜单的跨源综合分析。
+ * 今日总览 Tab 根屏 —— 端侧 AI 对多个归档源当日榜单的跨源综合分析。
  *
  * 结构(A+B 混合编辑风,去卡片化):
  *  - 头条 Hero:第 1 条(breaking 条目数据层已排最前)以 [BrandGradient] 通栏
@@ -545,7 +545,7 @@ private fun OverviewFooter(digest: OverviewDigest) {
         Spacer(Modifier.height(2.dp))
         Text(
             text = buildString {
-                append("基于 7 源当日内容")
+                append("基于 ${SummaryRepository.SOURCE_KEYS.size} 源当日内容")
                 if (digest.totalTokens > 0) append(" · AI 用量 ${digest.totalTokens}")
                 if (digest.missingSources.isNotEmpty()) {
                     append(" · 缺 ${digest.missingSources.joinToString("、") { SummaryRepository.titleOf(it) }}")

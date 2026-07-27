@@ -59,7 +59,7 @@ private enum class SummarySource(val key: String, val title: String) {
 /**
  * AI 摘要 Repository —— 读取各归档源当日快照里预生成的 `ai_summary_v2` 字段。
  *
- * 摘要由数据流水线在抓取时生成(OpenAI 兼容调用 + 7 个针对各源定制的 system prompt,
+ * 摘要由数据流水线在抓取时生成(OpenAI 兼容调用 + 8 个针对各源定制的 system prompt,
  * 实现见 `scripts/ai_summary.py`),写入快照顶层 `ai_summary_v2`(JSON 数组,每项含
  * title + desc)。App 端不再运行时调用 AI API,直接读字段即可 —— 快照本身就是缓存
  * (gitcode CDN + [ArchiveHttpClient] 的 index.json 2 分钟 TTL),无需额外的本地缓存或锁。
@@ -148,7 +148,7 @@ class SummaryRepository {
     }
 
     /**
-     * 「历史摘要」可选日期列表:7 源 history 索引的日期并集按倒序,
+     * 「历史摘要」可选日期列表:全源 history 索引的日期并集按倒序,
      * 每项为 (日期, 当天有归档数据的源数量)。history 索引为空时返回空列表。
      */
     suspend fun availableDates(): List<Pair<String, Int>> {

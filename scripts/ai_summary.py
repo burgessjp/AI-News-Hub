@@ -9,9 +9,10 @@
 (2-3 句描述),替代旧的纯文本 `ai_summary`(已停用,App 端兼容回退)。
 
 设计要点(复刻 App):
-  - 总结 7 个稳定源:hackernews / github-trending / huggingface-papers /
-    stormzhang-ai / producthunt / rundown-ai / aihot-featured。linuxdo 受 Cloudflare 影响不稳定,App 也没纳入,这里跳过。
-  - 7 个 system prompt 要求模型只输出 JSON 数组(无 markdown / 无解释);
+  - 总结 8 个稳定源:hackernews / github-trending / openai-anthropic-news /
+    huggingface-papers / stormzhang-ai / producthunt / rundown-ai / aihot-featured。
+    linuxdo 受 Cloudflare 影响不稳定,App 也没纳入,这里跳过。
+  - 8 个 system prompt 要求模型只输出 JSON 数组(无 markdown / 无解释);
     user prompt 格式化器搬自 App SummaryRepository.kt(lines 102-150)。
   - temperature=0.5(对齐 App 的 requestSummary);读取超时 30s。
   - 配置走环境变量:AI_NEWS_HUB_AI_BASE_URL / AI_NEWS_HUB_AI_MODEL /

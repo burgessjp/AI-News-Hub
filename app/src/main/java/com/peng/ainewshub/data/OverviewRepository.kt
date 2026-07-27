@@ -69,13 +69,14 @@ data class OverviewDigest(
  * 今日总览 Repository —— 首个根 tab「总览」的数据源。
  *
  * 与 [SummaryRepository] 的关键差异:摘要是流水线预生成、App 只读;总览是**端侧实时
- * 调用**用户在「设置 → AI 服务」配置的服务([AiChatClient]),对 7 个归档源当日快照
+ * 调用**用户在「设置 → AI 服务」配置的服务([AiChatClient]),对全部归档源当日快照
  * 做跨源综合分析(今日热点 Top10,其中 AI 判定为突发重磅的条目带 breaking 标记)。
  *
  * 设计要点(复刻 [TranslationRepository] 范式):
- *  - 输入仅 7 个归档源快照(不接 aihot.virxact.com /hot-topics、不接 LinuxDo 实时):每源取
- *    `ai_summary` 作上下文 + items 前 [ITEMS_PER_SOURCE] 条的标题/简介/互动指标;
- *  - 缓存键 = 北京日期 + 7 源 latest 路径指纹(路径含日期+时间,数据更新即失效),
+ *  - 输入为 [SummaryRepository.SOURCE_KEYS] 全部归档源快照(不接 aihot.virxact.com /hot-topics、
+ *    不接 LinuxDo 实时):每源取 `ai_summary` 作上下文 + items 前 [ITEMS_PER_SOURCE] 条的
+ *    标题/简介/归一化热度(跨源可比);
+ *  - 缓存键 = 北京日期 + 全源 latest 路径指纹(路径含日期+时间,数据更新即失效),
  *    命中缓存时**连快照都不拉**,一天正常只生成 1-2 次;缓存单槽覆盖,不留历史;
  *  - [Mutex] 全局串行防并发重复生成;成功后 token 用量写 [AiUsageStore];
  *  - 生成输出长(数千 token),read 超时放宽到 120s(见 [AiChatClient.chat]);
@@ -119,9 +120,9 @@ class OverviewRepository(context: Context) {
         }
     }
 
-    /** 完整生成:拉 7 源快照 → 组 prompt → 调 AI → 解析回填 → 写缓存。 */
+    /** 完整生成:拉全源快照 → 组 prompt → 调 AI → 解析回填 → 写缓存。 */
     private suspend fun generate(key: String, config: AiConfig): OverviewDigest {
-        // 1) 并发拉 7 源最新快照,单源失败不阻断
+        // 1) 并发拉全源最新快照,单源失败不阻断
         val snapshots: Map<String, JSONObject> = coroutineScope {
             SummaryRepository.SOURCE_KEYS.map { source ->
                 async { source to runCatching { ArchiveHttpClient.fetchLatestSnapshot(source) }.getOrNull() }
@@ -131,17 +132,17 @@ class OverviewRepository(context: Context) {
             throw AppException.NoData()
         }
 
-        // 「今天」以**数据侧日期**为准:取 7 源快照里最新的 fetched_at_ms 对应的北京日期。
+        // 「今天」以**数据侧日期**为准:取全源快照里最新的 fetched_at_ms 对应的北京日期。
         // 这样在数据流水线尚未跑当天的清晨,不会因本机日期超前于数据日期而产不出任何 breaking。
         val dataDateMs = snapshots.values.maxOf { it.optLong("fetched_at_ms", 0L) }
         val dataToday = beijingDateKeyOfMs(dataDateMs)
 
-        // 2) 组 prompt 并调用(长输出,read 超时放宽;温度 0.5 对齐流水线摘要)
+        // 2) 组 prompt 并调用(长输出,read 超时放宽;温度 0.3:排序是确定性任务,低温减少抖动)
         val user = buildString {
             append("数据日期(北京):").append(dataToday).append("\n\n")
             append(snapshots.entries.joinToString("\n\n") { (k, snap) -> buildSection(k, snap) })
         }
-        val result = chatClient.chat(config, SYSTEM_PROMPT, user, temperature = 0.5, readTimeoutSeconds = 120)
+        val result = chatClient.chat(config, SYSTEM_PROMPT, user, temperature = 0.3, readTimeoutSeconds = 120)
             .getOrThrow()
         runCatching { usageStore.record(config.model, result.promptTokens, result.completionTokens) }
 
@@ -162,7 +163,7 @@ class OverviewRepository(context: Context) {
 
     // ===== prompt 组装 =====
 
-    /** 单源输入段:标题行 + AI 要点(上下文)+ 编号条目(标题/简介/指标/发布日期,不带 URL)。 */
+    /** 单源输入段:标题行 + AI 要点(上下文)+ 编号条目(标题/简介/原始指标/跨源热度档位/发布日期,不带 URL)。 */
     private fun buildSection(source: String, snapshot: JSONObject): String {
         val sb = StringBuilder()
         sb.append("## ").append(source).append("(").append(SummaryRepository.titleOf(source)).append(")")
@@ -172,6 +173,9 @@ class OverviewRepository(context: Context) {
         extractItems(source, snapshot).forEach { item ->
             sb.append("\n[").append(item.index).append("] ").append(item.title)
             if (item.blurb.isNotEmpty()) sb.append(" — ").append(item.blurb.take(60))
+            // 跨源可比的归一化热度档位(各源按自身 top 归一化):AI 据此横向比较强度,
+            // 不被各源原始指标量级差异(HN 几百 / GitHub 几万 / PH 几百)误导
+            sb.append(" | 热度 ").append(item.heatPct).append("%")
             if (item.metrics.isNotEmpty()) sb.append(" | ").append(item.metrics)
             // 日期(北京 MM-dd)给 AI 判断「今天」用,时效兜底在 parseEntries 客户端二次校验
             if (item.dateKey.length >= 10) sb.append(" | ").append(item.dateKey.substring(5))
@@ -201,40 +205,49 @@ class OverviewRepository(context: Context) {
 
     /** 输入条目的统一视图:index 即 prompt 里的序号(供 AI ref 引用)。
      *  [dateKey] 为条目的北京日期(yyyy-MM-dd),用于「只推今天的 breaking」时效兜底;
-     *  无 item 级日期的源用快照顶层 fetched_at_ms 近似,均失败则为空串(按非今天处理)。 */
+     *  无 item 级日期的源用快照顶层 fetched_at_ms 近似,均失败则为空串(按非今天处理)。
+     *  [heatPct] 跨源可比的归一化热度(0-100):各源按自身 top 条目的最大原始热度
+     *  归一化(stormzhang / OpenAI×Anthropic / Rundown 等无指标源按列表内排名线性递减),
+     *  让 AI 在跨源排序时有一致的强度信号,而不是对比量级悬殊的原始数字。 */
     private data class ItemView(
         val index: Int,
         val title: String,
         val url: String,
         val metrics: String,
         val blurb: String,
-        val dateKey: String
+        val dateKey: String,
+        val heatPct: Int
     )
 
-    /** 从快照 items 提取前 [limit] 条,字段映射对齐 docs/news-hub-data-usage.md 各源结构。 */
+    /** 从快照 items 提取前 [limit] 条,字段映射对齐 docs/news-hub-data-usage.md 各源结构。
+     *  热度归一化:每源原始热度按该源 top-[limit] 内的最大值算百分比;无指标源
+     *  按列表序号线性递减(首位 100,末位 ≈10)。这样 AI 跨源比较的是相对档位而非绝对量级。 */
     private fun extractItems(source: String, snapshot: JSONObject, limit: Int = ITEMS_PER_SOURCE): List<ItemView> {
         val items = snapshot.optJSONArray("items") ?: return emptyList()
         val n = minOf(limit, items.length())
         // 无 item 级日期的源用快照顶层落盘时刻近似(北京时间日期)
         val fallbackDateKey = beijingDateKeyOfMs(snapshot.optLong("fetched_at_ms", 0L))
-        return (0 until n).mapNotNull { i ->
+        // 第一遍:抽取原始字段 + 原始热度(各源定义不同)。null 表示该条应丢弃。
+        data class Raw(val view: ItemView, val rawHeat: Double)
+        val raws: List<Raw> = (0 until n).mapNotNull { i ->
             val o = items.optJSONObject(i) ?: return@mapNotNull null
-            val view = when (source) {
+            // 每分支产出 Pair<ItemView, Double> 或 null(未知源 / 字段全空)
+            val pair: Pair<ItemView, Double>? = when (source) {
                 "hackernews" -> ItemView(
                     i, o.optString("title"), o.optString("target_url"),
                     "得分 ${o.optInt("score")} · 评论 ${o.optInt("descendants")}", "",
-                    beijingDateKeyOfMs(o.optLong("time", 0L) * 1000L)
-                )
+                    beijingDateKeyOfMs(o.optLong("time", 0L) * 1000L), 0
+                ) to rawHeatHackerNews(o)
                 "github-trending" -> ItemView(
                     i, "${o.optString("owner")}/${o.optString("name")}", o.optString("url"),
                     "今日 star +${o.optInt("starsToday")} · 累计 ${fmtCount(o.optInt("totalStars"))}",
-                    o.optString("description"), fallbackDateKey
-                )
+                    o.optString("description"), fallbackDateKey, 0
+                ) to rawHeatGithub(o)
                 "huggingface-papers" -> ItemView(
                     i, o.optString("title"), o.optString("url"),
                     "upvotes ${o.optInt("upvotes")}", o.optString("summary"),
-                    beijingDateKeyOfEnDate(o.optString("published"))
-                )
+                    beijingDateKeyOfEnDate(o.optString("published")), 0
+                ) to o.optInt("upvotes", 0).toDouble()
                 "producthunt" -> ItemView(
                     i, o.optString("name"), o.optString("url"),
                     buildString {
@@ -243,35 +256,71 @@ class OverviewRepository(context: Context) {
                         if (r > 0) append(" · 日榜#$r")
                     },
                     o.optString("tagline"),
-                    beijingDateKeyOfIso(o.optString("createdAt"))
-                )
+                    beijingDateKeyOfIso(o.optString("createdAt")), 0
+                ) to rawHeatProductHunt(o)
                 "rundown-ai" -> ItemView(
                     i, o.optString("title"), o.optString("url"),
-                    "", o.optString("subtitle"), fallbackDateKey
-                )
+                    "", o.optString("subtitle"), fallbackDateKey, 0
+                ) to 0.0  // 无指标源,按序号归一化
                 "stormzhang-ai" -> ItemView(
                     i, o.optString("summary"), o.optString("url"),
                     "信源 ${o.optString("source")}", o.optString("english"),
                     // "2026-07-15 20:00" 北京时间无时区,直接取前 10 字符(yyyy-MM-dd)
-                    o.optString("time").trim().takeIf { it.length >= 10 }?.substring(0, 10) ?: ""
-                )
+                    o.optString("time").trim().takeIf { it.length >= 10 }?.substring(0, 10) ?: "",
+                    0
+                ) to 0.0
                 "aihot-featured" -> ItemView(
                     i, o.optString("title"),
                     o.optString("permalink").ifBlank { o.optString("url") },
                     "权重 ${o.optInt("score")} · ${o.optString("source")}",
                     o.optString("summary"),
-                    beijingDateKeyOfIso(o.optString("publishedAt"))
-                )
+                    beijingDateKeyOfIso(o.optString("publishedAt")), 0
+                ) to o.optInt("score", 0).toDouble()
                 "openai-anthropic-news" -> ItemView(
                     i, o.optString("title"), o.optString("url"),
                     "厂商 ${o.optString("vendor")} · ${o.optString("category")}",
                     o.optString("summary"),
-                    beijingDateKeyOfIso(o.optString("publishedAt"))
-                )
+                    beijingDateKeyOfIso(o.optString("publishedAt")), 0
+                ) to 0.0
                 else -> null
             }
-            view?.takeIf { it.title.isNotBlank() }
+            val (view, rawHeat) = pair ?: return@mapNotNull null
+            // 标题空的条目丢弃(与原实现一致)
+            if (view.title.isBlank()) return@mapNotNull null
+            Raw(view, rawHeat)
         }
+        if (raws.isEmpty()) return emptyList()
+        // 第二遍:计算归一化热度
+        val maxRaw = raws.maxOf { it.rawHeat }
+        return raws.mapIndexed { pos, raw ->
+            val pct = when {
+                // 有指标的源:按该源最大原始热度归一化(最少 10%,避免末位被当成零热度)
+                maxRaw > 0 -> ((raw.rawHeat / maxRaw) * 100).toInt().coerceIn(10, 100)
+                // 无指标源:按列表序号线性递减(top1=100, topN≈10)
+                else -> if (raws.size == 1) 100 else (100 - pos * 90.0 / (raws.size - 1)).toInt().coerceIn(10, 100)
+            }
+            raw.view.copy(heatPct = pct)
+        }
+    }
+
+    /** HN 综合热度:得分 + 评论数 * 0.3(评论密度反映讨论热度,适当加权但不盖过得分)。 */
+    private fun rawHeatHackerNews(o: JSONObject): Double =
+        o.optInt("score", 0) + o.optInt("descendants", 0) * 0.3
+
+    /** GitHub 综合热度:今日新增 star * 3 + 累计 star 对数权重(今日增量是趋势主信号)。 */
+    private fun rawHeatGithub(o: JSONObject): Double {
+        val today = o.optInt("starsToday", 0)
+        val total = o.optInt("totalStars", 0)
+        return today * 3.0 + if (total > 0) Math.log10(total.toDouble()) * 10 else 0.0
+    }
+
+    /** Product Hunt 综合热度:票数 + 评论 * 0.5 + 日榜加成(日榜前 5 显著加权)。 */
+    private fun rawHeatProductHunt(o: JSONObject): Double {
+        val votes = o.optInt("votesCount", 0)
+        val comments = o.optInt("commentsCount", 0)
+        val rank = o.optInt("dailyRank", 0)
+        val rankBoost = if (rank in 1..5) (6 - rank) * 30.0 else 0.0
+        return votes + comments * 0.5 + rankBoost
     }
 
     /** Unix 毫秒 → 北京日期(yyyy-MM-dd);0 或负数返回空串。 */
@@ -317,10 +366,11 @@ class OverviewRepository(context: Context) {
      *  - **时效硬约束**:breaking 条目的北京日期必须等于数据日期 [today],非当日的
      *    强制降级为普通条目(防流水线失败保留机制把过期快照推成突发);
      *  - breaking 标记截断到 [MAX_BREAKING] 条(超出的按提交顺序降级为普通条目);
-     *  - 按落地 URL 去重(同一事件同链接跨源同现);
+     *  - **双层去重**:先按落地 URL(同链接跨源同现),再按标题 token 相似度
+     *    (Jaccard ≥ [TITLE_DUP_THRESHOLD],防同一事件跨源标题不同但描述一致);
      *  - breaking 条目稳定排序到最前,整体截断到 [MAX_TOP]。
      *
-     * @param today 数据日期(7 源快照里最新 fetched_at_ms 的北京日期,非本机当天)
+     * @param today 数据日期(全源快照里最新 fetched_at_ms 的北京日期,非本机当天)
      */
     private fun parseResult(
         content: String,
@@ -332,12 +382,44 @@ class OverviewRepository(context: Context) {
         if (entries.isEmpty()) throw AppException.AiService()
         var breakingLeft = MAX_BREAKING
         val urls = HashSet<String>()
+        val seenTitleTokens = mutableListOf<Set<String>>()  // 标题去重历史(用于跨条目相似度比对)
         return entries.map { e ->
                 if (e.breaking && breakingLeft > 0) { breakingLeft--; e } else e.copy(breaking = false, breakingReason = "")
             }
-            .filter { urls.add(it.url) }
+            .filter { urls.add(it.url) }  // 第一层:URL 去重
+            .filter { titleNotDuplicate(it.title, seenTitleTokens) }  // 第二层:标题相似度去重
             .sortedByDescending { it.breaking }  // 稳定排序,不打乱同级重要性次序
             .take(MAX_TOP)
+    }
+
+    /**
+     * 标题去重:把标题切成 token 集合(中英文混排,按非字母数字分割),与历史标题
+     * 集合逐一算 Jaccard 相似度,≥ [TITLE_DUP_THRESHOLD] 视为重复丢弃;否则记入历史。
+     */
+    private fun titleNotDuplicate(title: String, history: MutableList<Set<String>>): Boolean {
+        val tokens = tokenizeTitle(title)
+        if (tokens.size < 3) {
+            // 过短标题无比较意义(如 "GPT-5" 这种),直接放行但仍记录
+            history.add(tokens)
+            return true
+        }
+        val dup = history.any { prev -> jaccard(tokens, prev) >= TITLE_DUP_THRESHOLD }
+        if (dup) return false
+        history.add(tokens)
+        return true
+    }
+
+    /** 标题切 token:按非字母数字分段,统一小写,过滤 1 字符噪声(如单独的 "-" / "·")。 */
+    private fun tokenizeTitle(title: String): Set<String> =
+        title.lowercase().split(Regex("[^a-z0-9\\u4e00-\\u9fa5]+"))
+            .filter { it.length >= 2 }
+            .toSet()
+
+    /** Jaccard 相似度:交集 / 并集。空集返回 0。 */
+    private fun jaccard(a: Set<String>, b: Set<String>): Double {
+        if (a.isEmpty() || b.isEmpty()) return 0.0
+        val inter = a.count { it in b }
+        return inter.toDouble() / (a.size + b.size - inter)
     }
 
     /**
@@ -366,9 +448,13 @@ class OverviewRepository(context: Context) {
             // 序号必须落在 prompt 实际给出的前 ITEMS_PER_SOURCE 条内,防 AI 引用未提供的条目
             val item = extractItems(source, snapshot).getOrNull(index) ?: return@mapNotNull null
             if (item.url.isBlank()) return@mapNotNull null
-            // 时效硬约束:AI 标 breaking 但日期不是今天的,强制降级(防过期数据上突发位)
+            // 时效硬约束:AI 标 breaking 但日期不是今天的,强制降级(防过期数据上突发位)。
+            // dateKey 为空的源(stormzhang time 异常 / Rundown 无 item 级日期)回退到快照
+            // 顶层 fetched_at_ms 对应的北京日期作为兜底,避免今日热点因日期解析失败永不上突发位。
             val aiBreaking = o.optBoolean("breaking")
-            val isBreaking = aiBreaking && item.dateKey == today && item.dateKey.isNotEmpty()
+            val effectiveDate = if (item.dateKey.isNotEmpty()) item.dateKey
+                else beijingDateKeyOfMs(snapshot.optLong("fetched_at_ms", 0L))
+            val isBreaking = aiBreaking && effectiveDate == today && effectiveDate.isNotEmpty()
             OverviewEntry(
                 source = source,
                 title = item.title,
@@ -392,7 +478,7 @@ class OverviewRepository(context: Context) {
 
     // ===== 缓存(cacheDir 单槽 JSON,指纹命中即用;写失败不影响结果) =====
 
-    /** 缓存键 = 北京日期 + 7 源 latest 路径指纹(任源出新快照即变化)。 */
+    /** 缓存键 = 北京日期 + 全源 latest 路径指纹(任源出新快照即变化)。 */
     private fun cacheKey(paths: Map<String, String>): String {
         val raw = SummaryRepository.SOURCE_KEYS.joinToString("|") { "$it=${paths[it].orEmpty()}" }
         val md = MessageDigest.getInstance("SHA-256").digest(raw.toByteArray(Charsets.UTF_8))
@@ -493,18 +579,26 @@ class OverviewRepository(context: Context) {
         /** 热点列表总条数上限(breaking 与普通条目共计)。 */
         const val MAX_TOP = 10
 
+        /** 标题 Jaccard 相似度去重阈值:≥ 此值视为同一事件跨源重复,丢弃。 */
+        const val TITLE_DUP_THRESHOLD = 0.5
+
         val SYSTEM_PROMPT = """
-你是「AI News Hub」今日总览栏目的主编。输入是 7 个资讯源的今日榜单:每源附 AI 要点摘要,以及排名前若干条目(序号、标题、简介、互动指标、北京日期 MM-DD)。请基于全部数据做当天整体研判。
+你是「AI News Hub」今日总览栏目的主编。输入是多个资讯源的今日榜单:每源附 AI 要点摘要,以及排名前若干条目(序号、标题、简介、**跨源归一化热度档位**、原始指标、北京日期 MM-DD)。请基于全部数据做当天整体研判。
 
 严格输出一个 JSON 对象,不要输出任何解释文字,不要使用 markdown 代码围栏:
 {"items":[{"ref":"源key:序号","analysis":"一句话,不超过40字","breaking":true,"breakingReason":"为什么是突发,40字内"}]}
 
 规则:
-1. items 是今日最值得关注的条目,按重要性排序,最多 10 条;尽量覆盖不同源与主题(模型发布/产品/研究论文/开源项目/行业动态),同一事件只留最重要的一条;数据不足 10 条时有多少给多少,至少 5 条。
-2. 其中「突发重磅」标 "breaking":true:多源交叉报道、互动数据(得分/评论/票数/star)显著爆发、或重大发布与行业事件。0 到 2 条,宁缺毋滥,绝不硬凑;其余条目一律 "breaking":false。breaking 条目排在 items 最前,同样计入 10 条总数。**时效硬约束**:输入顶部已给出「数据日期(北京)」,仅条目末尾的北京日期等于该值的条目才可标 breaking;过期条目即便互动数据爆发也一律 false(客户端会二次校验日期,不符会强制降级,且不补 breakingReason)。
-3. ref 必须原样照抄输入中的「源key:序号」(如 hackernews:2),不得编造;标题与链接由客户端按 ref 回填,你不要输出标题和 URL。
-4. analysis 用简体中文,一句话说清「为什么重要/值得关注什么」,不要复述标题。
-5. breaking=true 的条目必须给出 breakingReason,简体中文,一句话说明「为什么是突发/影响面有多大」,≤40 字,不复述 analysis;breaking=false 时 breakingReason 留空字符串。
+1. items 是今日最值得关注的条目,**严格按热度档位(热度 NN%)从高到低排序**,最多 10 条(数据不足时按实际给,至少 5 条)。热度档位已跨源归一化,**直接按档位数字排序即可,不要主观调整顺序**——档位 92% 的条目必须排在档位 85% 的前面,即使后者主题看起来更重要。
+2. **归一化热度档位**是核心排序信号:每条带「热度 NN%」,反映该条在本源的相对强度(同源内档位越高越热)。跨源比较时:
+   - 有指标的源(HN/GitHub/HF/PH/AIHot)档位可信,直接按数字比;
+   - **无指标源(rundown-ai / stormzhang-ai / openai-anthropic-news)的档位仅按列表序号给**,可信度低于有指标源——同等档位下,有指标源的条目优先于无指标源;
+   - 原始指标量级差异极大(HN 几百 / GitHub 几万),**禁止直接比较原始数字**。
+3. 其中「突发重磅」标 "breaking":true:多源交叉报道、热度档位 ≥85% 且远超同源其它条目、或重大发布与行业事件。0 到 2 条,宁缺毋滥,绝不硬凑;其余条目一律 "breaking":false。breaking 条目排在 items 最前,同样计入 10 条总数。**时效硬约束**:输入顶部已给出「数据日期(北京)」,仅条目末尾的北京日期等于该值的条目才可标 breaking;过期条目即便热度爆发也一律 false(客户端会二次校验日期,不符会强制降级,且不补 breakingReason)。
+4. **跨源同事件合并**:同一事件(如某新模型发布)在多个源出现时,只保留热度档位最高的一条;通过 ref 引用其中之一即可,analysis 里可点出「多家报道」。不要让同一事件占据多个名额。
+5. ref 必须原样照抄输入中的「源key:序号」(如 hackernews:2),不得编造;标题与链接由客户端按 ref 回填,你不要输出标题和 URL。
+6. analysis 用简体中文,一句话说清「为什么重要/值得关注什么」,不要复述标题。
+7. breaking=true 的条目必须给出 breakingReason,简体中文,一句话说明「为什么是突发/影响面有多大」,≤40 字,不复述 analysis;breaking=false 时 breakingReason 留空字符串。
 """.trimIndent()
     }
 }

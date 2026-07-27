@@ -30,7 +30,7 @@ import com.peng.ainewshub.ui.components.AppTopBarDefaults
 import kotlinx.coroutines.launch
 
 /**
- * 历史摘要 —— 指定日期的 7 源摘要卡页。
+ * 历史摘要 —— 指定日期的全源摘要卡页。
  *
  * 卡片实现与摘要 Tab 完全同构(共享 [SummaryCardPage] / [SummaryHeaderRow]),
  * 差异仅在:
