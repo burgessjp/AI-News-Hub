@@ -22,12 +22,16 @@
     ]
   }
 
-设计要点(逐行搬自 OverviewRepository.kt):
+设计要点(初版逐行搬自 OverviewRepository.kt,后经准确性优化):
   - 输入 8 源快照(SOURCE_KEYS,与 App 端一致),每源取前 ITEMS_PER_SOURCE=8 条;
-  - 跨源归一化热度档位(每源按自身 top-8 最大原始热度归一化到 10-100%),
+  - 跨源归一化热度档位:有指标源按自身 top-8 最大原始热度归一化到 10-100%,
     让 AI 跨源比较的是相对档位而非量级悬殊的原始数字;
-  - 拍平各源顶层 ai_summary_v2 为上下文;
-  - 数据日期 = 全源快照最大 fetched_at_ms 的北京日期(breaking 时效硬约束用);
+    无指标源(rundown-ai/stormzhang-ai/openai-anthropic-news)无真实指标,按列表序号
+    线性给到 10-70%(上限压低,避免位置档位压过有指标源的真实高热度条目);
+  - 日期显示:与数据日期同年显示 MM-dd,跨年显示完整 yyyy-MM-dd(防旧文看似新鲜);
+    rundown-ai 列表页无文章日期,其日期为抓取兜底,输入中标注「抓取日期」;
+  - 数据日期 = 全源快照最大 fetched_at_ms 的北京日期;
+    breaking 时效窗口 = 数据日期及其前一天(07:00 跑批时,前一日晚间大事仍算突发);
   - 调 OpenAI 兼容 /v1/chat/completions,温度 0.3,read 超时放宽到 120s(输出长);
   - 解析后做 ref 回填 + 时效兜底 + URL/标题双层去重 + breaking 截断到 MAX_BREAKING;
   - 失败返回 None,不阻断推送(对齐单源 AI 摘要失败的优雅降级,
@@ -86,24 +90,31 @@ MAX_ATTEMPTS = 3
 BEIJING_TZ = timezone(timedelta(hours=8))
 
 
-# ===== system prompt(逐字搬自 OverviewRepository.kt SYSTEM_PROMPT) =====
+# ===== system prompt(初版逐字搬自 OverviewRepository.kt;现为提升生成准确性重写) =====
 
-SYSTEM_PROMPT = """你是「AI News Hub」今日总览栏目的主编。输入是多个资讯源的今日榜单:每源附 AI 要点摘要,以及排名前若干条目(序号、标题、简介、**跨源归一化热度档位**、原始指标、北京日期 MM-DD)。请基于全部数据做当天整体研判。
+SYSTEM_PROMPT = """你是「AI News Hub」今日总览栏目的主编。输入是多个资讯源的今日榜单:每源附 AI 要点摘要,以及排名前若干条目(序号、标题、简介、热度档位、原始指标、日期)。请基于全部数据做当天整体研判。
 
 严格输出一个 JSON 对象,不要输出任何解释文字,不要使用 markdown 代码围栏:
 {"items":[{"ref":"源key:序号","analysis":"一句话,不超过40字","breaking":true,"breakingReason":"为什么是突发,40字内"}]}
 
-规则:
-1. items 是今日最值得关注的条目,**严格按热度档位(热度 NN%)从高到低排序**,最多 10 条(数据不足时按实际给,至少 5 条)。热度档位已跨源归一化,**直接按档位数字排序即可,不要主观调整顺序**——档位 92% 的条目必须排在档位 85% 的前面,即使后者主题看起来更重要。
-2. **归一化热度档位**是核心排序信号:每条带「热度 NN%」,反映该条在本源的相对强度(同源内档位越高越热)。跨源比较时:
-   - 有指标的源(HN/GitHub/HF/PH/AIHot)档位可信,直接按数字比;
-   - **无指标源(rundown-ai / stormzhang-ai / openai-anthropic-news)的档位仅按列表序号给**,可信度低于有指标源——同等档位下,有指标源的条目优先于无指标源;
-   - 原始指标量级差异极大(HN 几百 / GitHub 几万),**禁止直接比较原始数字**。
-3. 其中「突发重磅」标 "breaking":true:多源交叉报道、热度档位 ≥85% 且远超同源其它条目、或重大发布与行业事件。0 到 2 条,宁缺毋滥,绝不硬凑;其余条目一律 "breaking":false。breaking 条目排在 items 最前,同样计入 10 条总数。**时效硬约束**:输入顶部已给出「数据日期(北京)」,仅条目末尾的北京日期等于该值的条目才可标 breaking;过期条目即便热度爆发也一律 false。
-4. **跨源同事件合并**:同一事件(如某新模型发布)在多个源出现时,只保留热度档位最高的一条;通过 ref 引用其中之一即可,analysis 里可点出「多家报道」。不要让同一事件占据多个名额。
+一、先读懂「热度档位」:
+- 有指标源(hackernews、github-trending、huggingface-papers、producthunt、aihot-featured):档位由真实指标(得分/star/票数/upvotes/权重)归一化而来,可信,直接按数字比较。
+- 无指标源(rundown-ai、stormzhang-ai、openai-anthropic-news):无真实热度指标,档位只按列表序号线性给出(上限 70%),仅反映站内排序。跨源比较时,无指标源条目默认排在同档位有指标源条目之后。
+- 原始指标量级差异极大(HN 几百、GitHub 几万),禁止直接比较原始数字。
+
+二、选条与排序:
+1. items 为今日最值得关注的条目,最多 10 条(数据不足按实际给,至少 5 条)。按热度档位从高到低排序;档位差 ≤2% 视为同档,同档时有指标源在前、日期新鲜的在前。
+2. 时效:输入顶部给出「数据日期(北京)」。日期早于数据日期 7 天以上的条目不得入选(档位再高也不行);标注「抓取日期」的条目其日期不代表发布日,不得作为时效依据。
+3. 跨源同事件合并:同一事件(如某新模型发布,含其衍生通稿如「上线某平台」「开源某组件」)在多个源出现时只保留一条,取各报道源中的最高档位参与排序;ref 优先选有指标源的条目,同为有指标源取档位最高者。analysis 里可点出「多家报道」。同一事件不得占多个名额。
+4. 同一来源(ref 源key)最多 3 条;超出时把名额让给其它源的高档位条目。
 5. ref 必须原样照抄输入中的「源key:序号」(如 hackernews:2),不得编造;标题与链接由数据侧按 ref 回填,你不要输出标题和 URL。
-6. analysis 用简体中文,一句话说清「为什么重要/值得关注什么」,不要复述标题。
-7. breaking=true 的条目必须给出 breakingReason,简体中文,一句话说明「为什么是突发/影响面有多大」,≤40 字,不复述 analysis;breaking=false 时 breakingReason 留空字符串。"""
+6. analysis 用简体中文,≤40 字,回答「所以怎样」——对开发者/行业意味着什么;禁止复述标题事实,可引用输入中的真实数字(如「HN 899 分」)提升信息密度。
+
+三、「突发重磅」("breaking":true),须同时满足:
+① 属于重大发布/行业事件(新模型、重大开源、巨头战略动作等);
+② 至少 2 个源报道同一事件,且其中 ≥1 个是有指标源;
+③ 佐证条目中至少 1 条的真实日期等于数据日期或前一天(「抓取日期」不算)。
+0 到 2 条,宁缺毋滥,绝不硬凑;任一条件不满足即 "breaking":false。breaking 条目排在 items 最前,计入 10 条总数。breaking=true 时必须给出 breakingReason:简体中文 ≤40 字,写清具体证据(哪些源报道、什么量级,如「HN 899 分热议 + PH 日榜#4」),禁止「影响面广」「引发热议」等无信息量表述,不复述 analysis;breaking=false 时留空字符串。"""
 
 
 # ===== 快照读取 =====
@@ -247,7 +258,7 @@ def _extract_items(source, snapshot, limit=ITEMS_PER_SOURCE):
     if not raws:
         return []
 
-    # 第二遍:计算归一化热度(每源最大原始热度 → 10-100%)
+    # 第二遍:计算归一化热度(有指标源:每源最大原始热度 → 10-100%;无指标源:序号 → 10-70%)
     max_raw = max(r[6] for r in raws)
     result = []
     for pos, r in enumerate(raws):
@@ -255,8 +266,9 @@ def _extract_items(source, snapshot, limit=ITEMS_PER_SOURCE):
         if max_raw > 0:
             pct = max(10, min(100, int((raw_heat / max_raw) * 100)))
         else:
-            # 无指标源:按列表序号线性递减(top1=100, topN≈10)
-            pct = 100 if len(raws) == 1 else max(10, min(100, int(100 - pos * 90.0 / (len(raws) - 1))))
+            # 无指标源:按列表序号线性递减,上限压到 70(top1=70, topN≈10)
+            # ——位置档位仅反映站内排序,不允许与有指标源的真实高热度档位同量级
+            pct = 70 if len(raws) == 1 else max(10, min(70, int(70 - pos * 60.0 / (len(raws) - 1))))
         result.append((index, title, url, metrics, blurb, date_key, pct))
     return result
 
@@ -333,8 +345,12 @@ def _read_ai_summary(snapshot):
     return (str(legacy).strip() if legacy else "")
 
 
-def _build_section(source, snapshot):
-    """单源输入段:标题行 + AI 要点(上下文)+ 编号条目(标题/简介/热度/指标/日期)。"""
+def _build_section(source, snapshot, data_today=""):
+    """
+    单源输入段:标题行 + AI 要点(上下文)+ 编号条目(标题/简介/热度/指标/日期)。
+    日期显示:与数据日期同年显示 MM-dd;跨年显示完整 yyyy-MM-dd(防上一年旧文看似新鲜);
+    rundown-ai 列表页无文章日期,其日期为抓取兜底,标注「抓取日期」。
+    """
     sb = [f"## {source}({SOURCE_TITLES.get(source, source)})"]
     ai_summary = _read_ai_summary(snapshot)
     if ai_summary:
@@ -349,7 +365,10 @@ def _build_section(source, snapshot):
         if metrics:
             line += f" | {metrics}"
         if len(date_key) >= 10:
-            line += f" | {date_key[5:]}"  # MM-dd
+            date_text = date_key[5:] if date_key[:4] == data_today[:4] else date_key
+            if source == "rundown-ai":
+                date_text += "(抓取日期)"
+            line += f" | {date_text}"
         sb.append(line)
     return "\n".join(sb)
 
@@ -439,9 +458,11 @@ def _title_not_duplicate(title, history):
     return True
 
 
-def _parse_result(ai_data, snapshots, today):
+def _parse_result(ai_data, snapshots, breaking_dates):
     """
     解析 AI 输出为统一的热点列表(完成 ref 回填 + 时效兜底 + 双层去重 + breaking 截断)。
+    breaking_dates: 允许标 breaking 的北京日期集合(数据日期及其前一天——07:00 跑批时,
+    前一日晚间的大事仍算突发)。
     返回 [{source, title, url, metrics, comment, breaking, breakingReason}, ...]。
     """
     raw_items = ai_data.get("items") or []
@@ -473,10 +494,10 @@ def _parse_result(ai_data, snapshots, today):
         _, title, url, metrics, _, date_key, _ = item
         if not url.strip():
             continue
-        # 时效硬约束:AI 标 breaking 但日期不是今天的,强制降级
+        # 时效硬约束:AI 标 breaking 但日期不在允许窗口(数据日期/前一天)的,强制降级
         ai_breaking = bool(o.get("breaking"))
         effective_date = date_key if date_key else _beijing_date_key_of_ms(snapshot.get("fetched_at_ms", 0))
-        is_breaking = ai_breaking and bool(effective_date) and effective_date == today
+        is_breaking = ai_breaking and bool(effective_date) and effective_date in breaking_dates
         entries.append({
             "source": source,
             "title": title,
@@ -538,10 +559,16 @@ def generate_overview(out_dir, now):
     # 数据日期 = 全源快照最大 fetched_at_ms 的北京日期
     data_date_ms = max((s.get("fetched_at_ms", 0) or 0) for s in snapshots.values())
     data_today = _beijing_date_key_of_ms(data_date_ms)
+    # breaking 时效窗口:数据日期及其前一天(07:00 跑批时,前一日晚间大事仍算突发)
+    data_yesterday = _beijing_date_key_of_ms(data_date_ms - 86400000)
+    breaking_dates = {d for d in (data_today, data_yesterday) if d}
 
     # 组 user prompt
-    user_prompt = f"数据日期(北京):{data_today}\n\n" + "\n\n".join(
-        _build_section(src, snapshots[src]) for src in SOURCE_KEYS if src in snapshots
+    user_prompt = (
+        f"数据日期(北京):{data_today};breaking 时效窗口:{data_yesterday} 或 {data_today}\n\n"
+        + "\n\n".join(
+            _build_section(src, snapshots[src], data_today) for src in SOURCE_KEYS if src in snapshots
+        )
     )
 
     base_url = os.getenv(ENV_BASE_URL)
@@ -552,7 +579,7 @@ def generate_overview(out_dir, now):
     for attempt in range(1, MAX_ATTEMPTS + 1):
         try:
             ai_data = _request_overview(SYSTEM_PROMPT, user_prompt, base_url, model, api_key)
-            items = _parse_result(ai_data, snapshots, data_today)
+            items = _parse_result(ai_data, snapshots, breaking_dates)
             if not items:
                 raise RuntimeError("解析后无有效条目")
             overview = {
