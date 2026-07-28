@@ -4,11 +4,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
 import java.io.File
-import java.util.concurrent.TimeUnit
 
 /**
  * LinuxDo 热榜抓取客户端。
@@ -31,11 +29,7 @@ class LinuxDoHotRepository(
     private val cacheDir: File? = null
 ) {
 
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(20, TimeUnit.SECONDS)
-        .followRedirects(true)
-        .build()
+    private val client = HttpClients.base
 
     private val hotUrl = "https://linux.do/c/develop/4/l/hot.json"
     private val userAgent =

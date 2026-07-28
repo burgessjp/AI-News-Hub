@@ -4,11 +4,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.jsoup.Jsoup
 import java.io.File
-import java.util.concurrent.TimeUnit
 
 /**
  * GitHub Trending 抓取客户端。
@@ -30,11 +28,7 @@ class GitHubTrendingRepository(
     private val cacheDir: File? = null
 ) : com.peng.ainewshub.data.source.GitHubTrendingSource {
 
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(20, TimeUnit.SECONDS)
-        .followRedirects(true)
-        .build()
+    private val client = HttpClients.base
 
     private val trendingUrl = "https://github.com/trending"
     private val userAgent =

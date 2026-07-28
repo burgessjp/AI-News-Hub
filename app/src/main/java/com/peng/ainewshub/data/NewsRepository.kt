@@ -2,12 +2,10 @@ package com.peng.ainewshub.data
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.URLEncoder
-import java.util.concurrent.TimeUnit
 
 /**
  * `aihot.virxact.com` 公开 API 客户端(第三方服务,非本项目自有后端)。
@@ -21,11 +19,7 @@ import java.util.concurrent.TimeUnit
  */
 class NewsRepository {
 
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(20, TimeUnit.SECONDS)
-        .followRedirects(true)
-        .build()
+    private val client = HttpClients.base
 
     private val base = "https://aihot.virxact.com/api/public"
     private val userAgent =

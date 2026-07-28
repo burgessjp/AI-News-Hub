@@ -7,12 +7,10 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
-import java.util.concurrent.TimeUnit
 
 /**
  * HackerNews 公开 API 客户端。
@@ -35,11 +33,7 @@ class HackerNewsRepository(
     private val cacheDir: File? = null
 ) : com.peng.ainewshub.data.source.HackerNewsSource {
 
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(20, TimeUnit.SECONDS)
-        .followRedirects(true)
-        .build()
+    private val client = HttpClients.base
 
     private val base = "https://hacker-news.firebaseio.com/v0"
 

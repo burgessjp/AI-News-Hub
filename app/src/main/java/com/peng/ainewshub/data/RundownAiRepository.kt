@@ -6,12 +6,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 import java.io.File
-import java.util.concurrent.TimeUnit
 
 /**
  * The Rundown AI 首页文章卡片墙抓取客户端(实时源)。
@@ -32,11 +30,7 @@ class RundownAiRepository(
     private val cacheDir: File? = null
 ) : RundownAiSource {
 
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(20, TimeUnit.SECONDS)
-        .followRedirects(true)
-        .build()
+    private val client = HttpClients.base
 
     private val homeUrl = "https://www.therundown.ai/"
     private val userAgent =

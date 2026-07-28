@@ -1,6 +1,7 @@
 package com.peng.ainewshub.data.source
 
 import com.peng.ainewshub.data.AppException
+import com.peng.ainewshub.data.HttpClients
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -8,11 +9,9 @@ import kotlinx.coroutines.withContext
 import okhttp3.Cookie
 import okhttp3.CookieJar
 import okhttp3.HttpUrl
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.TimeUnit
 
 /**
  * gitcode 归档数据 HTTP 客户端 —— 各 Archive Repository / SummaryRepository / OverviewRepository 共用。
@@ -61,10 +60,8 @@ object ArchiveHttpClient {
         "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
 
     private val client by lazy {
-        OkHttpClient.Builder()
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(20, TimeUnit.SECONDS)
-            .followRedirects(true)
+        // 共享 base 派生:连接池/线程池与全 App 复用,仅覆盖 cookieJar
+        HttpClients.base.newBuilder()
             // gitcode raw 背后是华为云 WAF,会下发 HWWAFSESID 等会话 cookie;不带 cookie
             // 的裸请求容易被 WAF 判为可疑流量返回 403。配 cookieJar 让客户端像浏览器一样
             // 记住并回传会话 cookie,降低被拦概率。内存存储(进程级,随 App 生命周期)。
