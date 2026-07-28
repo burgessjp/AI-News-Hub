@@ -3,6 +3,7 @@ package com.peng.ainewshub.ui.daily
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -32,6 +33,8 @@ fun DailyDateScreen(
     date: String,
     onBack: () -> Unit,
     onOpenUrl: (String, String) -> Unit = { _, _ -> },
+    // 列表状态由 MainActivity 上提持有(按日期各一份):进 WebView/返回后保持滚动位置
+    listState: LazyListState,
     // 按日期独立持有 VM:避免与 DailyScreen/DailyArchiveScreen 共用同一 DailyViewModel
     // 导致换日期时复用上次 Success 的 _selected,首帧闪现上一日期内容。
     vm: DailyViewModel = viewModel(key = "daily-date-$date")
@@ -64,7 +67,8 @@ fun DailyDateScreen(
                 )
                 is UiState.Success -> DailyContent(
                     report = s.data,
-                    onOpen = { url -> onOpenUrl(url, "AI HOT") }
+                    onOpen = { url -> onOpenUrl(url, "AI HOT") },
+                    listState = listState
                 )
             }
         }

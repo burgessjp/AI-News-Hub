@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -27,6 +28,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -65,9 +67,12 @@ fun DailyScreen(
     onOpenArchive: () -> Unit = {},
     onOpenUrl: (String, String) -> Unit = { _, _ -> },
     onBack: (() -> Unit)? = null,
+    // 列表状态由 MainActivity 上提持有:进 WebView/归档返回后保持滚动位置
+    listState: LazyListState,
     vm: DailyViewModel = viewModel()
 ) {
     val state by vm.latest.collectAsStateWithLifecycle()
+    val isRefreshing by vm.isRefreshing.collectAsStateWithLifecycle()
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
@@ -104,15 +109,26 @@ fun DailyScreen(
                     title = "日报加载失败",
                     onRetry = { vm.refreshLatest() }
                 )
-                is UiState.Success -> DailyContent(report = s.data, onOpen = { url -> onOpenUrl(url, "AI HOT") })
+                // 下拉刷新:不翻回 Loading,仅转刷新指示(对齐 8 源页既有模式)
+                is UiState.Success -> PullToRefreshBox(
+                    isRefreshing = isRefreshing,
+                    onRefresh = { vm.pullRefreshLatest() }
+                ) {
+                    DailyContent(
+                        report = s.data,
+                        onOpen = { url -> onOpenUrl(url, "AI HOT") },
+                        listState = listState
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-internal fun DailyContent(report: DailyReport, onOpen: (String) -> Unit) {
+internal fun DailyContent(report: DailyReport, onOpen: (String) -> Unit, listState: LazyListState) {
     LazyColumn(
+        state = listState,
         // 现作为二级页(底栏隐藏),底部只需常规留白,不再预留浮动底栏高度
         contentPadding = PaddingValues(top = 4.dp, bottom = 24.dp),
         modifier = Modifier.fillMaxSize()
@@ -144,7 +160,11 @@ internal fun DailyContent(report: DailyReport, onOpen: (String) -> Unit) {
         if (report.flashes.isNotEmpty()) {
             item(key = "divider-flashes") { DailyRowDivider() }
             item(key = "flashes-title") {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                // 与同页分隔线/条目同一边距(18dp),不再贴屏幕左缘
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 18.dp)
+                ) {
                     Icon(
                         Icons.Filled.Thunderstorm,
                         contentDescription = null,
@@ -161,7 +181,10 @@ internal fun DailyContent(report: DailyReport, onOpen: (String) -> Unit) {
                 }
             }
             item(key = "flashes-list") {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(horizontal = 18.dp)
+                ) {
                     report.flashes.forEachIndexed { idx, flash ->
                         FlashTimelineRow(flash = flash, onOpen = onOpen, isLast = idx == report.flashes.lastIndex)
                     }

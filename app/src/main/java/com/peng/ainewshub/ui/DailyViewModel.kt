@@ -24,6 +24,10 @@ class DailyViewModel : ViewModel() {
     private val _selected = MutableStateFlow<UiState<DailyReport>>(UiState.Loading)
     val selected: StateFlow<UiState<DailyReport>> = _selected.asStateFlow()
 
+    /** 下拉刷新进行中(供 PullToRefreshBox 转圈);不打断现有内容。 */
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
     init {
         refreshLatest()
         loadArchive()
@@ -35,6 +39,25 @@ class DailyViewModel : ViewModel() {
             runCatching { repo.fetchDaily() }
                 .onSuccess { _latest.value = UiState.Success(it) }
                 .onFailure { _latest.value = it.toUiError() }
+        }
+    }
+
+    /**
+     * 下拉刷新最新日报:不翻回 Loading(内容区保持现有日报,仅转刷新指示)。
+     * 失败保留旧内容;刷新中忽略重复触发。与 HackerNewsViewModel.forceRefresh 同模式。
+     */
+    fun pullRefreshLatest() {
+        if (_isRefreshing.value) return
+        _isRefreshing.value = true
+        viewModelScope.launch {
+            runCatching { repo.fetchDaily() }
+                .onSuccess { _latest.value = UiState.Success(it) }
+                .onFailure {
+                    if (_latest.value !is UiState.Success) {
+                        _latest.value = it.toUiError()
+                    }
+                }
+            _isRefreshing.value = false
         }
     }
 

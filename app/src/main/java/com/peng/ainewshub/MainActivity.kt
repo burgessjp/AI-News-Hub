@@ -752,16 +752,19 @@ private fun PageView(
             onItemClick = onItemClick,
             onOpenArchive = onOpenArchive,
             onBack = onBack,
-            onOpenUrl = { url, title -> onOpenUrl(url, title, "日报") }
+            onOpenUrl = { url, title -> onOpenUrl(url, title, "日报") },
+            listState = pageListStates.forPage(page)
         )
         Page.DailyArchive -> DailyArchiveScreen(
             onSelectDate = onSelectDate,
-            onBack = onBack
+            onBack = onBack,
+            listState = pageListStates.forPage(page)
         )
         is Page.DailyDate -> DailyDateScreen(
             date = page.date,
             onBack = onBack,
-            onOpenUrl = { url, title -> onOpenUrl(url, title, "日报") }
+            onOpenUrl = { url, title -> onOpenUrl(url, title, "日报") },
+            listState = pageListStates.forPage(page)
         )
         Page.Search -> SearchScreen(
             onBack = onBack,

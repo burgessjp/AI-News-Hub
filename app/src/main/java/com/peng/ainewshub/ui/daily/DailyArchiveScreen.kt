@@ -12,9 +12,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -33,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.peng.ainewshub.data.DailySummary
+import com.peng.ainewshub.ui.EmptyState
 import com.peng.ainewshub.ui.ErrorState
 import com.peng.ainewshub.ui.UiState
 import com.peng.ainewshub.ui.DailyViewModel
@@ -50,6 +53,8 @@ import java.time.temporal.ChronoUnit
 fun DailyArchiveScreen(
     onSelectDate: (String) -> Unit,
     onBack: () -> Unit,
+    // 列表状态由 MainActivity 上提持有:进单日日报返回后保持滚动位置
+    listState: LazyListState,
     vm: DailyViewModel = viewModel()
 ) {
     val state by vm.archive.collectAsStateWithLifecycle()
@@ -79,14 +84,26 @@ fun DailyArchiveScreen(
                     onRetry = { vm.loadArchive() }
                 )
                 is UiState.Success -> {
-                    LazyColumn(
-                        contentPadding = PaddingValues(vertical = 4.dp),
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        itemsIndexed(items = s.data, key = { _, it -> it.date }) { i, summary ->
-                            DailySummaryRow(summary = summary, onClick = { onSelectDate(summary.date) })
-                            if (i != s.data.lastIndex) {
-                                DailyArchiveDivider()
+                    if (s.data.isEmpty()) {
+                        // 空数据空态:与 SummaryArchiveScreen 同语言,不再是一页纯白
+                        EmptyState(
+                            title = "暂无历史日报",
+                            subtitle = "日报归档还没有内容,稍后再来看看",
+                            icon = Icons.Outlined.Inventory2,
+                            actionLabel = "重试",
+                            onAction = { vm.loadArchive() }
+                        )
+                    } else {
+                        LazyColumn(
+                            state = listState,
+                            contentPadding = PaddingValues(vertical = 4.dp),
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            itemsIndexed(items = s.data, key = { _, it -> it.date }) { i, summary ->
+                                DailySummaryRow(summary = summary, onClick = { onSelectDate(summary.date) })
+                                if (i != s.data.lastIndex) {
+                                    DailyArchiveDivider()
+                                }
                             }
                         }
                     }
