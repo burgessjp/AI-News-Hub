@@ -212,17 +212,17 @@ private fun MetaItem(
 /**
  * 分数小药丸 —— meta 行内的紧凑分数展示。
  *
- * 着色分档沿用原 ScoreBadgeLarge 语义(80+ error / 60+ tertiary / 40+ secondary / else outline),
- * 但尺寸大幅缩小:labelMedium + small 圆角 + 半透明背景,贴近列表页分数观感。
+ * 着色分档与列表 HotBadge(NewsCard)一致(80+ tertiary / 60+ secondary /
+ * 40+ primary / else onSurfaceVariant);尺寸:labelMedium + small 圆角 + 半透明背景。
  */
 @Composable
 private fun ScorePill(score: Int) {
     val cs = MaterialTheme.colorScheme
     val color = when {
-        score >= 80 -> cs.error
-        score >= 60 -> cs.tertiary
-        score >= 40 -> cs.secondary
-        else -> cs.outline
+        score >= 80 -> cs.tertiary
+        score >= 60 -> cs.secondary
+        score >= 40 -> cs.primary
+        else -> cs.onSurfaceVariant
     }
     Surface(
         color = color.copy(alpha = AppAlpha.badgeOverlay),

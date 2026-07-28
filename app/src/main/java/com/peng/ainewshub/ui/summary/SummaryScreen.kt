@@ -35,6 +35,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -48,6 +49,8 @@ import com.peng.ainewshub.ui.SummaryViewModel
 import com.peng.ainewshub.ui.UiState
 import com.peng.ainewshub.ui.components.AppTopBar
 import com.peng.ainewshub.ui.components.BottomBarReservedHeight
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -216,7 +219,9 @@ private fun SourceChipsRow(
     val chipOffsets = remember { mutableStateMapOf<Int, Int>() }
 
     LaunchedEffect(selectedIndex, specs.size) {
-        val x = chipOffsets[selectedIndex] ?: return@LaunchedEffect
+        // 等 onGloballyPositioned 回填偏移后再滚:首跑时 chipOffsets 尚为空,
+        // 直接返回会导致切 tab 返回后选中 chip 停在可视区外
+        val x = snapshotFlow { chipOffsets[selectedIndex] }.filterNotNull().first()
         val padPx = with(density) { 18.dp.roundToPx() }
         scrollState.animateScrollTo((x - padPx).coerceAtLeast(0))
     }
