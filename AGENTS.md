@@ -17,7 +17,7 @@
 ## 编码约定（与默认不同，务必遵守）
 
 - **注释用中文，代码/变量名用英文**（与存量代码一致）。
-- **不引入 Retrofit / Gson / Moshi**：网络一律 `OkHttpClient`，JSON 用内置 `org.json`，HTML 抓取用 jsoup。
+- **不引入 Retrofit / Gson / Moshi**：网络一律 `OkHttpClient`，JSON 用内置 `org.json`，HTML 抓取用 jsoup。`OkHttpClient` 统一经 `data/HttpClients.kt` 的共享 base 派生（`base` 或 `base.newBuilder()`），不各自 `OkHttpClient.Builder().build()`。
 - **不用 Navigation Compose**（见下「导航」），**无 DI 框架**：Repository 在 ViewModel / Composable 内直接构造。
 - 字号一律 `AppText.xxx`、透明度一律 `AppAlpha.xxx`、圆角一律 `MaterialTheme.shapes` 或 `CircleShape`、颜色只走 `colorScheme`——不散落 `.sp`/`.alpha`/hex 字面量（源品牌色集中在 `ui/more/SourceBrandColors.kt` 是唯一例外）。列表排名/统计/章节条/骨架屏统一复用 `ui/components/` 现有组件，不新建私有拷贝。
 - 协程 + Flow：`StateFlow` 驱动 UI，`collectAsStateWithLifecycle` 订阅；网络在 Repository 内切 `Dispatchers.IO`；并发去重用 `Mutex.withLock`。
@@ -66,7 +66,7 @@ AI_NEWS_HUB_AI_BASE_URL / AI_NEWS_HUB_AI_MODEL / AI_NEWS_HUB_AI_API_KEY / GITCOD
 
 ## CI/CD
 
-`.github/workflows/`：`build.yml`（PR 跑 `assembleDebug`）/ `release.yml`（`v*` tag 发版，从 secrets 还原 keystore）/ `fetch-data.yml`（每日定时跑数据流水线）。
+`.github/workflows/`：`build.yml`（PR 跑 `assembleDebug`）/ `release.yml`（`v*` tag 发版，从 secrets 还原 keystore，versionName/versionCode 从 tag 注入）/ `fetch-data.yml`（每日定时跑数据流水线）。
 
 ## 安全红线
 
