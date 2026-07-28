@@ -29,6 +29,8 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -36,8 +38,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
@@ -45,7 +49,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
-import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.MoreVert
@@ -83,6 +86,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -111,7 +115,8 @@ import kotlin.math.roundToInt
  *
  * 显示原文 / AI HOT 阅读页,带:
  *  - 顶栏:返回 + 标题(随网页加载动态更新)+ 当前域名副标题 + 「更多」菜单
- *    (刷新 / 前进 / 后退 / 阅读模式 / 分享 / 复制链接 / 在浏览器打开 / 关闭页面)
+ *    (刷新 / 翻译本页 / 复制链接 / 在浏览器打开)
+ *  - 底部工具栏:后退 / 前进 / 阅读模式 / 分享(高频导航一级操作,视频全屏时隐藏)
  *  - 顶部线性进度条(加载中;整页翻译时复用为翻译进度)
  *  - 主帧加载失败错误态([ErrorState] + 重试),不再是空白页
  *  - 站内导航(主帧 http(s) 交 WebView 原生处理;子框架不拦截;外部 scheme 唤起外部 App)
@@ -370,6 +375,8 @@ fun WebViewScreen(
                                 expanded = menuExpanded,
                                 onDismissRequest = { menuExpanded = false }
                             ) {
+                                // 高频导航(后退/前进/阅读模式/分享)已提到底部工具栏,
+                                // 菜单只留低频与场景项
                                 if (!readerActive) {
                                     DropdownMenuItem(
                                         text = { Text("刷新") },
@@ -379,64 +386,20 @@ fun WebViewScreen(
                                             webViewRef.web?.reload()
                                         }
                                     )
+                                }
+                                // 翻译入口遵循「设置 → AI 服务」的翻译开关;
+                                // 译文在底部弹层展示,不改写阅读页
+                                if (readerActive && aiConfig.translateEnabled) {
                                     DropdownMenuItem(
-                                        text = { Text("后退") },
-                                        leadingIcon = { Icon(Icons.AutoMirrored.Outlined.ArrowBack, null) },
-                                        enabled = webCanGoBack,
+                                        text = { Text("翻译本页") },
+                                        leadingIcon = { Icon(Icons.Outlined.Translate, null) },
                                         onClick = {
                                             menuExpanded = false
-                                            webViewRef.web?.goBack()
+                                            startTranslate()
                                         }
                                     )
-                                    DropdownMenuItem(
-                                        text = { Text("前进") },
-                                        leadingIcon = { Icon(Icons.AutoMirrored.Outlined.ArrowForward, null) },
-                                        enabled = webCanGoForward,
-                                        onClick = {
-                                            menuExpanded = false
-                                            webViewRef.web?.goForward()
-                                        }
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text("阅读模式") },
-                                        leadingIcon = { Icon(Icons.AutoMirrored.Outlined.MenuBook, null) },
-                                        enabled = !readerLoading,
-                                        onClick = {
-                                            menuExpanded = false
-                                            enterReaderMode()
-                                        }
-                                    )
-                                } else {
-                                    DropdownMenuItem(
-                                        text = { Text("退出阅读模式") },
-                                        leadingIcon = { Icon(Icons.Outlined.WebAsset, null) },
-                                        onClick = {
-                                            menuExpanded = false
-                                            exitReaderMode()
-                                        }
-                                    )
-                                    // 翻译入口遵循「设置 → AI 服务」的翻译开关;
-                                    // 译文在底部弹层展示,不改写阅读页
-                                    if (aiConfig.translateEnabled) {
-                                        DropdownMenuItem(
-                                            text = { Text("翻译本页") },
-                                            leadingIcon = { Icon(Icons.Outlined.Translate, null) },
-                                            onClick = {
-                                                menuExpanded = false
-                                                startTranslate()
-                                            }
-                                        )
-                                    }
                                 }
                                 HorizontalDivider()
-                                DropdownMenuItem(
-                                    text = { Text("分享") },
-                                    leadingIcon = { Icon(Icons.Outlined.Share, null) },
-                                    onClick = {
-                                        menuExpanded = false
-                                        shareUrl(context, pageTitle, currentUrl)
-                                    }
-                                )
                                 DropdownMenuItem(
                                     text = { Text("复制链接") },
                                     leadingIcon = { Icon(Icons.Outlined.ContentCopy, null) },
@@ -453,18 +416,25 @@ fun WebViewScreen(
                                         openInBrowser(currentUrl)
                                     }
                                 )
-                                DropdownMenuItem(
-                                    text = { Text("关闭页面") },
-                                    leadingIcon = { Icon(Icons.Outlined.Close, null) },
-                                    onClick = {
-                                        menuExpanded = false
-                                        onBack()
-                                    }
-                                )
                             }
                         }
                     }
                 )
+            },
+            bottomBar = {
+                // 高频导航一级操作(浏览器惯例);视频全屏时隐藏,不挡画面
+                if (fullscreenView == null) {
+                    WebBottomBar(
+                        canGoBack = webCanGoBack,
+                        canGoForward = webCanGoForward,
+                        readerActive = readerActive,
+                        readerLoading = readerLoading,
+                        onBack = { webViewRef.web?.goBack() },
+                        onForward = { webViewRef.web?.goForward() },
+                        onToggleReader = { if (readerActive) exitReaderMode() else enterReaderMode() },
+                        onShare = { shareUrl(context, pageTitle, currentUrl) }
+                    )
+                }
             }
         ) { padding ->
             Box(
@@ -1109,9 +1079,13 @@ private class BlobSaver(
     private val context: Context,
     private val onSave: (filename: String, mimetype: String?, data: String?) -> Unit
 ) {
+    // @JavascriptInterface 跑在 WebView JavaBridge 线程(无 Looper),
+    // 回调链里有 Toast,必须切主线程,否则抛 "Can't toast on a thread that has not called Looper.prepare()"
+    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+
     @JavascriptInterface
     fun save(filename: String, mimetype: String?, data: String?) {
-        onSave(filename, mimetype.takeIf { !it.isNullOrBlank() }, data)
+        mainHandler.post { onSave(filename, mimetype.takeIf { !it.isNullOrBlank() }, data) }
     }
 }
 
@@ -1208,4 +1182,93 @@ private fun WebView.configureWebSettings(darkTheme: Boolean, fontScale: FontScal
             .replace(Regex("Version/\\d+(\\.\\d+)*\\s+"), "")
     }
     applyDarkTheme(settings, darkTheme)
+}
+
+/**
+ * WebView 底部工具栏 —— 高频导航操作(后退/前进/阅读模式/分享)提为一级操作,
+ * 不再藏在「更多」菜单里(对齐浏览器惯例);阅读模式按 [readerActive] 切换进出。
+ * 视频全屏时由调用方整体隐藏。
+ */
+@Composable
+private fun WebBottomBar(
+    canGoBack: Boolean,
+    canGoForward: Boolean,
+    readerActive: Boolean,
+    readerLoading: Boolean,
+    onBack: () -> Unit,
+    onForward: () -> Unit,
+    onToggleReader: () -> Unit,
+    onShare: () -> Unit
+) {
+    val cs = MaterialTheme.colorScheme
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(cs.surface)
+            .navigationBarsPadding()
+    ) {
+        // 顶部发丝线,与网页内容区分隔
+        Spacer(
+            Modifier
+                .fillMaxWidth()
+                .height(0.5.dp)
+                .background(cs.outlineVariant)
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            WebBarItem(
+                icon = Icons.AutoMirrored.Outlined.ArrowBack,
+                label = "后退",
+                enabled = canGoBack,
+                onClick = onBack,
+                modifier = Modifier.weight(1f)
+            )
+            WebBarItem(
+                icon = Icons.AutoMirrored.Outlined.ArrowForward,
+                label = "前进",
+                enabled = canGoForward,
+                onClick = onForward,
+                modifier = Modifier.weight(1f)
+            )
+            WebBarItem(
+                icon = if (readerActive) Icons.Outlined.WebAsset else Icons.AutoMirrored.Outlined.MenuBook,
+                label = if (readerActive) "退出阅读" else "阅读模式",
+                enabled = !readerLoading,
+                onClick = onToggleReader,
+                modifier = Modifier.weight(1f)
+            )
+            WebBarItem(
+                icon = Icons.Outlined.Share,
+                label = "分享",
+                enabled = true,
+                onClick = onShare,
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+/** 底部工具栏单项:图标 + 小字标签,触摸区 ≥48dp;禁用态用 outline 色压低。 */
+@Composable
+private fun WebBarItem(
+    icon: ImageVector,
+    label: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val color = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.outline
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+        modifier = modifier
+            .clickable(enabled = enabled, onClick = onClick)
+            .heightIn(min = 48.dp)
+            .padding(vertical = 6.dp)
+    ) {
+        Icon(icon, contentDescription = label, tint = color, modifier = Modifier.size(20.dp))
+        Text(text = label, style = AppText.caption, color = color)
+    }
 }
