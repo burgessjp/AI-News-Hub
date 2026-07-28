@@ -1369,12 +1369,33 @@ def load_previous_index(url):
     必须从旧 index 继承合并,否则 history 里永远只剩当天一条。
     previous_overview 同样:本次总览 AI 生成失败时,继承上次的 latest_overview,
     避免一次失败导致 App 端总览空掉(对齐单源失败保留旧指向的兜底语义)。
-    拉取本身失败(HTTP/解析)时优雅降级,等同于无旧 index。
+    拉取本身失败(HTTP/解析)时重试 3 次;仍失败则退出非 0(fail-closed):
+    拿不到旧 index 就意味着 history 会从 31 天塌缩成当天、失败源 latest 丢失,
+    且推送后被逐次继承永久损毁 —— 宁可本轮不更新,也不推降级 index。
+    (--no-previous-index 显式关闭时不在此列,走 url 为空的早退分支。)
 
     与 App 的 ArchiveHttpClient.fetchIndex 同源(都是 gitcode API raw),匿名公开读。
     """
     if not url:
         return {}, {}, None
+    last_exc = None
+    for attempt in range(1, FETCH_MAX_ATTEMPTS + 1):
+        try:
+            return _load_previous_index_once(url)
+        except Exception as e:
+            last_exc = e
+            if attempt < FETCH_MAX_ATTEMPTS:
+                wait = 2 ** attempt  # 2s, 4s
+                print(f"[INDEX] 拉上次 index.json 第 {attempt}/{FETCH_MAX_ATTEMPTS} 次失败,"
+                      f"{wait}s 后重试:{type(e).__name__}: {e}", file=sys.stderr)
+                time.sleep(wait)
+    print(f"[INDEX] 拉上次 index.json {FETCH_MAX_ATTEMPTS} 次全败,中断本轮"
+          f"(不推降级 index):{type(last_exc).__name__}: {last_exc}", file=sys.stderr)
+    sys.exit(1)
+
+
+def _load_previous_index_once(url):
+    """load_previous_index 的单次尝试(成功返回三元组,失败抛异常由调用方重试)。"""
     try:
         text = fetch_text(
             url,
@@ -1404,9 +1425,7 @@ def load_previous_index(url):
               f"latest_overview {'有' if prev_overview else '无'}")
         return latest, history, prev_overview
     except Exception as e:
-        print(f"[INDEX] 拉上次 index.json 失败,失败源将无法保留旧指向:"
-              f"{type(e).__name__}: {e}", file=sys.stderr)
-    return {}, {}, None
+        raise RuntimeError(f"拉取/解析上次 index.json 失败:{type(e).__name__}: {e}") from e
 
 
 # App 端「历史摘要」只暴露最近 31 天,index.json 的 history 索引按此截断。
@@ -1553,6 +1572,11 @@ def main():
         try:
             # 需求 a:失败重试最多 3 次
             items, meta = fetch_with_retry(name, fn, limit_hn=args.limit_hn)
+
+            # 空结果视同失败(选择器失效/接口异常):不落盘 0 条快照、不前移 latest,
+            # 由 previous_latest 继承旧指针,避免 App 端拿到空列表
+            if not items:
+                raise RuntimeError("抓取结果为空(疑似源站改版/接口异常),按失败处理")
 
             # 需求 c:每源抓完做 AI 总结(失败仅 warn,不阻断落盘)
             ai_v2 = None
