@@ -11,7 +11,6 @@ import com.peng.ainewshub.data.source.SourceMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.runBlocking
 
 /**
  * 显示偏好(主题模式 + 动态取色 + 字体族 + 字号档位 + 数据源模式)持久化;
@@ -142,14 +141,12 @@ class SettingsStore(context: Context) {
     }
 
     /**
-     * 同步读取数据源模式 —— 供 ViewModel 在构造期(init 属性)非协程上下文取值。
-     *
-     * 用 [runBlocking] 阻塞读一次 DataStore 文件(DataStore 的单次读很快,仅打开一个
-     * 小文件)。仅用于 ViewModel 构造期的冷启动取值,不要在热路径(如 Composable、
-     * onClick)调用。读取失败(理论上不会,DataStore 容错)回退 [SourceMode.LIVE]。
+     * 挂起式读取数据源模式 —— 供 ViewModel 在 init 协程里取首帧真实值
+     * (替代原构造期 runBlocking 同步读:那是主线程磁盘 I/O,拖慢冷启动)。
+     * 读取失败(理论上不会,DataStore 容错)回退 [SourceMode.LIVE]。
      */
-    fun currentSourceModeSync(): SourceMode = runCatching {
-        runBlocking { prefsFlow.first().sourceMode }
+    suspend fun currentSourceMode(): SourceMode = runCatching {
+        prefsFlow.first().sourceMode
     }.getOrDefault(SourceMode.LIVE)
 
     private companion object {

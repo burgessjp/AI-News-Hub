@@ -48,9 +48,8 @@ class GitHubTrendingViewModel(application: Application) : AndroidViewModel(appli
      * 初始值 [SourceMode.LIVE](prefsFlow 首帧到达前用默认值,避免阻塞构造);
      * [init] 里同步读一次持久化值,让首次 [refresh] 用对模式。
      */
-    private val _sourceMode = MutableStateFlow(
-        runCatching { settingsStore.currentSourceModeSync() }.getOrDefault(SourceMode.LIVE)
-    )
+    // 占位初值:init 协程首帧即纠正为真实设置(替代原构造期 runBlocking 同步读)
+    private val _sourceMode = MutableStateFlow(SourceMode.LIVE)
     val sourceMode: StateFlow<SourceMode> = _sourceMode.asStateFlow()
 
     /** 按当前 sourceMode 取对应 Repository。 */
@@ -86,12 +85,13 @@ class GitHubTrendingViewModel(application: Application) : AndroidViewModel(appli
     val descStates: StateFlow<Map<String, TranslationState>> = _descStates.asStateFlow()
 
     init {
-        // 订阅数据源设置:设置页一改,_sourceMode 即更新,后续 refresh 自动用新源。
-        // 不在这里触发 refresh —— 避免设置变化导致自动重抓(用户需主动下拉刷新才切数据)。
         viewModelScope.launch {
+            // 先取首帧真实模式(挂起读,不占主线程),再首发加载,避免 ARCHIVE 用户
+            // 先按 LIVE 拉一次;随后持续订阅(后续 refresh 自动用新源,不自动重抓)。
+            _sourceMode.value = settingsStore.currentSourceMode()
+            refresh()
             settingsStore.prefsFlow.map { it.sourceMode }.collect { _sourceMode.value = it }
         }
-        refresh()
     }
 
     fun refresh() {

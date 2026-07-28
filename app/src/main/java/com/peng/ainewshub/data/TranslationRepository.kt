@@ -52,7 +52,8 @@ class ShortContentException : RuntimeException("content_too_short")
  * 设计要点(复刻项目既有范式):
  *  - 网络统一走 [AiChatClient](OpenAI 兼容,超时同 [NewsRepository]);
  *  - 缓存存 `cacheDir/hn_translations.json`,key=原文纯文本 sha256 前 16 位;
- *  - [Mutex] 按 key 串行化,防同一条内容被并发点两次;
+ *    进程内持内存副本(懒加载一次),文件级 Mutex 串行化读-改-写,上限 1000 条按插入序淘汰;
+ *  - per-key [Mutex] 串行化网络请求,防同一条内容被并发点两次;
  *  - 短内容(<5 字符或无字母)跳过,返回 [ShortContentException];
  *  - 目标语言固定简体中文(见 system prompt);
  *  - 请求成功后把 token 用量写入 [AiUsageStore](缓存命中不发请求,自然不统计)。
@@ -68,8 +69,35 @@ class TranslationRepository(context: Context) {
     private val locks = mutableMapOf<String, Mutex>()
     private val locksGuard = Mutex()
 
+    /**
+     * 缓存的文件级锁 + 进程内副本。
+     * per-key Mutex 只锁同 key,锁不住跨 key 的「全量读→put→全量写」竞态
+     * (整页翻译多 key 并发时后写覆盖先写);故读-改-写全程走 [cacheMutex] 一把锁,
+     * 内存副本懒加载一次,之后读写不再每次全量读盘。
+     */
+    private val cacheMutex = Mutex()
+    private var memCache: LinkedHashMap<String, String>? = null
+
     private suspend fun lockFor(key: String): Mutex = locksGuard.withLock {
         locks.getOrPut(key) { Mutex() }
+    }
+
+    /** [cacheMutex] 锁内调用:懒加载进程内缓存(仅首次读盘)。 */
+    private suspend fun cacheLocked(): LinkedHashMap<String, String> {
+        memCache?.let { return it }
+        val loaded = withContext(Dispatchers.IO) { TranslationCache.read(cacheDir) }
+        val map = LinkedHashMap(loaded)
+        memCache = map
+        return map
+    }
+
+    /** [cacheMutex] 锁内调用:超出上限按插入序淘汰最旧,然后全量落盘。 */
+    private suspend fun persistLocked(map: LinkedHashMap<String, String>) {
+        while (map.size > MAX_CACHE_ENTRIES) {
+            val eldest = map.entries.firstOrNull()?.key ?: break
+            map.remove(eldest)
+        }
+        withContext(Dispatchers.IO) { TranslationCache.write(cacheDir, map) }
     }
 
     /**
@@ -87,16 +115,14 @@ class TranslationRepository(context: Context) {
         }
         val key = sha256Short(plain)
 
-        // 命中缓存直接返回
-        val cached = withContext(Dispatchers.IO) { TranslationCache.read(cacheDir)[key] }
-        if (cached != null) return Result.success(cached)
+        // 命中缓存直接返回(内存副本,不再每次读盘)
+        cacheMutex.withLock { cacheLocked()[key] }?.let { return Result.success(it) }
 
         // 同一 key 串行,避免并发重复请求
         val mutex = lockFor(key)
         val got = mutex.withLock {
             // 二次查缓存(可能在等锁期间已被别的请求写入了)
-            val cached2 = withContext(Dispatchers.IO) { TranslationCache.read(cacheDir)[key] }
-            if (cached2 != null) return@withLock Result.success(cached2)
+            cacheMutex.withLock { cacheLocked()[key] }?.let { return@withLock Result.success(it) }
 
             chatClient.chat(config, SYSTEM_PROMPT, plain)
                 .onSuccess { result ->
@@ -104,10 +130,12 @@ class TranslationRepository(context: Context) {
                     runCatching {
                         usageStore.record(config.model, result.promptTokens, result.completionTokens)
                     }
-                    // 写缓存:读最新全量 → put → 写回,避免覆盖并发写入的其他 key
-                    val map = withContext(Dispatchers.IO) { TranslationCache.read(cacheDir) }
-                    map[key] = result.content
-                    withContext(Dispatchers.IO) { TranslationCache.write(cacheDir, map) }
+                    // 写缓存:文件级锁内「改内存副本 → 淘汰 → 落盘」,跨 key 竞态消除
+                    cacheMutex.withLock {
+                        val map = cacheLocked()
+                        map[key] = result.content
+                        persistLocked(map)
+                    }
                 }
                 .map { it.content }
         }
@@ -121,6 +149,9 @@ class TranslationRepository(context: Context) {
     }
 
     private companion object {
+        /** 缓存条目上限:超出按插入序淘汰最旧,防文件无界增长。 */
+        const val MAX_CACHE_ENTRIES = 1000
+
         const val SYSTEM_PROMPT =
             "You are a translator. Translate the user's text into Simplified Chinese. " +
                 "Preserve technical terms, code, and proper nouns in their original form. " +

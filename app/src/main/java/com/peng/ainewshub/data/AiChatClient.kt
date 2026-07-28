@@ -1,9 +1,9 @@
 package com.peng.ainewshub.data
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
@@ -28,11 +28,7 @@ class AiChatClient {
         val completionTokens: Int
     )
 
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(20, TimeUnit.SECONDS)
-        .followRedirects(true)
-        .build()
+    private val client = HttpClients.base
 
     private val jsonMedia = "application/json; charset=utf-8".toMediaType()
 
@@ -53,6 +49,9 @@ class AiChatClient {
         temperature: Double = 0.3,
         readTimeoutSeconds: Long = 20
     ): Result<ChatResult> = runCatching { request(config, system, user, temperature, readTimeoutSeconds) }
+        // runCatching 会吞 CancellationException:取消须照常抛出(结构化取消),
+        // 否则整页翻译取消时当批请求仍跑完才停
+        .onFailure { if (it is CancellationException) throw it }
 
     private suspend fun request(
         config: AiConfig,

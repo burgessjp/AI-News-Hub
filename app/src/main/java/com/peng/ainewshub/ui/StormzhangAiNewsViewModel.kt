@@ -38,9 +38,8 @@ class StormzhangAiNewsViewModel(application: Application) : AndroidViewModel(app
     private val liveRepo: StormzhangAiNewsRepository = StormzhangAiNewsRepository(cacheDir = application.cacheDir)
     private val archiveRepo: StormzhangAiNewsSource = StormzhangAiNewsArchiveRepository()
 
-    private val _sourceMode = MutableStateFlow(
-        runCatching { settingsStore.currentSourceModeSync() }.getOrDefault(SourceMode.LIVE)
-    )
+    // 占位初值:init 协程首帧即纠正为真实设置(替代原构造期 runBlocking 同步读)
+    private val _sourceMode = MutableStateFlow(SourceMode.LIVE)
     val sourceMode: StateFlow<SourceMode> = _sourceMode.asStateFlow()
 
     /** 按当前 sourceMode 取对应 Repository。 */
@@ -66,11 +65,14 @@ class StormzhangAiNewsViewModel(application: Application) : AndroidViewModel(app
     val pageDate: StateFlow<String> = _pageDate.asStateFlow()
 
     init {
-        // 订阅数据源设置:设置页一改即更新,后续 refresh 自动用新源(不自动重抓)。
         viewModelScope.launch {
+            // 先取首帧真实模式(挂起读,不占主线程),再首发加载,
+            // 避免 ARCHIVE 用户先按 LIVE 拉一次;随后持续订阅设置变更
+            // (设置页一改即更新,后续 refresh 自动用新源,不自动重抓)。
+            _sourceMode.value = settingsStore.currentSourceMode()
+            refresh()
             settingsStore.prefsFlow.map { it.sourceMode }.collect { _sourceMode.value = it }
         }
-        refresh()
     }
 
     fun refresh() {

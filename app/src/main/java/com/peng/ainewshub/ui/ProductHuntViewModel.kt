@@ -41,9 +41,8 @@ class ProductHuntViewModel(application: Application) : AndroidViewModel(applicat
     // 只归档:无 liveRepo,两种 SourceMode 都用归档(PH Developer Token 不进 APK)。
     private val archiveRepo: ProductHuntSource = ProductHuntArchiveRepository()
 
-    private val _sourceMode = MutableStateFlow(
-        runCatching { settingsStore.currentSourceModeSync() }.getOrDefault(SourceMode.LIVE)
-    )
+    // 占位初值:init 协程首帧即纠正为真实设置(替代原构造期 runBlocking 同步读)
+    private val _sourceMode = MutableStateFlow(SourceMode.LIVE)
     val sourceMode: StateFlow<SourceMode> = _sourceMode.asStateFlow()
 
     private val translationRepo = TranslationRepository(application)
@@ -72,11 +71,13 @@ class ProductHuntViewModel(application: Application) : AndroidViewModel(applicat
     val translationStates: StateFlow<Map<String, TranslationState>> = _translationStates.asStateFlow()
 
     init {
-        // 订阅数据源设置:仅用于顶栏角标一致(PH 实际都走归档)。
         viewModelScope.launch {
+            // 订阅数据源设置:仅用于顶栏角标一致(PH 实际都走归档);
+            // 首帧取真实值后再首发加载(替代原构造期 runBlocking 同步读)。
+            _sourceMode.value = settingsStore.currentSourceMode()
+            refresh()
             settingsStore.prefsFlow.map { it.sourceMode }.collect { _sourceMode.value = it }
         }
-        refresh()
     }
 
     fun refresh() {
