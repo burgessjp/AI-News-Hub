@@ -28,9 +28,15 @@ on:
     - cron: '30 7 * * *'   # UTC 07:30 = 北京 15:30(PH 当日批次 07:01 上线,日级聚合已覆盖)
   workflow_dispatch:       # 支持手动触发,便于首次验证 / 临时补抓
 
+# 定时与手动撞车时排队而非双双失败(push 非快进会报错丢本轮)
+concurrency:
+  group: fetch-data
+  cancel-in-progress: false
+
 jobs:
   fetch:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     env:
       TZ: Asia/Shanghai    # 脚本据此把文件名日期/时间统一成北京时间
 
@@ -46,6 +52,15 @@ jobs:
 
       - name: Install dependencies
         run: pip install -r scripts/requirements.txt
+
+      - name: Cache Playwright browsers
+        # 浏览器二进制(~150MB)单独缓存,不随 pip cache;key 随依赖声明变化
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('scripts/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
 
       - name: Install Playwright Chromium(供 LinuxDo 过 Cloudflare)
         # linux.do 套 CF 强挑战,普通 requests/curl_cffi 都被拦,必须真 Chromium。
