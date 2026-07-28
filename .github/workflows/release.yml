@@ -8,6 +8,7 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: write
 
@@ -28,16 +29,32 @@ jobs:
           echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 -d > app/aihot-release.jks
 
       - name: Generate keystore.properties
+        # heredoc 加引号:secret 值由 GitHub 先替换进脚本,密码含 $ / 反引号时
+        # 不加引号会被 bash 二次展开,签名静默用错密码
         run: |
-          cat > keystore.properties << EOF
+          cat > keystore.properties << 'EOF'
           storeFile=app/aihot-release.jks
           storePassword=${{ secrets.RELEASE_STORE_PASSWORD }}
           keyAlias=${{ secrets.RELEASE_KEY_ALIAS }}
           keyPassword=${{ secrets.RELEASE_KEY_PASSWORD }}
           EOF
 
+      - name: Inject version from tag
+        # versionName = tag 去 v 前缀;versionCode 从 x.y.z 换算(x*10000+y*100+z),
+        # tag 非语义化版本时回退 run_number(单调递增即可)
+        run: |
+          VN="${GITHUB_REF_NAME#v}"
+          if [[ "$VN" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            IFS='.' read -r MA MI PA <<< "$VN"
+            VC=$((MA * 10000 + MI * 100 + PA))
+          else
+            VC=${{ github.run_number }}
+          fi
+          echo "version_name=$VN" >> "$GITHUB_ENV"
+          echo "version_code=$VC" >> "$GITHUB_ENV"
+
       - name: Build release APK
-        run: ./gradlew assembleRelease
+        run: ./gradlew assembleRelease -PversionName="$version_name" -PversionCode="$version_code"
 
       - name: Get version name
         id: version
