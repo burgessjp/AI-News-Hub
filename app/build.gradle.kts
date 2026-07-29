@@ -84,4 +84,7 @@ dependencies {
     ksp(libs.androidx.room.compiler)
 
     implementation(libs.reorderable)
+
+    implementation(libs.androidx.glance.appwidget)
+    implementation(libs.androidx.glance.material3)
 }

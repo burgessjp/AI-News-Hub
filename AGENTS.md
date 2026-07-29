@@ -30,6 +30,7 @@
 - ⚠️ **含列表/页码的页，`LazyListState`/`PagerState` 一律在 `AiNewsHubApp` 层持有并下传**——`AnimatedContent` 换页即销毁屏内 `remember`/`rememberSaveable`，屏内自持会丢滚动位置。不要在屏内 `rememberLazyListState()`。摘要 Tab 为「源 chips 标签行 + 内容 Pager」双向同步结构，`summaryPagerState` 同理上提。
 - ⚠️ 含 WebView 的页转场 override 为 `FADE`（横向位移会让 AndroidView 撕裂），其余约定见 `ui/anim/Motion.kt`。
 - `openUrl` 是打开网页的**唯一入口**（统一记录浏览历史 + push `Page.Web`），全 App 链接都走内置 WebView，不走外部浏览器。
+- 外部深链两个入口：`EXTRA_OPEN_SETTINGS`（系统选中译「去设置」）与 `EXTRA_OPEN_URL`/`_TITLE`/`_SOURCE`（桌面小组件点击直达内置 WebView）。`MainActivity` 为 `singleTask`，冷/热启动分别在 `onCreate`/`onNewIntent` 解析，统一经 `openUrl` 消费；旋转重建不重复 push（与 `EXTRA_OPEN_SETTINGS` 同款 `savedInstanceState == null` 守卫）。
 
 ## 数据层（data/）
 
@@ -39,6 +40,7 @@
   - **归档失败直接显示 Error 态，不回退实时**。
 - **摘要 Tab 不在 App 端生成 AI 摘要**，直接读归档快照顶层 `ai_summary_v2` 字段（JSON 数组，每项含 `title`+`desc`，流水线预生成），兼容回退旧纯文本 `ai_summary`（历史快照），两者都缺失即失败态。
 - **总览 Tab 同样不在 App 端调 AI**，直接读 `index.json` 顶层 `latest_overview` 字段（流水线 `scripts/overview_summary.py` 预生成的跨源综合分析，含 Top10 items + breaking 标记）。App 端 `OverviewRepository` 只做反序列化，不再有端侧 AI 调用 / 缓存 / ConfigMissing 引导态。字段缺失走 NoData 空态。
+- **桌面小组件「今日热点」**（`widget/` 包，Glance）：只读归档 `latest_overview`（与总览同源同语义，与 SourceMode 无关）。缓存为 App 级 SharedPreferences `hot_now_widget`（多小组件实例共享，刻意不用 Glance per-id 状态）。刷新三路：系统 30min `updatePeriodMillis` / 头部按钮 `RefreshHotNowAction` / App 总览刷新成功联动（`HotNowWidgetUpdater.refreshFromApp`，同进程命中 ArchiveHttpClient 2 分钟缓存，零额外网络）。拉取失败保留旧数据不清空（小组件无错误交互入口）。配色直接取 `ui/theme/Color.kt` 设计令牌组 day/night `ColorProvider`（App 迷你版，不用壁纸动态色）；条目只展示排名 + 标题（+突发胶囊），来源/互动指标刻意不上小组件；Glance 1.1.1 不支持 res/font 自定义字体，层级靠字号 + 字重。
 - **源元数据 / 顺序单点定义** `ui/more/SourceMeta.kt`：8 源（HackerNews / GitHub Trending / OpenAI×Anthropic / HuggingFace Papers / Product Hunt / The Rundown AI / AIHot 精选 / stormzhang AI）的 key / icon / 品牌色 / 标题 / 副标题 / URL 集中于此，`DEFAULT_SOURCE_ORDER` 为默认顺序。信息源页 / 摘要 Tab / 关于页三处都从 `sourceMeta(key)` 派生，不再各自硬编码。
   - 用户在「信息源」页长按拖拽自定义顺序（reorderable 库），持久化于 `display_prefs` 的 `source_order` 键；**摘要 Tab 跟随用户顺序**（`SummaryViewModel.sourceKeys` 读 `SettingsStore.sourceOrderFlow`），**关于页固定默认顺序**。
   - **LinuxDo 暂时下线**：三处 UI 入口（信息源页 / 摘要 Tab / 关于页）均不展示，但底层代码（`Page.LinuxDo` / `LinuxDoHotScreen` / VM / Repo / 数据模型 / `SourceBrand.LinuxDo`）保留，恢复时在 `SourceMeta`/`DEFAULT_SOURCE_ORDER` 补回即可。
@@ -50,6 +52,7 @@
 - DataStore：`display_prefs`（主题 / 动态取色 / 字体族 / 字号档位 / 源模式 / 搜索历史 / 信息源顺序 `source_order`）、`ai_prefs`（全局 AI 服务配置 + 按「模型 × 月」聚合的 token 用量）。
 - Room（`ainewshub.db`，version 1，`fallbackToDestructiveMigration`）：仅浏览历史。
 - HN 列表缓存、翻译缓存为 `cacheDir` 下 JSON 文件。
+- 桌面小组件缓存为 SharedPreferences `hot_now_widget`（今日热点列表 JSON + 时间戳，KB 级，`CacheManager` 不涉及）。
 
 ## 数据流水线（scripts/）
 

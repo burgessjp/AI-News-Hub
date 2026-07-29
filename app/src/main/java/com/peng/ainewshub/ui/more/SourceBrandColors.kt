@@ -28,6 +28,10 @@ import androidx.compose.ui.graphics.Color
 @Immutable
 data class SourceBrandColors(val container: Color, val icon: Color)
 
+/** GitHub 品牌 container 深浅两色 —— 抽成常量供下方 @Composable getter 引用。 */
+private val GitHubContainerDay = Color(0xFF24292F)
+private val GitHubContainerNight = Color(0xFFE6EDF3)
+
 /** 九源品牌色入口:更多页「浏览」组图标块按源取色(仅 GitHub 需深色变体)。 */
 object SourceBrand {
     /** HackerNews —— 品牌橙 #FF6600 + 白图标(还原 HN 标识观感)。 */
@@ -36,9 +40,9 @@ object SourceBrand {
     /** GitHub —— 浅色模式深块白图标;深色模式反转为浅块深图标。 */
     val GitHub: SourceBrandColors
         @Composable get() = if (isSystemInDarkTheme()) {
-            SourceBrandColors(container = Color(0xFFE6EDF3), icon = Color(0xFF24292F))
+            SourceBrandColors(container = GitHubContainerNight, icon = Color(0xFF24292F))
         } else {
-            SourceBrandColors(container = Color(0xFF24292F), icon = Color.White)
+            SourceBrandColors(container = GitHubContainerDay, icon = Color.White)
         }
 
     /** LinuxDo —— 站点主色蓝 #1E88E5 + 白图标。 */

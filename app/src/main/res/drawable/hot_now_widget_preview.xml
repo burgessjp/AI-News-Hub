@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 「今日热点」小组件在系统 picker 中的静态预览图(手绘 mock,对齐实装:
+     淡蓝白圆角底 + 深色标题 + 品牌蓝刷新圆钮;条目为「排名 + 标题」,突发胶囊前置标题首行,无分隔线。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="240dp"
+    android:height="140dp"
+    android:viewportWidth="240"
+    android:viewportHeight="140">
+    <!-- 圆角底(淡蓝白 #F9F9FF) -->
+    <path
+        android:fillColor="#FFF9F9FF"
+        android:pathData="M16,0h208c8.84,0 16,7.16 16,16v108c0,8.84 -7.16,16 -16,16H16c-8.84,0 -16,-7.16 -16,-16V16C0,7.16 7.16,0 16,0z" />
+    <!-- 标题条(深炭 #141B2B) -->
+    <path
+        android:fillColor="#FF141B2B"
+        android:pathData="M14,12h58a4,4 0 0 1 4,4v8a4,4 0 0 1 -4,4H14a4,4 0 0 1 -4,-4v-8a4,4 0 0 1 4,-4z" />
+    <!-- 品牌蓝圆形刷新钮(#003EC7) -->
+    <path
+        android:fillColor="#FF003EC7"
+        android:pathData="M217,20m-9,0a9,9 0 1,1 18,0a9,9 0 1,1 -18,0" />
+    <!-- 头部「截至」行(灰 #8D92AB) -->
+    <path
+        android:fillColor="#FF8D92AB"
+        android:pathData="M14,32h72a3,3 0 0 1 3,3v4a3,3 0 0 1 -3,3H14a3,3 0 0 1 -3,-3v-4a3,3 0 0 1 3,-3z" />
+
+    <!-- 条目 1:Top1 蓝排名 + 突发胶囊前置 + 标题 -->
+    <path
+        android:fillColor="#FF003EC7"
+        android:pathData="M14,56h8a2,2 0 0 1 2,2v8a2,2 0 0 1 -2,2h-8a2,2 0 0 1 -2,-2v-8a2,2 0 0 1 2,-2z" />
+    <path
+        android:fillColor="#FFFFDAD6"
+        android:pathData="M30,54h20a3,3 0 0 1 3,3v6a3,3 0 0 1 -3,3H30a3,3 0 0 1 -3,-3v-6a3,3 0 0 1 3,-3z" />
+    <path
+        android:fillColor="#FF141B2B"
+        android:pathData="M56,54h124a3,3 0 0 1 3,3v4a3,3 0 0 1 -3,3H56a3,3 0 0 1 -3,-3v-4a3,3 0 0 1 3,-3z" />
+    <path
+        android:fillColor="#FF141B2B"
+        android:pathData="M30,68h96a3,3 0 0 1 3,3v4a3,3 0 0 1 -3,3H30a3,3 0 0 1 -3,-3v-4a3,3 0 0 1 3,-3z" />
+
+    <!-- 条目 2:灰排名 + 标题(两行) -->
+    <path
+        android:fillColor="#FF8D92AB"
+        android:pathData="M14,95h8a2,2 0 0 1 2,2v8a2,2 0 0 1 -2,2h-8a2,2 0 0 1 -2,-2v-8a2,2 0 0 1 2,-2z" />
+    <path
+        android:fillColor="#FF141B2B"
+        android:pathData="M30,92h168a3,3 0 0 1 3,3v4a3,3 0 0 1 -3,3H30a3,3 0 0 1 -3,-3v-4a3,3 0 0 1 3,-3z" />
+    <path
+        android:fillColor="#FF141B2B"
+        android:pathData="M30,106h110a3,3 0 0 1 3,3v4a3,3 0 0 1 -3,3H30a3,3 0 0 1 -3,-3v-4a3,3 0 0 1 3,-3z" />
+
+    <!-- 条目 3:灰排名 + 标题(自然截断) -->
+    <path
+        android:fillColor="#FF8D92AB"
+        android:pathData="M14,130h8a2,2 0 0 1 2,2v6a2,2 0 0 1 -2,2h-8a2,2 0 0 1 -2,-2v-6a2,2 0 0 1 2,-2z" />
+    <path
+        android:fillColor="#FF141B2B"
+        android:pathData="M30,127h140a3,3 0 0 1 3,3v4a3,3 0 0 1 -3,3H30a3,3 0 0 1 -3,-3v-4a3,3 0 0 1 3,-3z" />
+</vector>

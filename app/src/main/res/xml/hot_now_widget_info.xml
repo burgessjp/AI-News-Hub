@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 「今日热点」小组件元数据。
+     updatePeriodMillis 取系统下限 30min(数据一天一更,足够);其余两路刷新见 widget/ 包。
+     initialLayout 为 Glance 要求的占位布局(库内资源),真正渲染由 Glance 接管。 -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="250dp"
+    android:minHeight="110dp"
+    android:targetCellWidth="4"
+    android:targetCellHeight="2"
+    android:resizeMode="horizontal|vertical"
+    android:updatePeriodMillis="1800000"
+    android:initialLayout="@layout/glance_default_loading_layout"
+    android:previewImage="@drawable/hot_now_widget_preview"
+    android:widgetCategory="home_screen"
+    android:description="@string/widget_hot_now_desc" />

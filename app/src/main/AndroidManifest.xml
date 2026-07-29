@@ -46,14 +46,30 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
+        <!-- singleTask:单 Activity 架构,桌面小组件点击把既有任务带回前台走 onNewIntent,
+             避免每次点击都新开 Activity 实例 -->
         <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:launchMode="singleTask">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- 「今日热点」桌面小组件(Glance):只处理系统 APPWIDGET_UPDATE 广播 -->
+        <receiver
+            android:name=".widget.HotNowWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_hot_now_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/hot_now_widget_info" />
+        </receiver>
 
         <!-- 系统选中菜单「译」:声明 PROCESS_TEXT 后,系统 ActionMode 自动把 label「译」
              作为菜单项加入;点击时通过 EXTRA_PROCESS_TEXT 传入选中文本。

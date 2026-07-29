@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.peng.ainewshub.data.AppException
 import com.peng.ainewshub.data.OverviewDigest
 import com.peng.ainewshub.data.OverviewRepository
+import com.peng.ainewshub.widget.HotNowWidgetUpdater
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -63,7 +64,12 @@ class OverviewViewModel(application: Application) : AndroidViewModel(application
         if (_state.value !is OverviewState.Success) _state.value = OverviewState.Loading
         viewModelScope.launch {
             repo.loadDigest().fold(
-                onSuccess = { _state.value = OverviewState.Success(it) },
+                onSuccess = {
+                    _state.value = OverviewState.Success(it)
+                    // 联动刷新「今日热点」小组件(同进程命中 ArchiveHttpClient 2 分钟
+                    // 内存缓存,零额外网络;失败静默,不影响本页 UI 态)
+                    HotNowWidgetUpdater.refreshFromApp(getApplication())
+                },
                 onFailure = { e ->
                     Log.w("UiError", "总览加载失败: ${e.message ?: "(no message)"}", e)
                     _state.value = when (e) {

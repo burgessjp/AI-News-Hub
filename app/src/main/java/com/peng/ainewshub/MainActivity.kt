@@ -1,6 +1,7 @@
 package com.peng.ainewshub
 
 import android.app.Activity
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -99,14 +100,46 @@ class MainActivity : ComponentActivity() {
     companion object {
         /** Intent extra:为 true 时启动后自动进入「设置」页(系统选中翻译的「去设置」入口)。 */
         const val EXTRA_OPEN_SETTINGS = "com.peng.ainewshub.extra.OPEN_SETTINGS"
+
+        /** Intent extra:桌面小组件深链 —— 启动后在内置 WebView 打开该 URL(配 _TITLE / _SOURCE)。 */
+        const val EXTRA_OPEN_URL = "com.peng.ainewshub.extra.OPEN_URL"
+        const val EXTRA_OPEN_URL_TITLE = "com.peng.ainewshub.extra.OPEN_URL_TITLE"
+        const val EXTRA_OPEN_URL_SOURCE = "com.peng.ainewshub.extra.OPEN_URL_SOURCE"
     }
+
+    /** 待消费的小组件深链(Compose 状态:onCreate/onNewIntent 写入,UI 层消费后经回调清空)。 */
+    private var pendingOpenUrl by mutableStateOf<Triple<String, String, String?>?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val openSettings = savedInstanceState == null &&
             intent.getBooleanExtra(EXTRA_OPEN_SETTINGS, false)
-        setContent { AiNewsHubApp(openSettingsOnLaunch = openSettings) }
+        // 冷启动带深链(小组件点击):仅在全新启动时消费,避免旋转重建后重复 push
+        if (savedInstanceState == null) intent.openUrlRequest()?.let { pendingOpenUrl = it }
+        setContent {
+            AiNewsHubApp(
+                openSettingsOnLaunch = openSettings,
+                pendingOpenUrl = pendingOpenUrl,
+                onPendingUrlConsumed = { pendingOpenUrl = null }
+            )
+        }
+    }
+
+    /** 热启动(singleTask,Activity 已在栈内):小组件点击经此带深链直达。 */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        intent.openUrlRequest()?.let { pendingOpenUrl = it }
+    }
+
+    /** 解析小组件深链 extra:url 缺失/为空视为无深链。 */
+    private fun Intent.openUrlRequest(): Triple<String, String, String?>? {
+        val url = getStringExtra(EXTRA_OPEN_URL)?.takeIf { it.isNotBlank() } ?: return null
+        return Triple(
+            url,
+            getStringExtra(EXTRA_OPEN_URL_TITLE) ?: "",
+            getStringExtra(EXTRA_OPEN_URL_SOURCE)
+        )
     }
 }
 
@@ -272,7 +305,12 @@ private val pageStacksSaver = androidx.compose.runtime.saveable.Saver<
  *  - 底栏始终常驻(见 AiNewsHubApp 内说明)
  */
 @Composable
-fun AiNewsHubApp(openSettingsOnLaunch: Boolean = false) {
+fun AiNewsHubApp(
+    openSettingsOnLaunch: Boolean = false,
+    /** 桌面小组件深链(待消费):非 null 时经 openUrl 统一入口打开,随后回调清空。 */
+    pendingOpenUrl: Triple<String, String, String?>? = null,
+    onPendingUrlConsumed: () -> Unit = {}
+) {
     val appContext = androidx.compose.ui.platform.LocalContext.current.applicationContext
     val scope = rememberCoroutineScope()
     // 偏好存储(进程级单例):显示偏好(主题/字体) + AI 服务配置,均基于 DataStore 持久化。
@@ -406,6 +444,15 @@ fun AiNewsHubApp(openSettingsOnLaunch: Boolean = false) {
     // 外部入口要求直达设置页(如系统选中翻译的「去设置」)
     LaunchedEffect(openSettingsOnLaunch) {
         if (openSettingsOnLaunch) push(Page.Settings)
+    }
+
+    // 桌面小组件深链:经 openUrl 统一入口(记浏览历史 + push Page.Web),消费后清空。
+    // 与 openSettings 同范式 —— Activity 侧保证冷启动只消费一次(旋转重建不重复 push)。
+    LaunchedEffect(pendingOpenUrl) {
+        pendingOpenUrl?.let { (url, title, source) ->
+            openUrl(url, title, source)
+            onPendingUrlConsumed()
+        }
     }
 
     // 当前屏幕:根(tab) 或 二级页。用作转场的 currentState/targetState。

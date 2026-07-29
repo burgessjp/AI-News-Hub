@@ -28,6 +28,11 @@
 -keep class com.peng.ainewshub.data.** { *; }
 -keepclassmembers class com.peng.ainewshub.data.** { *; }
 
+# ---- Glance 小组件 ----
+# Glance 自带 consumer rules;Receiver / ActionCallback 经反射实例化,这里双保险
+-keep class com.peng.ainewshub.widget.** { *; }
+-dontwarn androidx.glance.**
+
 # ---- 通用保护 ----
 -keepattributes Signature, *Annotation*, InnerClasses, EnclosingMethod, RuntimeVisibleAnnotations, RuntimeVisibleParameterAnnotations, AnnotationDefault
 -keepattributes SourceFile,LineNumberTable
