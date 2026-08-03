@@ -386,6 +386,10 @@ def _request_summary(system_prompt, user_prompt, base_url, model, api_key):
     body = {
         "model": model,
         "temperature": TEMPERATURE,
+        # deepseek-v4-flash 默认 thinking=enabled + effort=high,
+        # 单次归纳请求会因思维链耗时 60-100s 撞穿 30s read timeout。
+        # 摘要是信息归纳任务,不需要推理,显式关闭以回到秒级响应(且更省 token)。
+        "thinking": {"type": "disabled"},
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},

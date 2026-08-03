@@ -403,6 +403,9 @@ def _request_overview(system_prompt, user_prompt, base_url, model, api_key):
     body = {
         "model": model,
         "temperature": TEMPERATURE,
+        # 同 ai_summary.py:关闭 deepseek-v4-flash 默认的 thinking=high,
+        # 总览是跨源归纳,无需推理链;关掉后从 60-100s 回到秒级,不再撞 read timeout。
+        "thinking": {"type": "disabled"},
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
