@@ -20,7 +20,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -45,6 +45,7 @@ import com.peng.ainewshub.data.SummaryItem
 import com.peng.ainewshub.ui.ErrorKind
 import com.peng.ainewshub.ui.UiState
 import com.peng.ainewshub.ui.anim.Motion
+import com.peng.ainewshub.ui.components.BottomBarPillHeight
 import com.peng.ainewshub.ui.components.ShimmerBox
 import com.peng.ainewshub.ui.more.sourceMeta
 import com.peng.ainewshub.ui.theme.AppAlpha
@@ -56,13 +57,13 @@ import java.util.Locale
 /**
  * 摘要页共享件 —— 摘要 Tab(当日)与「历史摘要」按日期页(归档)共用的单页实现。
  *
- * 从 SummaryScreen 抽出:页 spec、顶部提示行+页面指示器(历史页 pager 用)、
- * 单张源摘要页(紧凑扁头 + 条目化正文 + 底部出口,平铺无卡片)。两屏保持同构
- * (同一产品语言),差异仅在数据来源(latest 快照 vs history 索引按日期寻址)
- * 与底部出口(历史页无「查看完整列表」)。
+ * 从 SummaryScreen 抽出:页 spec、顶部提示行+页面指示器(两屏 pager 共用)、
+ * 单张源摘要页(紧凑扁头 + 条目正文,平铺无卡片,「查看完整列表」出口收口在扁头)。
+ * 两屏保持同构(同一产品语言),差异仅在数据来源(latest 快照 vs history 索引按日期寻址)
+ * 与出口(历史页扁头纯展示、不可点)。
  */
 
-/** 卡片配置:key → (标题 / 图标 / 进入列表的回调;历史页传 null 隐藏底部出口)。 */
+/** 卡片配置:key → (标题 / 图标 / 进入列表的回调;历史页传 null,扁头纯展示、无出口)。 */
 internal data class SummaryCardSpec(
     val source: String,
     val title: String,
@@ -75,8 +76,8 @@ internal data class SummaryCardSpec(
  * (用户在「信息源」页自定义的顺序,默认全集顺序)。
  *
  * @param keys 卡片顺序(源 key 列表,来自 SummaryViewModel.sourceKeys)
- * @param onOpenFor 按源 key 给「查看完整列表」回调;返回 null 则该卡不显示底部出口
- * (历史摘要按日期页:列表页展示的是当日数据,从历史跳转语义不符,故隐藏)
+ * @param onOpenFor 按源 key 给「查看完整列表」回调;返回 null 则该卡无出口、扁头不可点
+ * (历史摘要按日期页:列表页展示的是当日数据,从历史跳转语义不符,故无出口)
  */
 @Composable
 internal fun summaryCardSpecs(
@@ -141,26 +142,29 @@ internal fun SummaryHeaderRow(
 
 /**
  * 单张源摘要页 —— 平铺整页(无卡片容器、无渐变带),内含:
- *  - 紧凑扁头([SummaryPageHeader]):源图标(源强调色)+ 源名 + 数据时刻,下接发丝线
- *  - 中部:摘要正文(可纵向滚动),按 state 分支
- *  - 底部:发丝线 +「查看完整列表 →」按钮(spec.onOpen 非空才显示;历史页隐藏)
+ *  - 紧凑扁头([SummaryPageHeader]):源图标(源强调色)+ 源名 + 数据时刻,下接发丝线;
+ *    「查看完整列表」出口收口在此(onOpen 非空时整行可点 + 尾部 chevron)
+ *  - 中部:摘要正文(可纵向滚动),按 state 分支,占满剩余高度
  *
- * 底部按钮区用独立 clickable Row 吸收自己的点击,不依赖整页点击
- * (历史页 pager 页面整页可滑,按钮区单独可点)。
+ * 出口上移扁头后底部不再有常驻按钮条,纵向空间全部让给正文。
+ *
+ * @param reserveBottomBarSpace 根 tab(底栏为浮动药丸)传 true:列表可滚入药丸之下,
+ * 底部 contentPadding 补「药丸高 + 16dp 呼吸」让末条能停到药丸之上(与总览页同一做法);
+ * 二级页(历史摘要)底栏不悬浮,传 false
  */
 @Composable
 internal fun SummaryCardPage(
     spec: SummaryCardSpec,
     state: UiState<SourceSummary>,
-    onRetry: () -> Unit
+    onRetry: () -> Unit,
+    reserveBottomBarSpace: Boolean = false
 ) {
-    val cs = MaterialTheme.colorScheme
     val accent = sourceAccentOf(spec.source)
     Column(modifier = Modifier.fillMaxSize()) {
         SummaryPageHeader(spec = spec, state = state, accent = accent)
         SummaryHairline()
 
-        // 中部:摘要正文(可滚动),按 state 分支
+        // 摘要正文(可滚动),按 state 分支
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -173,33 +177,10 @@ internal fun SummaryCardPage(
                     kind = state.kind,
                     onRetry = onRetry
                 )
-                is UiState.Success -> SummaryBody(content = state.data.content, accent = accent)
-            }
-        }
-
-        // 底部:查看完整列表按钮(primary 加粗;不随源强调色,保持出口一致)
-        val onOpen = spec.onOpen
-        if (onOpen != null) {
-            SummaryHairline()
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = onOpen)
-                    .padding(vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "查看完整列表",
-                    style = AppText.body,
-                    fontWeight = FontWeight.Bold,
-                    color = cs.primary,
-                    modifier = Modifier.weight(1f)
-                )
-                Icon(
-                    Icons.AutoMirrored.Filled.ArrowForward,
-                    contentDescription = "查看完整列表",
-                    tint = cs.primary,
-                    modifier = Modifier.size(18.dp)
+                is UiState.Success -> SummaryBody(
+                    content = state.data.content,
+                    accent = accent,
+                    reserveBottomBarSpace = reserveBottomBarSpace
                 )
             }
         }
@@ -210,6 +191,10 @@ internal fun SummaryCardPage(
  * 紧凑扁头 —— 一行高:源图标(源强调色 tint)+ 源名 + 右侧数据时刻(caption)。
  * 取代原 BrandGradient 渐变卡头:蓝紫渐变焦点已收口到总览页头条(AI 特性专用),
  * 摘要页不再逐源重复渐变带,纵向空间让给正文。
+ *
+ * 「查看完整列表」出口也收口在此:[SummaryCardSpec.onOpen] 非空时整行可点,
+ * 尾部加 chevron 披露指示(语义同设置页/关于页的列表行);为 null(历史摘要页)
+ * 则纯展示不可点、无 chevron。
  */
 @Composable
 private fun SummaryPageHeader(
@@ -218,9 +203,11 @@ private fun SummaryPageHeader(
     accent: Color
 ) {
     val cs = MaterialTheme.colorScheme
+    val onOpen = spec.onOpen
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .then(if (onOpen != null) Modifier.clickable(onClick = onOpen) else Modifier)
             .padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -244,10 +231,19 @@ private fun SummaryPageHeader(
                 color = cs.onSurfaceVariant
             )
         }
+        if (onOpen != null) {
+            Spacer(Modifier.size(2.dp))
+            Icon(
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = "查看完整列表",
+                tint = cs.onSurfaceVariant,
+                modifier = Modifier.size(18.dp)
+            )
+        }
     }
 }
 
-/** 页内发丝线 —— 扁头下缘 / 底部出口上缘(0.5dp outlineVariant,与总览页同语言)。 */
+/** 页内发丝线 —— 扁头下缘(0.5dp outlineVariant,与总览页同语言)。 */
 @Composable
 private fun SummaryHairline() {
     Spacer(
@@ -260,7 +256,7 @@ private fun SummaryHairline() {
 
 /**
  * 源强调色 —— 卡头图标 tint 与条目序号的差异化锚点。
- * 7 张卡同构(同一产品语言),仅靠强调色与图标区分源。
+ * 8 张卡同构(同一产品语言),仅靠强调色与图标区分源。
  */
 @Composable
 private fun sourceAccentOf(source: String): Color {
@@ -287,20 +283,41 @@ private fun sourceAccentOf(source: String): Color {
  * - [SummaryContent.Plain]:整段纯文本按行切分,解析 **加粗** 标记(bullet 符号 trim 掉)。
  */
 @Composable
-private fun SummaryBody(content: SummaryContent, accent: Color) {
+private fun SummaryBody(
+    content: SummaryContent,
+    accent: Color,
+    reserveBottomBarSpace: Boolean
+) {
     when (content) {
-        is SummaryContent.Structured -> SummaryItems(items = content.items, accent = accent)
-        is SummaryContent.Plain -> SummaryPlainText(text = content.text, accent = accent)
+        is SummaryContent.Structured -> SummaryItems(
+            items = content.items,
+            accent = accent,
+            reserveBottomBarSpace = reserveBottomBarSpace
+        )
+        is SummaryContent.Plain -> SummaryPlainText(
+            text = content.text,
+            accent = accent,
+            reserveBottomBarSpace = reserveBottomBarSpace
+        )
     }
 }
 
 /** v2 结构化条目渲染:title 加粗作导语,desc 常规作正文,同行基线对齐。 */
 @Composable
-private fun SummaryItems(items: List<SummaryItem>, accent: Color) {
+private fun SummaryItems(
+    items: List<SummaryItem>,
+    accent: Color,
+    reserveBottomBarSpace: Boolean
+) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(12.dp),
-        contentPadding = PaddingValues(vertical = 4.dp)
+        // 根 tab:末条可停到药丸之上(药丸高 + 16dp 呼吸),列表本身滚入药丸之下;
+        // 二级页无悬浮底栏,只留 4dp 呼吸
+        contentPadding = PaddingValues(
+            top = 4.dp,
+            bottom = if (reserveBottomBarSpace) BottomBarPillHeight + 16.dp else 4.dp
+        )
     ) {
         itemsIndexed(items) { index, item ->
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -324,12 +341,20 @@ private fun SummaryItems(items: List<SummaryItem>, accent: Color) {
 
 /** v1 纯文本渲染:沿用旧的按行切分 + renderRichLine 逻辑。 */
 @Composable
-private fun SummaryPlainText(text: String, accent: Color) {
+private fun SummaryPlainText(
+    text: String,
+    accent: Color,
+    reserveBottomBarSpace: Boolean
+) {
     val lines = text.lines().filter { it.isNotBlank() }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(12.dp),
-        contentPadding = PaddingValues(vertical = 4.dp)
+        // 同 SummaryItems:根 tab 底部补「药丸高 + 16dp」,二级页只留 4dp
+        contentPadding = PaddingValues(
+            top = 4.dp,
+            bottom = if (reserveBottomBarSpace) BottomBarPillHeight + 16.dp else 4.dp
+        )
     ) {
         itemsIndexed(lines) { index, line ->
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
