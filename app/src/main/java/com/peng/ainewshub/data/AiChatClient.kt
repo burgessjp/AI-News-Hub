@@ -63,6 +63,11 @@ class AiChatClient {
         val body = JSONObject().apply {
             put("model", config.model)
             put("temperature", temperature)
+            // DeepSeek 推理模型(deepseek-v4-flash/pro)默认 thinking=high,
+            // 单次翻译请求会因思维链耗时 60-100s 撞穿 20s readTimeout。
+            // 全 provider 一律注入 thinking=disabled:对 DeepSeek 关闭推理链回到秒级;
+            // GLM / 自建 OpenAI 兼容服务按规范忽略未知字段(实测无 400)。
+            put("thinking", JSONObject().apply { put("type", "disabled") })
             put("messages", JSONArray().apply {
                 put(JSONObject().apply {
                     put("role", "system")
