@@ -1,0 +1,6 @@
+# 复制本文件为 local.properties 并按需修改 SDK 路径。
+# cp local.properties.example local.properties
+#
+# Android SDK 目录。Android Studio 通常已自动生成该文件，
+# 仅命令行 Gradle 构建或换机器时才需要手动填写。
+sdk.dir=/Users/你的用户名/Library/Android/sdk
