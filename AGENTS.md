@@ -73,7 +73,7 @@ AI_NEWS_HUB_AI_BASE_URL / AI_NEWS_HUB_AI_MODEL / AI_NEWS_HUB_AI_API_KEY / GITCOD
 
 ## 安全红线
 
-- **签名密钥绝不入库**：`*.jks`、`*.keystore`、`keystore.properties` 均已 gitignore；本地 release 需自行放 `keystore.properties` + `app/aihot-release.jks`，CI 从 secrets 还原。
+- **签名密钥绝不入库**：`*.jks`、`*.keystore`、`keystore.properties` 均已 gitignore；本地 release 需自行放 `keystore.properties` + `app/release.jks`，CI 从 secrets 还原。
 - **`GITCODE_TOKEN` 与流水线 AI 配置仅经环境变量注入**，代码里不得硬编码任何 key。
 - `network_security_config.xml` 全域名禁明文流量、仅系统 CA——不要为调试放开 cleartext。
 - AI / 翻译 key 由用户自填、存 App 私有目录（DataStore），不进 APK、不进日志、不上报。
