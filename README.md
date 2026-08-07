@@ -122,13 +122,13 @@ Release 构建需要本地签名材料（**绝不入库**）：
 1. 在工程根放一个 `keystore.properties`：
 
    ```properties
-   storeFile=app/aihot-release.jks
+   storeFile=app/release.jks
    storePassword=***
    keyAlias=***
    keyPassword=***
    ```
 
-2. 把对应的 `aihot-release.jks` 放到 `app/` 下。
+2. 把对应的 `release.jks` 放到 `app/` 下。
 
 3. 执行：
 
