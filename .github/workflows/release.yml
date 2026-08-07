@@ -26,14 +26,14 @@ jobs:
 
       - name: Decode keystore
         run: |
-          echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 -d > app/aihot-release.jks
+          echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 -d > app/release.jks
 
       - name: Generate keystore.properties
         # heredoc 加引号:secret 值由 GitHub 先替换进脚本,密码含 $ / 反引号时
         # 不加引号会被 bash 二次展开,签名静默用错密码
         run: |
           cat > keystore.properties << 'EOF'
-          storeFile=app/aihot-release.jks
+          storeFile=app/release.jks
           storePassword=${{ secrets.RELEASE_STORE_PASSWORD }}
           keyAlias=${{ secrets.RELEASE_KEY_ALIAS }}
           keyPassword=${{ secrets.RELEASE_KEY_PASSWORD }}

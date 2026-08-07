@@ -31,7 +31,7 @@ android {
     signingConfigs {
         create("release") {
             // storeFile 路径相对工程根目录解析（properties 中写的是 root 相对路径）
-            storeFile = rootProject.file(keystoreProperties.getProperty("storeFile") ?: "aihot-release.jks")
+            storeFile = rootProject.file(keystoreProperties.getProperty("storeFile") ?: "release.jks")
             storePassword = keystoreProperties.getProperty("storePassword") ?: ""
             keyAlias = keystoreProperties.getProperty("keyAlias") ?: ""
             keyPassword = keystoreProperties.getProperty("keyPassword") ?: ""
