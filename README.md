@@ -109,7 +109,7 @@
 
 ```bash
 git clone <本仓库地址>
-cd aihot
+cd AI-News-Hub
 cp local.properties.example local.properties   # 按需修改 SDK 路径（若没有示例文件，手动指定 sdk.dir）
 ./gradlew assembleDebug                        # 产物：app/build/outputs/apk/debug/app-debug.apk
 ./gradlew installDebug                         # 直装到已连接的设备/模拟器
@@ -182,6 +182,7 @@ app/                       唯一 Android 模块
       more/                更多页 / 信息源 / 关于
       webview/             内置 WebView + 阅读模式 + 整页翻译
       translate/           翻译仓库 + 系统选中翻译入口
+      widget/              Glance 桌面小组件（「今日热点」）
       components/           复用组件（卡片、徽章、骨架屏、SectionHeader）
       theme/                Material 3 双层主题（规范 + 语义）
       anim/                转场动画规范

@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "AIHot"
+rootProject.name = "AI-News-Hub"
 include(":app")

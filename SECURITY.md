@@ -4,8 +4,7 @@
 
 发现安全漏洞请**不要开公开 Issue**，改为私密上报：
 
-- 邮箱：（请补充维护者联系邮箱）
-- 或 GitHub 私密公告（Security Advisories）：仓库 **Security → Report a vulnerability**
+- GitHub 私密公告（Security Advisories）：仓库 **Security → Report a vulnerability**
 
 请附：问题描述、影响范围、复现步骤（如适用）、建议修复方向。收到后会在 72 小时内回复确认。
 

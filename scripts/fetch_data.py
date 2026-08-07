@@ -31,8 +31,8 @@ Repository 与对应 model 类),把 9 个数据源解析成 JSON 落盘:
 
 AI 总结(需求 c):
   - 每源抓完调 ai_summary.summarize_source 生成简体中文要点,写入快照顶层 `ai_summary`。
-  - 总结 7 个稳定源(hackernews/github-trending/huggingface-papers/stormzhang-ai/
-    producthunt/rundown-ai/aihot-featured),linuxdo 不做(对齐 App)。AI 调用失败仅 warn,不阻断落盘。
+  - 总结 8 个稳定源(hackernews/github-trending/huggingface-papers/stormzhang-ai/
+    producthunt/rundown-ai/aihot-featured/openai-anthropic-news),linuxdo 不做(对齐 App)。AI 调用失败仅 warn,不阻断落盘。
   - 需 3 个 AI 环境变量(AI_NEWS_HUB_AI_BASE_URL/_MODEL/_API_KEY)齐全;缺失则跳过总结。
     加 --no-summary 可显式跳过(本地调试用)。
 
