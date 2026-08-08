@@ -22,7 +22,7 @@ import kotlinx.coroutines.flow.map
  * `ai_prefs` 分开,语义清晰)持久化,枚举按 [name] 存取。
  *
  * [sourceMode] 控制 Hub 4 个稳定源(HackerNews / GitHub Trending / stormzhang AI /
- * HuggingFace Papers)从实时抓取还是 gitcode 归档取数,默认 [SourceMode.LIVE]。
+ * HuggingFace Papers)从实时抓取还是 gitcode 归档取数;设置页入口已移除,恒定 [SourceMode.ARCHIVE]。
  *
  * [sourceOrderFlow] 持久化用户在「信息源」页拖拽自定义的 8 源顺序(默认
  * [DEFAULT_SOURCE_ORDER]),摘要 Tab 跟随该顺序;关于页固定默认顺序不跟随。
@@ -38,7 +38,7 @@ class SettingsStore(context: Context) {
         val dynamicColor: Boolean = false,
         val fontChoice: FontChoice = FontChoice.System,
         val fontScale: FontScale = FontScale.Standard,
-        val sourceMode: SourceMode = SourceMode.LIVE,
+        val sourceMode: SourceMode = SourceMode.ARCHIVE,
         val language: AppLanguage = AppLanguage.SYSTEM
     )
 
@@ -51,7 +51,9 @@ class SettingsStore(context: Context) {
                 ?: FontChoice.System,
             fontScale = p[KEY_FONT_SCALE]?.let { name -> runCatching { FontScale.valueOf(name) }.getOrNull() }
                 ?: FontScale.Standard,
-            sourceMode = SourceMode.fromStored(p[KEY_SOURCE_MODE]),
+            // 设置页「数据源」入口已移除,默认恒定走归档:忽略 DataStore 旧值,强制 ARCHIVE。
+            // (底层 LIVE 分支 / SourceMode 枚举 / fromStored 保留待恢复。)
+            sourceMode = SourceMode.ARCHIVE,
             language = p[KEY_LANGUAGE]?.let { name -> runCatching { AppLanguage.valueOf(name) }.getOrNull() }
                 ?: AppLanguage.SYSTEM
         )
@@ -155,7 +157,7 @@ class SettingsStore(context: Context) {
      */
     suspend fun currentSourceMode(): SourceMode = runCatching {
         prefsFlow.first().sourceMode
-    }.getOrDefault(SourceMode.LIVE)
+    }.getOrDefault(SourceMode.ARCHIVE)
 
     private companion object {
         val KEY_THEME = stringPreferencesKey("theme_mode")

@@ -51,7 +51,6 @@ import com.peng.ainewshub.data.AiConfigStore
 import com.peng.ainewshub.data.CacheManager
 import com.peng.ainewshub.data.AiUsageStore
 import com.peng.ainewshub.data.SummaryRepository
-import com.peng.ainewshub.data.source.SourceMode
 import com.peng.ainewshub.ui.more.SettingsStore
 import com.peng.ainewshub.ui.NewsDetailScreen
 import com.peng.ainewshub.ui.BrowseHistoryViewModel
@@ -346,7 +345,6 @@ fun AiNewsHubApp(
     val dynamicColor = displayPrefs.dynamicColor
     val fontChoice = displayPrefs.fontChoice
     val fontScale = displayPrefs.fontScale
-    val sourceMode = displayPrefs.sourceMode
     // AI 服务全局配置:除设置页外,WebView 整页翻译也读取(开关/就绪态判定)
     val aiConfig by configStore.configFlow.collectAsStateWithLifecycle(
         initialValue = AiConfig()
@@ -355,7 +353,6 @@ fun AiNewsHubApp(
     val onToggleDynamicColor: (Boolean) -> Unit = { scope.launch { settingsStore.updateDynamicColor(it) } }
     val onSelectFont: (FontChoice) -> Unit = { scope.launch { settingsStore.updateFont(it) } }
     val onSelectFontScale: (FontScale) -> Unit = { scope.launch { settingsStore.updateFontScale(it) } }
-    val onSelectSource: (SourceMode) -> Unit = { scope.launch { settingsStore.updateSourceMode(it) } }
     // 应用内语言:持久化 + 重建 Activity 生效;小组件同步刷新文案
     val activity = LocalContext.current as? Activity
     val onSelectLanguage: (AppLanguage) -> Unit = { lang ->
@@ -621,8 +618,6 @@ fun AiNewsHubApp(
                             onSelectFont = onSelectFont,
                             fontScale = fontScale,
                             onSelectFontScale = onSelectFontScale,
-                            sourceMode = sourceMode,
-                            onSelectSource = onSelectSource,
                             language = displayPrefs.language,
                             onSelectLanguage = onSelectLanguage,
                             onBack = pop,
@@ -764,8 +759,6 @@ private fun PageView(
     onSelectFont: (FontChoice) -> Unit,
     fontScale: FontScale,
     onSelectFontScale: (FontScale) -> Unit,
-    sourceMode: SourceMode,
-    onSelectSource: (SourceMode) -> Unit,
     language: AppLanguage,
     onSelectLanguage: (AppLanguage) -> Unit,
     onBack: () -> Unit,
@@ -857,8 +850,6 @@ private fun PageView(
             onSelectFont = onSelectFont,
             fontScale = fontScale,
             onSelectFontScale = onSelectFontScale,
-            sourceMode = sourceMode,
-            onSelectSource = onSelectSource,
             language = language,
             onSelectLanguage = onSelectLanguage,
             cacheSizeBytes = cacheSizeBytes,

@@ -30,7 +30,6 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.peng.ainewshub.R
 import com.peng.ainewshub.data.CacheManager
-import com.peng.ainewshub.data.source.SourceMode
 import com.peng.ainewshub.ui.components.AppTopBar
 import com.peng.ainewshub.ui.components.AppTopBarDefaults
 import com.peng.ainewshub.ui.components.SegmentedOptionRow
@@ -97,8 +96,6 @@ fun SettingsScreen(
     onSelectFont: (FontChoice) -> Unit,
     fontScale: FontScale,
     onSelectFontScale: (FontScale) -> Unit,
-    sourceMode: SourceMode,
-    onSelectSource: (SourceMode) -> Unit,
     language: AppLanguage,
     onSelectLanguage: (AppLanguage) -> Unit,
     cacheSizeBytes: Long,
@@ -108,7 +105,6 @@ fun SettingsScreen(
     val themeOptions = ThemeMode.entries.map { stringResource(it.labelRes) }
     val fontOptions = FontChoice.entries.map { stringResource(it.labelRes) }
     val fontScaleOptions = FontScale.entries.map { stringResource(it.labelRes) }
-    val sourceOptions = SourceMode.entries.map { stringResource(it.labelRes) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
@@ -176,19 +172,6 @@ fun SettingsScreen(
                     selectedIndex = fontScale.ordinal,
                     onSelect = { idx -> onSelectFontScale(FontScale.entries[idx]) },
                     modifier = Modifier.padding(horizontal = 18.dp, vertical = 4.dp)
-                )
-            }
-
-            // 数据源 section —— Hub 4 个稳定源从实时抓取还是 gitcode 归档取数
-            // 实时:直连第三方站点(默认,数据最新);归档:读 gitcode 历史快照(稳定不受反爬影响)
-            // 切换后下拉刷新即用新源,无需重进页面(ViewModel 订阅 prefsFlow 动态选 repo)。
-            item { SectionHeader(stringResource(R.string.settings_section_data_source)) }
-            item {
-                SegmentedOptionRow(
-                    options = sourceOptions,
-                    selectedIndex = sourceMode.ordinal,
-                    onSelect = { idx -> onSelectSource(SourceMode.entries[idx]) },
-                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 6.dp)
                 )
             }
 
