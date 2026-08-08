@@ -33,7 +33,8 @@ from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from fetch_data import SOURCES, _scan_history, HISTORY_RETENTION_DAYS, HISTORY_START_DATE, CST
+from fetch_data import SOURCES, _scan_history, HISTORY_RETENTION_DAYS, HISTORY_START_DATE
+from common import BEIJING_TZ as CST
 from push_data import (
     DEFAULT_BRANCH,
     DEFAULT_REPO_URL,

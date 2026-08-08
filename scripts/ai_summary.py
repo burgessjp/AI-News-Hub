@@ -27,7 +27,10 @@ import os
 import sys
 import time
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 import ai_client
+from common import SOURCE_KEYS
 
 
 # ===== 环境变量 =====
@@ -42,8 +45,8 @@ TEMPERATURE = 0.5
 # 自带重试 3 次(对齐 fetch_data 主链路的重试上限);失败间隔 2s/4s
 MAX_ATTEMPTS = 3
 
-# App 端只对这 8 个源做摘要
-SUMMARY_SOURCES = ("hackernews", "github-trending", "huggingface-papers", "stormzhang-ai", "producthunt", "rundown-ai", "aihot-featured", "openai-anthropic-news")
+# App 端只对这 8 个源做摘要(对齐 common.SOURCE_KEYS;保留别名供既有 import 引用)
+SUMMARY_SOURCES = SOURCE_KEYS
 
 
 # ===== system prompt =====

@@ -50,19 +50,16 @@ import sys
 import time
 from datetime import datetime, timezone, timedelta
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 import ai_client
+from common import SOURCE_KEYS, BEIJING_TZ, now_cst
 
 # 复用 ai_summary 的配置入口(同一套 AI_NEWS_HUB_AI_* 环境变量 + config_ready)
 from ai_summary import ENV_BASE_URL, ENV_MODEL, ENV_API_KEY, config_ready
 
 
 # ===== 常量(对齐 OverviewRepository.kt companion) =====
-
-# 8 个归档源(对齐 App SummaryRepository.SOURCE_KEYS,顺序即默认展示顺序)
-SOURCE_KEYS = (
-    "hackernews", "github-trending", "openai-anthropic-news", "huggingface-papers",
-    "producthunt", "rundown-ai", "aihot-featured", "stormzhang-ai",
-)
 
 # 源 key → 展示标题(对齐 App SummaryRepository.titleOf)
 SOURCE_TITLES = {
@@ -86,8 +83,6 @@ TITLE_DUP_THRESHOLD = 0.5  # 标题 Jaccard 去重阈值
 TIMEOUT = (15, 120)
 TEMPERATURE = 0.3
 MAX_ATTEMPTS = 3
-
-BEIJING_TZ = timezone(timedelta(hours=8))
 
 
 # ===== system prompt(初版逐字搬自 OverviewRepository.kt;现为提升生成准确性重写) =====

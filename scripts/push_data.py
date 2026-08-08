@@ -27,10 +27,11 @@ import shutil
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
 
-# 北京时间(UTC+8):提交信息里的时间戳与文件名一致(对齐 fetch_data.py)
-CST = timezone(timedelta(hours=8))
+# 北京时间(UTC+8):提交信息里的时间戳与文件名一致(统一从 common 引入)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from common import BEIJING_TZ as CST
 
 ENV_GITCODE_TOKEN = "GITCODE_TOKEN"
 

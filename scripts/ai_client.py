@@ -93,8 +93,8 @@ def _strip_fence_and_extract(content, expect):
 
 
 def _sleep_for_status(resp):
-    """从 429/503 响应算退避时长(秒):优先 Retry-After 头,缺省则指数退避。
-    返回 (sleep_seconds, is_rate_limited)。"""
+    """从 429/503 响应算退避时长(秒):优先 Retry-After 头,缺省返回 0(由调用方指数退避)。
+    返回 sleep_seconds(float;0 表示无 Retry-After 头,调用方自行按重试次数退避)。"""
     sleep_s = 0
     retry_after = resp.headers.get("Retry-After") or resp.headers.get("retry-after")
     if retry_after:

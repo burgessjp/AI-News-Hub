@@ -72,13 +72,10 @@ SESSION = requests.Session()
 SESSION.headers.update({"User-Agent": UA})
 TIMEOUT = (15, 20)
 
-# 北京时间(UTC+8)—— App 端虽未显式设时区,但文件名用本地时间存历史快照更直观
-CST = timezone(timedelta(hours=8))
-
-
-def now_cst():
-    """当前北京时间(GitHub Actions 设了 TZ=Asia/Shanghai 时与系统时间一致)。"""
-    return datetime.now(CST)
+# 北京时间(UTC+8)—— 统一从 common 引入(命名 BEIJING_TZ;此处保留 CST 别名供
+# 本文件内部及 backfill_history 的 `from fetch_data import CST` 向后兼容)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from common import BEIJING_TZ as CST, now_cst
 
 
 def fetch_text(url, extra_headers=None, expect_json=False):
