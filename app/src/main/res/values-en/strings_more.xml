@@ -46,6 +46,7 @@
     <!-- ===== About screen ===== -->
     <string name="about_title">About</string>
     <string name="about_slogan">A curated daily AI news aggregator</string>
+    <string name="about_license">© 2026 peng · Licensed under the MIT License</string>
     <string name="about_section_data_sources">Data Sources</string>
     <string name="about_section_project">Project</string>
     <string name="about_project_source_title">Source Code</string>

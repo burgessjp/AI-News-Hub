@@ -48,6 +48,7 @@
     <!-- ===== 关于页(AboutScreen) ===== -->
     <string name="about_title">关于</string>
     <string name="about_slogan">精选每日 AI 资讯聚合客户端</string>
+    <string name="about_license">© 2026 peng · 基于 MIT 协议开源</string>
     <string name="about_section_data_sources">数据来源</string>
     <string name="about_section_project">项目</string>
     <string name="about_project_source_title">项目源码</string>

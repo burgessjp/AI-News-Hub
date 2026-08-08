@@ -182,6 +182,12 @@ private fun BrandHeader(versionName: String) {
                     style = MaterialTheme.typography.bodySmall,
                     color = cs.onSurfaceVariant
                 )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = stringResource(R.string.about_license),
+                    style = AppText.caption,
+                    color = cs.outline
+                )
             }
         }
     }
@@ -289,5 +295,9 @@ private val deps = listOf(
     "OkHttp" to "Apache-2.0",
     "jsoup" to "MIT",
     "Coil" to "Apache-2.0",
-    "Room" to "Apache-2.0"
+    "Room" to "Apache-2.0",
+    "Reorderable" to "Apache-2.0",
+    "Jetpack Glance" to "Apache-2.0",
+    "AndroidX WebKit" to "Apache-2.0",
+    "AndroidX DataStore" to "Apache-2.0"
 )
