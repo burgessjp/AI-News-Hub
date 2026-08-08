@@ -1,5 +1,8 @@
 package com.peng.ainewshub.data
 
+import androidx.compose.runtime.Immutable
+
+
 import org.jsoup.nodes.Element
 
 /**
@@ -22,6 +25,8 @@ import org.jsoup.nodes.Element
  *                   取不到时若页面给了具名头像/作者名,则拼成 "A, B, C" 形式;都没有则为空
  * @param githubUrl  论文关联的 GitHub 仓库地址(部分论文带「GitHub」按钮);无则为空
  */
+@Immutable
+
 data class HuggingFacePaper(
     val rank: Int,
     val id: String,

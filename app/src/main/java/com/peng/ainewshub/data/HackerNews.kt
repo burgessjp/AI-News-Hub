@@ -1,5 +1,8 @@
 package com.peng.ainewshub.data
 
+import androidx.compose.runtime.Immutable
+
+
 import android.os.Parcelable
 import kotlinx.parcelize.Parcelize
 import org.json.JSONArray
@@ -23,6 +26,7 @@ import org.json.JSONObject
  * - time:     Unix 秒级时间戳(非 ISO 8601)
  * - kids:     一级评论 id 列表(按 HN 排名顺序),用于拉取评论树
  */
+@Immutable
 @Parcelize
 data class HackerNewsStory(
     val id: Long,
@@ -146,6 +150,7 @@ data class HackerNewsStoriesCache(
  *
  * 层级(depth)不由数据模型持有 —— 懒加载树中层级由 UI 展开路径决定。
  */
+@Immutable
 data class HackerNewsComment(
     val id: Long,
     val by: String = "",

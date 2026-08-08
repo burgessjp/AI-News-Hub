@@ -1,5 +1,8 @@
 package com.peng.ainewshub.data
 
+import androidx.compose.runtime.Immutable
+
+
 import org.json.JSONObject
 
 /**
@@ -23,6 +26,8 @@ import org.json.JSONObject
  * @param category    分类标签,如 "Product" / "Research" / "Announcements";可空
  * @param publishedAt 发布时间 ISO,如 "2026-07-22T13:00:00Z";原样展示不做解析
  */
+@Immutable
+
 data class OpenAiAnthropicNews(
     val rank: Int,
     val title: String,

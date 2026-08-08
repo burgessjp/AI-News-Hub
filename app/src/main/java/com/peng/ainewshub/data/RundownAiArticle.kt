@@ -1,5 +1,8 @@
 package com.peng.ainewshub.data
 
+import androidx.compose.runtime.Immutable
+
+
 import org.json.JSONObject
 
 /**
@@ -25,6 +28,8 @@ import org.json.JSONObject
  * @param authors   作者段,如 "Zach Mink, +4"(+4 表示还有 4 位合著者);原样展示
  * @param coverUrl  封面图 URL(beehiiv cdn-cgi 图);列表缩略图用,无则为空
  */
+@Immutable
+
 data class RundownAiArticle(
     val rank: Int,
     val slug: String,

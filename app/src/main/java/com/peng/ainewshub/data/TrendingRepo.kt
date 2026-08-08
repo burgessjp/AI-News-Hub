@@ -1,5 +1,8 @@
 package com.peng.ainewshub.data
 
+import androidx.compose.runtime.Immutable
+
+
 import org.jsoup.nodes.Element
 
 /**
@@ -22,6 +25,8 @@ import org.jsoup.nodes.Element
  * @param forks         fork 数
  * @param starsToday    今日新增 star 数(页面默认 daily 窗口)
  */
+@Immutable
+
 data class TrendingRepo(
     val rank: Int,
     val owner: String,

@@ -1,5 +1,8 @@
 package com.peng.ainewshub.data
 
+import androidx.compose.runtime.Immutable
+
+
 import org.json.JSONObject
 
 /**
@@ -27,6 +30,8 @@ import org.json.JSONObject
  * @param topics        话题标签,如 ["Developer Tools", "Artificial Intelligence"];至多 3 个
  * @param thumbnailUrl  产品主图 URL(PH thumbnail.url,列表缩略图用);无则为空
  */
+@Immutable
+
 data class ProductHunt(
     val rank: Int,
     val id: String,

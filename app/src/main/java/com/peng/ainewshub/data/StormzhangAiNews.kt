@@ -1,5 +1,8 @@
 package com.peng.ainewshub.data
 
+import androidx.compose.runtime.Immutable
+
+
 import org.jsoup.nodes.Element
 
 /**
@@ -18,6 +21,8 @@ import org.jsoup.nodes.Element
  * @param source    来源信源名,如 "Hacker News" / "Reddit" / "Product Hunt" / "The Rundown AI" / "TLDR AI"
  * @param time      发布时间原文,如 "2026-07-13 20:00";原样展示不做解析
  */
+@Immutable
+
 data class StormzhangAiNews(
     val rank: Int,
     val url: String,

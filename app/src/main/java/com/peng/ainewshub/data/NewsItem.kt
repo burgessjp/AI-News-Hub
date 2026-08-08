@@ -1,5 +1,8 @@
 package com.peng.ainewshub.data
 
+import androidx.compose.runtime.Immutable
+
+
 import android.os.Parcelable
 import androidx.annotation.StringRes
 import com.peng.ainewshub.R
@@ -39,6 +42,7 @@ enum class Mode(val api: String) {
  *  - id 是 cuid(25 字符),不是数字
  *  - permalink 是站内中文翻译阅读页,深链优先用之;url 是第三方原文
  */
+@Immutable
 @Parcelize
 data class NewsItem(
     val id: String,
