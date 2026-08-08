@@ -26,6 +26,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 from datetime import datetime, timezone, timedelta
 
 # 北京时间(UTC+8):提交信息里的时间戳与文件名一致(对齐 fetch_data.py)
@@ -35,6 +36,11 @@ ENV_GITCODE_TOKEN = "GITCODE_TOKEN"
 
 DEFAULT_REPO_URL = "https://gitcode.com/peng1818/AI-News-Hub-Data.git"
 DEFAULT_BRANCH = "news-hub-data"
+
+# push 重试次数与退避(对齐 fetch/summary 链路的 3 次重试)。
+# push 是全链路最后一步,瞬时网络抖动 / 非快进会废掉整轮(下一轮要等次日 15:30),
+# 故与抓取/AI 同等对待:失败重试,push 类失败时重 clone 规避脏本地状态。
+PUSH_MAX_ATTEMPTS = 3
 
 
 def run(cmd, cwd=None, check=True):
@@ -64,7 +70,7 @@ def _redact(arg):
 
 
 def push(data_dir, repo_url, branch):
-    """克隆目标分支 → 覆盖产物 → 提交 → 推送。无改动时跳过。"""
+    """克隆目标分支 → 覆盖产物 → 提交 → 推送。无改动时跳过。push 失败重试。"""
     token = os.environ.get(ENV_GITCODE_TOKEN)
     if not token:
         print(f"[FATAL] 缺少环境变量 {ENV_GITCODE_TOKEN},无法推送。"
@@ -81,16 +87,44 @@ def push(data_dir, repo_url, branch):
     work_root = os.path.abspath(os.path.join(data_dir, os.pardir))
     repo_dir = os.path.join(work_root, "repo")
 
-    # 清掉上次可能残留的 clone 目录(本地连跑时复用 work_root)
+    # 首次 clone + overlay + commit;push 失败时重试(含重 clone 规避脏本地状态)。
+    # 整体重试最多 PUSH_MAX_ATTEMPTS 次,对齐 fetch/summary 链路的容错强度。
+    last_err = None
+    for attempt in range(1, PUSH_MAX_ATTEMPTS + 1):
+        try:
+            return _clone_overlay_commit_push(
+                data_dir, repo_dir, authed_url, branch, repo_url,
+                is_retry=(attempt > 1),
+            )
+        except subprocess.CalledProcessError as e:
+            last_err = e
+            if attempt < PUSH_MAX_ATTEMPTS:
+                wait = 2 ** attempt  # 2s, 4s
+                print(f"[PUSH] 第 {attempt}/{PUSH_MAX_ATTEMPTS} 次失败,{wait}s 后重试"
+                      f"(将重新 clone):\n{e.stderr}", file=sys.stderr)
+                time.sleep(wait)
+    print(f"[FATAL] 推送 {PUSH_MAX_ATTEMPTS} 次全败:{last_err.stderr if last_err else last_err}",
+          file=sys.stderr)
+    return 4
+
+
+def _clone_overlay_commit_push(data_dir, repo_dir, authed_url, branch, repo_url, *,
+                               is_retry=False):
+    """
+    单次完整推送:clone → overlay → commit → push。任一步失败抛 CalledProcessError
+    (由 push 的重试循环捕获)。is_retry=True 时打印重试标记。
+
+    失败后重试会重新 clone:浅克隆很快,且能规避上次 push 失败残留的脏本地状态
+    (如非快进冲突导致的本地分叉),比在同一仓库上反复 force push 更稳妥。
+    """
+    if is_retry:
+        print(f"[PUSH] 重新 clone 后重试推送")
+    # 清掉上次可能残留的 clone 目录(本地连跑 / 重试时复用 work_root)
     if os.path.isdir(repo_dir):
         shutil.rmtree(repo_dir)
 
     # 浅克隆目标分支(只要最新一次提交,省带宽)
-    try:
-        run(["git", "clone", "--depth", "1", "--branch", branch, authed_url, repo_dir])
-    except subprocess.CalledProcessError as e:
-        print(f"[FATAL] 克隆 {repo_url}(分支 {branch})失败:\n{e.stderr}", file=sys.stderr)
-        return 3
+    run(["git", "clone", "--depth", "1", "--branch", branch, authed_url, repo_dir])
 
     # 覆盖产物进仓库根:保留仓库既有历史快照,只覆盖 / 新增本次文件
     _overlay(data_dir, repo_dir)

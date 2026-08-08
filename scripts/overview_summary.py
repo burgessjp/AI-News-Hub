@@ -31,7 +31,7 @@
   - 日期显示:与数据日期同年显示 MM-dd,跨年显示完整 yyyy-MM-dd(防旧文看似新鲜);
     rundown-ai 列表页无文章日期,其日期为抓取兜底,输入中标注「抓取日期」;
   - 数据日期 = 全源快照最大 fetched_at_ms 的北京日期;
-    breaking 时效窗口 = 数据日期及其前一天(07:00 跑批时,前一日晚间大事仍算突发);
+    breaking 时效窗口 = 数据日期及其前一天(15:30 北京跑批时,前一日晚间大事仍算突发);
   - 调 OpenAI 兼容 /v1/chat/completions,温度 0.3,read 超时放宽到 120s(输出长);
   - 解析后做 ref 回填 + 时效兜底 + URL/标题双层去重 + breaking 截断到 MAX_BREAKING;
   - 失败返回 None,不阻断推送(对齐单源 AI 摘要失败的优雅降级,
@@ -50,7 +50,7 @@ import sys
 import time
 from datetime import datetime, timezone, timedelta
 
-import requests
+import ai_client
 
 # 复用 ai_summary 的配置入口(同一套 AI_NEWS_HUB_AI_* 环境变量 + config_ready)
 from ai_summary import ENV_BASE_URL, ENV_MODEL, ENV_API_KEY, config_ready
@@ -373,60 +373,17 @@ def _build_section(source, snapshot, data_today=""):
     return "\n".join(sb)
 
 
-# ===== AI 调用 + 解析(复刻 ai_summary._request_summary,放宽超时) =====
+# ===== AI 调用统一经 ai_client(共享 Session / 429 重试 / 围栏剥离) =====
+# 总览的请求与解析原与 ai_summary 各持一份逐字重复的实现,现已收口到
+# ai_client.call_llm(expect="object");此处仅保留对返回对象的结构校验。
 
-def _parse_overview_json(content):
-    """
-    把 AI 返回的文本解析成 {items: [...]};items 每项含 ref/analysis/breaking/breakingReason。
-    容错:剥 markdown 围栏,截取首个 { 到末个 }。解析失败抛 RuntimeError(由调用方重试)。
-    """
-    if not content:
-        raise RuntimeError("AI 响应 content 为空")
-    # 剥 markdown 围栏
-    stripped = re.sub(r"^```(?:json)?\s*", "", content.strip(), flags=re.IGNORECASE).rstrip("`").strip()
-    start, end = stripped.find("{"), stripped.rfind("}")
-    if start == -1 or end == -1 or end <= start:
-        raise RuntimeError(f"AI 响应未找到 JSON 对象:{content[:120]}")
-    payload = stripped[start:end + 1]
-    try:
-        data = json.loads(payload)
-    except json.JSONDecodeError as e:
-        raise RuntimeError(f"AI 响应 JSON 解析失败:{e}:{content[:120]}")
-    if not isinstance(data, dict) or not isinstance(data.get("items"), list) or not data["items"]:
-        raise RuntimeError(f"AI 响应非含非空 items 数组的对象:{content[:120]}")
+
+def _validate_overview_obj(data):
+    """ai_client.call_llm 已保证返回非空 dict;这里校验它含非空 items 数组。
+    失败抛 RuntimeError(由 generate_overview 的 3 次业务层重试捕获)。"""
+    if not isinstance(data.get("items"), list) or not data["items"]:
+        raise RuntimeError(f"AI 响应非含非空 items 数组的对象:{str(data)[:120]}")
     return data
-
-
-def _request_overview(system_prompt, user_prompt, base_url, model, api_key):
-    """发起一次 OpenAI 兼容 /v1/chat/completions 请求,返回解析后的 {items: [...]}。失败抛异常。"""
-    url = f"{base_url.rstrip('/')}/v1/chat/completions"
-    body = {
-        "model": model,
-        "temperature": TEMPERATURE,
-        # 同 ai_summary.py:关闭 deepseek-v4-flash 默认的 thinking=high,
-        # 总览是跨源归纳,无需推理链;关掉后从 60-100s 回到秒级,不再撞 read timeout。
-        "thinking": {"type": "disabled"},
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-    }
-    resp = requests.post(
-        url,
-        json=body,
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        },
-        timeout=TIMEOUT,
-    )
-    resp.raise_for_status()
-    data = resp.json()
-    choices = data.get("choices") or []
-    if not choices:
-        raise RuntimeError(f"AI 响应无 choices:{str(data)[:120]}")
-    content = (((choices[0].get("message") or {}).get("content")) or "").strip()
-    return _parse_overview_json(content)
 
 
 # ===== 解析兜底(搬自 OverviewRepository.kt parseResult/parseEntries) =====
@@ -464,8 +421,8 @@ def _title_not_duplicate(title, history):
 def _parse_result(ai_data, snapshots, breaking_dates):
     """
     解析 AI 输出为统一的热点列表(完成 ref 回填 + 时效兜底 + 双层去重 + breaking 截断)。
-    breaking_dates: 允许标 breaking 的北京日期集合(数据日期及其前一天——07:00 跑批时,
-    前一日晚间的大事仍算突发)。
+    breaking_dates: 允许标 breaking 的北京日期集合(数据日期及其前一天——15:30 北京
+    跑批时,前一日晚间的大事仍算突发)。
     返回 [{source, title, url, metrics, comment, breaking, breakingReason}, ...]。
     """
     raw_items = ai_data.get("items") or []
@@ -562,7 +519,7 @@ def generate_overview(out_dir, now):
     # 数据日期 = 全源快照最大 fetched_at_ms 的北京日期
     data_date_ms = max((s.get("fetched_at_ms", 0) or 0) for s in snapshots.values())
     data_today = _beijing_date_key_of_ms(data_date_ms)
-    # breaking 时效窗口:数据日期及其前一天(07:00 跑批时,前一日晚间大事仍算突发)
+    # breaking 时效窗口:数据日期及其前一天(15:30 北京跑批时,前一日晚间大事仍算突发)
     data_yesterday = _beijing_date_key_of_ms(data_date_ms - 86400000)
     breaking_dates = {d for d in (data_today, data_yesterday) if d}
 
@@ -581,7 +538,11 @@ def generate_overview(out_dir, now):
     last_err = None
     for attempt in range(1, MAX_ATTEMPTS + 1):
         try:
-            ai_data = _request_overview(SYSTEM_PROMPT, user_prompt, base_url, model, api_key)
+            ai_data = ai_client.call_llm(
+                SYSTEM_PROMPT, user_prompt, base_url, model, api_key,
+                timeout=TIMEOUT, temperature=TEMPERATURE, expect="object",
+            )
+            _validate_overview_obj(ai_data)
             items = _parse_result(ai_data, snapshots, breaking_dates)
             if not items:
                 raise RuntimeError("解析后无有效条目")

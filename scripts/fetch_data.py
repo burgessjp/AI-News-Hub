@@ -29,7 +29,7 @@ Repository 与对应 model 类),把 8 个数据源解析成 JSON 落盘:
   - 只要 ≥1 个源成功,退出码 0;全部失败才非 0。
 
 AI 总结(需求 c):
-  - 每源抓完调 ai_summary.summarize_source 生成简体中文要点,写入快照顶层 `ai_summary`。
+  - 每源抓完调 ai_summary.summarize_source 生成简体中文要点,写入快照顶层 `ai_summary_v2`。
   - 总结 8 个稳定源(hackernews/github-trending/huggingface-papers/stormzhang-ai/
     producthunt/rundown-ai/aihot-featured/openai-anthropic-news)。AI 调用失败仅 warn,不阻断落盘。
   - 需 3 个 AI 环境变量(AI_NEWS_HUB_AI_BASE_URL/_MODEL/_API_KEY)齐全;缺失则跳过总结。
@@ -187,7 +187,7 @@ def fetch_github_trending():
             "Accept-Language": "en-US,en;q=0.9",
         },
     )
-    soup = BeautifulSoup(html, "html.parser")
+    soup = BeautifulSoup(html, "lxml")
     items = []
     for idx, article in enumerate(soup.select("article.Box-row")):
         link = article.select_one("h2 a")
@@ -250,7 +250,7 @@ def fetch_stormzhang_ai():
             "Accept-Language": "zh-CN,zh;q=0.9",
         },
     )
-    soup = BeautifulSoup(html, "html.parser")
+    soup = BeautifulSoup(html, "lxml")
     items = []
     for idx, el in enumerate(soup.select("a.item")):
         url = (el.get("href") or "").strip()
@@ -349,7 +349,7 @@ def fetch_rundown_ai():
             "Accept-Language": "en-US,en;q=0.9",
         },
     )
-    soup = BeautifulSoup(html, "html.parser")
+    soup = BeautifulSoup(html, "lxml")
     items = []
     seen_slugs = set()
     rank = 0
@@ -405,7 +405,7 @@ def fetch_huggingface_papers():
             "Accept-Language": "en-US,en;q=0.9,zh-CN,zh;q=0.8",
         },
     )
-    soup = BeautifulSoup(html, "html.parser")
+    soup = BeautifulSoup(html, "lxml")
     items = []
     for idx, article in enumerate(soup.select("article.relative.overflow-hidden.rounded-xl.border")):
         link = article.select_one('h3 > a[href^="/papers/"]')
@@ -511,7 +511,7 @@ query($first: Int!, $after: DateTime) {
 def _ph_today_utc_start():
     """当日 UTC 0 点的 ISO 字符串(如 '2026-07-18T00:00:00Z')。
     PH 按太平洋时间排「Product of the Day」,但 API 的 postedAfter 用 UTC 最直观,
-    且北京 07:00/14:00 抓取时 UTC 当天已覆盖 PH 当日榜单。"""
+    且北京 15:30 抓取时 UTC 当天已覆盖 PH 当日榜单。"""
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT00:00:00Z")
 
 
@@ -759,7 +759,7 @@ def _fetch_anthropic_html_items():
             "Accept-Language": "en-US,en;q=0.9",
         },
     )
-    soup = BeautifulSoup(html, "html.parser")
+    soup = BeautifulSoup(html, "lxml")
     items = []
     for el in soup.select('a[href^="/news/"]'):
         href = (el.get("href") or "").strip().split("?")[0].split("#")[0]
@@ -834,7 +834,7 @@ def _fetch_claude_blog_items():
             "Accept-Language": "en-US,en;q=0.9",
         },
     )
-    soup = BeautifulSoup(html, "html.parser")
+    soup = BeautifulSoup(html, "lxml")
     items = []
     seen_slugs = set()
     for card in soup.select(".blog_cms_item"):
@@ -898,7 +898,7 @@ def _fetch_anthropic_engineering_items():
             "Accept-Language": "en-US,en;q=0.9",
         },
     )
-    soup = BeautifulSoup(html, "html.parser")
+    soup = BeautifulSoup(html, "lxml")
     items = []
     seen_slugs = set()
     for el in soup.select('a[href^="/engineering/"]'):
@@ -1063,6 +1063,11 @@ SOURCES = {
 # 单源抓取最大重试次数(需求 a:失败重试,最多 3 次)。首次 + 2 次重试。
 FETCH_MAX_ATTEMPTS = 3
 
+# 允许「空结果」的源:这些源在时间窗口内无新内容时正常返回空列表,不应视为源站故障。
+# openai-anthropic-news 含 Claude Blog/Engineering 等月级更新子源,2 天窗口常无新文。
+# 其余源空结果 = 选择器失效/接口异常(按失败处理,不落盘 0 条快照、由 previous_latest 兜底)。
+EMPTY_OK_SOURCES = frozenset({"openai-anthropic-news"})
+
 
 def fetch_with_retry(name, fn, limit_hn=None):
     """
@@ -1119,6 +1124,23 @@ def write_snapshot(out_dir, source_name, items, meta, now, ai_summary_v2=None):
     with open(file_path, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2)
     return file_path
+
+
+def patch_ai_summary_v2(file_path, ai_summary_v2):
+    """
+    把 AI 摘要回填到已落盘的快照顶层 `ai_summary_v2` 字段(两阶段抓取用)。
+
+    P1 优化:抓取阶段先不带摘要落盘(快),拿到 8 源 items 后再并发调 AI 总结;
+    本函数把并发产出的摘要 patch 回各自快照文件,避免重写整个快照。
+    ai_summary_v2 为 None/空时跳过(保持无摘要时的结构兼容)。
+    """
+    if not ai_summary_v2:
+        return
+    with open(file_path, "r", encoding="utf-8") as f:
+        payload = json.load(f)
+    payload["ai_summary_v2"] = ai_summary_v2
+    with open(file_path, "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
 
 
 def _iter_snapshots(out_dir, source_name):
@@ -1405,30 +1427,51 @@ def main():
               file=sys.stderr)
 
     results = {}  # source -> {"status": "ok"|"fail"|"skipped", ...}
+    # 阶段 1(串行抓取):逐源 fetch + 落盘(先不带 AI 摘要),成功源缓存待 AI 总结。
+    # 抓取保持串行(各源 HTTP 请求相互独立但并发会叠加反爬/限流风险,刻意串行)。
+    # AI 摘要阶段(P1)改为并发 —— 见下方阶段 2。
+    pending_summary = []  # [(name, items, file_path), ...] 待 AI 总结的成功源
     for name, fn in targets:
         try:
             # 需求 a:失败重试最多 3 次
             items, meta = fetch_with_retry(name, fn, limit_hn=args.limit_hn)
 
-            # 空结果视同失败(选择器失效/接口异常):不落盘 0 条快照、不前移 latest,
-            # 由 previous_latest 继承旧指针,避免 App 端拿到空列表
-            if not items:
+            # 空结果处理:EMPTY_OK_SOURCES 里的源(如 openai-anthropic-news 的月级更新
+            # 子源)在时间窗口无新文时正常返回空,落盘 0 条快照、不调 AI;其余源空结果
+            # = 选择器失效/接口异常,按失败处理(不落盘,由 previous_latest 兜底)。
+            if not items and name not in EMPTY_OK_SOURCES:
                 raise RuntimeError("抓取结果为空(疑似源站改版/接口异常),按失败处理")
 
-            # 需求 c:每源抓完做 AI 总结(失败仅 warn,不阻断落盘)
-            ai_v2 = None
-            if do_summary:
-                ai_v2 = ai_summary.summarize_source(name, items)
-
-            file_path = write_snapshot(args.out_dir, name, items, meta, now, ai_summary_v2=ai_v2)
-            extra = "(含 AI 摘要)" if ai_v2 else ""
-            print(f"[OK]   {name:<20} {len(items):>4} 条{extra} → {file_path}")
+            file_path = write_snapshot(args.out_dir, name, items, meta, now)
+            print(f"[OK]   {name:<20} {len(items):>4} 条 → {file_path}")
             results[name] = {"status": "ok", "count": len(items), "file": file_path}
+            if items:  # 空结果的源没有东西可总结,不进待总结队列
+                pending_summary.append((name, items, file_path))
         except Exception as e:
             # 单源 3 次重试全败:记错误、跳过、继续(需求 a:由 previous_latest 兜底 index)
             print(f"[FAIL] {name:<20} 重试 {FETCH_MAX_ATTEMPTS} 次仍失败:"
                   f"{type(e).__name__}: {e}", file=sys.stderr)
             results[name] = {"status": "fail", "error": f"{type(e).__name__}: {e}"}
+
+    # 阶段 2(并发 AI 摘要):P1 优化 —— 8 源的 summarize_source 彼此独立(LLM 调用是
+    # IO-bound),用线程池并发跑,把 AI 阶段从串行 ~8× 压到 ~2-3×。summarize_source
+    # 内部自带 3 次重试且无共享可变状态,线程安全。并发度限 4 控制对 AI 服务的压力。
+    if do_summary and pending_summary:
+        with ThreadPoolExecutor(max_workers=4, thread_name_prefix="ai") as pool:
+            # map 保输入/输出顺序一一对应;每个任务返回 (name, ai_v2)
+            ai_results = list(pool.map(
+                lambda t: (t[0], ai_summary.summarize_source(t[0], t[1])),
+                pending_summary,
+            ))
+        for name, ai_v2 in ai_results:
+            if ai_v2:
+                # 找到该源的快照路径并 patch 回写 ai_summary_v2
+                file_path = next(p[2] for p in pending_summary if p[0] == name)
+                patch_ai_summary_v2(file_path, ai_v2)
+                print(f"[AI]   {name:<20} 摘要已回填 {len(ai_v2)} 条 → {file_path}")
+            else:
+                print(f"[AI]   {name:<20} 摘要失败/为空,快照不带 ai_summary_v2",
+                      file=sys.stderr)
 
     # manifest:本次运行总览(放输出根,便于 CI 提交后回溯)
     manifest = {

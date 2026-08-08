@@ -23,13 +23,11 @@
   items = summarize_source("hackernews", raw_items)  # 返回 list[dict] 或 None
 """
 
-import json
 import os
-import re
 import sys
 import time
 
-import requests
+import ai_client
 
 
 # ===== 环境变量 =====
@@ -338,80 +336,6 @@ def config_ready():
     return all(os.getenv(k) for k in (ENV_BASE_URL, ENV_MODEL, ENV_API_KEY))
 
 
-def _parse_summary_json(content):
-    """
-    把 AI 返回的文本解析成摘要对象列表(list[dict],每项含非空 title 与 desc)。
-
-    模型有时会把 JSON 包在 ```json ... ``` 代码块里,或在首尾混入解释性文字,
-    这里做容错:先剥除 ``` 代码块围栏,再截取第一个 '[' 到最后一个 ']' 之间的
-    内容做 json.loads。解析成功后过滤掉 title/desc 为空的项。
-
-    返回 list[dict];解析失败或过滤后为空时抛 RuntimeError(由调用方重试)。
-    """
-    if not content:
-        raise RuntimeError("AI 响应 content 为空")
-    # 剥除 markdown 代码块围栏(```json ... ``` 或 ``` ... ```)
-    stripped = re.sub(r"^```(?:json)?\s*", "", content.strip(), flags=re.IGNORECASE).rstrip("`").strip()
-    # 截取最外层数组 [ ... ](应对模型前后混入解释文字的情况)
-    start, end = stripped.find("["), stripped.rfind("]")
-    if start == -1 or end == -1 or end <= start:
-        raise RuntimeError(f"AI 响应未找到 JSON 数组:{content[:120]}")
-    payload = stripped[start:end + 1]
-    try:
-        data = json.loads(payload)
-    except json.JSONDecodeError as e:
-        raise RuntimeError(f"AI 响应 JSON 解析失败:{e}:{content[:120]}")
-    if not isinstance(data, list) or not data:
-        raise RuntimeError(f"AI 响应非非空数组:{content[:120]}")
-    items = []
-    for obj in data:
-        if not isinstance(obj, dict):
-            continue
-        title = (obj.get("title") or "").strip()
-        desc = (obj.get("desc") or "").strip()
-        if title and desc:
-            items.append({"title": title, "desc": desc})
-    if not items:
-        raise RuntimeError(f"AI 响应解析后无有效条目:{content[:120]}")
-    return items
-
-
-def _request_summary(system_prompt, user_prompt, base_url, model, api_key):
-    """
-    发起一次 OpenAI 兼容 `/v1/chat/completions` 请求(对齐 App 的 requestSummary)。
-    返回解析后的摘要对象列表(list[dict],每项含 title + desc)。失败抛异常。
-    """
-    url = f"{base_url.rstrip('/')}/v1/chat/completions"
-    body = {
-        "model": model,
-        "temperature": TEMPERATURE,
-        # deepseek-v4-flash 默认 thinking=enabled + effort=high,
-        # 单次归纳请求会因思维链耗时 60-100s 撞穿 30s read timeout。
-        # 摘要是信息归纳任务,不需要推理,显式关闭以回到秒级响应(且更省 token)。
-        "thinking": {"type": "disabled"},
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-    }
-    resp = requests.post(
-        url,
-        json=body,
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        },
-        timeout=TIMEOUT,
-    )
-    resp.raise_for_status()
-    data = resp.json()
-    choices = data.get("choices") or []
-    if not choices:
-        raise RuntimeError(f"AI 响应无 choices:{str(data)[:120]}")
-    content = (((choices[0].get("message") or {}).get("content")) or "").strip()
-    return _parse_summary_json(content)
-
-
 def summarize_source(source, items):
     """
     给某源的本次 items 生成中文 AI 摘要。返回 list[dict](每项含 title + desc),失败返回 None。
@@ -420,6 +344,10 @@ def summarize_source(source, items):
     - 空 items → 返回 None(没东西可总结)。
     - 配置缺失 → 返回 None,并 stderr 提示(让调用方知道为什么没出摘要)。
     - API 调用 → 3 次重试(间隔 2s/4s),全败返回 None。
+
+    AI 请求/解析(含 markdown 围栏剥离、429 限流快速重试、thinking 开关)统一经
+    `ai_client.call_llm`;本函数只做该源的业务校验:过滤掉 title/desc 为空的项,
+    过滤后为空则视为失败(抛 RuntimeError 触发本函数的 3 次业务层重试)。
     """
     if source not in SUMMARY_SOURCES:
         return None
@@ -439,9 +367,23 @@ def summarize_source(source, items):
     last_err = None
     for attempt in range(1, MAX_ATTEMPTS + 1):
         try:
-            parsed = _request_summary(system_prompt, user_prompt, base_url, model, api_key)
-            print(f"[AI]   {source:<20} 摘要 {len(parsed)} 条(第 {attempt} 次成功)")
-            return parsed
+            parsed = ai_client.call_llm(
+                system_prompt, user_prompt, base_url, model, api_key,
+                timeout=TIMEOUT, temperature=TEMPERATURE, expect="array",
+            )
+            # 业务校验:过滤掉 title/desc 为空的项(ai_client 只保证是非空数组)。
+            cleaned = []
+            for obj in parsed:
+                if not isinstance(obj, dict):
+                    continue
+                title = (obj.get("title") or "").strip()
+                desc = (obj.get("desc") or "").strip()
+                if title and desc:
+                    cleaned.append({"title": title, "desc": desc})
+            if not cleaned:
+                raise RuntimeError("AI 响应解析后无有效条目(无 title/desc 非空项)")
+            print(f"[AI]   {source:<20} 摘要 {len(cleaned)} 条(第 {attempt} 次成功)")
+            return cleaned
         except Exception as e:
             last_err = e
             print(f"[AI]   {source:<20} 第 {attempt}/{MAX_ATTEMPTS} 次失败:{type(e).__name__}: {e}",
