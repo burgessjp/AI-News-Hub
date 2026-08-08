@@ -43,7 +43,7 @@
 
 ## 数据层（data/）
 
-- **双模式取数 `SourceMode`**（DataStore `display_prefs` 的 `source_mode`，默认 LIVE）：5 个稳定源（HackerNews / GitHub Trending / stormzhang AI / HuggingFace Papers / The Rundown AI）可切 LIVE / ARCHIVE。
+- **取数模式恒定归档**（设置页「数据源」入口已移除）：5 个稳定源（HackerNews / GitHub Trending / stormzhang AI / HuggingFace Papers / The Rundown AI）固定走 ARCHIVE；底层 `SourceMode` 枚举与 LIVE 分支保留待恢复（`SettingsStore` 强制返回 `ARCHIVE`）。
   - **Product Hunt 只归档**（Developer Token 是服务端 secret 不进 APK，两种模式都走归档）。
   - 归档走 `ArchiveHttpClient`（gitcode **REST API raw 端点**，**不要**用 raw 直链——背后是 WAF 会 403）。
   - **归档失败直接显示 Error 态，不回退实时**。
