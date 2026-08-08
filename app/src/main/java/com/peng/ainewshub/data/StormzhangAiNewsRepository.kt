@@ -76,7 +76,9 @@ class StormzhangAiNewsRepository(
  * [pageDate] 是页面声明的资讯日期(如 "2026.07.13"),取自 title,解析不到时为空。
  */
 data class StormzhangAiNewsResult(
-    val fetchedAt: Long,
+    override val fetchedAt: Long,
     val news: List<StormzhangAiNews>,
     val pageDate: String = ""
-)
+) : SourceListResult<StormzhangAiNews> {
+    override val items: List<StormzhangAiNews> get() = news
+}

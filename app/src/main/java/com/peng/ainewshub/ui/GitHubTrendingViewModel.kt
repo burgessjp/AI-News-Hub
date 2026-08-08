@@ -1,166 +1,41 @@
 package com.peng.ainewshub.ui
-import com.peng.ainewshub.ui.i18n.localized
-import com.peng.ainewshub.R
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import android.app.Application
+import com.peng.ainewshub.data.SourceListResult
 import com.peng.ainewshub.data.GitHubTrendingRepository
-import com.peng.ainewshub.data.ShortContentException
 import com.peng.ainewshub.data.TrendingRepo
-import com.peng.ainewshub.data.AiConfigStore
-import com.peng.ainewshub.data.TranslationRepository
 import com.peng.ainewshub.data.source.GitHubTrendingArchiveRepository
 import com.peng.ainewshub.data.source.GitHubTrendingSource
 import com.peng.ainewshub.data.source.SourceMode
-import com.peng.ainewshub.ui.more.SettingsStore
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
 
 /**
  * GitHub Trending ViewModel。
  *
- * 与 [HackerNewsViewModel] 同构:AndroidViewModel 拿 cacheDir 注入 Repository,
- * 启用 4 小时文件缓存(进入页面命中缓存秒回,不打网络)。
- *
- * 描述翻译:仓库描述多为英文,翻译开关开且配置就绪时,描述行出现「译」按钮
- * (复用 HackerNews 的 [InlineTranslateButton] / [TranslatedText] 组件,UI 一致)。
- * 翻译状态以 repo.url 为 key(同 URL 即同仓库,刷新后状态保留,避免重复请求)。
- *
- * 数据源模式([SourceMode]):订阅 [SettingsStore].prefsFlow,实时跟随设置变化
- * (在设置页切换数据源后,本页下拉刷新立即用新模式,无需重进页面或重建 ViewModel)。
- * LIVE → [liveRepo](实时,带 4 小时缓存);ARCHIVE → [archiveRepo](gitcode 归档,无缓存)。
- * [currentRepo] 按当前 sourceMode 取,refresh/forceRefresh 调它。
+ * 继承 [SourceListViewModel]:sourceMode 订阅 / state / refresh / forceRefresh 等公共逻辑
+ * 由基类统一。翻译逻辑由 [translateSupport] 委托(描述翻译,以 repo.url 为 key)。
  */
-class GitHubTrendingViewModel(application: Application) : AndroidViewModel(application) {
+class GitHubTrendingViewModel(application: Application) : SourceListViewModel<TrendingRepo>(application) {
 
-    private val settingsStore = SettingsStore(application)
-
-    // 两个 Repository 都持有,按当前 sourceMode 动态选用(避免切换后旧 repo 固化)。
-    // archiveRepo 无缓存/无状态,常驻无开销;liveRepo 带 4 小时文件缓存,构造即就绪。
     private val liveRepo: GitHubTrendingRepository = GitHubTrendingRepository(cacheDir = application.cacheDir)
     private val archiveRepo: GitHubTrendingSource = GitHubTrendingArchiveRepository()
-
-    /**
-     * 当前数据源模式 —— 订阅 prefsFlow,设置一变即更新。
-     * 初始值 [SourceMode.LIVE](prefsFlow 首帧到达前用默认值,避免阻塞构造);
-     * [init] 里同步读一次持久化值,让首次 [refresh] 用对模式。
-     */
-    // 占位初值:init 协程首帧即纠正为真实设置(替代原构造期 runBlocking 同步读)
-    private val _sourceMode = MutableStateFlow(SourceMode.LIVE)
-    val sourceMode: StateFlow<SourceMode> = _sourceMode.asStateFlow()
-
-    /** 按当前 sourceMode 取对应 Repository。 */
-    private fun currentRepo(): GitHubTrendingSource =
-        if (_sourceMode.value == SourceMode.ARCHIVE) archiveRepo else liveRepo
-
-    private val translationRepo = TranslationRepository(application)
-    private val configStore = AiConfigStore(application)
-
-    private val _state = MutableStateFlow<UiState<List<TrendingRepo>>>(UiState.Loading)
-    val state: StateFlow<UiState<List<TrendingRepo>>> = _state.asStateFlow()
-
-    /**
-     * 上次成功拿到数据时的「数据落盘时刻」(缓存写入或刚抓取)。
-     * 命中缓存秒回时也会更新为缓存写入时刻 —— 这正是「上次刷新时间」的语义。
-     * null 表示尚未成功过。
-     */
-    private val _lastRefreshAt = MutableStateFlow<Long?>(null)
-    val lastRefreshAt: StateFlow<Long?> = _lastRefreshAt.asStateFlow()
-
-    /**
-     * 手动刷新进行中(下拉刷新转圈 + 防重复)。
-     * 仅 [forceRefresh] 置 true;[refresh](走缓存)不触发,避免进入页面就转圈。
-     */
-    private val _isRefreshing = MutableStateFlow(false)
-    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+    private val translateSupport = TranslateSupport(application)
 
     /** 翻译配置流(UI 订阅以决定是否显示「译」按钮)。 */
-    val configFlow = configStore.configFlow
+    val configFlow = translateSupport.configFlow
 
-    /** 描述翻译状态(repoUrl → state),与 HackerNewsViewModel.titleStates 同源。 */
-    private val _descStates = MutableStateFlow<Map<String, TranslationState>>(emptyMap())
-    val descStates: StateFlow<Map<String, TranslationState>> = _descStates.asStateFlow()
+    /** 描述翻译状态(repoUrl → state)。 */
+    val descStates: StateFlow<Map<String, TranslationState>> = translateSupport.states
 
-    init {
-        viewModelScope.launch {
-            // 先取首帧真实模式(挂起读,不占主线程),再首发加载,避免 ARCHIVE 用户
-            // 先按 LIVE 拉一次;随后持续订阅(后续 refresh 自动用新源,不自动重抓)。
-            _sourceMode.value = settingsStore.currentSourceMode()
-            refresh()
-            settingsStore.prefsFlow.map { it.sourceMode }.collect { _sourceMode.value = it }
-        }
-    }
+    private fun currentRepo(): GitHubTrendingSource =
+        if (sourceMode.value == SourceMode.ARCHIVE) archiveRepo else liveRepo
 
-    fun refresh() {
-        viewModelScope.launch {
-            runCatching { currentRepo().fetch() }
-                .onSuccess { result ->
-                    _state.value =
-                        if (result.repos.isEmpty()) UiState.Error(getApplication<Application>().localized().getString(R.string.common_empty_today), ErrorKind.NoData) else UiState.Success(result.repos)
-                    _lastRefreshAt.value = result.fetchedAt
-                }
-                .onFailure { _state.value = it.toUiError(getApplication<Application>().localized()) }
-        }
-    }
+    override suspend fun doFetch(): SourceListResult<TrendingRepo> = currentRepo().fetch()
 
-    /**
-     * 强制刷新:忽略缓存真打网络(用户下拉刷新)。
-     *
-     * 失败处理:若当前已有数据(Success),保留旧数据不切 Error,用户至少能看旧列表;
-     * 若当前无数据,则与 [refresh] 一样设 Error 态。
-     * 刷新中([isRefreshing]为 true)忽略重复触发。
-     *
-     * 用当前 sourceMode([currentRepo]):设置页切换数据源后,下拉刷新立即用新源。
-     */
-    fun forceRefresh() {
-        if (_isRefreshing.value) return
-        _isRefreshing.value = true
-        viewModelScope.launch {
-            runCatching { currentRepo().forceRefresh() }
-                .onSuccess { result ->
-                    _state.value =
-                        if (result.repos.isEmpty()) UiState.Error(getApplication<Application>().localized().getString(R.string.common_empty_today), ErrorKind.NoData) else UiState.Success(result.repos)
-                    _lastRefreshAt.value = result.fetchedAt
-                }
-                .onFailure {
-                    if (_state.value !is UiState.Success) {
-                        _state.value = it.toUiError(getApplication<Application>().localized())
-                    }
-                }
-            _isRefreshing.value = false
-        }
-    }
+    override suspend fun doForceRefresh(): SourceListResult<TrendingRepo> = currentRepo().forceRefresh()
 
     /** 翻译仓库描述(列表页)。 */
-    fun translateDesc(repo: TrendingRepo) {
-        val current = _descStates.value[repo.url]
-        if (current is TranslationState.Loading) return
-        if (repo.description.isBlank()) return
-        _descStates.value = _descStates.value + (repo.url to TranslationState.Loading)
-        viewModelScope.launch {
-            val outcome = doTranslate(repo.description)
-            _descStates.value = _descStates.value + (repo.url to outcome)
-        }
-    }
-
-    private suspend fun doTranslate(text: String): TranslationState {
-        val config = configStore.configFlow.first()
-        if (!config.isReady) return TranslationState.Error(TranslationState.CONFIG_MISSING)
-        return runCatching { translationRepo.translate(text, config).getOrThrow() }
-            .fold(
-                onSuccess = { TranslationState.Success(it) },
-                onFailure = {
-                    if (it is ShortContentException) {
-                        TranslationState.Error(TranslationState.TOO_SHORT)
-                    } else {
-                        TranslationState.Error(it.toUiError(getApplication<Application>().localized()).message)
-                    }
-                }
-            )
-    }
+    fun translateDesc(repo: TrendingRepo) =
+        translateSupport.translate(viewModelScope, repo.url, repo.description)
 }

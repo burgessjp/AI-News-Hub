@@ -175,7 +175,7 @@ fun HackerNewsScreen(
 private fun HackerNewsList(
     stories: List<HackerNewsStory>,
     listState: LazyListState,
-    titleStates: Map<Long, TranslationState>,
+    titleStates: Map<String, TranslationState>,
     translateEnabled: Boolean,
     sourceMode: SourceMode,
     fetchedAtMillis: Long?,
@@ -198,7 +198,7 @@ private fun HackerNewsList(
                 rank = index + 1,
                 story = story,
                 translateEnabled = translateEnabled,
-                translationState = titleStates[story.id] ?: TranslationState.Idle,
+                translationState = titleStates[story.id.toString()] ?: TranslationState.Idle,
                 onClick = { onClick(story) },
                 onTranslate = { onTranslate(story) }
             )

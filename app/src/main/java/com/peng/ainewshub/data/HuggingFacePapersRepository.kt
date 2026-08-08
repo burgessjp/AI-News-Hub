@@ -72,6 +72,8 @@ class HuggingFacePapersRepository(
  * 走网络时是当前时刻。UI 据此在顶栏显示「上次刷新 N 分钟前」。
  */
 data class HuggingFacePapersResult(
-    val fetchedAt: Long,
+    override val fetchedAt: Long,
     val papers: List<HuggingFacePaper>
-)
+) : SourceListResult<HuggingFacePaper> {
+    override val items: List<HuggingFacePaper> get() = papers
+}

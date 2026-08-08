@@ -80,9 +80,11 @@ data class HackerNewsStory(
  * @param stories   story 列表(已排序,按下标即排名)
  */
 data class HackerNewsTopStories(
-    val fetchedAt: Long,
+    override val fetchedAt: Long,
     val stories: List<HackerNewsStory>
-)
+) : SourceListResult<HackerNewsStory> {
+    override val items: List<HackerNewsStory> get() = stories
+}
 
 /**
  * HackerNews Top Stories 列表缓存条目。

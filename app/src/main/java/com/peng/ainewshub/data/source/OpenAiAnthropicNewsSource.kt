@@ -21,6 +21,8 @@ interface OpenAiAnthropicNewsSource {
  * @param articles  厂商动态列表(最新 20 条,按发布时间倒序)
  */
 data class OpenAiAnthropicNewsResult(
-    val fetchedAt: Long,
+    override val fetchedAt: Long,
     val articles: List<OpenAiAnthropicNews>
-)
+) : com.peng.ainewshub.data.SourceListResult<OpenAiAnthropicNews> {
+    override val items: List<OpenAiAnthropicNews> get() = articles
+}

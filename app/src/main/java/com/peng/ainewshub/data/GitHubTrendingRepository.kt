@@ -57,6 +57,8 @@ class GitHubTrendingRepository(
  * 走网络时是当前时刻。UI 据此在顶栏显示「上次刷新 N 分钟前」。
  */
 data class TrendingResult(
-    val fetchedAt: Long,
+    override val fetchedAt: Long,
     val repos: List<TrendingRepo>
-)
+) : SourceListResult<TrendingRepo> {
+    override val items: List<TrendingRepo> get() = repos
+}

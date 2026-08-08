@@ -20,7 +20,9 @@ interface ProductHuntSource {
  * @param products  当日热门产品列表
  */
 data class ProductHuntResult(
-    val fetchedAt: Long,
+    override val fetchedAt: Long,
     val products: List<ProductHunt>
-)
+) : com.peng.ainewshub.data.SourceListResult<ProductHunt> {
+    override val items: List<ProductHunt> get() = products
+}
 

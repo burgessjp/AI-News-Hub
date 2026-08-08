@@ -22,6 +22,8 @@ interface RundownAiSource {
  * @param articles  近况 newsletter 文章列表(首页约 16 篇)
  */
 data class RundownAiResult(
-    val fetchedAt: Long,
+    override val fetchedAt: Long,
     val articles: List<RundownAiArticle>
-)
+) : com.peng.ainewshub.data.SourceListResult<RundownAiArticle> {
+    override val items: List<RundownAiArticle> get() = articles
+}
