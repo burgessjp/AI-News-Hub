@@ -82,7 +82,6 @@ AI_NEWS_HUB_AI_BASE_URL / AI_NEWS_HUB_AI_MODEL / AI_NEWS_HUB_AI_API_KEY / GITCOD
 
 - **Conventional Commits 风格**：`type(scope): subject`，type 用 `feat`/`fix`/`refactor`/`docs`/`chore` 等，scope 可选（如 `feat(build):`、`refactor(settings):`）。
 - **commit message 一律用英文**（subject + body 都用英文）。
-- 分支命名 `feat/xxx` / `fix/xxx`，不直接在 `main` 上开发（详见 [`CONTRIBUTING.md`](CONTRIBUTING.md)）。
 - 仅为 AI 代写时的强约束：人类可读的 message 必须英文，**但代码注释、PR 描述、文档仍按各自约定**（注释中文、文档双语）。
 
 ## 安全红线
