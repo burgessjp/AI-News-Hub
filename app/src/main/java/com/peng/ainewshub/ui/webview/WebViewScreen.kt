@@ -35,20 +35,24 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
+import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.MoreVert
@@ -390,18 +394,7 @@ fun WebViewScreen(
                                         }
                                     )
                                 }
-                                // 翻译入口遵循「设置 → AI 服务」的翻译开关;
-                                // 译文在底部弹层展示,不改写阅读页
-                                if (readerActive && aiConfig.translateEnabled) {
-                                    DropdownMenuItem(
-                                        text = { Text(stringResource(R.string.webview_menu_translate_page)) },
-                                        leadingIcon = { Icon(Icons.Outlined.Translate, null) },
-                                        onClick = {
-                                            menuExpanded = false
-                                            startTranslate()
-                                        }
-                                    )
-                                }
+                                // 翻译入口已提升到底部栏一键操作,不再占溢出菜单
                                 HorizontalDivider()
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.webview_menu_copy_link)) },
@@ -432,9 +425,12 @@ fun WebViewScreen(
                         canGoForward = webCanGoForward,
                         readerActive = readerActive,
                         readerLoading = readerLoading,
+                        translateEnabled = aiConfig.translateEnabled,
+                        translateActive = translating || translateResults != null,
                         onBack = { webViewRef.web?.goBack() },
                         onForward = { webViewRef.web?.goForward() },
                         onToggleReader = { if (readerActive) exitReaderMode() else enterReaderMode() },
+                        onTranslate = { startTranslate() },
                         onShare = { shareUrl(context, pageTitle, currentUrl) }
                     )
                 }
@@ -764,11 +760,13 @@ private sealed interface LongPressTarget {
 }
 
 /**
- * 翻译弹层 —— 原文/译文对照列表。
+ * 翻译弹层 —— 原文/译文平铺对照列表(高信息密度)。
  *
  * [ModalBottomSheet] 半屏起步(skipPartiallyExpanded=false),可手势拖拽到全屏、
- * 拖下关闭。译文未到的块先以弱化色显示原文;到达后译文在上、原文小字在下,
- * 翻译中可在头部取消(已译部分保留)。
+ * 拖下关闭。每段平铺:原文在上(主色 [cs.onSurface])、译文在下(次要色
+ * [cs.onSurfaceVariant]),靠颜色区分层次不靠卡片,密度高、阅读连贯。译文未到时
+ * 不占位,到达后在原文下方追加。翻译中头部展示线性进度条,完成态列表末尾给
+ * 「翻译完成」收尾提示。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -780,28 +778,38 @@ private fun TranslateSheet(
     onCancelTranslate: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val cs = MaterialTheme.colorScheme
+    // 全屏展开:跳过半屏态,直接展开到全屏
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+        sheetState = sheetState
     ) {
-        // 头部:标题 + 进度/取消
+        // 头部:图标 + 标题 + 进度/取消
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp)
         ) {
+            Icon(
+                imageVector = Icons.Outlined.Translate,
+                contentDescription = null,
+                tint = cs.primary,
+                modifier = Modifier.size(22.dp)
+            )
+            Spacer(modifier = Modifier.width(10.dp))
             Text(
                 text = stringResource(R.string.webview_translate_sheet_title),
                 style = AppText.titleItem,
-                color = MaterialTheme.colorScheme.onSurface
+                color = cs.onSurface
             )
             Spacer(modifier = Modifier.weight(1f))
             if (translating && progress != null) {
                 Text(
                     text = stringResource(R.string.webview_translate_progress, progress.first, progress.second),
                     style = AppText.caption,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = cs.onSurfaceVariant
                 )
             }
             if (translating) {
@@ -809,9 +817,28 @@ private fun TranslateSheet(
                 TextButton(onClick = onCancelTranslate) { Text(stringResource(R.string.common_cancel)) }
             }
         }
-        Spacer(modifier = Modifier.height(4.dp))
+        // 头部进度条:翻译中展示确定性进度;无轨道细线,与顶栏加载条同语言
+        val progressFraction = if (translating && progress != null && progress.second > 0) {
+            progress.first.toFloat() / progress.second
+        } else null
+        if (progressFraction != null) {
+            Spacer(modifier = Modifier.height(6.dp))
+            LinearProgressIndicator(
+                progress = { progressFraction },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp)
+                    .height(2.dp),
+                color = cs.primary,
+                trackColor = Color.Transparent,
+                strokeCap = StrokeCap.Round
+            )
+        }
+        Spacer(modifier = Modifier.height(6.dp))
         // 空白块(空段落等)不参与展示
         val blocks = remember(originals) { originals.indices.filter { originals[it].isNotBlank() } }
+        // 翻译完成判定:非翻译中、有结果、且有至少一条译文
+        val finished = !translating && results != null && results.any { it != null }
         LazyColumn(modifier = Modifier.fillMaxWidth()) {
             items(blocks.size) { position ->
                 val index = blocks[position]
@@ -820,26 +847,60 @@ private fun TranslateSheet(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 10.dp)
+                        .padding(horizontal = 20.dp, vertical = 8.dp)
                 ) {
+                    // 原文(在上):主色,信息主体
+                    Text(
+                        text = original,
+                        style = AppText.body,
+                        color = cs.onSurface
+                    )
+                    // 译文(在下):左侧 primary 色细条做视觉锚点 + 弱化色文字,
+                    // 靠色条明确区分译文与原文(单靠 onSurfaceVariant 与 onSurface 差别太小)
                     if (translated != null) {
-                        Text(
-                            text = translated,
-                            style = AppText.body,
-                            color = MaterialTheme.colorScheme.onSurface
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(IntrinsicSize.Min)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .width(3.dp)
+                                    .fillMaxHeight()
+                                    .background(cs.primary, RoundedCornerShape(2.dp))
+                            )
+                            Text(
+                                text = translated,
+                                style = AppText.body,
+                                color = cs.onSurfaceVariant,
+                                modifier = Modifier.padding(start = 8.dp)
+                            )
+                        }
+                    }
+                }
+            }
+            // 完成态收尾:居中 check + 「翻译完成」
+            if (finished) {
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.CheckCircle,
+                            contentDescription = null,
+                            tint = cs.primary,
+                            modifier = Modifier.size(16.dp)
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = original,
-                            style = AppText.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    } else {
-                        // 译文未到(或被跳过):先以弱化色显示原文
-                        Text(
-                            text = original,
-                            style = AppText.body,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            text = stringResource(R.string.webview_translate_done),
+                            style = AppText.caption,
+                            color = cs.primary
                         )
                     }
                 }
@@ -1214,9 +1275,12 @@ private fun WebBottomBar(
     canGoForward: Boolean,
     readerActive: Boolean,
     readerLoading: Boolean,
+    translateEnabled: Boolean,
+    translateActive: Boolean,
     onBack: () -> Unit,
     onForward: () -> Unit,
     onToggleReader: () -> Unit,
+    onTranslate: () -> Unit,
     onShare: () -> Unit
 ) {
     val cs = MaterialTheme.colorScheme
@@ -1260,6 +1324,15 @@ private fun WebBottomBar(
                 onClick = onToggleReader,
                 modifier = Modifier.weight(1f)
             )
+            // 翻译:阅读模式下可用;翻译中或已有结果时图标高亮表示已激活
+            WebBarItem(
+                icon = Icons.Outlined.Translate,
+                label = stringResource(R.string.webview_bar_translate),
+                enabled = readerActive && translateEnabled,
+                highlight = translateActive,
+                onClick = onTranslate,
+                modifier = Modifier.weight(1f)
+            )
             WebBarItem(
                 icon = Icons.Outlined.Share,
                 label = stringResource(R.string.common_share),
@@ -1278,9 +1351,15 @@ private fun WebBarItem(
     label: String,
     enabled: Boolean,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    highlight: Boolean = false
 ) {
-    val color = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.outline
+    // 高亮(已激活)用 primary 色,否则用常规禁用/可用色
+    val color = when {
+        highlight -> MaterialTheme.colorScheme.primary
+        enabled -> MaterialTheme.colorScheme.onSurfaceVariant
+        else -> MaterialTheme.colorScheme.outline
+    }
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,

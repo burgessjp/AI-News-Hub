@@ -44,6 +44,7 @@
     <!-- ===== 翻译弹层 ===== -->
     <string name="webview_translate_sheet_title">全文翻译</string>
     <string name="webview_translate_progress">翻译中 %1$d/%2$d</string>
+    <string name="webview_translate_done">翻译完成</string>
 
     <!-- ===== AI 服务配置引导弹窗 ===== -->
     <string name="webview_ai_config_title">未配置 AI 服务</string>
@@ -59,4 +60,5 @@
     <string name="webview_bar_forward">前进</string>
     <string name="webview_bar_reader">阅读模式</string>
     <string name="webview_bar_exit_reader">退出阅读</string>
+    <string name="webview_bar_translate">翻译</string>
 </resources>
