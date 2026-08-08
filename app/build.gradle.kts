@@ -39,6 +39,11 @@ android {
     }
 
     buildTypes {
+        // debug 加 .debug 后缀,可与正式包共存于同一手机;resValue 覆盖 app_name 以区分图标标签
+        debug {
+            applicationIdSuffix = ".debug"
+            resValue("string", "app_name", "AI News Hub (Debug)")
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
