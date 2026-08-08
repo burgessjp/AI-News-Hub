@@ -22,7 +22,7 @@
 
 - **一屏读完今日 AI 圈** — 聚合 HackerNews、GitHub Trending、HuggingFace Papers、Product Hunt 等 8 个高质量源，一个 App 看完当日动态。
 - **AI 帮你抓重点** — 配套流水线每天把每个源的中文要点、跨源「今日热点 Top10」预生成好，打开即看、零等待；突发重磅条目带 Breaking 标记。
-- **数据源你自己说了算** — 5 个稳定源支持「实时抓取 / 归档快照」双模式切换；信息源磁贴长按拖拽自定义顺序。
+- **数据源你自己说了算** — 信息源磁贴长按拖拽自定义顺序。
 - **AI Key 你自己掌握** — 整页翻译等运行时 AI 能力不内置任何 key，用户自配服务商（DeepSeek / 智谱 GLM / 任意 OpenAI 兼容服务），仅存应用私有目录。
 - **应用内读完一切** — 全 App 链接走内置 WebView，集成阅读模式与整页翻译，不跳外部浏览器。
 - **桌面小组件** — 「今日热点」小组件 30 分钟自动刷新，桌面直达热点。
@@ -63,7 +63,7 @@
 
 8 个信息源磁贴，每个都走自己的二级页：
 
-- **HackerNews** —— Firebase API 实时榜单 + 评论树展开
+- **HackerNews** —— Top Stories 热门榜 + 评论树展开（评论实时拉自 Firebase API）
 - **GitHub Trending** —— 仓库语言/时间窗口筛选
 - **OpenAI × Anthropic** —— 两家头部 AI 公司的官方动态聚合
 - **HuggingFace Papers** —— 论文热度榜
@@ -71,7 +71,7 @@
 - **The Rundown AI**、**stormzhang AI 资讯** —— 英文/中文 AI Newsletter
 - **AIHot 精选** —— 第三方服务 aihot.virxact.com 的「今日热点 + 精选 TOP20」
 
-其中 5 个稳定源（HackerNews / GitHub Trending / HuggingFace Papers / The Rundown AI / stormzhang AI）支持「实时抓取 / 归档快照」双模式切换（设置 → 数据源模式），归档来自配套的数据流水线。
+5 个稳定源（HackerNews / GitHub Trending / HuggingFace Papers / The Rundown AI / stormzhang AI）恒定读取配套数据流水线生成的归档快照（代码内保留了实时抓取模式但未开放入口）。
 
 ### AI 能力
 
@@ -174,20 +174,20 @@ AI News Hub 的整页翻译等运行时 AI 能力**不内置任何 key**，由�
 app/                       唯一 Android 模块
   src/main/java/com/peng/ainewshub/
     MainActivity.kt        自定义多栈导航 + 页面路由（不用 Navigation Compose）
-    data/                  Repository、数据模型、Room、DataStore、数据源双模式
+    data/                  Repository、数据模型、Room、DataStore、数据源模式
     ui/                    ViewModel + Compose Screen，按功能分包
-      tabs/                3 个根 Tab 框架
+      tabs/                AIHot「全部动态 / 精选」二级页
       overview/            今日总览（读流水线预生成的跨源分析）
       summary/             摘要 Tab + 历史摘要
-      items/               AIHot 精选列表 / 全部动态
+      items/               各信息源详情页（HackerNews、GitHub Trending……）+ 搜索 + 浏览历史
       daily/               AI 日报与归档
       more/                更多页 / 信息源 / 关于
       webview/             内置 WebView + 阅读模式 + 整页翻译
       translate/           翻译仓库 + 系统选中翻译入口
-      widget/              Glance 桌面小组件（「今日热点」）
       components/           复用组件（卡片、徽章、骨架屏、SectionHeader）
       theme/                Material 3 双层主题（规范 + 语义）
       anim/                转场动画规范
+    widget/                Glance 桌面小组件（「今日热点」）
   src/main/assets/readability.js   WebView 阅读模式正文提取
 scripts/                   Python 数据流水线 + 图标生成
 docs/news-hub-data-usage.md   数据仓库格式与消费方式

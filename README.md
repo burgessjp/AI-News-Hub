@@ -22,7 +22,7 @@ Download the latest APK from the [Releases](https://github.com/burgessjp/AI-News
 
 - **Read the whole AI world in one screen** — Aggregates 8 high-quality sources (HackerNews, GitHub Trending, HuggingFace Papers, Product Hunt, and more) so you can catch up on the day in one app.
 - **AI does the heavy lifting** — A companion pipeline pre-generates Chinese bullet points for every source and a cross-source "Today's Top 10" every day. Open and read instantly, zero waiting. Breaking items are flagged.
-- **You control the sources** — 5 stable sources support a "live / archived snapshot" toggle; long-press and drag the source tiles to customize the order.
+- **You control the sources** — long-press and drag the source tiles to customize the order.
 - **Your AI key stays yours** — Runtime AI features like full-page translation ship with no built-in key. You bring your own provider (DeepSeek / Zhipu GLM / any OpenAI-compatible service), stored only in app-private storage.
 - **Read everything in-app** — Every link in the app opens in the built-in WebView with Reader Mode and full-page translation. No jumping out to an external browser.
 - **Home screen widget** — A "Today's Hot" widget that auto-refreshes every 30 minutes; jump straight to the highlights from your home screen.
@@ -63,7 +63,7 @@ Download the latest APK from the [Releases](https://github.com/burgessjp/AI-News
 
 8 source tiles, each with its own detail page:
 
-- **HackerNews** — Firebase API live leaderboard + expandable comment trees
+- **HackerNews** — Top Stories leaderboard + expandable comment trees (comments fetched live from the Firebase API)
 - **GitHub Trending** — filter by repo language / time window
 - **OpenAI × Anthropic** — aggregated official updates from two leading AI labs
 - **HuggingFace Papers** — trending papers leaderboard
@@ -71,7 +71,7 @@ Download the latest APK from the [Releases](https://github.com/burgessjp/AI-News
 - **The Rundown AI**, **stormzhang AI** — English / Chinese AI newsletters
 - **AIHot Picks** — "Today's Hot + Picks TOP20" from the third-party service aihot.virxact.com
 
-5 of the stable sources (HackerNews / GitHub Trending / HuggingFace Papers / The Rundown AI / stormzhang AI) support a "live / archived snapshot" toggle (Settings → Source mode); the archive is produced by the companion data pipeline.
+The 5 stable sources (HackerNews / GitHub Trending / HuggingFace Papers / The Rundown AI / stormzhang AI) always read from the companion data pipeline's archived snapshots (a live-fetch mode exists in the code but is not exposed).
 
 ### AI capabilities
 
@@ -174,20 +174,20 @@ The data-repo format is documented in [`docs/news-hub-data-usage.md`](docs/news-
 app/                       the single Android module
   src/main/java/com/peng/ainewshub/
     MainActivity.kt        custom multi-stack navigation + page routing (no Navigation Compose)
-    data/                  Repository, data models, Room, DataStore, source dual-mode
+    data/                  Repository, data models, Room, DataStore, source modes
     ui/                    ViewModel + Compose Screen, split by feature
-      tabs/                the 3 root-tab scaffolds
+      tabs/                AIHot "All activity" and "Picks" secondary screens
       overview/            today's overview (reads pipeline-pre-generated cross-source analysis)
       summary/             Summary tab + archive history
-      items/               AIHot Picks list / all activity
+      items/               per-source detail screens (HackerNews, GitHub Trending, ...) + search + browsing history
       daily/               AI Daily and archive
       more/                More page / Sources / About
       webview/             built-in WebView + Reader Mode + full-page translation
       translate/           translation repo + system text-selection entry
-      widget/              Glance home-screen widget ("Today's Hot")
       components/          reusable components (cards, badges, skeletons, SectionHeader)
       theme/               Material 3 two-tier theme (spec + semantic)
       anim/                transition-animation specs
+    widget/                Glance home-screen widget ("Today's Hot")
   src/main/assets/readability.js   WebView Reader Mode body extraction
 scripts/                   Python data pipeline + icon generation
 docs/news-hub-data-usage.md   data-repo format and consumption
