@@ -4,35 +4,23 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.ThumbUp
-import androidx.compose.material.icons.outlined.Inventory2
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -47,27 +35,20 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import coil.compose.AsyncImage
-import androidx.compose.ui.res.stringResource
-import com.peng.ainewshub.R
 import com.peng.ainewshub.data.AiConfig
 import com.peng.ainewshub.data.ProductHunt
 import com.peng.ainewshub.data.source.SourceMode
-import com.peng.ainewshub.ui.EmptyState
-import com.peng.ainewshub.ui.ErrorState
 import com.peng.ainewshub.ui.ProductHuntViewModel
 import com.peng.ainewshub.ui.TranslationState
 import com.peng.ainewshub.ui.UiState
-import com.peng.ainewshub.ui.components.AppTopBar
-import com.peng.ainewshub.ui.components.AppTopBarDefaults
-import com.peng.ainewshub.ui.components.HairlineDivider
-import com.peng.ainewshub.ui.components.TranslateConfigMissingEffect
-import com.peng.ainewshub.ui.components.ListUpdateTimeHeader
 import com.peng.ainewshub.ui.components.RankBadge
-import com.peng.ainewshub.ui.components.RankRowSkeletonList
+import com.peng.ainewshub.ui.components.RowDividerIfNeeded
+import com.peng.ainewshub.ui.components.SourceListScaffold
 import com.peng.ainewshub.ui.components.StatBadge
+import com.peng.ainewshub.ui.components.TranslateConfigMissingEffect
 import com.peng.ainewshub.ui.components.formatCount
+import com.peng.ainewshub.ui.components.updateTimeHeader
 import com.peng.ainewshub.ui.theme.AppText
 
 /**
@@ -110,102 +91,29 @@ fun ProductHuntScreen(
     // 配置未就绪提示:点「译」后若 state 变成 CONFIG_MISSING,弹一次引导
     TranslateConfigMissingEffect(translationStates, snackbarHostState, onOpenSettings)
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.surface,
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
-            AppTopBar(
-                title = "Product Hunt",
-                titleFontSize = AppTopBarDefaults.secondaryTitleFontSize,
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.common_back)
-                        )
-                    }
-                },
-                actions = {
-                    // 「上次刷新」已移到列表顶部居中(见 ListUpdateTimeHeader),顶栏不再显示。
-                }
-            )
-        }
-    ) { padding ->
-        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-            when (val s = state) {
-                is UiState.Loading -> RankRowSkeletonList(count = 8)
-                is UiState.Error -> ErrorState(
-                    message = s.message,
-                    onRetry = { vm.forceRefresh() }
-                )
-                is UiState.Success -> {
-                    val products = s.data
-                    if (products.isEmpty()) {
-                        EmptyState(
-                            title = stringResource(R.string.common_empty),
-                            subtitle = stringResource(R.string.common_refresh_hint),
-                            icon = Icons.Outlined.Inventory2,
-                            actionLabel = stringResource(R.string.common_refresh_once),
-                            onAction = { vm.forceRefresh() }
-                        )
-                    } else {
-                        PullToRefreshBox(
-                            isRefreshing = isRefreshing,
-                            onRefresh = { vm.forceRefresh() },
-                        ) {
-                            ProductsList(
-                                products = products,
-                                listState = listState,
-                                translationStates = translationStates,
-                                translateEnabled = config.translateEnabled,
-                                sourceMode = sourceMode,
-                                fetchedAtMillis = lastRefreshAt,
-                                onClick = { p ->
-                                    val target = p.targetUrl
-                                    if (target.isNotBlank()) onOpenUrl(target, p.name)
-                                },
-                                onTranslate = { vm.translateProduct(it) }
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ProductsList(
-    products: List<ProductHunt>,
-    listState: LazyListState,
-    translationStates: Map<String, TranslationState>,
-    translateEnabled: Boolean,
-    sourceMode: SourceMode,
-    fetchedAtMillis: Long?,
-    onClick: (ProductHunt) -> Unit,
-    onTranslate: (ProductHunt) -> Unit
-) {
-    LazyColumn(
-        state = listState,
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(vertical = 8.dp)
+    SourceListScaffold(
+        title = "Product Hunt",
+        onBack = onBack,
+        state = state,
+        isRefreshing = isRefreshing,
+        onForceRefresh = { vm.forceRefresh() },
+        listState = listState,
+        snackbarHostState = snackbarHostState
     ) {
-        // 列表顶部居中显示数据时间(归档快照时刻)
-        item { ListUpdateTimeHeader(sourceMode, fetchedAtMillis) }
-        itemsIndexed(
-            items = products,
-            key = { _, p -> p.id }
-        ) { index, product ->
+        val products = (state as UiState.Success).data
+        updateTimeHeader(sourceMode, lastRefreshAt)
+        itemsIndexed(items = products, key = { _, p -> p.id }) { index, product ->
             ProductRow(
                 item = product,
-                translateEnabled = translateEnabled,
+                translateEnabled = config.translateEnabled,
                 translationState = translationStates[product.slug.ifBlank { product.id }] ?: TranslationState.Idle,
-                onClick = { onClick(product) },
-                onTranslate = { onTranslate(product) }
+                onClick = {
+                    val target = product.targetUrl
+                    if (target.isNotBlank()) onOpenUrl(target, product.name)
+                },
+                onTranslate = { vm.translateProduct(product) }
             )
-            if (index != products.lastIndex) {
-                HairlineDivider(startIndent = 60.dp)
-            }
+            RowDividerIfNeeded(index, products.size)
         }
     }
 }

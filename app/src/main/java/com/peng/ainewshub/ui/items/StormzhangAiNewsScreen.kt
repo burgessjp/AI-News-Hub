@@ -49,9 +49,13 @@ import com.peng.ainewshub.ui.StormzhangAiNewsViewModel
 import com.peng.ainewshub.ui.UiState
 import com.peng.ainewshub.ui.components.AppTopBar
 import com.peng.ainewshub.ui.components.AppTopBarDefaults
+import com.peng.ainewshub.ui.components.HairlineDivider
 import com.peng.ainewshub.ui.components.ListUpdateTimeHeader
 import com.peng.ainewshub.ui.components.RankBadge
 import com.peng.ainewshub.ui.components.RankRowSkeletonList
+import com.peng.ainewshub.ui.components.SourceListScaffold
+import com.peng.ainewshub.ui.components.RowDividerIfNeeded
+import com.peng.ainewshub.ui.components.updateTimeHeader
 import com.peng.ainewshub.ui.theme.AppAlpha
 import com.peng.ainewshub.ui.theme.AppText
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -87,101 +91,30 @@ fun StormzhangAiNewsScreen(
     val isRefreshing by vm.isRefreshing.collectAsStateWithLifecycle()
     val pageDate by vm.pageDate.collectAsStateWithLifecycle()
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.surface,
-        topBar = {
-            AppTopBar(
-                title = stringResource(R.string.source_title_stormzhang),
-                titleFontSize = AppTopBarDefaults.secondaryTitleFontSize,
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.common_back)
-                        )
-                    }
-                },
-                actions = {
-                    // 右侧 actions 仅保留「页面日期」(资讯当天日期,如 2026.07.15)。
-                    // 「上次刷新」已移到列表顶部居中(见 ListUpdateTimeHeader),顶栏不再显示。
-                    if (pageDate.isNotBlank()) {
-                        Text(
-                            text = pageDate,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            )
-        }
-    ) { padding ->
-        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-            when (val s = state) {
-                is UiState.Loading -> RankRowSkeletonList(count = 8)
-                is UiState.Error -> ErrorState(
-                    message = s.message,
-                    onRetry = { vm.forceRefresh() }
+    SourceListScaffold(
+        title = stringResource(R.string.source_title_stormzhang),
+        onBack = onBack,
+        state = state,
+        isRefreshing = isRefreshing,
+        onForceRefresh = { vm.forceRefresh() },
+        listState = listState,
+        topBarActions = {
+            // 右侧 actions 仅保留「页面日期」(资讯当天日期,如 2026.07.15)。
+            // 「上次刷新」已移到列表顶部居中(见 ListUpdateTimeHeader),顶栏不再显示。
+            if (pageDate.isNotBlank()) {
+                Text(
+                    text = pageDate,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                is UiState.Success -> {
-                    val news = s.data
-                    if (news.isEmpty()) {
-                        // 数据缺失空态(归档快照为空/实时无条目):给刷新恢复路径
-                        EmptyState(
-                            title = stringResource(R.string.common_empty),
-                            subtitle = stringResource(R.string.common_refresh_hint),
-                            icon = Icons.Outlined.Inventory2,
-                            actionLabel = stringResource(R.string.common_refresh_once),
-                            onAction = { vm.forceRefresh() }
-                        )
-                    } else {
-                        PullToRefreshBox(
-                            isRefreshing = isRefreshing,
-                            onRefresh = { vm.forceRefresh() },
-                        ) {
-                            AiNewsList(
-                                news = news,
-                                listState = listState,
-                                sourceMode = sourceMode,
-                                fetchedAtMillis = lastRefreshAt,
-                                onClick = { item -> onOpenUrl(item.url, item.summary) }
-                            )
-                        }
-                    }
-                }
             }
         }
-    }
-}
-
-@Composable
-private fun AiNewsList(
-    news: List<StormzhangAiNews>,
-    listState: LazyListState,
-    sourceMode: SourceMode,
-    fetchedAtMillis: Long?,
-    onClick: (StormzhangAiNews) -> Unit
-) {
-    LazyColumn(
-        state = listState,
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(vertical = 8.dp)
     ) {
-        // 列表顶部居中显示数据时间(实时/归档统一位置,文案不同)
-        item { ListUpdateTimeHeader(sourceMode, fetchedAtMillis) }
-        itemsIndexed(
-            items = news,
-            key = { _, item -> item.url }
-        ) { index, item ->
-            AiNewsRow(item = item, onClick = { onClick(item) })
-            if (index != news.lastIndex) {
-                Spacer(
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(start = 60.dp, end = 18.dp)
-                        .height(0.5.dp)
-                        .background(MaterialTheme.colorScheme.outlineVariant)
-                )
-            }
+        val news = (state as UiState.Success).data
+        updateTimeHeader(sourceMode, lastRefreshAt)
+        itemsIndexed(items = news, key = { _, item -> item.url }) { index, item ->
+            AiNewsRow(item = item, onClick = { onOpenUrl(item.url, item.summary) })
+            RowDividerIfNeeded(index, news.size)
         }
     }
 }

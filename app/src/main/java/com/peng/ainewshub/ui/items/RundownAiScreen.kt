@@ -4,34 +4,23 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,25 +35,20 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import coil.compose.AsyncImage
 import androidx.compose.ui.res.stringResource
 import com.peng.ainewshub.R
 import com.peng.ainewshub.data.AiConfig
 import com.peng.ainewshub.data.RundownAiArticle
 import com.peng.ainewshub.data.source.SourceMode
-import com.peng.ainewshub.ui.EmptyState
-import com.peng.ainewshub.ui.ErrorState
 import com.peng.ainewshub.ui.RundownAiViewModel
 import com.peng.ainewshub.ui.TranslationState
 import com.peng.ainewshub.ui.UiState
-import com.peng.ainewshub.ui.components.AppTopBar
-import com.peng.ainewshub.ui.components.AppTopBarDefaults
-import com.peng.ainewshub.ui.components.HairlineDivider
-import com.peng.ainewshub.ui.components.TranslateConfigMissingEffect
-import com.peng.ainewshub.ui.components.ListUpdateTimeHeader
 import com.peng.ainewshub.ui.components.RankBadge
-import com.peng.ainewshub.ui.components.RankRowSkeletonList
+import com.peng.ainewshub.ui.components.RowDividerIfNeeded
+import com.peng.ainewshub.ui.components.SourceListScaffold
+import com.peng.ainewshub.ui.components.TranslateConfigMissingEffect
+import com.peng.ainewshub.ui.components.updateTimeHeader
 import com.peng.ainewshub.ui.theme.AppText
 
 /**
@@ -108,99 +92,26 @@ fun RundownAiScreen(
     // 配置未就绪提示:点「译」后若 state 变成 CONFIG_MISSING,弹一次引导
     TranslateConfigMissingEffect(translationStates, snackbarHostState, onOpenSettings)
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.surface,
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
-            AppTopBar(
-                title = "The Rundown AI",
-                titleFontSize = AppTopBarDefaults.secondaryTitleFontSize,
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.common_back)
-                        )
-                    }
-                },
-                actions = {
-                    // 「上次刷新」已移到列表顶部居中(见 ListUpdateTimeHeader),顶栏不再显示。
-                }
-            )
-        }
-    ) { padding ->
-        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-            when (val s = state) {
-                is UiState.Loading -> RankRowSkeletonList(count = 8)
-                is UiState.Error -> ErrorState(
-                    message = s.message,
-                    onRetry = { vm.forceRefresh() }
-                )
-                is UiState.Success -> {
-                    val articles = s.data
-                    if (articles.isEmpty()) {
-                        EmptyState(
-                            title = stringResource(R.string.common_empty),
-                            subtitle = stringResource(R.string.common_refresh_hint),
-                            icon = Icons.Outlined.Inventory2,
-                            actionLabel = stringResource(R.string.common_refresh_once),
-                            onAction = { vm.forceRefresh() }
-                        )
-                    } else {
-                        PullToRefreshBox(
-                            isRefreshing = isRefreshing,
-                            onRefresh = { vm.forceRefresh() },
-                        ) {
-                            ArticlesList(
-                                articles = articles,
-                                listState = listState,
-                                translationStates = translationStates,
-                                translateEnabled = config.translateEnabled,
-                                sourceMode = sourceMode,
-                                fetchedAtMillis = lastRefreshAt,
-                                onClick = { a -> onOpenUrl(a.url, a.title) },
-                                onTranslate = { vm.translateArticle(it) }
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ArticlesList(
-    articles: List<RundownAiArticle>,
-    listState: LazyListState,
-    translationStates: Map<String, TranslationState>,
-    translateEnabled: Boolean,
-    sourceMode: SourceMode,
-    fetchedAtMillis: Long?,
-    onClick: (RundownAiArticle) -> Unit,
-    onTranslate: (RundownAiArticle) -> Unit
-) {
-    LazyColumn(
-        state = listState,
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(vertical = 8.dp)
+    SourceListScaffold(
+        title = "The Rundown AI",
+        onBack = onBack,
+        state = state,
+        isRefreshing = isRefreshing,
+        onForceRefresh = { vm.forceRefresh() },
+        listState = listState,
+        snackbarHostState = snackbarHostState
     ) {
-        // 列表顶部居中显示数据时间(实时抓取时刻 / 归档快照时刻)
-        item { ListUpdateTimeHeader(sourceMode, fetchedAtMillis) }
-        itemsIndexed(
-            items = articles,
-            key = { _, a -> a.slug }
-        ) { index, article ->
+        val articles = (state as UiState.Success).data
+        updateTimeHeader(sourceMode, lastRefreshAt)
+        itemsIndexed(items = articles, key = { _, article -> article.slug }) { index, article ->
             ArticleRow(
                 item = article,
-                translateEnabled = translateEnabled,
+                translateEnabled = config.translateEnabled,
                 translationState = translationStates[article.slug] ?: TranslationState.Idle,
-                onClick = { onClick(article) },
-                onTranslate = { onTranslate(article) }
+                onClick = { onOpenUrl(article.url, article.title) },
+                onTranslate = { vm.translateArticle(article) }
             )
-            if (index != articles.lastIndex) {
-                HairlineDivider(startIndent = 60.dp)
-            }
+            RowDividerIfNeeded(index, articles.size)
         }
     }
 }

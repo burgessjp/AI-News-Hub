@@ -66,6 +66,9 @@ import com.peng.ainewshub.ui.components.TranslateConfigMissingEffect
 import com.peng.ainewshub.ui.components.ListUpdateTimeHeader
 import com.peng.ainewshub.ui.components.RankBadge
 import com.peng.ainewshub.ui.components.RankRowSkeletonList
+import com.peng.ainewshub.ui.components.RowDividerIfNeeded
+import com.peng.ainewshub.ui.components.SourceListScaffold
+import com.peng.ainewshub.ui.components.updateTimeHeader
 import com.peng.ainewshub.ui.components.formatRelativeTime
 import com.peng.ainewshub.ui.theme.AppAlpha
 import com.peng.ainewshub.ui.theme.AppText
@@ -109,102 +112,27 @@ fun HackerNewsScreen(
     // 配置未就绪提示:点「译」后若 state 变成 CONFIG_MISSING,弹一次引导
     TranslateConfigMissingEffect(titleStates, snackbarHostState, onOpenSettings)
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.surface,
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
-            AppTopBar(
-                title = stringResource(R.string.source_title_hackernews),
-                titleFontSize = AppTopBarDefaults.secondaryTitleFontSize,
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.common_back)
-                        )
-                    }
-                },
-                actions = {
-                    // 「上次刷新」已移到列表顶部居中(见 ListUpdateTimeHeader),顶栏不再显示。
-                }
-            )
-        }
-    ) { padding ->
-        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-            when (val s = state) {
-                is UiState.Loading -> RankRowSkeletonList(count = 8)
-                is UiState.Error -> ErrorState(
-                    message = s.message,
-                    onRetry = { vm.forceRefresh() }
-                )
-                is UiState.Success -> {
-                    val stories = s.data
-                    if (stories.isEmpty()) {
-                        // 数据缺失空态(归档快照为空/实时无条目):给刷新恢复路径
-                        EmptyState(
-                            title = stringResource(R.string.common_empty),
-                            subtitle = stringResource(R.string.common_refresh_hint),
-                            icon = Icons.Outlined.Inventory2,
-                            actionLabel = stringResource(R.string.common_refresh_once),
-                            onAction = { vm.forceRefresh() }
-                        )
-                    } else {
-                        PullToRefreshBox(
-                            isRefreshing = isRefreshing,
-                            onRefresh = { vm.forceRefresh() },
-                        ) {
-                            HackerNewsList(
-                                stories = stories,
-                                listState = listState,
-                                titleStates = titleStates,
-                                translateEnabled = config.translateEnabled,
-                                sourceMode = sourceMode,
-                                fetchedAtMillis = lastRefreshAt,
-                                onClick = onOpenComments,
-                                onTranslate = { vm.translateTitle(it) }
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun HackerNewsList(
-    stories: List<HackerNewsStory>,
-    listState: LazyListState,
-    titleStates: Map<String, TranslationState>,
-    translateEnabled: Boolean,
-    sourceMode: SourceMode,
-    fetchedAtMillis: Long?,
-    onClick: (HackerNewsStory) -> Unit,
-    onTranslate: (HackerNewsStory) -> Unit
-) {
-    LazyColumn(
-        state = listState,
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(vertical = 8.dp)
+    SourceListScaffold(
+        title = stringResource(R.string.source_title_hackernews),
+        onBack = onBack,
+        state = state,
+        isRefreshing = isRefreshing,
+        onForceRefresh = { vm.forceRefresh() },
+        listState = listState,
+        snackbarHostState = snackbarHostState
     ) {
-        // 列表顶部居中显示数据时间(实时:上次刷新 N 分钟前;归档:数据更新时间绝对值)。
-        // 顶栏右上角不再显示,统一到这里,两种模式同一位置。
-        item { ListUpdateTimeHeader(sourceMode, fetchedAtMillis) }
-        itemsIndexed(
-            items = stories,
-            key = { _, story -> story.id }
-        ) { index, story ->
+        val stories = (state as UiState.Success).data
+        updateTimeHeader(sourceMode, lastRefreshAt)
+        itemsIndexed(items = stories, key = { _, story -> story.id }) { index, story ->
             HackerNewsRow(
                 rank = index + 1,
                 story = story,
-                translateEnabled = translateEnabled,
+                translateEnabled = config.translateEnabled,
                 translationState = titleStates[story.id.toString()] ?: TranslationState.Idle,
-                onClick = { onClick(story) },
-                onTranslate = { onTranslate(story) }
+                onClick = { onOpenComments(story) },
+                onTranslate = { vm.translateTitle(story) }
             )
-            if (index != stories.lastIndex) {
-                HairlineDivider(startIndent = 60.dp)
-            }
+            RowDividerIfNeeded(index, stories.size)
         }
     }
 }

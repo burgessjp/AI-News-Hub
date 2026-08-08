@@ -65,6 +65,9 @@ import com.peng.ainewshub.ui.components.TranslateConfigMissingEffect
 import com.peng.ainewshub.ui.components.ListUpdateTimeHeader
 import com.peng.ainewshub.ui.components.RankBadge
 import com.peng.ainewshub.ui.components.RankRowSkeletonList
+import com.peng.ainewshub.ui.components.RowDividerIfNeeded
+import com.peng.ainewshub.ui.components.SourceListScaffold
+import com.peng.ainewshub.ui.components.updateTimeHeader
 import com.peng.ainewshub.ui.components.StatBadge
 import com.peng.ainewshub.ui.components.formatCount
 import com.peng.ainewshub.ui.theme.AppText
@@ -108,100 +111,26 @@ fun GitHubTrendingScreen(
     // 配置未就绪提示:点「译」后若 state 变成 CONFIG_MISSING,弹一次引导
     TranslateConfigMissingEffect(descStates, snackbarHostState, onOpenSettings)
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.surface,
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
-            AppTopBar(
-                title = "GitHub Trending",
-                titleFontSize = AppTopBarDefaults.secondaryTitleFontSize,
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.common_back)
-                        )
-                    }
-                },
-                actions = {
-                    // 「上次刷新」已移到列表顶部居中(见 ListUpdateTimeHeader),顶栏不再显示。
-                }
-            )
-        }
-    ) { padding ->
-        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-            when (val s = state) {
-                is UiState.Loading -> RankRowSkeletonList(count = 8)
-                is UiState.Error -> ErrorState(
-                    message = s.message,
-                    onRetry = { vm.forceRefresh() }
-                )
-                is UiState.Success -> {
-                    val repos = s.data
-                    if (repos.isEmpty()) {
-                        // 数据缺失空态(归档快照为空/实时无条目):给刷新恢复路径
-                        EmptyState(
-                            title = stringResource(R.string.common_empty),
-                            subtitle = stringResource(R.string.common_refresh_hint),
-                            icon = Icons.Outlined.Inventory2,
-                            actionLabel = stringResource(R.string.common_refresh_once),
-                            onAction = { vm.forceRefresh() }
-                        )
-                    } else {
-                        PullToRefreshBox(
-                            isRefreshing = isRefreshing,
-                            onRefresh = { vm.forceRefresh() },
-                        ) {
-                            TrendingList(
-                                repos = repos,
-                                listState = listState,
-                                descStates = descStates,
-                                translateEnabled = config.translateEnabled,
-                                sourceMode = sourceMode,
-                                fetchedAtMillis = lastRefreshAt,
-                                onClick = { repo -> onOpenUrl(repo.url, "${repo.owner}/${repo.name}") },
-                                onTranslate = { vm.translateDesc(it) }
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun TrendingList(
-    repos: List<TrendingRepo>,
-    listState: LazyListState,
-    descStates: Map<String, TranslationState>,
-    translateEnabled: Boolean,
-    sourceMode: SourceMode,
-    fetchedAtMillis: Long?,
-    onClick: (TrendingRepo) -> Unit,
-    onTranslate: (TrendingRepo) -> Unit
-) {
-    LazyColumn(
-        state = listState,
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(vertical = 8.dp)
+    SourceListScaffold(
+        title = "GitHub Trending",
+        onBack = onBack,
+        state = state,
+        isRefreshing = isRefreshing,
+        onForceRefresh = { vm.forceRefresh() },
+        listState = listState,
+        snackbarHostState = snackbarHostState
     ) {
-        // 列表顶部居中显示数据时间(实时/归档统一位置,文案不同)
-        item { ListUpdateTimeHeader(sourceMode, fetchedAtMillis) }
-        itemsIndexed(
-            items = repos,
-            key = { _, repo -> repo.url }
-        ) { index, repo ->
+        val repos = (state as UiState.Success).data
+        updateTimeHeader(sourceMode, lastRefreshAt)
+        itemsIndexed(items = repos, key = { _, repo -> repo.url }) { index, repo ->
             TrendingRow(
                 repo = repo,
-                translateEnabled = translateEnabled,
+                translateEnabled = config.translateEnabled,
                 translationState = descStates[repo.url] ?: TranslationState.Idle,
-                onClick = { onClick(repo) },
-                onTranslate = { onTranslate(repo) }
+                onClick = { onOpenUrl(repo.url, "${repo.owner}/${repo.name}") },
+                onTranslate = { vm.translateDesc(repo) }
             )
-            if (index != repos.lastIndex) {
-                HairlineDivider(startIndent = 60.dp)
-            }
+            RowDividerIfNeeded(index, repos.size)
         }
     }
 }
