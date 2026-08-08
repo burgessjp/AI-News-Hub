@@ -84,7 +84,7 @@ class OpenAiAnthropicNewsViewModel(application: Application) : AndroidViewModel(
             runCatching { archiveRepo.fetch() }
                 .onSuccess { result ->
                     _state.value =
-                        if (result.articles.isEmpty()) UiState.Error(getApplication<Application>().localized().getString(R.string.common_empty), ErrorKind.NoData) else UiState.Success(result.articles)
+                        if (result.articles.isEmpty()) UiState.Error(getApplication<Application>().localized().getString(R.string.common_empty_today), ErrorKind.NoData) else UiState.Success(result.articles)
                     _lastRefreshAt.value = result.fetchedAt
                 }
                 .onFailure { _state.value = it.toUiError(getApplication<Application>().localized()) }
@@ -102,7 +102,7 @@ class OpenAiAnthropicNewsViewModel(application: Application) : AndroidViewModel(
             runCatching { archiveRepo.forceRefresh() }
                 .onSuccess { result ->
                     _state.value =
-                        if (result.articles.isEmpty()) UiState.Error(getApplication<Application>().localized().getString(R.string.common_empty), ErrorKind.NoData) else UiState.Success(result.articles)
+                        if (result.articles.isEmpty()) UiState.Error(getApplication<Application>().localized().getString(R.string.common_empty_today), ErrorKind.NoData) else UiState.Success(result.articles)
                     _lastRefreshAt.value = result.fetchedAt
                 }
                 .onFailure {

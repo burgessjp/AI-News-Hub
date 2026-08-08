@@ -63,6 +63,7 @@ import com.peng.ainewshub.ui.ErrorState
 import com.peng.ainewshub.ui.components.AppTopBar
 import com.peng.ainewshub.ui.components.BottomBarPillHeight
 import com.peng.ainewshub.ui.components.BrandWordmark
+import com.peng.ainewshub.ui.components.HairlineDivider
 import com.peng.ainewshub.ui.components.RankBadge
 import com.peng.ainewshub.ui.theme.AppAlpha
 import com.peng.ainewshub.ui.theme.AppText
@@ -490,15 +491,7 @@ private fun TopEntryRow(
 
 /** 行间发丝线:缩进对齐文字列(18 行 padding + 24 徽章 + 12 间距 = 54),与 HotTopicsSection 同语言。 */
 @Composable
-private fun RowDivider() {
-    Spacer(
-        Modifier
-            .fillMaxWidth()
-            .padding(start = 54.dp, end = 18.dp)
-            .height(0.5.dp)
-            .background(MaterialTheme.colorScheme.outlineVariant)
-    )
-}
+private fun RowDivider() = HairlineDivider(startIndent = 54.dp)
 
 /** 来源徽章:surfaceContainerHigh 底衬小胶囊。 */
 @Composable

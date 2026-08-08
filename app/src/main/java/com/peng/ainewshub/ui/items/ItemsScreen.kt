@@ -69,21 +69,12 @@ import com.peng.ainewshub.ui.NewsCard
 import com.peng.ainewshub.ui.UiState
 import com.peng.ainewshub.ui.dayKeyOf
 import com.peng.ainewshub.ui.components.BottomBarReservedHeight
+import com.peng.ainewshub.ui.components.HairlineDivider
 import com.peng.ainewshub.ui.components.NewsCardSkeletonList
 import kotlinx.coroutines.launch
 
 /** 一天的分组(日期 key + 该天的条目)。空 key 表示不分天(搜索模式)。 */
 private data class GroupedDay(val dayKey: String, val items: List<NewsItem>)
-
-/** 行间 hairline 分隔线 —— 左侧缩进对齐右栏(避开时间列)。 */
-@Composable
-private fun NewsRowDivider() {
-    HorizontalDivider(
-        thickness = 0.5.dp,
-        color = MaterialTheme.colorScheme.outlineVariant,
-        modifier = Modifier.padding(start = 72.dp, end = 18.dp)
-    )
-}
 
 /**
  * 动态列表屏幕。
@@ -257,7 +248,7 @@ fun ItemsScreen(
                                             onClick = { onItemClick(item) }
                                         )
                                         if (item.id != group.items.last().id) {
-                                            NewsRowDivider()
+                                            HairlineDivider(startIndent = 72.dp)
                                         }
                                     }
                                 }

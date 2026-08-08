@@ -60,6 +60,8 @@ import com.peng.ainewshub.ui.TranslationState
 import com.peng.ainewshub.ui.UiState
 import com.peng.ainewshub.ui.components.AppTopBar
 import com.peng.ainewshub.ui.components.AppTopBarDefaults
+import com.peng.ainewshub.ui.components.HairlineDivider
+import com.peng.ainewshub.ui.components.TranslateConfigMissingEffect
 import com.peng.ainewshub.ui.components.ListUpdateTimeHeader
 import com.peng.ainewshub.ui.components.RankBadge
 import com.peng.ainewshub.ui.components.RankRowSkeletonList
@@ -102,21 +104,9 @@ fun GitHubTrendingScreen(
     val descStates by vm.descStates.collectAsStateWithLifecycle()
     val config by vm.configFlow.collectAsStateWithLifecycle(initialValue = AiConfig())
     val snackbarHostState = remember { SnackbarHostState() }
-    // Snackbar 文案须在组合期取词:LaunchedEffect 块不是 Composable 环境,只能捕获提前取好的串
-    val translateConfigMissingMsg = stringResource(R.string.common_translate_config_missing)
-    val goSettingsLabel = stringResource(R.string.common_go_settings)
 
     // 配置未就绪提示:点「译」后若 state 变成 CONFIG_MISSING,弹一次引导
-    LaunchedEffect(descStates) {
-        descStates.values.firstOrNull { it is TranslationState.Error && it.message == TranslationState.CONFIG_MISSING }
-            ?.let {
-                val r = snackbarHostState.showSnackbar(
-                    message = translateConfigMissingMsg,
-                    actionLabel = goSettingsLabel
-                )
-                if (r == SnackbarResult.ActionPerformed) onOpenSettings()
-            }
-    }
+    TranslateConfigMissingEffect(descStates, snackbarHostState, onOpenSettings)
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
@@ -210,13 +200,7 @@ private fun TrendingList(
                 onTranslate = { onTranslate(repo) }
             )
             if (index != repos.lastIndex) {
-                Spacer(
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(start = 60.dp, end = 18.dp)
-                        .height(0.5.dp)
-                        .background(MaterialTheme.colorScheme.outlineVariant)
-                )
+                HairlineDivider(startIndent = 60.dp)
             }
         }
     }

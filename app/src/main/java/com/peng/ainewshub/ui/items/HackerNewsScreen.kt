@@ -61,6 +61,8 @@ import com.peng.ainewshub.ui.TranslationState
 import com.peng.ainewshub.ui.UiState
 import com.peng.ainewshub.ui.components.AppTopBar
 import com.peng.ainewshub.ui.components.AppTopBarDefaults
+import com.peng.ainewshub.ui.components.HairlineDivider
+import com.peng.ainewshub.ui.components.TranslateConfigMissingEffect
 import com.peng.ainewshub.ui.components.ListUpdateTimeHeader
 import com.peng.ainewshub.ui.components.RankBadge
 import com.peng.ainewshub.ui.components.RankRowSkeletonList
@@ -103,19 +105,9 @@ fun HackerNewsScreen(
     val titleStates by vm.titleStates.collectAsStateWithLifecycle()
     val config by vm.configFlow.collectAsStateWithLifecycle(initialValue = AiConfig())
     val snackbarHostState = remember { SnackbarHostState() }
-    val context = LocalContext.current
 
     // 配置未就绪提示:点「译」后若 state 变成 CONFIG_MISSING,弹一次引导
-    LaunchedEffect(titleStates) {
-        titleStates.values.firstOrNull { it is TranslationState.Error && it.message == TranslationState.CONFIG_MISSING }
-            ?.let {
-                val r = snackbarHostState.showSnackbar(
-                    message = context.getString(R.string.common_translate_config_missing),
-                    actionLabel = context.getString(R.string.common_go_settings)
-                )
-                if (r == SnackbarResult.ActionPerformed) onOpenSettings()
-            }
-    }
+    TranslateConfigMissingEffect(titleStates, snackbarHostState, onOpenSettings)
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
@@ -211,13 +203,7 @@ private fun HackerNewsList(
                 onTranslate = { onTranslate(story) }
             )
             if (index != stories.lastIndex) {
-                Spacer(
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(start = 60.dp, end = 18.dp)
-                        .height(0.5.dp)
-                        .background(MaterialTheme.colorScheme.outlineVariant)
-                )
+                HairlineDivider(startIndent = 60.dp)
             }
         }
     }
