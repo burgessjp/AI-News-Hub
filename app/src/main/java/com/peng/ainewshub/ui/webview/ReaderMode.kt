@@ -198,16 +198,23 @@ suspend fun translateReaderBlocks(
     if (budget.isEmpty()) return results.toList()
 
     var done = 0
-    supervisorScope {
-        budget.chunked(TRANSLATE_BATCH).forEach { batch ->
-            batch.map { i ->
-                async(Dispatchers.Default) {
-                    results[i] = repo.translate(texts[i], config).getOrNull()
-                }
-            }.awaitAll()
-            done += batch.size
-            onBatch(results.toList(), done, budget.size)
+    try {
+        // 批量翻译用 deferPersist:每条只更新内存副本,避免 N 条全量重写缓存文件的
+        // 写放大(O(N²) → O(N));整个流程结束后统一 flush 一次。
+        supervisorScope {
+            budget.chunked(TRANSLATE_BATCH).forEach { batch ->
+                batch.map { i ->
+                    async(Dispatchers.Default) {
+                        results[i] = repo.translate(texts[i], config, deferPersist = true).getOrNull()
+                    }
+                }.awaitAll()
+                done += batch.size
+                onBatch(results.toList(), done, budget.size)
+            }
         }
+    } finally {
+        // 无论成功还是取消,把已翻译的缓存落盘(进程被杀前兜底)
+        runCatching { repo.flush() }
     }
     return results.toList()
 }

@@ -40,7 +40,7 @@ object HotNowWidgetUpdater {
             return HotNowWidgetStore.read(appContext).hasData
         }
         HotNowWidgetStore.markAttempt(appContext, now)
-        return OverviewRepository(appContext).loadDigest().fold(
+        return OverviewRepository().loadDigest().fold(
             onSuccess = { digest ->
                 HotNowWidgetStore.write(
                     appContext,

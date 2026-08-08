@@ -1,6 +1,5 @@
 package com.peng.ainewshub.data
 
-import android.content.Context
 import com.peng.ainewshub.data.source.ArchiveHttpClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -60,19 +59,18 @@ data class OverviewDigest(
  *  - 字段缺失(null)→ 抛 [AppException.NoData](UI 走空态,语义是「今日尚未生成」);
  *  - 网络/解析失败 → 抛 [AppException.Network]/[AppException.ServerError](UI 走错误态)。
  */
-class OverviewRepository(context: Context) {
-
-    private val appContext = context.applicationContext
+class OverviewRepository {
 
     /**
      * 加载今日总览。
      *
-     * @param force 保留参数兼容现有调用方(刷新按钮);归档只读模式下 force 失去原强制
-     * 重新生成的语义,仅触发一次网络重读(归档 2 分钟缓存仍生效)
+     * 归档只读:经 [ArchiveHttpClient.fetchLatestOverview](复用 index.json 2 分钟缓存)
+     * 拉取流水线预生成的 `latest_overview` 字段并反序列化。
+     *
      * @return 成功为 [OverviewDigest];失败为 [AppException.NoData](字段缺失)/
      * 网络/解析失败
      */
-    suspend fun loadDigest(force: Boolean = false): Result<OverviewDigest> = runCatching {
+    suspend fun loadDigest(): Result<OverviewDigest> = runCatching {
         val json = ArchiveHttpClient.fetchLatestOverview()
             ?: throw AppException.NoData()
         parseDigest(json)

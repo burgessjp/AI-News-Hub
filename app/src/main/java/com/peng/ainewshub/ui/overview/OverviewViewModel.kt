@@ -40,7 +40,7 @@ sealed interface OverviewState {
  */
 class OverviewViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val repo = OverviewRepository(application)
+    private val repo = OverviewRepository()
 
     private val _state = MutableStateFlow<OverviewState>(OverviewState.Loading)
     val state: StateFlow<OverviewState> = _state.asStateFlow()

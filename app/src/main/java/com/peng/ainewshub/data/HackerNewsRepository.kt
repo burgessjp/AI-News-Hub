@@ -5,7 +5,9 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -113,6 +115,7 @@ class HackerNewsRepository(
         if (ids.isEmpty()) return@withContext emptyList()
 
         // 并发拉取每条详情,单条失败(返回 null)被跳过,不拖垮整体(与 fetchComments 一致)。
+        // 并发上限由 fetchItemJson 内的 Semaphore 统一节流。
         coroutineScope {
             ids.map { id -> async { fetchItemJson(id) } }.awaitAll()
         }.mapNotNull { obj -> obj?.let { HackerNewsStory.fromJson(it) } }
@@ -179,14 +182,28 @@ class HackerNewsRepository(
         (0 until arr.length()).map { arr.optLong(it) }
     }
 
-    /** 拉取单个 item 的 JSON;失败/404 返回 null(调用方跳过该条)。 */
-    private suspend fun fetchItemJson(id: Long): JSONObject? = runCatching {
-        JSONObject(getRaw("$base/item/$id.json"))
-    }.getOrNull()?.takeIf { it.optLong("id", -1L) != -1L }
+    /**
+     * 拉取单个 item 的 JSON;失败/404 返回 null(调用方跳过该条)。
+     *
+     * 经 [itemSemaphore] 节流:Top Stories / 评论树并发拉取时限制同时在途的请求数,
+     * 避免 limit=100 时瞬间发起 100 个并发请求打满 OkHttp Dispatcher 连接数。
+     */
+    private suspend fun fetchItemJson(id: Long): JSONObject? = itemSemaphore.withPermit {
+        runCatching {
+            JSONObject(getRaw("$base/item/$id.json"))
+        }.getOrNull()?.takeIf { it.optLong("id", -1L) != -1L }
+    }
 
     private companion object {
         /** 每个节点最多展开的子评论数(按 HN 排名截断)。 */
         private const val MAX_CHILDREN_PER_NODE = 15
+
+        /**
+         * item 详情并发拉取上限。
+         * Firebase API 匿名不限速,但 OkHttp Dispatcher 默认最多 64 并发、连接池 5 空闲,
+         * 瞬间发起 100 个请求会排队且对端不友好。16 在并发效率与连接压力间取平衡。
+         */
+        private val itemSemaphore = Semaphore(16)
 
         /** Top Stories 缓存有效期:4 小时。 */
         const val CACHE_TTL_MS = 4L * 60 * 60 * 1000
