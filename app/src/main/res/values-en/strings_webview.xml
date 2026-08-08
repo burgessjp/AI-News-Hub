@@ -39,6 +39,7 @@
     <!-- ===== Translation sheet ===== -->
     <string name="webview_translate_sheet_title">Page translation</string>
     <string name="webview_translate_progress">Translating %1$d/%2$d</string>
+    <string name="webview_translate_done">Translation complete</string>
 
     <!-- ===== AI service setup dialog ===== -->
     <string name="webview_ai_config_title">AI service not set up</string>
@@ -54,4 +55,5 @@
     <string name="webview_bar_forward">Forward</string>
     <string name="webview_bar_reader">Reader Mode</string>
     <string name="webview_bar_exit_reader">Exit Reader</string>
+    <string name="webview_bar_translate">Translate</string>
 </resources>
