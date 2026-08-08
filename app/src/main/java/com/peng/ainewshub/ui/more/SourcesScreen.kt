@@ -39,7 +39,7 @@ import org.burnoutcrew.reorderable.reorderable
  * Product Hunt / The Rundown AI / AIHot 精选 / stormzhang AI),元数据来自 [sourceMeta]。
  *
  * **可拖拽自定义顺序**:长按某行进入拖拽,松手即落位并持久化(存 [SettingsStore.sourceOrderFlow])。
- * 顺序变化后摘要 Tab 跟随,关于页固定默认顺序。LinuxDo 暂下线(不含于此)。
+ * 顺序变化后摘要 Tab 跟随,关于页固定默认顺序。
  *
  * 二级页惯例:顶栏带返回箭头、标题用 secondaryTitleFontSize,列表不预留浮动底栏
  * (二级页底栏不悬浮)。无章节条(顶栏标题即「信息源」,再加章节条重复)。

@@ -25,7 +25,7 @@ import kotlinx.coroutines.launch
  *
  * 与 [ProductHuntViewModel] 同构,**不接实时源**:两家均无稳定公开 API(Anthropic
  * 无官方 RSS),App 端不直连。故 [SourceMode] LIVE 与 ARCHIVE 都走归档([archiveRepo])——
- * 与 LinuxDo「只实时」对称,本源是「只归档」。[sourceMode] 仍订阅设置,仅为顶栏角标一致。
+ * 与 Product Hunt 同理,本源是「只归档」。[sourceMode] 仍订阅设置,仅为顶栏角标一致。
  *
  * 整体翻译:标题多为英文,翻译开关开且配置就绪时,标题行出现「译」按钮。翻译状态以
  * 文章 url 为 key(url 唯一,刷新后状态保留,避免重复请求)。

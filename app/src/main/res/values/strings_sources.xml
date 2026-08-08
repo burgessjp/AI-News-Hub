@@ -5,7 +5,4 @@
   源标题(stormzhang 等)复用 common 的 source_title_*,均不在此重复。
 -->
 <resources>
-    <!-- LinuxDo 热榜(源暂时下线,代码保留):顶栏标题 + 置顶图钉无障碍描述 -->
-    <string name="sources_linuxdo_hot_title">LinuxDo 热榜</string>
-    <string name="sources_linuxdo_pinned">置顶</string>
 </resources>

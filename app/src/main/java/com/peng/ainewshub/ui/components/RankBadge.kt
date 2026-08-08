@@ -17,7 +17,7 @@ import com.peng.ainewshub.ui.theme.AppText
  * 排名徽章 —— 全 App 统一的「左 24dp 序号块」。
  *
  * 取代各屏私有实现(此前 1-3 名实心 primary、其余灰底,尺寸在 20dp/24dp 间漂移):
- * 今日热点 / HackerNews / GitHub Trending / LinuxDo / stormzhang / HuggingFace 共用。
+ * 今日热点 / HackerNews / GitHub Trending / stormzhang / HuggingFace 共用。
  *
  * 规格:24×24dp,圆角走 MaterialTheme.shapes.extraSmall;数字 AppText.bodySmall 加粗居中。
  * (数字等宽 tnum 特性项目内无先例,保持简单不引入。)

@@ -7,7 +7,7 @@ import com.peng.ainewshub.data.RundownAiArticle
  * [RundownAiArchiveRepository](gitcode 归档)的共同接口。
  *
  * 与 [StormzhangAiNewsSource] 平行:双模式源,ViewModel 按
- * [SourceMode] 选择实现(与 LinuxDo「只实时」/ Product Hunt「只归档」不同,
+ * [SourceMode] 选择实现(与 Product Hunt「只归档」不同,
  * The Rundown AI 走标准双模式)。
  */
 interface RundownAiSource {

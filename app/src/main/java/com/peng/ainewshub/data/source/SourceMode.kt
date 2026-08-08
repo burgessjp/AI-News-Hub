@@ -12,8 +12,6 @@ import com.peng.ainewshub.R
  *   GitHub Action 每天定时归档的历史快照。数据非实时,但稳定不受第三方站点
  *   反爬(如 Cloudflare)影响。
  *
- * LinuxDo 不参与切换:它 CI 上归档拿不到(CF 拦截),始终走实时抓取。
- *
  * 持久化:存于 display_prefs 的 source_mode 键,按 [name] 存取;未知值回退 [LIVE]。
  * 展示名走资源([labelRes]),UI 层 `stringResource(mode.labelRes)`。
  */

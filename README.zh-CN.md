@@ -205,7 +205,6 @@ gradle/libs.versions.toml  所有依赖版本集中
 
 ```bash
 pip install -r scripts/requirements.txt
-python -m playwright install --with-deps chromium   # 仅 LinuxDo 源过 Cloudflare 需要
 
 export AI_NEWS_HUB_AI_BASE_URL=...
 export AI_NEWS_HUB_AI_MODEL=...
@@ -244,7 +243,6 @@ bash scripts/pipeline.sh
 
 ## ⚠️ 已知限制
 
-- **LinuxDo 源易失败** — 套 Cloudflare 强挑战，CI runner 的数据中心 IP 可能被额外收紧，单源失败属已知风险，会被跳过、不影响其余源。
 - **Product Hunt 仅归档** — Developer Token 是服务端 secret 不进 APK，两种模式都走归档。
 - **翻译依赖用户自配 key** — 未配置 AI 服务时整页翻译、选中翻译不可用（摘要、今日热点等预生成内容不受影响）。
 - **归档失败不回退实时** — 归档模式抓取失败直接显示 Error 态，设计上不自动降级。
@@ -314,4 +312,4 @@ bash scripts/pipeline.sh
 
 本项目基于 [MIT License](LICENSE) 开源，欢迎自由使用、修改与分发（包括商用），只需保留版权与许可声明。
 
-> 数据源（HackerNews / GitHub / Product Hunt / LinuxDo 等）的内容版权归各源所有。本项目仅做客户端聚合展示，不存储或再分发原始内容。二次开发或部署私有数据流水线时，请遵守各信息源的访问频率限制与服务条款。
+> 数据源（HackerNews / GitHub / Product Hunt 等）的内容版权归各源所有。本项目仅做客户端聚合展示，不存储或再分发原始内容。二次开发或部署私有数据流水线时，请遵守各信息源的访问频率限制与服务条款。

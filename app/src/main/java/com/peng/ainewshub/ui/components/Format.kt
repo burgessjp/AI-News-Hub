@@ -10,9 +10,9 @@ import java.util.Locale
  * 列表 meta 通用格式化 —— 收口 Hub 各屏曾经各自私有的计数/时间格式化。
  *
  * 行为与各屏原私有实现逐字一致,只做去重,不改变任何输出:
- *  - [formatCount]:GitHub / LinuxDo / HuggingFace 三屏逐字相同,合一
+ *  - [formatCount]:GitHub / HuggingFace 两屏逐字相同,合一
  *  - [formatRelativeTime]:HackerNews 列表屏与评论屏逐字相同(Unix 秒),合一
- *  - [formatRelative]:LinuxDo 热榜(毫秒,7 天窗口),随 formatCount 一并收口
+ *  - [formatRelative]:毫秒时间戳相对化(7 天窗口),随 formatCount 一并收口
  *
  * 国际化:相对时间/日期模式经 [context] 取词(values 中文全集 / values-en 英文),
  * 调用方传局部化 context(Composable 的 LocalContext 或 `context.localized()`);

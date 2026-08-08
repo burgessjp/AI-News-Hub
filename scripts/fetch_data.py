@@ -3,11 +3,10 @@
 AI News Hub「Hub」tab 浏览区域数据抓取脚本。
 
 复刻 App 端的抓取逻辑(见 app/src/main/java/com/peng/ainewshub/data/ 下的各
-Repository 与对应 model 类),把 9 个数据源解析成 JSON 落盘:
+Repository 与对应 model 类),把 8 个数据源解析成 JSON 落盘:
 
   - hackernews           HackerNews Top Stories(两步拉取,Firebase API)
   - github-trending      GitHub Trending 仓库(HTML 抓取)
-  - linuxdo              LinuxDo 热榜(Discourse JSON)
   - stormzhang-ai        stormzhang AI 资讯(HTML 抓取)
   - huggingface-papers   HuggingFace Trending Papers(HTML 抓取)
   - producthunt          Product Hunt 当日热门(GraphQL API,需 PRODUCT_HUNT_KEY)
@@ -32,13 +31,13 @@ Repository 与对应 model 类),把 9 个数据源解析成 JSON 落盘:
 AI 总结(需求 c):
   - 每源抓完调 ai_summary.summarize_source 生成简体中文要点,写入快照顶层 `ai_summary`。
   - 总结 8 个稳定源(hackernews/github-trending/huggingface-papers/stormzhang-ai/
-    producthunt/rundown-ai/aihot-featured/openai-anthropic-news),linuxdo 不做(对齐 App)。AI 调用失败仅 warn,不阻断落盘。
+    producthunt/rundown-ai/aihot-featured/openai-anthropic-news)。AI 调用失败仅 warn,不阻断落盘。
   - 需 3 个 AI 环境变量(AI_NEWS_HUB_AI_BASE_URL/_MODEL/_API_KEY)齐全;缺失则跳过总结。
     加 --no-summary 可显式跳过(本地调试用)。
 
 用法:
   python3 scripts/fetch_data.py --out-dir /tmp/aihot-data-test
-  python3 scripts/fetch_data.py --out-dir out --only hackernews,linuxdo
+  python3 scripts/fetch_data.py --out-dir out --only hackernews,github-trending
   python3 scripts/fetch_data.py --out-dir out --no-summary --no-previous-index  # 本地干跑
 """
 
@@ -111,28 +110,6 @@ def parse_count(s):
     if not s:
         return 0
     return int(s.replace(",", "").strip()) if s.replace(",", "").strip().isdigit() else 0
-
-
-def strip_html(s):
-    """粗略去 HTML 标签(对齐 HtmlUtil.stripHtml)。
-    LinuxDo excerpt 是 HTML 片段,存 JSON 前清理成纯文本更易消费。"""
-    if not s:
-        return ""
-    return re.sub(r"<[^>]+>", "", s).replace("&nbsp;", " ").strip()
-
-
-def parse_iso_to_ms(iso):
-    """解析 ISO 8601(如 '2026-07-13T04:28:29.805Z')为毫秒;失败返回 0。
-    对齐 LinuxDoTopic.kt 的 parseIsoMillis。"""
-    if not iso or not iso.strip():
-        return 0
-    for fmt in ("%Y-%m-%dT%H:%M:%S.%fZ", "%Y-%m-%dT%H:%M:%SZ"):
-        try:
-            dt = datetime.strptime(iso, fmt).replace(tzinfo=timezone.utc)
-            return int(dt.timestamp() * 1000)
-        except ValueError:
-            continue
-    return 0
 
 
 # ===== 数据源 1:HackerNews =====
@@ -252,145 +229,6 @@ def fetch_github_trending():
             "totalStars": total_stars,
             "forks": forks,
             "starsToday": stars_today,
-        })
-    return items, {}
-
-
-# ===== 数据源 3:LinuxDo 热榜 =====
-# 特殊:linux.do 套 Cloudflare 强挑战(带 Turnstile 的 cf-mitigated: challenge),
-# 普通.requests/curl_cffi 都会被 403(实测所有 Chrome 指纹变种均被拦,首页都进不去)。
-# 这里用 Playwright 跑真 Chromium 内核过 CF:先访问首页让 CF 认它是真浏览器,
-# 再用页面内 fetch 请求 API(自动带 _cfuvid 等 cookie)。本地实测能直接 200 拿到 JSON。
-# Playwright 没装时 _fetch_linuxdo_raw 抛 RuntimeError,被主流程当单源失败跳过,
-# 不影响其余 4 个源。
-
-def _fetch_linuxdo_raw():
-    """用 Playwright(真 Chromium)过 CF 拿 linux.do hot.json 原文。
-    返回 JSON 字符串。Playwright/浏览器未就绪时抛 RuntimeError。"""
-    try:
-        from playwright.sync_api import sync_playwright
-    except ImportError as e:
-        raise RuntimeError("LinuxDo 需要 Playwright 过 CF,但未安装(见 requirements.txt)") from e
-
-    api_url = "https://linux.do/c/develop/4/l/hot.json"
-    with sync_playwright() as p:
-        try:
-            browser = p.chromium.launch(headless=True)
-        except Exception as e:
-            raise RuntimeError(
-                "Playwright Chromium 未下载,请先跑 `python -m playwright install chromium`"
-            ) from e
-        try:
-            context = browser.new_context(
-                user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                           "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-                locale="zh-CN",
-            )
-            page = context.new_page()
-            # 1) 先访问首页:让 CF 跑完挑战 JS、认它是真浏览器,落地 _cfuvid cookie。
-            page.goto("https://linux.do/", wait_until="domcontentloaded", timeout=30000)
-            # 等"Just a moment..."挑战页(若有)自动跳转完成,最多等 20s。
-            for _ in range(20):
-                time.sleep(1)
-                if "just a moment" not in page.title().lower():
-                    break
-            # 2) 用页面内 fetch 请求 API:自动复用浏览器 cookie + 指纹,过 CF。
-            result = page.evaluate("""async (url) => {
-                const r = await fetch(url, {headers: {'Accept': 'application/json'}});
-                return {status: r.status, ct: r.headers.get('content-type'), text: await r.text()};
-            }""", api_url)
-            status = result.get("status")
-            ct = result.get("ct") or ""
-            text = result.get("text") or ""
-            if status != 200 or "json" not in ct:
-                raise RuntimeError(
-                    f"LinuxDo 仍被 CF 拦截(HTTP {status}, {ct});"
-                    f"body 前 80 字符: {text[:80]!r}"
-                )
-            return text
-        finally:
-            browser.close()
-
-
-def _resolve_avatar(template):
-    """补全头像 URL(对齐 LinuxDoTopic.resolveAvatar)。
-    {size}→48;相对路径补 https://linux.do 前缀。"""
-    if not template:
-        return ""
-    sized = template.replace("{size}", "48")
-    if sized.startswith("https://") or sized.startswith("http://"):
-        return sized
-    if sized.startswith("//"):
-        return "https:" + sized
-    if sized.startswith("/"):
-        return "https://linux.do" + sized
-    return sized
-
-
-def fetch_linuxdo():
-    """
-    Discourse JSON(对齐 LinuxDoHotRepository + LinuxDoTopic.fromJson)。
-    users[] 建索引,topic_list.topics[] 解析。置顶帖 rank=0。
-
-    数据获取走 Playwright 过 CF(见 _fetch_linuxdo_raw);字段解析逻辑与 App 端一致。
-    """
-    raw = _fetch_linuxdo_raw()
-    root = json.loads(raw)
-    users = root.get("users") or []
-    users_by_id = {u.get("id"): u for u in users if isinstance(u, dict)}
-
-    topics = (((root.get("topic_list") or {}).get("topics")) or [])
-    items = []
-    rank = 0
-    for t in topics:
-        if not isinstance(t, dict):
-            continue
-        tid = t.get("id")
-        if not tid or tid <= 0:
-            continue
-        title = (t.get("title") or "").strip() or (t.get("fancy_title") or "").strip()
-        if not title:
-            continue
-
-        is_pinned = bool(t.get("pinned_globally")) or bool(t.get("pinned"))
-        r = 0 if is_pinned else (rank := rank + 1)
-
-        # 作者:posters[0] 中 description 含"原始发帖"的 user_id;否则取 posters 第一个
-        op_user_id = -1
-        posters = t.get("posters") or []
-        if posters:
-            op = next((p for p in posters if "原始发帖" in (p.get("description") or "")), None)
-            if op:
-                op_user_id = op.get("user_id", -1)
-            elif isinstance(posters[0], dict):
-                op_user_id = posters[0].get("user_id", -1)
-        user = users_by_id.get(op_user_id) or {}
-        author_name = (user.get("name") or "").strip() or (user.get("username") or "")
-        avatar_url = _resolve_avatar(user.get("avatar_template") or "")
-
-        excerpt = strip_html(t.get("excerpt") or "")
-        tags = []
-        for tag in (t.get("tags") or []):
-            if isinstance(tag, dict):
-                n = (tag.get("name") or "").strip()
-                if n:
-                    tags.append(n)
-        tags = tags[:2]
-
-        items.append({
-            "rank": r,
-            "title": title,
-            "url": f"https://linux.do/t/topic/{tid}",
-            "excerpt": excerpt,
-            "authorName": author_name,
-            "avatarUrl": avatar_url,
-            "views": t.get("views", 0) or 0,
-            "replyCount": t.get("reply_count", 0) or 0,
-            "likeCount": t.get("like_count", 0) or 0,
-            "tags": tags,
-            "createdAtMs": parse_iso_to_ms(t.get("created_at") or ""),
-            "pinned": is_pinned,
-            "closed": bool(t.get("closed")),
         })
     return items, {}
 
@@ -1214,7 +1052,6 @@ def fetch_openai_anthropic_news():
 SOURCES = {
     "hackernews": fetch_hackernews,
     "github-trending": fetch_github_trending,
-    "linuxdo": fetch_linuxdo,
     "stormzhang-ai": fetch_stormzhang_ai,
     "huggingface-papers": fetch_huggingface_papers,
     "producthunt": fetch_producthunt,
@@ -1258,7 +1095,7 @@ def write_snapshot(out_dir, source_name, items, meta, now, ai_summary_v2=None):
     顶层结构:source / fetched_at(ISO CST)/ fetched_at_ms / count / items / meta / ai_summary_v2?。
 
     ai_summary_v2:AI 摘要对象列表(list[dict],每项含 title + desc),非空时写入顶层
-    `ai_summary_v2` 字段。调用 AI 失败或源不支持(linuxdo)时传 None,该字段直接省略。
+    `ai_summary_v2` 字段。调用 AI 失败时传 None,该字段直接省略。
     App 端同时兼容旧的纯文本 `ai_summary`(历史快照),新快照只写 v2。
     """
     date_str = now.strftime("%Y-%m-%d")

@@ -1,15 +1,11 @@
 # 数据抓取脚本依赖(fetch_data.py)
 # 与 scripts/gen_icon.py 不同 —— 后者只用 PIL/NumPy 跑本地图像生成;
 # 本脚本需要 requests 做 HTTP,beautifulsoup4 解析 HTML(对齐 App 端 jsoup)。
-# playwright 仅 LinuxDo 源需要:linux.do 套 Cloudflare 强挑战,普通 HTTP 库
-# 被秒拦(实测 curl_cffi 各指纹变种都 403),必须用真 Chromium 过 CF。
-# 其余 4 个源不需要 playwright,装了也不会拖慢(按需 import)。
 requests>=2.31
 beautifulsoup4>=4.12
 # lxml:bs4 的 "xml" 解析器由它提供(openai-anthropic-news 源的 OpenAI RSS 子源使用);
 # 缺失时该子源直接 FeatureNotFound 失败(CI 曾因此长期静默跳过,latest 指针停更)
 lxml>=5.0
-playwright>=1.40
 
 # 设计资源生成脚本依赖(gen_wordmark.py:字体轮廓 → 矢量路径;gen_icon*.py 同用 PIL)
 fontTools>=4.50

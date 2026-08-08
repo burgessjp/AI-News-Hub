@@ -11,7 +11,6 @@
 设计要点(复刻 App):
   - 总结 8 个稳定源:hackernews / github-trending / openai-anthropic-news /
     huggingface-papers / stormzhang-ai / producthunt / rundown-ai / aihot-featured。
-    linuxdo 受 Cloudflare 影响不稳定,App 也没纳入,这里跳过。
   - 8 个 system prompt 要求模型只输出 JSON 数组(无 markdown / 无解释);
     user prompt 格式化器搬自 App SummaryRepository.kt(lines 102-150)。
   - temperature=0.5(对齐 App 的 requestSummary);读取超时 30s。
@@ -45,7 +44,7 @@ TEMPERATURE = 0.5
 # 自带重试 3 次(对齐 fetch_data 主链路的重试上限);失败间隔 2s/4s
 MAX_ATTEMPTS = 3
 
-# App 端只对这 8 个源做摘要(linuxdo 不稳定,排除)
+# App 端只对这 8 个源做摘要
 SUMMARY_SOURCES = ("hackernews", "github-trending", "huggingface-papers", "stormzhang-ai", "producthunt", "rundown-ai", "aihot-featured", "openai-anthropic-news")
 
 
@@ -417,7 +416,7 @@ def summarize_source(source, items):
     """
     给某源的本次 items 生成中文 AI 摘要。返回 list[dict](每项含 title + desc),失败返回 None。
 
-    - 不支持的源(linuxdo / 未知)→ 直接返回 None,不算错。
+    - 不支持的源(未知 key)→ 直接返回 None,不算错。
     - 空 items → 返回 None(没东西可总结)。
     - 配置缺失 → 返回 None,并 stderr 提示(让调用方知道为什么没出摘要)。
     - API 调用 → 3 次重试(间隔 2s/4s),全败返回 None。

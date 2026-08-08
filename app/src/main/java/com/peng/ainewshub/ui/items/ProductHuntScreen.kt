@@ -262,7 +262,7 @@ private fun ProductRow(
         RankBadge(rank = item.rank)
 
         // 产品主图(thumbnail):40dp 方形圆角(对齐 BrowseHistory 缩略块尺寸 + shapes.small),
-        // 缺失时不渲染(对齐 LinuxDo 头像写法:if 非空保护,不占位)。底色兜底加载中/失败态。
+        // 缺失时不渲染(if 非空保护,不占位)。底色兜底加载中/失败态。
         if (item.thumbnailUrl.isNotBlank()) {
             AsyncImage(
                 model = item.thumbnailUrl,

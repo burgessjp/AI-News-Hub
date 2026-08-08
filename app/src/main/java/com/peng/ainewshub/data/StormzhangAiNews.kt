@@ -5,7 +5,7 @@ import org.jsoup.nodes.Element
 /**
  * stormzhang AI Daily 单条资讯(来源:https://news.stormzhang.ai)。
  *
- * 与 [TrendingRepo] / [LinuxDoTopic] 平行:这是第四个独立热榜数据源。
+ * 与 [TrendingRepo] 平行:这是独立热榜数据源之一。
  * 该站是「每日 AI 资讯聚合」,由 AI 自动摘要生成,聚合 Hacker News / Reddit /
  * Product Hunt / The Rundown AI / TLDR AI 等信源。每条同时带中文摘要(主)和英文原文(辅)。
  *

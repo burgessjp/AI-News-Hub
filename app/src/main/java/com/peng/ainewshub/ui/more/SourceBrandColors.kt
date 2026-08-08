@@ -15,7 +15,6 @@ import androidx.compose.ui.graphics.Color
  * 色值出处:
  *  - HackerNews:  #FF6600 —— HN 官方品牌橙
  *  - GitHub:      浅 #24292F / 深 #E6EDF3 —— GitHub Primer 前景色,深色模式色块/图标反转
- *  - LinuxDo:     #1E88E5 —— LinuxDo 站点主色(蓝)
  *  - stormzhang:  #00897B —— 无官方品牌色,自定义固定色(青绿,与其余四色不撞)
  *  - HuggingFace: #FFB000 —— HuggingFace 品牌黄(深浅同值,图标用深色保对比)
  *  - ProductHunt: #DA552F —— PH 官方品牌橙红(logo 色)
@@ -32,7 +31,7 @@ data class SourceBrandColors(val container: Color, val icon: Color)
 private val GitHubContainerDay = Color(0xFF24292F)
 private val GitHubContainerNight = Color(0xFFE6EDF3)
 
-/** 九源品牌色入口:更多页「浏览」组图标块按源取色(仅 GitHub 需深色变体)。 */
+/** 八源品牌色入口:更多页「浏览」组图标块按源取色(仅 GitHub 需深色变体)。 */
 object SourceBrand {
     /** HackerNews —— 品牌橙 #FF6600 + 白图标(还原 HN 标识观感)。 */
     val HackerNews = SourceBrandColors(container = Color(0xFFFF6600), icon = Color.White)
@@ -44,9 +43,6 @@ object SourceBrand {
         } else {
             SourceBrandColors(container = GitHubContainerDay, icon = Color.White)
         }
-
-    /** LinuxDo —— 站点主色蓝 #1E88E5 + 白图标。 */
-    val LinuxDo = SourceBrandColors(container = Color(0xFF1E88E5), icon = Color.White)
 
     /** stormzhang —— 无官方品牌色,自定义固定色(青绿 #00897B,与其余四色不撞)+ 白图标。 */
     val Stormzhang = SourceBrandColors(container = Color(0xFF00897B), icon = Color.White)

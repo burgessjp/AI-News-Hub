@@ -63,7 +63,6 @@ import com.peng.ainewshub.ui.items.HackerNewsScreen
 import com.peng.ainewshub.ui.items.GitHubTrendingScreen
 import com.peng.ainewshub.ui.items.BrowseHistoryScreen
 import com.peng.ainewshub.ui.items.HuggingFacePapersScreen
-import com.peng.ainewshub.ui.items.LinuxDoHotScreen
 import com.peng.ainewshub.ui.items.ProductHuntScreen
 import com.peng.ainewshub.ui.items.RundownAiScreen
 import com.peng.ainewshub.ui.items.OpenAiAnthropicNewsScreen
@@ -199,7 +198,6 @@ private sealed interface Page {
     data object HackerNews : Page
     data class HackerNewsComments(val story: HackerNewsStory) : Page
     data object GitHubTrending : Page
-    data object LinuxDo : Page
     data object StormzhangAiNews : Page
     data object HuggingFacePapers : Page
     data object ProductHunt : Page
@@ -235,7 +233,6 @@ private fun Page.toBundle(): Bundle = Bundle().apply {
         is Page.About -> putString("t", "About")
         is Page.HackerNews -> putString("t", "HackerNews")
         is Page.GitHubTrending -> putString("t", "GitHubTrending")
-        is Page.LinuxDo -> putString("t", "LinuxDo")
         is Page.StormzhangAiNews -> putString("t", "StormzhangAiNews")
         is Page.HuggingFacePapers -> putString("t", "HuggingFacePapers")
         is Page.ProductHunt -> putString("t", "ProductHunt")
@@ -265,7 +262,6 @@ private fun pageFromBundle(b: Bundle, webFallbackTitle: String): Page? {
         "About" -> Page.About
         "HackerNews" -> Page.HackerNews
         "GitHubTrending" -> Page.GitHubTrending
-        "LinuxDo" -> Page.LinuxDo
         "StormzhangAiNews" -> Page.StormzhangAiNews
         "HuggingFacePapers" -> Page.HuggingFacePapers
         "ProductHunt" -> Page.ProductHunt
@@ -598,7 +594,6 @@ fun AiNewsHubApp(
                             onOpenAll = { push(Page.All) },
                             onOpenHackerNews = { push(Page.HackerNews) },
                             onOpenGitHubTrending = { push(Page.GitHubTrending) },
-                            onOpenLinuxDo = { push(Page.LinuxDo) },
                             onOpenStormzhangAiNews = { push(Page.StormzhangAiNews) },
                             onOpenHuggingFacePapers = { push(Page.HuggingFacePapers) },
                             onOpenProductHunt = { push(Page.ProductHunt) },
@@ -642,7 +637,6 @@ fun AiNewsHubApp(
                             onOpenSettings = { push(Page.Settings) },
                             onOpenHackerNews = { push(Page.HackerNews) },
                             onOpenGitHubTrending = { push(Page.GitHubTrending) },
-                            onOpenLinuxDo = { push(Page.LinuxDo) },
                             onOpenStormzhangAiNews = { push(Page.StormzhangAiNews) },
                             onOpenHuggingFacePapers = { push(Page.HuggingFacePapers) },
                             onOpenProductHunt = { push(Page.ProductHunt) },
@@ -708,7 +702,6 @@ private fun TabRoot(
     onOpenAll: () -> Unit,
     onOpenHackerNews: () -> Unit,
     onOpenGitHubTrending: () -> Unit,
-    onOpenLinuxDo: () -> Unit,
     onOpenStormzhangAiNews: () -> Unit,
     onOpenHuggingFacePapers: () -> Unit,
     onOpenProductHunt: () -> Unit,
@@ -783,7 +776,6 @@ private fun PageView(
     // 信息源(Sources)二级页内的 8 个源入口回调
     onOpenHackerNews: () -> Unit,
     onOpenGitHubTrending: () -> Unit,
-    onOpenLinuxDo: () -> Unit,
     onOpenStormzhangAiNews: () -> Unit,
     onOpenHuggingFacePapers: () -> Unit,
     onOpenProductHunt: () -> Unit,
@@ -889,11 +881,6 @@ private fun PageView(
             onBack = onBack,
             onOpenUrl = { url, title -> onOpenUrl(url, title, "GitHub Trending") },
             onOpenSettings = onOpenSettings,
-            listState = pageListStates.forPage(page)
-        )
-        Page.LinuxDo -> LinuxDoHotScreen(
-            onBack = onBack,
-            onOpenUrl = { url, title -> onOpenUrl(url, title, "LinuxDo") },
             listState = pageListStates.forPage(page)
         )
         Page.StormzhangAiNews -> StormzhangAiNewsScreen(

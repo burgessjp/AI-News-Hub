@@ -19,9 +19,6 @@ import com.peng.ainewshub.R
  * 副标题、品牌色、跳转 URL 统一收口于此,消除此前三处各自硬编码、顺序互不一致、
  * About 漏 OpenAI×Anthropic 等问题。
  *
- * LinuxDo 暂时下线(三处 UI 入口均不展示),底层代码([com.peng.ainewshub.ui.items.LinuxDoHotScreen]
- * / Page.LinuxDo 等)保留,故此处刻意不含 LinuxDo,待恢复时补回。
- *
  * - **默认顺序** [DEFAULT_SOURCE_ORDER]:HackerNews → GitHub Trending → OpenAI×Anthropic
  *   → HuggingFace Papers → Product Hunt → The Rundown AI → AIHot 精选 → stormzhang AI。
  *   此为全 App 默认顺序,信息源页可拖拽自定义(持久化于 [SettingsStore.sourceOrderFlow]),
@@ -96,7 +93,7 @@ object SourceKeys {
 }
 
 /**
- * 全 App 默认源顺序(8 源,不含 LinuxDo)。
+ * 全 App 默认源顺序(8 源)。
  *
  * 用户在「信息源」页拖拽后的自定义顺序持久化于 [SettingsStore.sourceOrderFlow],
  * 读取时会以本常量为兜底(只保留已知 key + 补全缺失 key 到末尾)。

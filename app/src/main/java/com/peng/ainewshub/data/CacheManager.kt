@@ -16,7 +16,7 @@ import java.io.File
  *  - WebView Cookie / Web Storage(随浏览不断累积的持久化数据)
  *  - Coil 图片缓存(磁盘 + 内存)
  *  - 翻译缓存文件 `hn_translations.json`
- *  - 6 个榜单源列表缓存文件(HackerNews/GitHub/HuggingFace/stormzhang/LinuxDo/Rundown)
+ *  - 5 个榜单源列表缓存文件(HackerNews/GitHub/HuggingFace/stormzhang/Rundown)
  *  - 浏览历史([BrowseHistoryRepository.clearAll])
  *  - 搜索历史([SettingsStore.clearSearchHistory])
  *

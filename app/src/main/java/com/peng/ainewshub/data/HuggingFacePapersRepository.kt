@@ -17,7 +17,7 @@ import java.io.File
  *  - 数据是 HTML → 用 jsoup 解析,缓存原始 HTML
  *  - 卡片选择器 `article.relative.overflow-hidden.rounded-xl.border`,字段抽取见 [HuggingFacePaper.fromArticle]
  *  - 带 CF 挑战页检测:huggingface.co 套 Cloudflare,异常时可能返回 HTML 挑战页
- *    而非论文列表,此时给出明确错误而非泛泛解析失败(同 [LinuxDoHotRepository] 套路)
+ *    而非论文列表,此时给出明确错误而非泛泛解析失败
  *  - TTL 4 小时(与 [GitHubTrendingRepository] 对齐)
  *
  * UA:站点对默认 OkHttp UA 偶尔差异对待,统一带浏览器 UA,复用 [NewsRepository] 同款字串。

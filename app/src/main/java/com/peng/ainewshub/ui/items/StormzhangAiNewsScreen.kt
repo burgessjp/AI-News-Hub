@@ -60,7 +60,7 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 /**
  * stormzhang AI Daily 全屏页面(「更多」tab 二级页)。
  *
- * 视觉对齐 [GitHubTrendingScreen] / [LinuxDoHotScreen]:
+ * 视觉对齐 [GitHubTrendingScreen]:
  *  - 顶栏:返回箭头 + 「stormzhang AI 资讯」+ 右上「上次刷新 N 分钟前」
  *  - 列表:排名徽章([RankBadge] 统一分档)+ 中文摘要(主)+ 英文原文(辅,弱色)
  *    + 信源徽章(描边小标签)· 发布时间

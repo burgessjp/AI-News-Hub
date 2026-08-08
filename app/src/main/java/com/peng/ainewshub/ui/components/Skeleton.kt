@@ -123,7 +123,7 @@ fun NewsCardSkeletonList(
 }
 
 /**
- * 排名行骨架 —— 匹配 Hub 五源屏(HN/GitHub/LinuxDo/stormzhang/HF)的真实行结构:
+ * 排名行骨架 —— 匹配 Hub 四源屏(HN/GitHub/stormzhang/HF)的真实行结构:
  * 左 24dp 排名徽章 + 右侧标题两行 + meta 统计行(padding 18h/14v、间距 12dp 对齐
  * 各屏真实行),避免加载→内容切换时的结构跳变。
  */

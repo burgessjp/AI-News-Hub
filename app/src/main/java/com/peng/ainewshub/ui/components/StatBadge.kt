@@ -20,8 +20,8 @@ import com.peng.ainewshub.ui.theme.AppText
 /**
  * 统计徽章 —— Hub 列表 meta 行的「图标 + 数值」紧凑横排。
  *
- * 取代 GitHubTrending / LinuxDo / HuggingFacePapers 三屏各自的私有 CountBadge
- * (三份实现逐字相同,仅默认值微调)。图标 14dp + AppText.bodySmall,
+ * 取代 GitHubTrending / HuggingFacePapers 两屏各自的私有 CountBadge
+ * (两份实现逐字相同,仅默认值微调)。图标 14dp + AppText.bodySmall,
  * 默认弱色 onSurfaceVariant;热度主指标等场景经 [tint]/[fontWeight] 强调。
  */
 @Composable

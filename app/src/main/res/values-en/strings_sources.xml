@@ -1,7 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- English: source-screen specific strings. Generic states/actions reuse strings_common.xml. -->
 <resources>
-    <!-- LinuxDo hot list (source temporarily offline, code kept): top bar title + pin a11y label -->
-    <string name="sources_linuxdo_hot_title">LinuxDo Trending</string>
-    <string name="sources_linuxdo_pinned">Pinned</string>
 </resources>

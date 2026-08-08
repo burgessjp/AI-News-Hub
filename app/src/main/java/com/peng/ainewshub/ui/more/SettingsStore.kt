@@ -127,7 +127,7 @@ class SettingsStore(context: Context) {
      * 信息源顺序流 —— 用户在「信息源」页拖拽自定义的 8 源排列,默认 [DEFAULT_SOURCE_ORDER]。
      *
      * 存储格式:换行分隔的源 key 字符串(与搜索历史同模式,规避 stringListPreferencesKey)。
-     * 读取容错:只保留 [DEFAULT_SOURCE_ORDER] 中已知 key(过滤历史脏数据/已下线源如 LinuxDo),
+     * 读取容错:只保留 [DEFAULT_SOURCE_ORDER] 中已知 key(过滤历史脏数据/已下线源),
      * 再把缺失的 key 按默认顺序补到末尾 —— 保证旧用户升级 / 未来新增源时不丢条目、
      * 数据迁移无需写脚本。
      */

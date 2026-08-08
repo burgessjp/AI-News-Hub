@@ -25,8 +25,8 @@ import kotlinx.coroutines.launch
  *
  * 与 [HuggingFacePapersViewModel] 同构,但 **不接实时源**:Product Hunt 的
  * Developer Token 是服务端 secret,不进 APK,App 端不直连 PH GraphQL。
- * 故 [SourceMode] LIVE 与 ARCHIVE 都走归档([archiveRepo])——与 LinuxDo「只实时」
- * 对称,PH 是「只归档」。[sourceMode] 仍订阅设置,仅为顶栏角标一致。
+ * 故 [SourceMode] LIVE 与 ARCHIVE 都走归档([archiveRepo])——
+ * PH 是「只归档」。[sourceMode] 仍订阅设置,仅为顶栏角标一致。
  *
  * 整体翻译:产品名(name)与 tagline 多为英文,翻译开关开且配置就绪时,标题行出现
  * 「译」按钮(复用 [InlineTranslateButton] / [TranslatedText],UI 与其他源一致)。

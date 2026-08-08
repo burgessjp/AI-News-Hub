@@ -5,7 +5,7 @@ import org.jsoup.nodes.Element
 /**
  * HuggingFace Trending Paper 单篇论文(来源:https://huggingface.co/papers/trending)。
  *
- * 与 [TrendingRepo] / [LinuxDoTopic] / [StormzhangAiNews] 平行:这是第五个独立热榜数据源。
+ * 与 [TrendingRepo] / [StormzhangAiNews] 平行:这是独立热榜数据源之一。
  * HuggingFace 的 Trending Papers 由 AK 每日精选 arXiv 论文,按社区 upvote 排序,
  * 是跟踪前沿 AI 研究的常用入口。页面为 SSR HTML,无公开 JSON API。
  *

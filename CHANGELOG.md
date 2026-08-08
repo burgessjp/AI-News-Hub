@@ -26,7 +26,6 @@
 
 - `scripts/pipeline.sh` 统一编排 8 源抓取 + AI 摘要 + 跨源总览 + 推送
 - 每日北京时间 15:30 定时执行（Product Hunt 当日批次 15:01 上线后），单源失败跳过且 latest 指针继承
-- LinuxDo 套 Cloudflare 强挑战，用 Playwright 真 Chromium 过 CF
 
 ### 工程化
 

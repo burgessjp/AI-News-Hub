@@ -15,12 +15,9 @@ name: Fetch Hub Data
 # 失败策略(对齐 scripts/fetch_data.py):单源失败 3 次重试后被跳过,成功源照常提交;
 # 失败源的 index.json latest 指针从上一次 index.json 继承,客户端永远拿到有效数据。
 # 全部失败时 fetch 步骤退出码非 0,workflow 标红便于发现。
-# 注:LinuxDo 套 Cloudflare 强挑战,普通 HTTP 库被秒拦,这里用 Playwright
-# 真 Chromium 过 CF(见下方 install 步骤)。runner 的数据中心 IP 仍可能被 CF
-# 额外收紧 → LinuxDo 单源失败属已知风险,会被跳过,其余 4 源照常。
 #
 # 流程由 scripts/pipeline.sh 统一编排(抓取 + AI 总结 + 推送);本 workflow 只负责
-# 环境准备(装依赖 / playwright)与注入 secrets。4 个环境变量在 pipeline.sh 执行前
+# 环境准备(装依赖)与注入 secrets。4 个环境变量在 pipeline.sh 执行前
 # 统一检测(需求 b-i):AI_NEWS_HUB_AI_BASE_URL / _MODEL / _API_KEY / GITCODE_TOKEN。
 
 on:
@@ -52,21 +49,6 @@ jobs:
 
       - name: Install dependencies
         run: pip install -r scripts/requirements.txt
-
-      - name: Cache Playwright browsers
-        # 浏览器二进制(~150MB)单独缓存,不随 pip cache;key 随依赖声明变化
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('scripts/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-
-
-      - name: Install Playwright Chromium(供 LinuxDo 过 Cloudflare)
-        # linux.do 套 CF 强挑战,普通 requests/curl_cffi 都被拦,必须真 Chromium。
-        # --with-deps 装 Chromium 跑 headless 需要的系统库(libnss3/libatk 等)。
-        # --shell 后单独跑:playwright 的浏览器(~150MB)单独缓存,不在 pip cache 里。
-        run: python -m playwright install --with-deps chromium
 
       - name: Run pipeline (fetch + AI summary + push)
         env:

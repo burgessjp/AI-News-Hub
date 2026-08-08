@@ -49,7 +49,7 @@ import com.peng.ainewshub.ui.theme.AppText
  * 数据来源 8 源(与信息源页 / 摘要 Tab 一致,元数据来自 [sourceMeta],顺序固定用
  * [DEFAULT_SOURCE_ORDER] 不跟随用户自定义):HackerNews、GitHub Trending、
  * OpenAI×Anthropic、HuggingFace Papers、Product Hunt、The Rundown AI、AIHot 精选、
- * stormzhang AI。LinuxDo 暂下线。
+ * stormzhang AI。
  *
  * 链接统一走内置 WebView([onOpenUrl],计入浏览历史),不跳外部浏览器 ——
  * 与全 App openUrl 策略一致。

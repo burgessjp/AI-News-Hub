@@ -205,7 +205,6 @@ If you need to run the data pipeline yourself (e.g. to deploy a private data sou
 
 ```bash
 pip install -r scripts/requirements.txt
-python -m playwright install --with-deps chromium   # only needed for the LinuxDo source to pass Cloudflare
 
 export AI_NEWS_HUB_AI_BASE_URL=...
 export AI_NEWS_HUB_AI_MODEL=...
@@ -244,7 +243,6 @@ No Retrofit / Gson / Moshi — networking goes through `OkHttp` uniformly, JSON 
 
 ## ⚠️ Known limitations
 
-- **LinuxDo source is failure-prone** — it sits behind a strict Cloudflare challenge, and CI runner data-center IPs may be additionally throttled. A single-source failure is a known risk: it gets skipped and does not affect the others.
 - **Product Hunt is archive-only** — its Developer Token is a server-side secret that never enters the APK, so both modes use the archive.
 - **Translation needs a user-supplied key** — without an AI service configured, full-page and text-selection translation are unavailable (pre-generated content like summaries and Today's Hot is unaffected).
 - **Archive failure does not fall back to live** — in archive mode a fetch failure shows an Error state directly; by design it does not auto-degrade.
@@ -314,4 +312,4 @@ See [CHANGELOG.md](CHANGELOG.md) for version history.
 
 This project is open-sourced under the [MIT License](LICENSE). You're free to use, modify, and distribute it (including commercially) as long as you retain the copyright and license notice.
 
-> The content of the data sources (HackerNews / GitHub / Product Hunt / LinuxDo, etc.) is copyrighted by each source. This project only aggregates and displays it as a client and does not store or redistribute the original content. When extending the project or deploying a private data pipeline, please respect each source's rate limits and terms of service.
+> The content of the data sources (HackerNews / GitHub / Product Hunt / etc.) is copyrighted by each source. This project only aggregates and displays it as a client and does not store or redistribute the original content. When extending the project or deploying a private data pipeline, please respect each source's rate limits and terms of service.

@@ -20,7 +20,7 @@ import kotlinx.coroutines.launch
 /**
  * stormzhang AI Daily ViewModel。
  *
- * 与 [LinuxDoHotViewModel] 同构:AndroidViewModel 拿 cacheDir 注入 Repository,
+ * 与 [HuggingFacePapersViewModel] 同构:AndroidViewModel 拿 cacheDir 注入 Repository,
  * 启用 4 小时文件缓存(进入页面命中缓存秒回,不打网络)。
  *
  * 内容已是中文摘要(AI 生成),不接翻译(对比 GitHubTrending 接了英文描述翻译)。

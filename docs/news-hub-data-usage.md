@@ -3,7 +3,7 @@
 数据仓库:[gitcode.com/peng1818/AI-News-Hub-Data](https://gitcode.com/peng1818/AI-News-Hub-Data)
 分支:`news-hub-data`
 
-本仓库定时抓取 [AI News Hub](../) App「Hub」tab 浏览区域的 9 个数据源(8 个第三方站点源 + AIHot 精选 TOP20,后者来自第三方服务 aihot.virxact.com;其中 linuxdo 受 Cloudflare 挑战影响不稳定),解析成 JSON 后按日期归档。本文档说明数据结构、获取方式与消费示例。
+本仓库定时抓取 [AI News Hub](../) App「Hub」tab 浏览区域的 8 个数据源(7 个第三方站点源 + AIHot 精选 TOP20,后者来自第三方服务 aihot.virxact.com),解析成 JSON 后按日期归档。本文档说明数据结构、获取方式与消费示例。
 
 ## 更新频率
 
@@ -24,9 +24,6 @@ news-hub-data 分支/
 │   └── 2026-07-15/
 │       └── 08-00-data.json
 ├── github-trending/
-│   └── 2026-07-15/
-│       └── 08-00-data.json
-├── linuxdo/                            ← CI 上可能因 CF 拦截缺失
 │   └── 2026-07-15/
 │       └── 08-00-data.json
 ├── stormzhang-ai/
@@ -59,7 +56,6 @@ news-hub-data 分支/
   "latest": {
     "hackernews": "2026-07-15/08-00-data.json",
     "github-trending": "2026-07-15/08-00-data.json",
-    "linuxdo": "2026-07-14/08-00-data.json",
     "stormzhang-ai": "2026-07-15/08-00-data.json",
     "huggingface-papers": "2026-07-15/08-00-data.json",
     "producthunt": "2026-07-15/08-00-data.json",
@@ -89,7 +85,7 @@ news-hub-data 分支/
 }
 ```
 
-`latest` 里的路径是**相对于源目录**的。注意上例中 linuxdo 指向了前一天 —— 这是设计行为:某源当天抓取失败时,`index.json` 会保留它最后一次成功的指向,客户端永远能拿到有效数据。
+`latest` 里的路径是**相对于源目录**的。设计行为:某源当天抓取失败时,`index.json` 会保留它最后一次成功的指向(可能落在前一天),客户端永远能拿到有效数据。
 
 `history` 是按日期寻址的历史索引(`{源名: {日期: relpath}}`,上例仅示意一个源,实际每源都有;只收录 2026-07-18 起的日期),详见下文「按日期取历史快照」。
 
@@ -236,7 +232,7 @@ print(hn['items'][0]['title'])
 | `fetched_at_ms` | 抓取时刻,Unix 毫秒时间戳 |
 | `count` | `items` 数组长度 |
 | `items` | 该源的条目数组,结构因源而异(见下) |
-| `ai_summary_v2` | 本次数据的简体中文 AI 要点,JSON 数组(6-10 个对象,每个含 `title` 加粗导语 + `desc` 2-3 句正文)。8 个稳定源都有(hackernews / github-trending / openai-anthropic-news / huggingface-papers / stormzhang-ai / producthunt / rundown-ai / aihot-featured);linuxdo 不做,AI 调用失败时该字段缺省。**新快照只写 `ai_summary_v2`**;旧快照仅有 `ai_summary`(纯文本 `• **标题**：描述` 串),App 兼容回退 |
+| `ai_summary_v2` | 本次数据的简体中文 AI 要点,JSON 数组(6-10 个对象,每个含 `title` 加粗导语 + `desc` 2-3 句正文)。8 个稳定源都有(hackernews / github-trending / openai-anthropic-news / huggingface-papers / stormzhang-ai / producthunt / rundown-ai / aihot-featured);AI 调用失败时该字段缺省。**新快照只写 `ai_summary_v2`**;旧快照仅有 `ai_summary`(纯文本 `• **标题**：描述` 串),App 兼容回退 |
 
 部分源会有额外顶层字段(如 stormzhang-ai 带 `pageDate`)。
 
@@ -276,28 +272,6 @@ GitHub Trending 日榜,默认 daily 窗口。
 | `forks` | int | fork 数 |
 | `starsToday` | int | 今日新增 star 数(daily 窗口) |
 
-### linuxdo(LinuxDo 热榜)
-
-LinuxDo「开发调优」分类热榜(Discourse)。
-
-> ⚠️ **此源可能缺失**:linux.do 套 Cloudflare 强挑战,GitHub Actions 的数据中心 IP 经常被拦。`index.json` 在它失败时会保留历史指向;若仓库里完全没有 `linuxdo/` 目录,说明从未成功过。
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `rank` | int | 热度排名(1 起);置顶帖为 0 不参与编号 |
-| `title` | string | 话题标题 |
-| `url` | string | 话题地址 `https://linux.do/t/topic/<id>` |
-| `excerpt` | string | 首帖摘要(已去 HTML 标签);可能为空 |
-| `authorName` | string | 原始发帖人显示名 |
-| `avatarUrl` | string | 作者头像完整 URL |
-| `views` | int | 浏览数 |
-| `replyCount` | int | 回复数 |
-| `likeCount` | int | 点赞数 |
-| `tags` | string[] | 标签(取前 2 个) |
-| `createdAtMs` | int | 话题创建时刻,Unix 毫秒 |
-| `pinned` | bool | 是否全局置顶 |
-| `closed` | bool | 是否已关闭 |
-
 ### stormzhang-ai(stormzhang AI 资讯)
 
 stormzhang AI Daily 每日资讯聚合(中文摘要 + 英文原文),聚合 Hacker News / Reddit / Product Hunt / The Rundown AI / TLDR AI 等信源。
@@ -333,7 +307,7 @@ HuggingFace Trending Papers(AK 每日精选 arXiv 论文,按社区 upvote 排序
 
 Product Hunt 当日(Product of the Day 语义)按 upvote 排序的热门产品,取前 20。走 V2 GraphQL API(`api.producthunt.com/v2/api/graphql`,`posts(first:20, order:VOTES, postedAfter: 当日UTC0点)`),需 Developer Token(`PRODUCT_HUNT_KEY`)。
 
-> ⚠️ **token 失效时该源失败**:`PRODUCT_HUNT_KEY` 缺失或 401/403 时该源 3 次重试后跳过,`index.latest.producthunt` 保留上一次成功指向(同 LinuxDo 的失败保留机制)。token 在 Product Hunt API Dashboard 重新生成即可恢复。
+> ⚠️ **token 失效时该源失败**:`PRODUCT_HUNT_KEY` 缺失或 401/403 时该源 3 次重试后跳过,`index.latest.producthunt` 保留上一次成功指向(失败保留机制见下)。token 在 Product Hunt API Dashboard 重新生成即可恢复。
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
@@ -398,7 +372,7 @@ The Rundown AI(beehiiv 托管的头部英文 AI 日更 newsletter)首页文章�
   "run_at_ms": 1784073612000,
   "sources": {
     "hackernews": {"status": "ok", "count": 20, "file": "..."},
-    "linuxdo": {"status": "fail", "error": "HTTPError: 403 ..."}
+    "producthunt": {"status": "fail", "error": "HTTPError: 401 ..."}
   }
 }
 ```
@@ -412,21 +386,19 @@ The Rundown AI(beehiiv 托管的头部英文 AI 日更 newsletter)首页文章�
 1. **快照不落盘** —— 本次没有该源的新文件,仓库里保留它最后一次成功的快照。
 2. **`index.json` 继承旧指向** —— `fetch_data.py` 会在抓取前拉一次上一次的 `index.json`,把失败源的 `latest` 指针原样保留到本次 `index.json`,客户端读到的永远是有效数据路径(不会指空或丢源)。
 
-> 例如:linuxdo 在 07-15 当天两次都被 CF 拦截,`index.latest.linuxdo` 仍指向 `2026-07-14/...`,客户端照常能拉到 07-14 的数据。这是设计行为,对应用户「某源偶尔失败不能让 App 空白」的预期。
+> 例如:producthunt 在 07-15 当天因 token 失效被 401 拦截,`index.latest.producthunt` 仍指向 `2026-07-14/...`,客户端照常能拉到 07-14 的数据。这是设计行为,对应用户「某源偶尔失败不能让 App 空白」的预期。
 
 该机制依赖 gitcode 上一次 `index.json` 可匿名拉取(公开仓库)。首跑(仓库还没有 `index.json`)时无旧指向可继承,失败源在首跑的 `index.json` 中会缺省。
 
 ## 限制与注意事项
 
-1. **LinuxDo 源不稳定**:受 Cloudflare 拦截影响,CI 上可能长期失败(单源会重试 3 次后才跳过)。消费方应对 `index.latest.linuxdo` 缺失或指向旧日期有容忍(失败保留机制见上)。
-
-   **Product Hunt 源依赖 token**:`PRODUCT_HUNT_KEY`(Developer Token)缺失或失效(401/403)时该源同样会失败跳过并保留旧指向。token 在 [Product Hunt API Dashboard](https://api.producthunt.com/v2/dashboard) 重新生成、更新仓库 secret 即可恢复。
+1. **Product Hunt 源依赖 token**:`PRODUCT_HUNT_KEY`(Developer Token)缺失或失效(401/403)时该源会失败跳过并保留旧指向。token 在 [Product Hunt API Dashboard](https://api.producthunt.com/v2/dashboard) 重新生成、更新仓库 secret 即可恢复。
 
 2. **无历史数据保证**:数据从 workflow 首次成功运行起开始积累。某源若从未成功过,对应目录不会存在。
 
 3. **频率与配额**:每天 1 次定时 + 偶发手动触发。不要高频轮询 raw URL,gitcode 有访问频率限制。客户端建议缓存 `index.json` 的 `updated_at` 判断是否需要刷新。
 
-4. **字段可能变化**:各源抓自第三方页面(GitHub Trending / HuggingFace / linux.do 等)或第三方 API(aihot-featured 来自 aihot.virxact.com),若对方改版/接口调整导致字段缺失,会在 `manifest.json` 的 error 中体现。字段语义遵循上述文档,新增字段不破坏旧消费者。
+4. **字段可能变化**:各源抓自第三方页面(GitHub Trending / HuggingFace 等)或第三方 API(aihot-featured 来自 aihot.virxact.com),若对方改版/接口调整导致字段缺失,会在 `manifest.json` 的 error 中体现。字段语义遵循上述文档,新增字段不破坏旧消费者。
 
 5. **时区**:所有时间戳与文件名路径均为北京时间(UTC+8)。`fetched_at` / `run_at` 带显式 `+0800` 偏移,`_ms` 为 UTC Unix 毫秒(与时区无关)。
 

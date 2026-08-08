@@ -44,7 +44,7 @@
 ## 数据层（data/）
 
 - **双模式取数 `SourceMode`**（DataStore `display_prefs` 的 `source_mode`，默认 LIVE）：5 个稳定源（HackerNews / GitHub Trending / stormzhang AI / HuggingFace Papers / The Rundown AI）可切 LIVE / ARCHIVE。
-  - **Product Hunt 只归档**（Developer Token 是服务端 secret 不进 APK，两种模式都走归档），**LinuxDo 只实时**。
+  - **Product Hunt 只归档**（Developer Token 是服务端 secret 不进 APK，两种模式都走归档）。
   - 归档走 `ArchiveHttpClient`（gitcode **REST API raw 端点**，**不要**用 raw 直链——背后是 WAF 会 403）。
   - **归档失败直接显示 Error 态，不回退实时**。
 - **摘要 Tab 不在 App 端生成 AI 摘要**，直接读归档快照顶层 `ai_summary_v2` 字段（JSON 数组，每项含 `title`+`desc`，流水线预生成），兼容回退旧纯文本 `ai_summary`（历史快照），两者都缺失即失败态。
@@ -52,7 +52,6 @@
 - **桌面小组件「今日热点」**（`widget/` 包，Glance）：只读归档 `latest_overview`（与总览同源同语义，与 SourceMode 无关）。缓存为 App 级 SharedPreferences `hot_now_widget`（多小组件实例共享，刻意不用 Glance per-id 状态）。刷新三路：系统 30min `updatePeriodMillis` / 头部按钮 `RefreshHotNowAction` / App 总览刷新成功联动（`HotNowWidgetUpdater.refreshFromApp`，同进程命中 ArchiveHttpClient 2 分钟缓存，零额外网络）。拉取失败保留旧数据不清空（小组件无错误交互入口）。配色直接取 `ui/theme/Color.kt` 设计令牌组 day/night `ColorProvider`（App 迷你版，不用壁纸动态色）；条目只展示排名 + 标题（+突发胶囊），来源/互动指标刻意不上小组件；Glance 1.1.1 不支持 res/font 自定义字体，层级靠字号 + 字重。
 - **源元数据 / 顺序单点定义** `ui/more/SourceMeta.kt`：8 源（HackerNews / GitHub Trending / OpenAI×Anthropic / HuggingFace Papers / Product Hunt / The Rundown AI / AIHot 精选 / stormzhang AI）的 key / icon / 品牌色 / 标题 / 副标题 / URL 集中于此，`DEFAULT_SOURCE_ORDER` 为默认顺序。信息源页 / 摘要 Tab / 关于页三处都从 `sourceMeta(key)` 派生，不再各自硬编码。
   - 用户在「信息源」页长按拖拽自定义顺序（reorderable 库），持久化于 `display_prefs` 的 `source_order` 键；**摘要 Tab 跟随用户顺序**（`SummaryViewModel.sourceKeys` 读 `SettingsStore.sourceOrderFlow`），**关于页固定默认顺序**。
-  - **LinuxDo 暂时下线**：三处 UI 入口（信息源页 / 摘要 Tab / 关于页）均不展示，但底层代码（`Page.LinuxDo` / `LinuxDoHotScreen` / VM / Repo / 数据模型 / `SourceBrand.LinuxDo`）保留，恢复时在 `SourceMeta`/`DEFAULT_SOURCE_ORDER` 补回即可。
 - 端侧 AI（翻译 / 系统选中译）统一经 `AiChatClient` 访问「设置 → AI 服务」里的用户配置。
 - 数据模型：`NewsItem` / `HackerNewsStory` 用 `@Parcelize`。
 
@@ -73,7 +72,6 @@ AI_NEWS_HUB_AI_BASE_URL / AI_NEWS_HUB_AI_MODEL / AI_NEWS_HUB_AI_API_KEY / GITCOD
 
 - 抓 8 源（7 个第三方站点 + `aihot.virxact.com` 精选 `/items?mode=selected&take=20`）→ 各源 AI 摘要（`ai_summary.py`，写入快照顶层 `ai_summary_v2`）+ 跨源总览（`overview_summary.py`，写入 `index.json` 顶层 `latest_overview`）→ 推送到 gitcode 数据仓库 `peng1818/AI-News-Hub-Data` 的 `news-hub-data` 分支。
 - 单源失败跳过且 `index.json` latest 指针从上一次继承（客户端永远拿到有效数据）；总览 AI 生成失败时 `latest_overview` 同样继承上一次。≥1 源成功退出码即为 0。日期统一北京时间。
-- LinuxDo 套 Cloudflare 强挑战，CI 单源失败属预期行为。
 - 数据格式详见 `docs/news-hub-data-usage.md`；各脚本行为见脚本头注释。
 
 ## CI/CD
