@@ -20,7 +20,7 @@ import androidx.compose.ui.text.font.FontFamily
  * Android 12+ 用户可在调用处显式传 `dynamicColor = true` 启用壁纸派生色。
  * 始终跟随系统深/浅色设置。
  *
- * @param fontFamily 字体族覆盖。默认 null 沿用 [AppTypography] 的 Inter;
+ * @param fontFamily 字体族覆盖。默认 null 跟随系统字体;
  *        设置页"衬线/等宽"选项传 Serif/Monospace 将全 App 文字统一切换。
  *        同时作用于语义字号层 [AppTextStyles](经 [LocalAppTextStyles] 下发)。
  * @param fontScale 字号整体缩放(设置页「字号」档位),只作用于 [AppTextStyles]
@@ -44,9 +44,9 @@ fun AiNewsHubTheme(
     }
 
     val typography = if (fontFamily != null) AppTypography.withFontFamily(fontFamily) else AppTypography
-    // 语义字号层:字体族与缩放随设置变化,与 typography 同源(fontFamily 缺省 = Inter)
+    // 语义字号层:字体族与缩放随设置变化,与 typography 同源(fontFamily 缺省 = 跟随系统)
     val appTextStyles = remember(fontFamily, fontScale) {
-        AppTextStyles(fontFamily = fontFamily ?: InterFontFamily, fontScale = fontScale)
+        AppTextStyles(fontFamily = fontFamily, fontScale = fontScale)
     }
 
     CompositionLocalProvider(LocalAppTextStyles provides appTextStyles) {

@@ -50,12 +50,12 @@ enum class ThemeMode(@StringRes val labelRes: Int) {
  * 字体族 —— 同样提升到 [com.peng.ainewshub.AiNewsHubApp]。
  *
  * 仅用 Compose 内置 FontFamily,无需引入外部字体资源:
- *  - System: SansSerif(系统默认无衬线,与 Type.kt 一致)
+ *  - System: 系统默认字体
  *  - Serif:  衬线体(阅读向)
  *  - Mono:   等宽体(代码/技术向)
  */
 enum class FontChoice(@StringRes val labelRes: Int, val fontFamily: FontFamily) {
-    System(R.string.settings_font_default, FontFamily.SansSerif),
+    System(R.string.settings_font_default, FontFamily.Default),
     Serif(R.string.settings_font_serif, FontFamily.Serif),
     Mono(R.string.settings_font_mono, FontFamily.Monospace)
 }
