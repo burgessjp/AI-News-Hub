@@ -8,7 +8,6 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
-import java.util.concurrent.TimeUnit
 
 /**
  * OpenAI 兼容 chat 调用统一出口 —— App 内所有端侧 AI 功能(翻译及后续新功能)
@@ -39,16 +38,17 @@ class AiChatClient {
      * @param system system prompt
      * @param user 用户输入文本
      * @param temperature 采样温度,默认 0.3(翻译等确定性场景)
-     * @param readTimeoutSeconds 本次请求的 read 超时(秒),默认跟随 client 的 20s;
-     * 长输出场景(如今日总览的综合分析,输出可达数千 token)由调用方显式放宽。
+     * @param longOutput 是否长输出场景(今日总览综合分析等,输出可达数千 token)。
+     * true 用 [HttpClients.longRead](read 120s);false 用 [HttpClients.base](read 20s)。
+     * 预建常驻 client 复用连接池,避免每次按超时值 newBuilder 建一次性 client。
      */
     suspend fun chat(
         config: AiConfig,
         system: String,
         user: String,
         temperature: Double = 0.3,
-        readTimeoutSeconds: Long = 20
-    ): Result<ChatResult> = runCatching { request(config, system, user, temperature, readTimeoutSeconds) }
+        longOutput: Boolean = false
+    ): Result<ChatResult> = runCatching { request(config, system, user, temperature, longOutput) }
         // runCatching 会吞 CancellationException:取消须照常抛出(结构化取消),
         // 否则整页翻译取消时当批请求仍跑完才停
         .onFailure { if (it is CancellationException) throw it }
@@ -58,7 +58,7 @@ class AiChatClient {
         system: String,
         user: String,
         temperature: Double,
-        readTimeoutSeconds: Long
+        longOutput: Boolean
     ): ChatResult = withContext(Dispatchers.IO) {
         val body = JSONObject().apply {
             put("model", config.model)
@@ -87,8 +87,8 @@ class AiChatClient {
             .post(body.toString().toRequestBody(jsonMedia))
             .build()
 
-        val callClient = if (readTimeoutSeconds == 20L) client
-        else client.newBuilder().readTimeout(readTimeoutSeconds, TimeUnit.SECONDS).build()
+        // 长输出用预建 longRead(read 120s),其余用 base(read 20s),复用同一连接池。
+        val callClient = if (longOutput) HttpClients.longRead else client
         callClient.newCall(req).execute().use { resp ->
             if (!resp.isSuccessful) {
                 throw AppException.AiService()
