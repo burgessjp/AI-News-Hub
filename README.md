@@ -39,11 +39,11 @@
 
 | 总览 | 摘要 | 信息源 | HackerNews |
 |:---:|:---:|:---:|:---:|
-| ![总览](docs/screenshots/01-overview.png) | ![摘要](docs/screenshots/02-summary.png) | ![信息源](docs/screenshots/03-sources.png) | ![HackerNews](docs/screenshots/04-hackernews.png) |
+| <img src="docs/screenshots/01-overview.png" width="200" alt="总览"> | <img src="docs/screenshots/02-summary.png" width="200" alt="摘要"> | <img src="docs/screenshots/03-sources.png" width="200" alt="信息源"> | <img src="docs/screenshots/04-hackernews.png" width="200" alt="HackerNews"> |
 
 | WebView 阅读模式 | 设置 | 总览（暗色） |
 |:---:|:---:|:---:|
-| ![WebView](docs/screenshots/05-webview.png) | ![设置](docs/screenshots/06-settings.png) | ![暗色](docs/screenshots/07-overview-dark.png) |
+| <img src="docs/screenshots/05-webview.png" width="200" alt="WebView"> | <img src="docs/screenshots/06-settings.png" width="200" alt="设置"> | <img src="docs/screenshots/07-overview-dark.png" width="200" alt="总览（暗色）"> |
 
 ---
 
