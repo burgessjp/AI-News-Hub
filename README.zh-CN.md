@@ -43,9 +43,9 @@
 |:---:|:---:|:---:|:---:|
 | <img src="docs/screenshots/01-overview.png" width="200" alt="总览"> | <img src="docs/screenshots/02-summary.png" width="200" alt="摘要"> | <img src="docs/screenshots/03-sources.png" width="200" alt="信息源"> | <img src="docs/screenshots/04-hackernews.png" width="200" alt="HackerNews"> |
 
-| WebView 阅读模式 | 设置 | 总览（暗色） |
-|:---:|:---:|:---:|
-| <img src="docs/screenshots/05-webview.png" width="200" alt="WebView"> | <img src="docs/screenshots/06-settings.png" width="200" alt="设置"> | <img src="docs/screenshots/07-overview-dark.png" width="200" alt="总览（暗色）"> |
+| OpenAI × Anthropic | GitHub Trending | The Rundown AI | 设置 |
+|:---:|:---:|:---:|:---:|
+| <img src="docs/screenshots/05-openai-anthropic.png" width="200" alt="OpenAI × Anthropic"> | <img src="docs/screenshots/06-github-trending.png" width="200" alt="GitHub Trending"> | <img src="docs/screenshots/07-the-rundown-ai.png" width="200" alt="The Rundown AI"> | <img src="docs/screenshots/08-settings.png" width="200" alt="设置"> |
 
 ---
 

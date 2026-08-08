@@ -43,9 +43,9 @@ Download the latest APK from the [Releases](https://github.com/burgessjp/AI-News
 |:---:|:---:|:---:|:---:|
 | <img src="docs/screenshots/01-overview.png" width="200" alt="Overview"> | <img src="docs/screenshots/02-summary.png" width="200" alt="Summary"> | <img src="docs/screenshots/03-sources.png" width="200" alt="Sources"> | <img src="docs/screenshots/04-hackernews.png" width="200" alt="HackerNews"> |
 
-| WebView Reader | Settings | Overview (Dark) |
-|:---:|:---:|:---:|
-| <img src="docs/screenshots/05-webview.png" width="200" alt="WebView"> | <img src="docs/screenshots/06-settings.png" width="200" alt="Settings"> | <img src="docs/screenshots/07-overview-dark.png" width="200" alt="Overview (Dark)"> |
+| OpenAI × Anthropic | GitHub Trending | The Rundown AI | Settings |
+|:---:|:---:|:---:|:---:|
+| <img src="docs/screenshots/05-openai-anthropic.png" width="200" alt="OpenAI × Anthropic"> | <img src="docs/screenshots/06-github-trending.png" width="200" alt="GitHub Trending"> | <img src="docs/screenshots/07-the-rundown-ai.png" width="200" alt="The Rundown AI"> | <img src="docs/screenshots/08-settings.png" width="200" alt="Settings"> |
 
 ---
 
