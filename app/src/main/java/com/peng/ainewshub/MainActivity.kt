@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedContent
@@ -25,8 +26,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,10 +37,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.core.view.WindowInsetsControllerCompat
 import androidx.activity.BackEventCompat
 import androidx.activity.compose.PredictiveBackHandler
 import com.peng.ainewshub.data.AppDatabase
@@ -98,6 +97,12 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+/** 浅色系统栏 scrim(与 AndroidX enableEdgeToEdge 默认值一致)。ARGB 32 位带符号整数。 */
+private val LIGHT_SCRIM = 0xE6FFFFFF.toInt()
+
+/** 深色系统栏 scrim(与 AndroidX enableEdgeToEdge 默认值一致)。ARGB 32 位带符号整数。 */
+private val DARK_SCRIM = 0x801B1B1B.toInt()
 
 class MainActivity : ComponentActivity() {
 
@@ -379,17 +384,19 @@ fun AiNewsHubApp(
         ThemeMode.Dark -> true
     }
 
-    // 状态栏/导航栏图标外观跟随 App 实际暗色态(用户 ThemeMode 或系统暗色),
+    // 系统栏(状态栏/导航栏)外观跟随 App 实际暗色态(用户 ThemeMode 或系统暗色),
     // 而非 enableEdgeToEdge() 默认依据的系统 uiMode —— 否则用户强制浅色 / 深色时,
-    // 图标颜色会与界面背景同色(如浅色背景配白字)。每次 darkTheme 重组即重下发。
-    val statusBarView = LocalView.current
-    if (!statusBarView.isInEditMode) {
-        SideEffect {
-            val window = (statusBarView.context as Activity).window
-            val controller = WindowInsetsControllerCompat(window, statusBarView)
-            controller.isAppearanceLightStatusBars = !darkTheme
-            controller.isAppearanceLightNavigationBars = !darkTheme
-        }
+    // scrim 色与图标明暗会与界面背景错配(如浅色 scrim 配深色 Surface)。用带参重载 +
+    // key 驱动,darkTheme 变化时即时重发 scrim 色 + 图标明暗,切换深/浅色即时生效。
+    val systemBarsHost = LocalContext.current as ComponentActivity
+    DisposableEffect(darkTheme) {
+        systemBarsHost.enableEdgeToEdge(
+            statusBarStyle = if (darkTheme) SystemBarStyle.dark(DARK_SCRIM)
+                else SystemBarStyle.light(LIGHT_SCRIM, DARK_SCRIM),
+            navigationBarStyle = if (darkTheme) SystemBarStyle.dark(DARK_SCRIM)
+                else SystemBarStyle.light(LIGHT_SCRIM, DARK_SCRIM)
+        )
+        onDispose { }
     }
 
     // 当前 tab + 每个 tab 的二级页栈(默认「总览」——端侧 AI 当日分析,首屏即默认首页)
