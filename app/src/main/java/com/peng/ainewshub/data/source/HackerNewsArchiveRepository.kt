@@ -1,9 +1,7 @@
 package com.peng.ainewshub.data.source
 
-import com.peng.ainewshub.data.AppException
 import com.peng.ainewshub.data.HackerNewsStory
 import com.peng.ainewshub.data.HackerNewsTopStories
-import org.json.JSONObject
 
 /**
  * HackerNews 的 [gitcode 归档]数据源实现。
@@ -24,15 +22,10 @@ class HackerNewsArchiveRepository : HackerNewsSource {
     override suspend fun forceRefresh(limit: Int): HackerNewsTopStories = load()
 
     private suspend fun load(): HackerNewsTopStories {
-        val snapshot = ArchiveHttpClient.fetchLatestSnapshot(SOURCE_KEY)
-        val fetchedAt = snapshot.optLong("fetched_at_ms", System.currentTimeMillis())
-        val items = snapshot.optJSONArray("items")
-            ?: throw AppException.NoData()
-        val stories = (0 until items.length()).mapNotNull { i ->
-            val obj = items.optJSONObject(i) ?: return@mapNotNull null
+        val (fetchedAt, stories) = ArchiveHttpClient.fetchItemsList(SOURCE_KEY) { obj, _ ->
             val id = obj.optLong("id", -1L)
-            if (id <= 0) return@mapNotNull null
-            HackerNewsStory(
+            if (id <= 0) null
+            else HackerNewsStory(
                 id = id,
                 title = obj.optString("title"),
                 url = obj.optString("url"),
@@ -44,7 +37,6 @@ class HackerNewsArchiveRepository : HackerNewsSource {
                 kids = emptyList()
             )
         }
-        if (stories.isEmpty()) throw AppException.NoData()
         return HackerNewsTopStories(fetchedAt, stories)
     }
 

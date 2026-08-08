@@ -1,6 +1,5 @@
 package com.peng.ainewshub.data.source
 
-import com.peng.ainewshub.data.AppException
 import com.peng.ainewshub.data.ProductHunt
 import org.json.JSONObject
 
@@ -22,15 +21,9 @@ class ProductHuntArchiveRepository : ProductHuntSource {
     override suspend fun forceRefresh(): ProductHuntResult = load()
 
     private suspend fun load(): ProductHuntResult {
-        val snapshot = ArchiveHttpClient.fetchLatestSnapshot(SOURCE_KEY)
-        val fetchedAt = snapshot.optLong("fetched_at_ms", System.currentTimeMillis())
-        val items = snapshot.optJSONArray("items")
-            ?: throw AppException.NoData()
-        val products = (0 until items.length()).mapNotNull { i ->
-            val obj = items.optJSONObject(i) ?: return@mapNotNull null
+        val (fetchedAt, products) = ArchiveHttpClient.fetchItemsList(SOURCE_KEY) { obj, i ->
             ProductHunt.fromJson(obj, fallbackRank = i + 1)
         }
-        if (products.isEmpty()) throw AppException.NoData()
         return ProductHuntResult(fetchedAt, products)
     }
 

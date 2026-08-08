@@ -3,91 +3,34 @@ package com.peng.ainewshub.data
 import com.peng.ainewshub.data.source.RundownAiResult
 import com.peng.ainewshub.data.source.RundownAiSource
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.jsoup.Jsoup
-import org.jsoup.nodes.Element
 import java.io.File
 
 /**
  * The Rundown AI 首页文章卡片墙抓取客户端(实时源)。
  * 来源:https://www.therundown.ai/(beehiiv 托管的 AI newsletter,首页静态 HTML)。
  *
- * 与 [StormzhangAiNewsRepository] 同构:OkHttp 直连 + 文件缓存 + stale 兜底 + Mutex
- * 防并发重复请求。区别在:
- *  - 选择器 `a[href^="/p/"]`,每张卡片含「标题 | PLUS:副标题 | 作者」三段文本 +
- *    一张封面图(beehiiv cdn-cgi 图,需排除 width=256 的作者头像)
- *  - 列表页无日期字段(beehiiv 首页不放文章日期),不抽 pageDate
- *  - TTL 4 小时(与 [StormzhangAiNewsRepository] 对齐)
+ * 继承 [BaseHtmlCacheRepository]:缓存 + Mutex + stale 兜底四步逻辑由基类统一,
+ * 本类只提供 URL / headers / jsoup 解析(卡片墙 + 封面图)+ 结果包装。TTL 4 小时(基类统一)。
  *
- * UA:站点对默认 OkHttp UA 偶尔差异对待,统一带浏览器 UA,复用 [NewsRepository] 同款字串。
+ * 选择器 `a[href^="/p/"]`,每张卡片含「标题 | PLUS:副标题 | 作者」三段文本 +
+ * 一张封面图(beehiiv cdn-cgi 图,需排除 width=256 的作者头像)。列表页无日期字段,不抽 pageDate。
+ *
+ * UA:站点对默认 OkHttp UA 偶尔差异对待,统一带浏览器 UA。
  *
  * @param cacheDir 缓存根目录,通常传 application.cacheDir;传 null 关闭缓存
  */
 class RundownAiRepository(
-    private val cacheDir: File? = null
-) : RundownAiSource {
+    cacheDir: File? = null
+) : BaseHtmlCacheRepository<RundownAiResult>(cacheDir), RundownAiSource {
 
     private val homeUrl = "https://www.therundown.ai/"
 
-    /** 串行化 [fetch],避免短时间内并发刷新重复打网络。 */
-    private val refreshMutex = Mutex()
+    override val cacheFileName: String = "rundown_ai.html"
 
-    /**
-     * 拉取文章列表,带 4 小时文件缓存。
-     *
-     * 缓存策略(仅在 [cacheDir] 非空时生效):
-     *  1. 缓存存在且未过 4 小时 → 直接返回(不打网络)
-     *  2. 否则走网络;成功则更新缓存后返回
-     *  3. 网络失败但有缓存(无论是否过期)→ 回退缓存兜底,优先保可用
-     *  4. 网络失败且无缓存 → 抛出原异常,交由 UI 显示错误态
-     *
-     * [refreshMutex] 保证并发调用只触发一次真实网络请求。
-     */
-    override suspend fun fetch(): RundownAiResult {
-        if (cacheDir == null) {
-            val parsed = fetchFromNetwork()
-            return RundownAiResult(System.currentTimeMillis(), parsed)
-        }
-
-        return refreshMutex.withLock {
-            val cached = readCache()
-            if (cached != null && !isStale(cached.first)) {
-                return@withLock RundownAiResult(cached.first, parse(cached.second))
-            }
-            val result = runCatching { fetchFromNetwork() }
-            if (result.isSuccess) {
-                val fresh = result.getOrThrow()
-                val now = System.currentTimeMillis()
-                writeCache(now, lastRawHtml)
-                return@withLock RundownAiResult(now, fresh)
-            }
-            if (cached != null && cached.second.isNotBlank()) {
-                return@withLock RundownAiResult(cached.first, parse(cached.second))
-            }
-            throw result.exceptionOrNull() ?: RuntimeException("未知错误")
-        }
-    }
-
-    /**
-     * 强制忽略缓存重新抓取(下拉刷新等场景)。
-     * 抓取成功后刷新缓存,fetchedAt 取当前时刻。
-     */
-    override suspend fun forceRefresh(): RundownAiResult {
-        val fresh = fetchFromNetwork()
-        val now = System.currentTimeMillis()
-        if (cacheDir != null) {
-            writeCache(now, lastRawHtml)
-        }
-        return RundownAiResult(now, fresh)
-    }
-
-    /** 最近一次抓取到的原始 HTML(供 [fetch] 在写入缓存时复用,避免重复抓取)。 */
-    private var lastRawHtml: String = ""
-
-    private suspend fun fetchFromNetwork(): List<RundownAiArticle> = withContext(Dispatchers.IO) {
-        val html = HttpClients.get(
+    override suspend fun fetchHtml(): String = withContext(Dispatchers.IO) {
+        HttpClients.get(
             homeUrl,
             mapOf(
                 "User-Agent" to HttpClients.DEFAULT_BROWSER_UA,
@@ -95,9 +38,10 @@ class RundownAiRepository(
                 "Accept-Language" to "en-US,en;q=0.9"
             )
         )
-        lastRawHtml = html
-        parse(html)
     }
+
+    override fun packResult(fetchedAt: Long, rawHtml: String): RundownAiResult =
+        RundownAiResult(fetchedAt, parse(rawHtml))
 
     /**
      * 用 jsoup 解析首页文章卡片墙。
@@ -173,40 +117,4 @@ class RundownAiRepository(
         }
         return Triple(title, subtitle, authors)
     }
-
-    private companion object {
-        /** 文章缓存有效期:4 小时(与 StormzhangAiNewsRepository 对齐)。 */
-        const val CACHE_TTL_MS = 4L * 60 * 60 * 1000
-
-        /** 缓存文件名(放在 [cacheDir] 下)。 */
-        const val CACHE_FILE = "rundown_ai.html"
-    }
-
-    // ===== 缓存读写(存原始 HTML + 写入时刻,首行注入时间戳头) =====
-
-    private fun cacheFile(): File = File(cacheDir, CACHE_FILE)
-
-    /**
-     * 缓存格式:`<fetchedAt 毫秒>\n<原始 HTML>`(与 StormzhangAiNewsRepository 同套路)。
-     */
-    private fun readCache(): Pair<Long, String>? {
-        val file = cacheFile()
-        if (!file.exists()) return null
-        val raw = runCatching { file.readText() }.getOrNull() ?: return null
-        val nl = raw.indexOf('\n')
-        if (nl <= 0) return null
-        val ts = raw.substring(0, nl).trim().toLongOrNull() ?: return null
-        val html = raw.substring(nl + 1)
-        return ts to html
-    }
-
-    private fun writeCache(fetchedAt: Long, html: String) {
-        val dir = cacheDir ?: return
-        if (!dir.exists()) dir.mkdirs()
-        if (html.isBlank()) return
-        runCatching { cacheFile().writeText("$fetchedAt\n$html") }
-    }
-
-    private fun isStale(fetchedAt: Long): Boolean =
-        System.currentTimeMillis() - fetchedAt > CACHE_TTL_MS
 }

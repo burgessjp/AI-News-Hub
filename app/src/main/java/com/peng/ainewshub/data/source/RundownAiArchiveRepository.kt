@@ -1,6 +1,5 @@
 package com.peng.ainewshub.data.source
 
-import com.peng.ainewshub.data.AppException
 import com.peng.ainewshub.data.RundownAiArticle
 
 /**
@@ -20,15 +19,9 @@ class RundownAiArchiveRepository : RundownAiSource {
     override suspend fun forceRefresh(): RundownAiResult = load()
 
     private suspend fun load(): RundownAiResult {
-        val snapshot = ArchiveHttpClient.fetchLatestSnapshot(SOURCE_KEY)
-        val fetchedAt = snapshot.optLong("fetched_at_ms", System.currentTimeMillis())
-        val items = snapshot.optJSONArray("items")
-            ?: throw AppException.NoData()
-        val articles = (0 until items.length()).mapNotNull { i ->
-            val obj = items.optJSONObject(i) ?: return@mapNotNull null
+        val (fetchedAt, articles) = ArchiveHttpClient.fetchItemsList(SOURCE_KEY) { obj, i ->
             RundownAiArticle.fromJson(obj, fallbackRank = i + 1)
         }
-        if (articles.isEmpty()) throw AppException.NoData()
         return RundownAiResult(fetchedAt, articles)
     }
 

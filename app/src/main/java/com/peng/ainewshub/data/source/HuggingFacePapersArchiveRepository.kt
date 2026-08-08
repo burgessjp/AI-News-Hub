@@ -1,6 +1,5 @@
 package com.peng.ainewshub.data.source
 
-import com.peng.ainewshub.data.AppException
 import com.peng.ainewshub.data.HuggingFacePaper
 import com.peng.ainewshub.data.HuggingFacePapersResult
 import org.json.JSONObject
@@ -21,17 +20,12 @@ class HuggingFacePapersArchiveRepository : HuggingFacePapersSource {
     override suspend fun forceRefresh(): HuggingFacePapersResult = load()
 
     private suspend fun load(): HuggingFacePapersResult {
-        val snapshot = ArchiveHttpClient.fetchLatestSnapshot(SOURCE_KEY)
-        val fetchedAt = snapshot.optLong("fetched_at_ms", System.currentTimeMillis())
-        val items = snapshot.optJSONArray("items")
-            ?: throw AppException.NoData()
-        val papers = (0 until items.length()).mapNotNull { i ->
-            val obj = items.optJSONObject(i) ?: return@mapNotNull null
+        val (fetchedAt, papers) = ArchiveHttpClient.fetchItemsList(SOURCE_KEY) { obj, i ->
             val id = obj.optString("id")
             val title = obj.optString("title")
             // id 与 title 必有(对齐 fetch_data.py:缺则跳过)
-            if (id.isBlank() || title.isBlank()) return@mapNotNull null
-            HuggingFacePaper(
+            if (id.isBlank() || title.isBlank()) null
+            else HuggingFacePaper(
                 rank = obj.optInt("rank", i + 1),
                 id = id,
                 url = obj.optString("url"),
@@ -43,7 +37,6 @@ class HuggingFacePapersArchiveRepository : HuggingFacePapersSource {
                 githubUrl = obj.optString("githubUrl")
             )
         }
-        if (papers.isEmpty()) throw AppException.NoData()
         return HuggingFacePapersResult(fetchedAt, papers)
     }
 

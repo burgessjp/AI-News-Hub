@@ -1,6 +1,5 @@
 package com.peng.ainewshub.data.source
 
-import com.peng.ainewshub.data.AppException
 import com.peng.ainewshub.data.OpenAiAnthropicNews
 
 /**
@@ -20,15 +19,9 @@ class OpenAiAnthropicNewsArchiveRepository : OpenAiAnthropicNewsSource {
     override suspend fun forceRefresh(): OpenAiAnthropicNewsResult = load()
 
     private suspend fun load(): OpenAiAnthropicNewsResult {
-        val snapshot = ArchiveHttpClient.fetchLatestSnapshot(SOURCE_KEY)
-        val fetchedAt = snapshot.optLong("fetched_at_ms", System.currentTimeMillis())
-        val items = snapshot.optJSONArray("items")
-            ?: throw AppException.NoData()
-        val articles = (0 until items.length()).mapNotNull { i ->
-            val obj = items.optJSONObject(i) ?: return@mapNotNull null
+        val (fetchedAt, articles) = ArchiveHttpClient.fetchItemsList(SOURCE_KEY) { obj, i ->
             OpenAiAnthropicNews.fromJson(obj, fallbackRank = i + 1)
         }
-        if (articles.isEmpty()) throw AppException.NoData()
         return OpenAiAnthropicNewsResult(fetchedAt, articles)
     }
 

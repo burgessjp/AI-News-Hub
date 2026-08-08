@@ -119,6 +119,37 @@ object ArchiveHttpClient {
     }
 
     /**
+     * 拉某源最新快照并按 [mapper] 映射成领域对象列表 —— 收敛 7 个 ArchiveRepository
+     * 完全同构的 `fetched_at_ms` / `items` / mapNotNull / 空判 骨架。
+     *
+     * 各 ArchiveRepository 退化到只提供 [source] 与 [mapper],由本方法统一处理:
+     *  1. 拉最新快照(经 index 缓存 + 并发去重)
+     *  2. 取 fetched_at_ms(缺失回退当前时刻)
+     *  3. 遍历 items[],对每个 JSONObject 调 [mapper];返回 null 的条目被跳过
+     *  4. 映射后为空(全被过滤)抛 [AppException.NoData]
+     *
+     * @param source 源标识(目录名 / index latest 键)
+     * @param mapper (items[i] 的 JSON, 索引 i) → 领域对象;返回 null 跳过该条。
+     *               索引从 0 起,供 fallbackRank = i+1 等场景使用
+     * @return (数据落盘时刻, 领域对象列表)
+     */
+    suspend fun <T> fetchItemsList(
+        source: String,
+        mapper: (org.json.JSONObject, Int) -> T?
+    ): Pair<Long, List<T>> = withContext(Dispatchers.IO) {
+        val snapshot = fetchLatestSnapshot(source)
+        val fetchedAt = snapshot.optLong("fetched_at_ms", System.currentTimeMillis())
+        val items = snapshot.optJSONArray("items")
+            ?: throw AppException.NoData()
+        val list = (0 until items.length()).mapNotNull { i ->
+            val obj = items.optJSONObject(i) ?: return@mapNotNull null
+            mapper(obj, i)
+        }
+        if (list.isEmpty()) throw AppException.NoData()
+        fetchedAt to list
+    }
+
+    /**
      * 读 index.json 的 latest 指针表(与快照共享 2 分钟缓存),返回 source → 相对路径。
      * 供 OverviewRepository 计算数据指纹(路径含日期+时间,数据更新即变化)——只读指针,
      * 不拉快照本体。index 无 latest 字段时返回空 map。

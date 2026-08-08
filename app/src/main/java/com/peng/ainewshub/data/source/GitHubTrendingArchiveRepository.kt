@@ -1,9 +1,7 @@
 package com.peng.ainewshub.data.source
 
-import com.peng.ainewshub.data.AppException
 import com.peng.ainewshub.data.TrendingRepo
 import com.peng.ainewshub.data.TrendingResult
-import org.json.JSONObject
 
 /**
  * GitHub Trending 的 [gitcode 归档]数据源实现。
@@ -21,12 +19,7 @@ class GitHubTrendingArchiveRepository : GitHubTrendingSource {
     override suspend fun forceRefresh(): TrendingResult = load()
 
     private suspend fun load(): TrendingResult {
-        val snapshot = ArchiveHttpClient.fetchLatestSnapshot(SOURCE_KEY)
-        val fetchedAt = snapshot.optLong("fetched_at_ms", System.currentTimeMillis())
-        val items = snapshot.optJSONArray("items")
-            ?: throw AppException.NoData()
-        val repos = (0 until items.length()).mapNotNull { i ->
-            val obj = items.optJSONObject(i) ?: return@mapNotNull null
+        val (fetchedAt, repos) = ArchiveHttpClient.fetchItemsList(SOURCE_KEY) { obj, i ->
             TrendingRepo(
                 rank = obj.optInt("rank", i + 1),
                 owner = obj.optString("owner"),
@@ -40,7 +33,6 @@ class GitHubTrendingArchiveRepository : GitHubTrendingSource {
                 starsToday = obj.optInt("starsToday", 0)
             )
         }
-        if (repos.isEmpty()) throw AppException.NoData()
         return TrendingResult(fetchedAt, repos)
     }
 
