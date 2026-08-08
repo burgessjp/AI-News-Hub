@@ -338,8 +338,10 @@ class HotNowWidget : GlanceAppWidget() {
             title: String
         ): Pair<String, String?> {
             val metrics = context.resources.displayMetrics
+            // scaledDensity 自 API 34 起废弃,等价改用 density * Configuration.fontScale;后者在多窗口场景下也更准
+            val scaledDensity = metrics.density * context.resources.configuration.fontScale
             val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                textSize = 14f * metrics.scaledDensity   // 与标题 TextStyle(14.sp)一致
+                textSize = 14f * scaledDensity   // 与标题 TextStyle(14.sp)一致
                 typeface = Typeface.DEFAULT
             }
             val fullWidthPx =
