@@ -2,7 +2,6 @@ package com.peng.ainewshub.data
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.URLEncoder
@@ -19,11 +18,7 @@ import java.net.URLEncoder
  */
 class NewsRepository {
 
-    private val client = HttpClients.base
-
     private val base = "https://aihot.virxact.com/api/public"
-    private val userAgent =
-        "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
 
     // ===== /items =====
 
@@ -151,29 +146,25 @@ class NewsRepository {
 
     // ===== HTTP =====
 
-    private fun get(path: String, params: List<Pair<String, String>>): String {
+    private suspend fun get(path: String, params: List<Pair<String, String>>): String {
         val url = if (params.isEmpty()) path else {
             path + "?" + params.joinToString("&") { (k, v) -> "$k=$v" }
         }
-        val req = Request.Builder()
-            .url(url)
-            .header("Accept", "application/json")
-            .header("Accept-Language", "zh-CN,zh;q=0.9")
-            .header("User-Agent", userAgent)
-            .build()
-        client.newCall(req).execute().use { resp ->
-            if (!resp.isSuccessful) {
-                throw AppException.Network()
-            }
-            return resp.body?.string() ?: throw AppException.Network()
-        }
+        return HttpClients.get(
+            url,
+            mapOf(
+                "Accept" to "application/json",
+                "Accept-Language" to "zh-CN,zh;q=0.9",
+                "User-Agent" to HttpClients.DEFAULT_BROWSER_UA
+            )
+        )
     }
 
     /**
      * 取 JSON 根对象。HTTP 失败抛 RuntimeException;HTTP 200 但 body 非 JSON
      * (CDN 把 5xx 透传成 HTML、空 body 等)返回 null,由调用方决定走错误态还是空列表。
      */
-    private fun getJson(path: String, params: List<Pair<String, String>>): JSONObject? =
+    private suspend fun getJson(path: String, params: List<Pair<String, String>>): JSONObject? =
         runCatching { JSONObject(get(path, params)) }.getOrNull()
 
     private fun enc(s: String): String = URLEncoder.encode(s, "UTF-8")

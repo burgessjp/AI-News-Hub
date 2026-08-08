@@ -4,7 +4,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import okhttp3.Request
 import org.jsoup.Jsoup
 import java.io.File
 
@@ -28,11 +27,7 @@ class HuggingFacePapersRepository(
     private val cacheDir: File? = null
 ) : com.peng.ainewshub.data.source.HuggingFacePapersSource {
 
-    private val client = HttpClients.base
-
     private val papersUrl = "https://huggingface.co/papers/trending"
-    private val userAgent =
-        "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
 
     /** 串行化 [fetch],避免短时间内并发刷新重复打网络。 */
     private val refreshMutex = Mutex()
@@ -97,25 +92,21 @@ class HuggingFacePapersRepository(
     private var lastRawHtml: String = ""
 
     private suspend fun fetchFromNetwork(): List<HuggingFacePaper> = withContext(Dispatchers.IO) {
-        val req = Request.Builder()
-            .url(papersUrl)
-            .header("User-Agent", userAgent)
-            .header("Accept", "text/html,application/xhtml+xml")
-            .header("Accept-Language", "en-US,en;q=0.9,zh-CN,zh;q=0.8")
-            .build()
-        client.newCall(req).execute().use { resp ->
-            if (!resp.isSuccessful) {
-                throw AppException.Network()
-            }
-            val html = resp.body?.string() ?: throw AppException.Network()
-            // CF 挑战页检测:huggingface.co 套 Cloudflare,异常时返回 HTML 挑战页而非论文列表。
-            // 常见特征:body 含 "Just a moment" 或标题为 CF 挑战页。
-            if (html.contains("Just a moment", ignoreCase = true)) {
-                throw AppException.RateLimited()
-            }
-            lastRawHtml = html
-            parse(html)
+        val html = HttpClients.get(
+            papersUrl,
+            mapOf(
+                "User-Agent" to HttpClients.DEFAULT_BROWSER_UA,
+                "Accept" to "text/html,application/xhtml+xml",
+                "Accept-Language" to "en-US,en;q=0.9,zh-CN,zh;q=0.8"
+            )
+        )
+        // CF 挑战页检测:huggingface.co 套 Cloudflare,异常时返回 HTML 挑战页而非论文列表。
+        // 常见特征:body 含 "Just a moment" 或标题为 CF 挑战页。
+        if (html.contains("Just a moment", ignoreCase = true)) {
+            throw AppException.RateLimited()
         }
+        lastRawHtml = html
+        parse(html)
     }
 
     /**

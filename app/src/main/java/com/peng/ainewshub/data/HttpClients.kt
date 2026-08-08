@@ -1,6 +1,9 @@
 package com.peng.ainewshub.data
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
+import okhttp3.Request
 import java.util.concurrent.TimeUnit
 
 /**
@@ -52,5 +55,47 @@ object HttpClients {
             .readTimeout(120, TimeUnit.SECONDS)
             .callTimeout(180, TimeUnit.SECONDS)
             .build()
+    }
+
+    /**
+     * 统一的浏览器 User-Agent。
+     *
+     * 第三方站点(GitHub Trending / HuggingFace / stormzhang / The Rundown / aihot API /
+     * gitcode 归档)对默认 OkHttp UA 偶尔差异对待(裁剪条目 / 限流 / WAF 拦截),统一带
+     * 浏览器 UA。UA 会随时间老化(Chrome 版本号),集中一处便于同步更新。
+     */
+    const val DEFAULT_BROWSER_UA =
+        "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
+
+    /**
+     * 发起一个同步 GET 请求,返回响应正文。在 [Dispatchers.IO] 上执行(阻塞调用)。
+     *
+     * 收敛此前各 Repository 各自重复的 `newCall().execute().use { if(!successful)
+     * throw Network; body?.string() ?: throw Network }` 样板。
+     *
+     * @param url 完整请求 URL
+     * @param headers 请求头键值对(通常含 User-Agent / Accept 等)
+     * @param requireNonBlank true(默认)时空白正文视为网络错误抛 [AppException.Network];
+     *                        false 时返回空串(供个别需要区分空响应的场景)
+     * @throws AppException.Network HTTP 非 2xx、响应体为 null 或(默认)空白
+     */
+    suspend fun get(
+        url: String,
+        headers: Map<String, String> = emptyMap(),
+        requireNonBlank: Boolean = true
+    ): String = withContext(Dispatchers.IO) {
+        val builder = Request.Builder().url(url)
+        headers.forEach { (k, v) -> builder.header(k, v) }
+        base.newCall(builder.build()).execute().use { resp ->
+            if (!resp.isSuccessful) {
+                throw AppException.Network()
+            }
+            val body = resp.body?.string()
+            when {
+                body == null -> throw AppException.Network()
+                requireNonBlank && body.isBlank() -> throw AppException.Network()
+                else -> body
+            }
+        }
     }
 }

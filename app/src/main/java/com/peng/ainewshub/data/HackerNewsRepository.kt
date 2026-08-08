@@ -7,7 +7,6 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -32,8 +31,6 @@ import java.io.File
 class HackerNewsRepository(
     private val cacheDir: File? = null
 ) : com.peng.ainewshub.data.source.HackerNewsSource {
-
-    private val client = HttpClients.base
 
     private val base = "https://hacker-news.firebaseio.com/v0"
 
@@ -122,7 +119,7 @@ class HackerNewsRepository(
     }
 
     /** 拉取一个仅含 id 的 JSON 数组端点(topstories / newstories / beststories 等)。 */
-    private fun fetchIds(url: String): List<Long> {
+    private suspend fun fetchIds(url: String): List<Long> {
         val arr = JSONArray(getRaw(url))
         return (0 until arr.length()).map { arr.optLong(it) }
     }
@@ -183,7 +180,7 @@ class HackerNewsRepository(
     }
 
     /** 拉取单个 item 的 JSON;失败/404 返回 null(调用方跳过该条)。 */
-    private fun fetchItemJson(id: Long): JSONObject? = runCatching {
+    private suspend fun fetchItemJson(id: Long): JSONObject? = runCatching {
         JSONObject(getRaw("$base/item/$id.json"))
     }.getOrNull()?.takeIf { it.optLong("id", -1L) != -1L }
 
@@ -221,16 +218,7 @@ class HackerNewsRepository(
     // optString 在遇到 JSON null 时返回字面字符串 "null"(非空),需过滤。
     private fun String?.asClean(): String? = this?.takeIf { it.isNotBlank() && it != "null" }
 
-    private fun getRaw(url: String): String {
-        val req = Request.Builder()
-            .url(url)
-            .header("Accept", "application/json")
-            .build()
-        client.newCall(req).execute().use { resp ->
-            if (!resp.isSuccessful) {
-                throw AppException.Network()
-            }
-            return resp.body?.string() ?: throw AppException.Network()
-        }
-    }
+    private suspend fun getRaw(url: String): String =
+        // Firebase API 匿名免费不限速,无需浏览器 UA(与第三方反爬源不同)。
+        HttpClients.get(url, mapOf("Accept" to "application/json"))
 }

@@ -4,7 +4,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import okhttp3.Request
 import org.jsoup.Jsoup
 import java.io.File
 
@@ -27,11 +26,7 @@ class StormzhangAiNewsRepository(
     private val cacheDir: File? = null
 ) : com.peng.ainewshub.data.source.StormzhangAiNewsSource {
 
-    private val client = HttpClients.base
-
     private val newsUrl = "https://news.stormzhang.ai"
-    private val userAgent =
-        "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
 
     /** 串行化 [fetch],避免短时间内并发刷新重复打网络。 */
     private val refreshMutex = Mutex()
@@ -98,20 +93,16 @@ class StormzhangAiNewsRepository(
     private var lastRawHtml: String = ""
 
     private suspend fun fetchFromNetwork(): Pair<List<StormzhangAiNews>, String> = withContext(Dispatchers.IO) {
-        val req = Request.Builder()
-            .url(newsUrl)
-            .header("User-Agent", userAgent)
-            .header("Accept", "text/html,application/xhtml+xml")
-            .header("Accept-Language", "zh-CN,zh;q=0.9")
-            .build()
-        client.newCall(req).execute().use { resp ->
-            if (!resp.isSuccessful) {
-                throw AppException.Network()
-            }
-            val html = resp.body?.string() ?: throw AppException.Network()
-            lastRawHtml = html
-            parse(html)
-        }
+        val html = HttpClients.get(
+            newsUrl,
+            mapOf(
+                "User-Agent" to HttpClients.DEFAULT_BROWSER_UA,
+                "Accept" to "text/html,application/xhtml+xml",
+                "Accept-Language" to "zh-CN,zh;q=0.9"
+            )
+        )
+        lastRawHtml = html
+        parse(html)
     }
 
     /**

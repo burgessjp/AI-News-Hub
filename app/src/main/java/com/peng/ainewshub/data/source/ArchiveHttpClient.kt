@@ -56,9 +56,6 @@ object ArchiveHttpClient {
     /** index.json 内存缓存有效期:2 分钟(index 实际几小时才更新一次,短 TTL 足够)。 */
     private const val INDEX_TTL_MS = 2L * 60 * 1000
 
-    private const val UA =
-        "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
-
     private val client by lazy {
         // 共享 base 派生:连接池/线程池与全 App 复用,仅覆盖 cookieJar
         HttpClients.base.newBuilder()
@@ -198,7 +195,7 @@ object ArchiveHttpClient {
     private fun getRaw(url: String, @Suppress("UNUSED_PARAMETER") hint: String): String {
         val req = Request.Builder()
             .url(url)
-            .header("User-Agent", UA)
+            .header("User-Agent", HttpClients.DEFAULT_BROWSER_UA)
             .header("Accept", "application/json,text/plain,*/*")
             .build()
         client.newCall(req).execute().use { resp ->
