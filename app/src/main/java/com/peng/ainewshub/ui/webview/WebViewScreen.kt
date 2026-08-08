@@ -779,9 +779,8 @@ private fun TranslateSheet(
     onDismiss: () -> Unit
 ) {
     val cs = MaterialTheme.colorScheme
-    // 半屏起步:展开后立即拉回部分展开态,避免内容多时默认撑满全屏
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
-    LaunchedEffect(Unit) { sheetState.partialExpand() }
+    // 全屏展开:跳过半屏态,直接展开到全屏
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState
