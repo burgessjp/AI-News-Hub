@@ -33,7 +33,7 @@ import androidx.compose.ui.unit.sp
  * 需要语义命名的场景(详情页标题、紧凑正文、弱化正文等)。
  *
  * 实例化设计(不再是 object):
- *  - 字体族随设置页「字体」选项切换(默认 Inter;衬线/等宽为 Compose 内置族)
+ *  - 字体族随设置页「字体」选项切换(默认 null = 跟随系统;衬线/等宽为 Compose 内置族)
  *  - 字号随设置页「字号」档位整体缩放(fontScale 只作用于 fontSize/lineHeight,
  *    字重/字距不动;letterSpacing 不缩放,避免破坏精调的字距)
  *  - 由 [AiNewsHubTheme] 构造并经 [LocalAppTextStyles] 下发;组件经顶层
@@ -41,7 +41,7 @@ import androidx.compose.ui.unit.sp
  */
 @Immutable
 class AppTextStyles(
-    fontFamily: FontFamily = InterFontFamily,
+    fontFamily: FontFamily? = null,
     fontScale: Float = 1f
 ) {
 
