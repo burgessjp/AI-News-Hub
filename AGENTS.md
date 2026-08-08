@@ -80,6 +80,13 @@ AI_NEWS_HUB_AI_BASE_URL / AI_NEWS_HUB_AI_MODEL / AI_NEWS_HUB_AI_API_KEY / GITCOD
 
 `.github/workflows/`：`build.yml`（PR 跑 `assembleDebug`）/ `release.yml`（`v*` tag 发版，从 secrets 还原 keystore，versionName/versionCode 从 tag 注入）/ `fetch-data.yml`（每日定时跑数据流水线）。
 
+## 提交规范
+
+- **Conventional Commits 风格**：`type(scope): subject`，type 用 `feat`/`fix`/`refactor`/`docs`/`chore` 等，scope 可选（如 `feat(build):`、`refactor(settings):`）。
+- **commit message 一律用英文**（subject + body 都用英文）。
+- 分支命名 `feat/xxx` / `fix/xxx`，不直接在 `main` 上开发（详见 [`CONTRIBUTING.md`](CONTRIBUTING.md)）。
+- 仅为 AI 代写时的强约束：人类可读的 message 必须英文，**但代码注释、PR 描述、文档仍按各自约定**（注释中文、文档双语）。
+
 ## 安全红线
 
 - **签名密钥绝不入库**：`*.jks`、`*.keystore`、`keystore.properties` 均已 gitignore；本地 release 需自行放 `keystore.properties` + `app/release.jks`，CI 从 secrets 还原。

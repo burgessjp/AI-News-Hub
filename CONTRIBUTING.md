@@ -22,7 +22,7 @@
    - 不引入 Retrofit / Gson / Moshi；网络走 `OkHttp`，JSON 用 `org.json`。
    - 字号走 `AppText.xxx`、透明度走 `AppAlpha.xxx`、颜色只走 `colorScheme`，不散落 `.sp`/`.alpha`/hex 字面量。
    - `OkHttpClient` 统一经 `data/HttpClients.kt` 派生，不各自 new。
-4. Commit message 用 Conventional Commits 风格（`feat:` / `fix:` / `refactor:` / `docs:` 等），与现有历史一致。
+4. Commit message 用 Conventional Commits 风格（`feat:` / `fix:` / `refactor:` / `docs:` 等），**一律用英文**，与现有历史一致。
 5. PR 描述写清做了什么、为什么、怎么验证。
 
 ## 安全相关的注意事项
