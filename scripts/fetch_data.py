@@ -75,7 +75,7 @@ TIMEOUT = (15, 20)
 # 北京时间(UTC+8)—— 统一从 common 引入(命名 BEIJING_TZ;此处保留 CST 别名供
 # 本文件内部及 backfill_history 的 `from fetch_data import CST` 向后兼容)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from common import BEIJING_TZ as CST, now_cst
+from common import BEIJING_TZ as CST, now_cst, retry
 
 
 def fetch_text(url, extra_headers=None, expect_json=False):
@@ -1073,22 +1073,19 @@ def fetch_with_retry(name, fn, limit_hn=None):
     每次失败间指数退避:2s / 4s。全 3 次都败才抛最后一个异常
     (交给 main 的 try/except 记 fail,并触发「保留旧 latest」逻辑)。
 
-    HackerNews 签名带 limit,其余源无参,这里按 name 分派。
+    HackerNews 签名带 limit,其余源无参,这里用闭包统一调用入口,重试骨架走 common.retry。
     """
-    last_exc = None
-    for attempt in range(1, FETCH_MAX_ATTEMPTS + 1):
-        try:
-            if name == "hackernews" and limit_hn is not None:
-                return fn(limit=limit_hn)
-            return fn()
-        except Exception as e:
-            last_exc = e
-            if attempt < FETCH_MAX_ATTEMPTS:
-                wait = 2 ** attempt  # 2s, 4s
-                print(f"[RETRY] {name:<20} 第 {attempt}/{FETCH_MAX_ATTEMPTS} 次失败,"
-                      f"{wait}s 后重试:{type(e).__name__}: {e}", file=sys.stderr)
-                time.sleep(wait)
-    raise last_exc
+    # 把 HackerNews 的 limit 分派收敛进闭包,统一成无参 callable 交给 common.retry
+    def attempt():
+        if name == "hackernews" and limit_hn is not None:
+            return fn(limit=limit_hn)
+        return fn()
+
+    return retry(
+        attempt,
+        attempts=FETCH_MAX_ATTEMPTS,
+        log_tag=f"RETRY {name:<14}",
+    )
 
 
 def write_snapshot(out_dir, source_name, items, meta, now, ai_summary_v2=None):
@@ -1234,20 +1231,19 @@ def load_previous_index(url):
     """
     if not url:
         return {}, {}, None
-    last_exc = None
-    for attempt in range(1, FETCH_MAX_ATTEMPTS + 1):
-        try:
-            return _load_previous_index_once(url)
-        except Exception as e:
-            last_exc = e
-            if attempt < FETCH_MAX_ATTEMPTS:
-                wait = 2 ** attempt  # 2s, 4s
-                print(f"[INDEX] 拉上次 index.json 第 {attempt}/{FETCH_MAX_ATTEMPTS} 次失败,"
-                      f"{wait}s 后重试:{type(e).__name__}: {e}", file=sys.stderr)
-                time.sleep(wait)
-    print(f"[INDEX] 拉上次 index.json {FETCH_MAX_ATTEMPTS} 次全败,中断本轮"
-          f"(不推降级 index):{type(last_exc).__name__}: {last_exc}", file=sys.stderr)
-    sys.exit(1)
+
+    # 重试骨架走 common.retry;全败时 fail-closed(sys.exit 1,不推降级 index)
+    def on_exhausted(exc):
+        print(f"[INDEX] 拉上次 index.json {FETCH_MAX_ATTEMPTS} 次全败,中断本轮"
+              f"(不推降级 index):{type(exc).__name__}: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    return retry(
+        lambda: _load_previous_index_once(url),
+        attempts=FETCH_MAX_ATTEMPTS,
+        log_tag="INDEX 拉上次 index.json",
+        on_exhausted=on_exhausted,
+    )
 
 
 def _load_previous_index_once(url):

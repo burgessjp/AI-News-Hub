@@ -1,39 +1,25 @@
 package com.peng.ainewshub.ui.items
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
-import com.peng.ainewshub.data.source.SourceMode
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.ThumbUp
-import androidx.compose.material.icons.outlined.Inventory2
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -49,18 +35,13 @@ import androidx.compose.ui.res.stringResource
 import com.peng.ainewshub.R
 import com.peng.ainewshub.data.HuggingFacePaper
 import com.peng.ainewshub.data.AiConfig
-import com.peng.ainewshub.ui.EmptyState
-import com.peng.ainewshub.ui.ErrorState
 import com.peng.ainewshub.ui.HuggingFacePapersViewModel
 import com.peng.ainewshub.ui.TranslationState
 import com.peng.ainewshub.ui.UiState
-import com.peng.ainewshub.ui.components.AppTopBar
-import com.peng.ainewshub.ui.components.AppTopBarDefaults
-import com.peng.ainewshub.ui.components.HairlineDivider
+import com.peng.ainewshub.ui.components.InlineTranslateButton
+import com.peng.ainewshub.ui.components.TranslatedText
 import com.peng.ainewshub.ui.components.TranslateConfigMissingEffect
-import com.peng.ainewshub.ui.components.ListUpdateTimeHeader
 import com.peng.ainewshub.ui.components.RankBadge
-import com.peng.ainewshub.ui.components.RankRowSkeletonList
 import com.peng.ainewshub.ui.components.RowDividerIfNeeded
 import com.peng.ainewshub.ui.components.SourceListScaffold
 import com.peng.ainewshub.ui.components.StatBadge
@@ -68,7 +49,6 @@ import com.peng.ainewshub.ui.components.formatCount
 import com.peng.ainewshub.ui.components.updateTimeHeader
 import com.peng.ainewshub.ui.theme.AppText
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 
 /**
  * HuggingFace Trending Papers 全屏页面(「更多」tab 二级页)。
@@ -110,7 +90,7 @@ fun HuggingFacePapersScreen(
     TranslateConfigMissingEffect(translationStates, snackbarHostState, onOpenSettings)
 
     SourceListScaffold(
-        title = "HuggingFace Paper Trending",
+        title = stringResource(R.string.source_title_huggingface),
         onBack = onBack,
         state = state,
         isRefreshing = isRefreshing,

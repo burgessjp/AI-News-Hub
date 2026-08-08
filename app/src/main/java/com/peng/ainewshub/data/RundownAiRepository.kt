@@ -2,8 +2,6 @@ package com.peng.ainewshub.data
 
 import com.peng.ainewshub.data.source.RundownAiResult
 import com.peng.ainewshub.data.source.RundownAiSource
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import org.jsoup.Jsoup
 import java.io.File
 
@@ -29,7 +27,7 @@ class RundownAiRepository(
 
     override val cacheFileName: String = "rundown_ai.html"
 
-    override suspend fun fetchHtml(): String = withContext(Dispatchers.IO) {
+    override suspend fun fetchHtml(): String =
         HttpClients.get(
             homeUrl,
             mapOf(
@@ -38,7 +36,6 @@ class RundownAiRepository(
                 "Accept-Language" to "en-US,en;q=0.9"
             )
         )
-    }
 
     override fun packResult(fetchedAt: Long, rawHtml: String): RundownAiResult =
         RundownAiResult(fetchedAt, parse(rawHtml))

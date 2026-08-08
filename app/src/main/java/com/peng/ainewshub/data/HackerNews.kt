@@ -47,9 +47,7 @@ data class HackerNewsStory(
         get() = url.ifBlank { discussionUrl }
 
     companion object {
-        // optString 在遇到 JSON null 时返回字面字符串 "null"(非空),需过滤。
-        private fun String?.asClean(): String? =
-            this?.takeIf { it.isNotBlank() && it != "null" }
+        // asClean 逻辑收口于顶层扩展(data/JsonExt.kt),各 companion 直接引用。
 
         fun fromJson(json: JSONObject): HackerNewsStory {
             val kidsArr = json.optJSONArray("kids")

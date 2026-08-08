@@ -222,21 +222,25 @@ object ArchiveHttpClient {
     /**
      * GET 一个 URL,返回响应正文;非 2xx 或空响应抛 [AppException.Network]。
      * [hint] 仅用于日志诊断(toUiError 会把原始异常记入 logcat)。
+     *
+     * suspend 自管 [Dispatchers.IO]:所有调用方(含 [fetchIndex] 的 Mutex 锁内)
+     * 均无需再外层切 IO,与 [HttpClients.get] 行为一致。
      */
-    private fun getRaw(url: String, @Suppress("UNUSED_PARAMETER") hint: String): String {
-        val req = Request.Builder()
-            .url(url)
-            .header("User-Agent", HttpClients.DEFAULT_BROWSER_UA)
-            .header("Accept", "application/json,text/plain,*/*")
-            .build()
-        client.newCall(req).execute().use { resp ->
-            if (!resp.isSuccessful) {
-                throw AppException.Network()
+    private suspend fun getRaw(url: String, @Suppress("UNUSED_PARAMETER") hint: String): String =
+        withContext(Dispatchers.IO) {
+            val req = Request.Builder()
+                .url(url)
+                .header("User-Agent", HttpClients.DEFAULT_BROWSER_UA)
+                .header("Accept", "application/json,text/plain,*/*")
+                .build()
+            client.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) {
+                    throw AppException.Network()
+                }
+                resp.body?.string()?.takeIf { it.isNotBlank() }
+                    ?: throw AppException.Network()
             }
-            return resp.body?.string()?.takeIf { it.isNotBlank() }
-                ?: throw AppException.Network()
         }
-    }
 }
 
 /**

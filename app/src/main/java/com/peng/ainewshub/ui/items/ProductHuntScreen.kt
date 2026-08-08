@@ -35,7 +35,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.ui.res.stringResource
 import coil.compose.AsyncImage
+import com.peng.ainewshub.R
 import com.peng.ainewshub.data.AiConfig
 import com.peng.ainewshub.data.ProductHunt
 import com.peng.ainewshub.data.source.SourceMode
@@ -47,6 +49,8 @@ import com.peng.ainewshub.ui.components.RowDividerIfNeeded
 import com.peng.ainewshub.ui.components.SourceListScaffold
 import com.peng.ainewshub.ui.components.StatBadge
 import com.peng.ainewshub.ui.components.TranslateConfigMissingEffect
+import com.peng.ainewshub.ui.components.InlineTranslateButton
+import com.peng.ainewshub.ui.components.TranslatedText
 import com.peng.ainewshub.ui.components.formatCount
 import com.peng.ainewshub.ui.components.updateTimeHeader
 import com.peng.ainewshub.ui.theme.AppText
@@ -92,7 +96,7 @@ fun ProductHuntScreen(
     TranslateConfigMissingEffect(translationStates, snackbarHostState, onOpenSettings)
 
     SourceListScaffold(
-        title = "Product Hunt",
+        title = stringResource(R.string.source_title_producthunt),
         onBack = onBack,
         state = state,
         isRefreshing = isRefreshing,

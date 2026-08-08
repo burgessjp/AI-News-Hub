@@ -1,8 +1,6 @@
 package com.peng.ainewshub.data
 
 import com.peng.ainewshub.data.source.GitHubTrendingSource
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import org.jsoup.Jsoup
 import java.io.File
 
@@ -25,7 +23,7 @@ class GitHubTrendingRepository(
 
     override val cacheFileName: String = "github_trending.html"
 
-    override suspend fun fetchHtml(): String = withContext(Dispatchers.IO) {
+    override suspend fun fetchHtml(): String =
         HttpClients.get(
             trendingUrl,
             mapOf(
@@ -34,7 +32,6 @@ class GitHubTrendingRepository(
                 "Accept-Language" to "en-US,en;q=0.9"
             )
         )
-    }
 
     override fun packResult(fetchedAt: Long, rawHtml: String): TrendingResult =
         TrendingResult(fetchedAt, parse(rawHtml))

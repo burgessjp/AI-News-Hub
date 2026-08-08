@@ -793,12 +793,21 @@ private fun PageView(
     // 浏览历史来源标签:下方非 Composable 回调(onOpenUrl lambda)里捕获,提前取词
     val dailyLabel = stringResource(R.string.history_source_daily)
     val aboutLabel = stringResource(R.string.history_source_about)
+    // 各源标签:统一走 source_title_* 取词,避免浏览历史里硬编码散落
+    val aihotLabel = stringResource(R.string.source_title_aihot_featured)
+    val hackerNewsLabel = stringResource(R.string.source_title_hackernews)
+    val githubTrendingLabel = stringResource(R.string.source_title_github_trending)
+    val stormzhangLabel = stringResource(R.string.source_title_stormzhang)
+    val huggingFaceLabel = stringResource(R.string.source_title_huggingface)
+    val productHuntLabel = stringResource(R.string.source_title_producthunt)
+    val rundownLabel = stringResource(R.string.source_title_rundown)
+    val openAiAnthropicLabel = stringResource(R.string.source_title_openai_anthropic)
     when (page) {
         is Page.Detail -> NewsDetailScreen(
             item = page.item,
             onBack = onBack,
-            // 适配:Detail 页打开的链接来自 AI HOT 详情,标注 "AI HOT"
-            onOpenUrl = { url, title -> onOpenUrl(url, title, "AI HOT") }
+            // 适配:Detail 页打开的链接来自 AI HOT 详情,标注 "AIHot 精选"
+            onOpenUrl = { url, title -> onOpenUrl(url, title, aihotLabel) }
         )
         is Page.Web -> WebViewScreen(
             url = page.url,
@@ -873,42 +882,42 @@ private fun PageView(
         is Page.HackerNewsComments -> HackerNewsCommentsScreen(
             story = page.story,
             onBack = onBack,
-            onOpenUrl = { url, title -> onOpenUrl(url, title, "HackerNews") },
+            onOpenUrl = { url, title -> onOpenUrl(url, title, hackerNewsLabel) },
             onOpenSettings = onOpenSettings,
             listState = pageListStates.forPage(page)
         )
         Page.GitHubTrending -> GitHubTrendingScreen(
             onBack = onBack,
-            onOpenUrl = { url, title -> onOpenUrl(url, title, "GitHub Trending") },
+            onOpenUrl = { url, title -> onOpenUrl(url, title, githubTrendingLabel) },
             onOpenSettings = onOpenSettings,
             listState = pageListStates.forPage(page)
         )
         Page.StormzhangAiNews -> StormzhangAiNewsScreen(
             onBack = onBack,
-            onOpenUrl = { url, title -> onOpenUrl(url, title, "stormzhang AI") },
+            onOpenUrl = { url, title -> onOpenUrl(url, title, stormzhangLabel) },
             listState = pageListStates.forPage(page)
         )
         Page.HuggingFacePapers -> HuggingFacePapersScreen(
             onBack = onBack,
-            onOpenUrl = { url, title -> onOpenUrl(url, title, "HuggingFace") },
+            onOpenUrl = { url, title -> onOpenUrl(url, title, huggingFaceLabel) },
             onOpenSettings = onOpenSettings,
             listState = pageListStates.forPage(page)
         )
         Page.ProductHunt -> ProductHuntScreen(
             onBack = onBack,
-            onOpenUrl = { url, title -> onOpenUrl(url, title, "Product Hunt") },
+            onOpenUrl = { url, title -> onOpenUrl(url, title, productHuntLabel) },
             onOpenSettings = onOpenSettings,
             listState = pageListStates.forPage(page)
         )
         Page.RundownAi -> RundownAiScreen(
             onBack = onBack,
-            onOpenUrl = { url, title -> onOpenUrl(url, title, "The Rundown AI") },
+            onOpenUrl = { url, title -> onOpenUrl(url, title, rundownLabel) },
             onOpenSettings = onOpenSettings,
             listState = pageListStates.forPage(page)
         )
         Page.OpenAiAnthropicNews -> OpenAiAnthropicNewsScreen(
             onBack = onBack,
-            onOpenUrl = { url, title -> onOpenUrl(url, title, "OpenAI x Anthropic") },
+            onOpenUrl = { url, title -> onOpenUrl(url, title, openAiAnthropicLabel) },
             onOpenSettings = onOpenSettings,
             listState = pageListStates.forPage(page)
         )
@@ -918,7 +927,7 @@ private fun PageView(
         Page.FeaturedHub -> FeaturedTab(
             onItemClick = onItemClick,
             onOpenAll = onOpenAll,
-            onOpenUrl = { url, title -> onOpenUrl(url, title, "AI HOT") },
+            onOpenUrl = { url, title -> onOpenUrl(url, title, aihotLabel) },
             onBack = onBack,
             reselectSignal = 0,
             listState = pageListStates.forPage(page)

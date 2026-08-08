@@ -232,8 +232,7 @@ class HackerNewsRepository(
     private fun isStale(cache: HackerNewsStoriesCache): Boolean =
         System.currentTimeMillis() - cache.fetchedAt > CACHE_TTL_MS
 
-    // optString 在遇到 JSON null 时返回字面字符串 "null"(非空),需过滤。
-    private fun String?.asClean(): String? = this?.takeIf { it.isNotBlank() && it != "null" }
+    // asClean 逻辑收口于顶层扩展(data/JsonExt.kt),此处直接引用。
 
     private suspend fun getRaw(url: String): String =
         // Firebase API 匿名免费不限速,无需浏览器 UA(与第三方反爬源不同)。

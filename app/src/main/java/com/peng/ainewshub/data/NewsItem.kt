@@ -62,10 +62,7 @@ data class NewsItem(
     fun categoryLabelRes(): Int? = NewsCategory.fromApi(category)?.labelRes
 
     companion object {
-        // optString 在遇到 JSON null 时返回字面字符串 "null"(非空),故需额外 != "null" 过滤,
-        // 与 NewsRepository 中 permalink/nextCursor 等的处理保持一致。
-        private fun String?.asClean(): String? =
-            this?.takeIf { it.isNotBlank() && it != "null" }
+        // asClean 逻辑收口于顶层扩展(data/JsonExt.kt),各 companion 直接引用。
 
         fun fromJson(json: JSONObject): NewsItem = NewsItem(
             id = json.optString("id").asClean().orEmpty(),
@@ -150,9 +147,7 @@ data class HotTopic(
     val latestAt: String? = null
 ) {
     companion object {
-        // optString 在遇到 JSON null 时返回字面字符串 "null"(非空),需过滤。
-        private fun String?.asClean(): String? =
-            this?.takeIf { it.isNotBlank() && it != "null" }
+        // asClean 逻辑收口于顶层扩展(data/JsonExt.kt),各 companion 直接引用。
 
         fun fromJson(json: JSONObject): HotTopic {
             val namesArr = json.optJSONArray("sourceNames") ?: org.json.JSONArray()

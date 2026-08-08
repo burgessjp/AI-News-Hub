@@ -75,6 +75,8 @@ import com.peng.ainewshub.ui.UiState
 import com.peng.ainewshub.ui.components.AppTopBar
 import com.peng.ainewshub.ui.components.AppTopBarDefaults
 import com.peng.ainewshub.ui.components.NewsCardSkeletonList
+import com.peng.ainewshub.ui.components.InlineTranslateButton
+import com.peng.ainewshub.ui.components.TranslatedText
 import com.peng.ainewshub.ui.components.formatRelativeTime
 import com.peng.ainewshub.ui.theme.AppText
 

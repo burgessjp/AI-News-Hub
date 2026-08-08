@@ -1,8 +1,6 @@
 package com.peng.ainewshub.data
 
 import com.peng.ainewshub.data.source.StormzhangAiNewsSource
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import org.jsoup.Jsoup
 import java.io.File
 
@@ -25,7 +23,7 @@ class StormzhangAiNewsRepository(
 
     override val cacheFileName: String = "stormzhang_ai_news.html"
 
-    override suspend fun fetchHtml(): String = withContext(Dispatchers.IO) {
+    override suspend fun fetchHtml(): String =
         HttpClients.get(
             newsUrl,
             mapOf(
@@ -34,7 +32,6 @@ class StormzhangAiNewsRepository(
                 "Accept-Language" to "zh-CN,zh;q=0.9"
             )
         )
-    }
 
     override fun packResult(fetchedAt: Long, rawHtml: String): StormzhangAiNewsResult {
         val (news, date) = parse(rawHtml)

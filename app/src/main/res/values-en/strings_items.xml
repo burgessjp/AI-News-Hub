@@ -31,6 +31,9 @@
     <string name="items_hide_translation">Hide translation</string>
     <string name="items_translate_failed_retry">Translation failed, retry</string>
 
+    <!-- ===== GitHub Trending ===== -->
+    <string name="trending_stars_today">%1$s today</string>
+
     <!-- ===== Items list ===== -->
     <string name="items_category_all">All</string>
     <string name="items_refresh_hint_button">Tap the button below to refresh</string>

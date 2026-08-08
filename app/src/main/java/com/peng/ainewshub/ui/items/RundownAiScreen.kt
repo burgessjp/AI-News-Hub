@@ -48,6 +48,8 @@ import com.peng.ainewshub.ui.components.RankBadge
 import com.peng.ainewshub.ui.components.RowDividerIfNeeded
 import com.peng.ainewshub.ui.components.SourceListScaffold
 import com.peng.ainewshub.ui.components.TranslateConfigMissingEffect
+import com.peng.ainewshub.ui.components.InlineTranslateButton
+import com.peng.ainewshub.ui.components.TranslatedText
 import com.peng.ainewshub.ui.components.updateTimeHeader
 import com.peng.ainewshub.ui.theme.AppText
 
@@ -93,7 +95,7 @@ fun RundownAiScreen(
     TranslateConfigMissingEffect(translationStates, snackbarHostState, onOpenSettings)
 
     SourceListScaffold(
-        title = "The Rundown AI",
+        title = stringResource(R.string.source_title_rundown),
         onBack = onBack,
         state = state,
         isRefreshing = isRefreshing,

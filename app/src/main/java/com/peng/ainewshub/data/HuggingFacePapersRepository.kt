@@ -1,8 +1,6 @@
 package com.peng.ainewshub.data
 
 import com.peng.ainewshub.data.source.HuggingFacePapersSource
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import org.jsoup.Jsoup
 import java.io.File
 
@@ -28,7 +26,7 @@ class HuggingFacePapersRepository(
 
     override val cacheFileName: String = "huggingface_papers.html"
 
-    override suspend fun fetchHtml(): String = withContext(Dispatchers.IO) {
+    override suspend fun fetchHtml(): String {
         val html = HttpClients.get(
             papersUrl,
             mapOf(
@@ -42,7 +40,7 @@ class HuggingFacePapersRepository(
         if (html.contains("Just a moment", ignoreCase = true)) {
             throw AppException.RateLimited()
         }
-        html
+        return html
     }
 
     override fun packResult(fetchedAt: Long, rawHtml: String): HuggingFacePapersResult =
