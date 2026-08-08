@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 总览 Tab 文案(中文全集,默认 locale;英文在 values-en/strings_overview.xml)。 -->
+<resources>
+    <!-- 顶栏刷新按钮 contentDescription -->
+    <string name="overview_refresh_desc">重新生成</string>
+    <!-- 加载中说明(AI 长输出,避免用户误以为卡死) -->
+    <string name="overview_loading">正在加载今日总览…</string>
+    <!-- 空态:归档 latest_overview 字段缺失 -->
+    <string name="overview_no_data_title">今日总览尚未生成</string>
+    <string name="overview_no_data_subtitle">今天的内容还在准备中,请稍后再来</string>
+    <!-- 错误态标题 -->
+    <string name="overview_load_failed">总览加载失败</string>
+    <!-- breaking 标签(沿用英文品牌词) -->
+    <string name="overview_breaking_tag">Breaking</string>
+    <!-- breaking 推荐理由前缀(引述块/面板加粗段,与正文间补空格) -->
+    <string name="overview_breaking_reason_label">推荐理由</string>
+
+    <!-- 页脚:生成时间 / 数据截至 / 源计数 / 缺源标注(段间「 · 」为标点,两语言一致,留代码) -->
+    <string name="overview_generated_at">生成于 %1$s</string>
+    <string name="overview_data_until">数据截至 %1$s</string>
+    <plurals name="overview_based_on_sources">
+        <item quantity="other">基于 %1$d 源当日内容</item>
+    </plurals>
+    <string name="overview_missing_sources">缺 %1$s</string>
+    <!-- 缺源列表连接符(中文顿号;英文用逗号) -->
+    <string name="overview_list_separator">、</string>
+    <!-- 数据时刻解析失败回退 -->
+    <string name="overview_time_unknown">未知</string>
+
+    <!-- ViewModel 错误文案(网络/受限复用 common error_*) -->
+    <string name="overview_error_parse">数据解析失败,请稍后重试</string>
+    <string name="overview_error_load_failed">总览加载失败,请稍后重试</string>
+</resources>

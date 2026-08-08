@@ -49,12 +49,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import android.content.Context
+import com.peng.ainewshub.R
 import com.peng.ainewshub.data.BrowseHistoryEntity
 import com.peng.ainewshub.data.BrowseHistoryRepository
 import com.peng.ainewshub.ui.BrowseHistoryViewModel
@@ -104,6 +109,7 @@ fun BrowseHistoryScreen(
 
     var showClearDialog by rememberSaveable { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
     // 暂存最近一次删除,供 Snackbar 撤销(单条撤销;连续删多条只撤销最后一条)
     var lastDeleted by remember { mutableStateOf<BrowseHistoryEntity?>(null) }
 
@@ -111,8 +117,8 @@ fun BrowseHistoryScreen(
     LaunchedEffect(lastDeleted) {
         lastDeleted?.let { entity ->
             val r = snackbarHostState.showSnackbar(
-                message = "已删除",
-                actionLabel = "撤销"
+                message = context.getString(R.string.history_deleted),
+                actionLabel = context.getString(R.string.history_undo)
             )
             if (r == SnackbarResult.ActionPerformed) {
                 // 撤销 = 原样恢复实体(保留原 visitCount/visitedAt,不新增访问)
@@ -125,16 +131,16 @@ fun BrowseHistoryScreen(
     if (showClearDialog) {
         AlertDialog(
             onDismissRequest = { showClearDialog = false },
-            title = { Text("清空浏览历史") },
-            text = { Text("将删除全部 $count 条记录,此操作不可撤销。") },
+            title = { Text(stringResource(R.string.history_clear_dialog_title)) },
+            text = { Text(pluralStringResource(R.plurals.history_clear_dialog_message, count, count)) },
             confirmButton = {
                 TextButton(onClick = {
                     vm.clearAll()
                     showClearDialog = false
-                }) { Text("清空", color = MaterialTheme.colorScheme.error) }
+                }) { Text(stringResource(R.string.items_clear), color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                TextButton(onClick = { showClearDialog = false }) { Text("取消") }
+                TextButton(onClick = { showClearDialog = false }) { Text(stringResource(R.string.common_cancel)) }
             }
         )
     }
@@ -144,11 +150,11 @@ fun BrowseHistoryScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             AppTopBar(
-                title = "浏览历史",
+                title = stringResource(R.string.history_title),
                 titleFontSize = AppTopBarDefaults.secondaryTitleFontSize,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 },
                 actions = {
@@ -156,7 +162,7 @@ fun BrowseHistoryScreen(
                     if (history.isNotEmpty()) {
                         IconButton(onClick = vm::toggleGroupByHost) {
                             Text(
-                                text = if (groupByHost) "时间" else "域名",
+                                text = stringResource(if (groupByHost) R.string.history_group_by_time else R.string.history_group_by_host),
                                 style = AppText.caption,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.primary
@@ -166,7 +172,7 @@ fun BrowseHistoryScreen(
                         IconButton(onClick = { showClearDialog = true }) {
                             Icon(
                                 Icons.Filled.DeleteSweep,
-                                contentDescription = "清空",
+                                contentDescription = stringResource(R.string.items_clear),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -178,8 +184,8 @@ fun BrowseHistoryScreen(
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             if (history.isEmpty()) {
                 EmptyState(
-                    title = "还没有浏览记录",
-                    subtitle = "打开过的网页会出现在这里",
+                    title = stringResource(R.string.history_empty_title),
+                    subtitle = stringResource(R.string.history_empty_subtitle),
                     icon = Icons.Outlined.History
                 )
             } else {
@@ -217,7 +223,7 @@ private fun LoadMoreFooter(hasMore: Boolean) {
             )
         } else {
             Text(
-                text = "没有更多了",
+                text = stringResource(R.string.items_no_more),
                 style = AppText.caption,
                 color = MaterialTheme.colorScheme.outlineVariant
             )
@@ -307,6 +313,7 @@ private fun HistoryRow(
     onSwipeDelete: () -> Unit
 ) {
     val cs = MaterialTheme.colorScheme
+    val context = LocalContext.current
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = {
             if (it == SwipeToDismissBoxValue.EndToStart) {
@@ -329,7 +336,7 @@ private fun HistoryRow(
             ) {
                 Icon(
                     Icons.Filled.DeleteSweep,
-                    contentDescription = "删除",
+                    contentDescription = stringResource(R.string.history_delete),
                     tint = cs.onErrorContainer
                 )
             }
@@ -389,7 +396,7 @@ private fun HistoryRow(
                         MetaText(entity.source)
                         MetaDot()
                     }
-                    MetaText(formatRelativeAgo(entity.visitedAt))
+                    MetaText(formatRelativeAgo(context, entity.visitedAt))
                     if (entity.visitCount > 1) {
                         Spacer(Modifier.width(2.dp))
                         VisitBadge(count = entity.visitCount)
@@ -458,14 +465,15 @@ private fun hostAccent(
  * 相对时间格式化(与 GitHubTrendingScreen.formatRefreshAgo 同源,语义一致)。
  * <1 分「刚刚」;<60 分「N 分钟前」;<24h「N 小时前」;<7d「N 天前」;更早显示日期。
  */
-private fun formatRelativeAgo(visitedAtMillis: Long): String {
+private fun formatRelativeAgo(context: Context, visitedAtMillis: Long): String {
+    val res = context.resources
     val diff = System.currentTimeMillis() - visitedAtMillis
     val minutes = diff / 60_000L
     return when {
-        minutes < 1 -> "刚刚"
-        minutes < 60 -> "${minutes} 分钟前"
-        minutes < 60 * 24 -> "${minutes / 60} 小时前"
-        minutes < 60 * 24 * 7 -> "${minutes / (60 * 24)} 天前"
-        else -> SimpleDateFormat("MM-dd HH:mm", Locale.CHINA).format(Date(visitedAtMillis))
+        minutes < 1 -> context.getString(R.string.time_just_now)
+        minutes < 60 -> minutes.toInt().let { res.getQuantityString(R.plurals.time_minutes_ago, it, it) }
+        minutes < 60 * 24 -> (minutes / 60).toInt().let { res.getQuantityString(R.plurals.time_hours_ago, it, it) }
+        minutes < 60 * 24 * 7 -> (minutes / (60 * 24)).toInt().let { res.getQuantityString(R.plurals.time_days_ago, it, it) }
+        else -> SimpleDateFormat(context.getString(R.string.date_fmt_month_day_time_dash), Locale.getDefault()).format(Date(visitedAtMillis))
     }
 }

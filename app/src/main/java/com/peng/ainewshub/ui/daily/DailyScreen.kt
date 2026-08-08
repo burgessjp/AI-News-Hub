@@ -1,5 +1,6 @@
 package com.peng.ainewshub.ui.daily
 
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -34,11 +35,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.peng.ainewshub.R
 import com.peng.ainewshub.data.DailyEntry
 import com.peng.ainewshub.data.DailyReport
 import com.peng.ainewshub.data.Flash
@@ -50,8 +54,11 @@ import com.peng.ainewshub.ui.components.AppTopBar
 import com.peng.ainewshub.ui.components.AppTopBarDefaults
 import com.peng.ainewshub.ui.components.ArchiveIconButton
 import com.peng.ainewshub.ui.components.SectionHeader
+import com.peng.ainewshub.ui.components.weekdayLabel
 import com.peng.ainewshub.ui.theme.AppText
 import com.peng.ainewshub.ui.theme.TrackingWide
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 /**
  * 日报屏幕:展示最新日报,顶部入口进入归档。
@@ -78,14 +85,14 @@ fun DailyScreen(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             AppTopBar(
-                title = "AI 日报",
+                title = stringResource(R.string.daily_title),
                 titleFontSize = AppTopBarDefaults.secondaryTitleFontSize,
                 navigationIcon = if (onBack != null) {
                     {
                         IconButton(onClick = onBack) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "返回"
+                                contentDescription = stringResource(R.string.common_back)
                             )
                         }
                     }
@@ -93,7 +100,7 @@ fun DailyScreen(
                 actions = {
                     ArchiveIconButton(onClick = onOpenArchive)
                     Text(
-                        text = "每早八时",
+                        text = stringResource(R.string.daily_every_morning),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -106,7 +113,7 @@ fun DailyScreen(
                 is UiState.Loading -> DailySkeleton()
                 is UiState.Error -> ErrorState(
                     message = s.message,
-                    title = "日报加载失败",
+                    title = stringResource(R.string.daily_load_failed),
                     onRetry = { vm.refreshLatest() }
                 )
                 // 下拉刷新:不翻回 Loading,仅转刷新指示(对齐 8 源页既有模式)
@@ -173,7 +180,7 @@ internal fun DailyContent(report: DailyReport, onOpen: (String) -> Unit, listSta
                     )
                     Spacer(Modifier.width(6.dp))
                     Text(
-                        "快讯",
+                        stringResource(R.string.daily_flashes),
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.tertiary
@@ -216,10 +223,11 @@ private fun DailyRowDivider() {
 @Composable
 private fun DailySummaryHeader(report: DailyReport) {
     val accent = MaterialTheme.colorScheme.primary
+    val context = LocalContext.current
     Column(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 4.dp)) {
             Text(
-                text = dateLabel(report.date),
+                text = dateLabel(context, report.date),
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
                 color = accent,
@@ -254,31 +262,23 @@ private fun DailySummaryHeader(report: DailyReport) {
     }
 }
 
-/** 把 YYYY-MM-DD(UTC)格式化为中文标签:今天 / 昨天 / 前天 / M月d日 · 周X。 */
-private fun dateLabel(date: String): String {
+/** 把 YYYY-MM-DD(UTC)格式化为本地化标签:今天 / 昨天 / 前天 / M月d日 · 周X(英文 Today / Yesterday / MMM d)。 */
+private fun dateLabel(context: Context, date: String): String {
     return runCatching {
         val d = java.time.LocalDate.parse(date)
         // 日报 date 按 UTC 切日,基准也用 UTC,避免系统时区边缘用户把今天/昨天算错
         val today = java.time.LocalDate.now(java.time.ZoneOffset.UTC)
         val days = java.time.temporal.ChronoUnit.DAYS.between(d, today)
         val base = when {
-            days == 0L -> "今天"
-            days == 1L -> "昨天"
-            days == 2L -> "前天"
-            else -> "${d.monthValue}月${d.dayOfMonth}日"
+            days == 0L -> context.getString(R.string.time_today)
+            days == 1L -> context.getString(R.string.time_yesterday)
+            days == 2L -> context.getString(R.string.time_day_before_yesterday)
+            else -> d.format(
+                DateTimeFormatter.ofPattern(context.getString(R.string.date_fmt_month_day), Locale.getDefault())
+            )
         }
-        "$base · ${d.dayOfWeek.toChinese()}"
-    }.getOrDefault("$date 日报")
-}
-
-private fun java.time.DayOfWeek.toChinese(): String = when (this) {
-    java.time.DayOfWeek.MONDAY -> "周一"
-    java.time.DayOfWeek.TUESDAY -> "周二"
-    java.time.DayOfWeek.WEDNESDAY -> "周三"
-    java.time.DayOfWeek.THURSDAY -> "周四"
-    java.time.DayOfWeek.FRIDAY -> "周五"
-    java.time.DayOfWeek.SATURDAY -> "周六"
-    java.time.DayOfWeek.SUNDAY -> "周日"
+        "$base · ${weekdayLabel(context, d.dayOfWeek.value)}"
+    }.getOrDefault(context.getString(R.string.daily_date_title, date))
 }
 
 /** 统计行:每个统计项 = 数字(primary,加粗)+ 标签(灰);项间中点分隔。 */
@@ -288,11 +288,16 @@ private fun DailySummaryStats(report: DailyReport, accent: androidx.compose.ui.g
     val flashes = report.flashes.size
     val sections = report.sections.count { it.items.isNotEmpty() }
     val readMin = (entries * 2).coerceAtLeast(1) // 粗估:每条约 2 分钟
+    // 单位文案提前取出:buildList 是非 Composable lambda,不能在内调 stringResource
+    val itemsUnit = stringResource(R.string.daily_stat_items)
+    val sectionsUnit = stringResource(R.string.daily_stat_sections)
+    val flashesUnit = stringResource(R.string.daily_stat_flashes)
+    val minutesUnit = stringResource(R.string.daily_stat_minutes)
     val stats = buildList {
-        if (entries > 0) add(entries to "条")
-        if (sections > 0) add(sections to "类")
-        if (flashes > 0) add(flashes to "快讯")
-        add(readMin to "分钟")
+        if (entries > 0) add(entries to itemsUnit)
+        if (sections > 0) add(sections to sectionsUnit)
+        if (flashes > 0) add(flashes to flashesUnit)
+        add(readMin to minutesUnit)
     }
     if (stats.isEmpty()) return
     Row(

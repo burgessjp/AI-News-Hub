@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  内置 WebView 屏文案(中文全集,默认 locale;英文在 values-en/strings_webview.xml)。
+  覆盖:更多菜单 / 底部工具栏 / Toast / 长按弹窗 / 翻译弹层 / AI 配置引导弹窗 /
+  下载与保存(含落盘文件名)/ 外部链接唤起 / 分享。
+  通用动作(返回/刷新/分享/取消/去设置)与「更多」复用 strings_common / strings.xml。
+-->
+<resources>
+    <!-- ===== Toast ===== -->
+    <string name="webview_toast_permission_denied">未授予权限,已取消下载</string>
+    <string name="webview_toast_copied">已复制</string>
+    <string name="webview_toast_no_browser">未找到可用的浏览器</string>
+    <string name="webview_toast_reader_extract_failed">未能提取正文,当前页可能不是文章页</string>
+    <string name="webview_toast_nothing_to_translate">没有可翻译的内容</string>
+    <string name="webview_toast_save_image_failed">无法保存图片</string>
+    <string name="webview_toast_save_image_unsupported">暂不支持保存此图片</string>
+    <string name="webview_toast_download_unsupported">暂不支持下载此类型的链接</string>
+    <string name="webview_toast_download_manager_unavailable">下载服务不可用</string>
+    <string name="webview_toast_download_started">开始下载:%1$s</string>
+    <string name="webview_toast_download_failed">下载失败,请稍后重试</string>
+    <string name="webview_toast_saving_file">正在保存文件…</string>
+    <string name="webview_toast_download_no_data">下载失败:网页未能提供文件数据</string>
+    <string name="webview_toast_save_create_failed">保存失败:无法创建文件</string>
+    <string name="webview_toast_saved">已保存:%1$s</string>
+    <string name="webview_toast_save_failed">保存失败,请稍后重试</string>
+    <string name="webview_toast_no_app_for_link">未找到可打开此链接的应用</string>
+    <string name="webview_toast_open_link_failed">无法打开此链接</string>
+
+    <!-- ===== 「更多」菜单(刷新复用 common_refresh) ===== -->
+    <string name="webview_menu_translate_page">翻译本页</string>
+    <string name="webview_menu_copy_link">复制链接</string>
+    <string name="webview_menu_open_browser">在浏览器打开</string>
+
+    <!-- ===== 加载错误态 ===== -->
+    <string name="webview_error_http">网页加载失败(%1$d)</string>
+    <string name="webview_error_title">页面加载失败</string>
+
+    <!-- ===== 长按图片/链接弹窗 ===== -->
+    <string name="webview_dialog_image">图片</string>
+    <string name="webview_dialog_link">链接</string>
+    <string name="webview_action_save_image">保存图片</string>
+    <string name="webview_action_copy_image_url">复制图片地址</string>
+
+    <!-- ===== 翻译弹层 ===== -->
+    <string name="webview_translate_sheet_title">全文翻译</string>
+    <string name="webview_translate_progress">翻译中 %1$d/%2$d</string>
+
+    <!-- ===== AI 服务配置引导弹窗 ===== -->
+    <string name="webview_ai_config_title">未配置 AI 服务</string>
+    <string name="webview_ai_config_message">整页翻译使用「设置 → AI 服务」里的服务配置,请先完成服务与模型设置。</string>
+
+    <!-- ===== 下载/保存落盘文件名 ===== -->
+    <string name="webview_download_image_name">下载图片</string>
+    <string name="webview_download_file_name">下载文件</string>
+    <string name="webview_download_fallback_name">下载文件.bin</string>
+
+    <!-- ===== 底部工具栏(分享复用 common_share) ===== -->
+    <string name="webview_bar_back">后退</string>
+    <string name="webview_bar_forward">前进</string>
+    <string name="webview_bar_reader">阅读模式</string>
+    <string name="webview_bar_exit_reader">退出阅读</string>
+</resources>

@@ -1,4 +1,7 @@
 package com.peng.ainewshub.ui.more
+import android.content.Context
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -41,6 +44,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.peng.ainewshub.R
 import com.peng.ainewshub.data.AiConfig
 import com.peng.ainewshub.data.AiConfigStore
 import com.peng.ainewshub.data.AiProvider
@@ -71,11 +75,11 @@ fun AiServiceScreen(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             AppTopBar(
-                title = "AI 服务",
+                title = stringResource(R.string.aiservice_title),
                 titleFontSize = AppTopBarDefaults.secondaryTitleFontSize,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 }
             )
@@ -86,13 +90,13 @@ fun AiServiceScreen(
             contentPadding = PaddingValues(bottom = 24.dp)
         ) {
             // 服务商 section —— 翻译开关 + 服务商/API 地址/API Key/模型(自定义时另有单价两行)
-            item { SectionHeader("服务商") }
+            item { SectionHeader(stringResource(R.string.aiservice_provider)) }
             item {
                 AiServiceSection(config = config, configStore = configStore)
             }
 
             // 用量与费用 section —— token 消耗统计 + 官方刊例价估算
-            item { SectionHeader("用量与费用") }
+            item { SectionHeader(stringResource(R.string.aiservice_usage_section)) }
             item {
                 AiUsageSection(usageStore = usageStore, config = config)
             }
@@ -121,11 +125,24 @@ private fun AiServiceSection(
 
     val cs = MaterialTheme.colorScheme
 
+    // 文案提前取出:ifBlank/when 等非 Composable lambda 内不能调 stringResource
+    val notSetLabel = stringResource(R.string.aiservice_not_set)
+    val setLabel = stringResource(R.string.aiservice_set)
+    val priceNotSetLabel = stringResource(R.string.aiservice_price_not_set)
+    val apiUrlTitle = stringResource(R.string.aiservice_api_url)
+    val apiKeyTitle = stringResource(R.string.aiservice_api_key)
+    val modelTitle = stringResource(R.string.aiservice_model)
+    val inputPriceTitle = stringResource(R.string.aiservice_input_price)
+    val outputPriceTitle = stringResource(R.string.aiservice_output_price)
+    val apiUrlPlaceholder = stringResource(R.string.aiservice_api_url_placeholder)
+    val modelPlaceholder = stringResource(R.string.aiservice_model_placeholder)
+    val pricePlaceholder = stringResource(R.string.aiservice_price_placeholder)
+
     SettingsRow(
         icon = Icons.Filled.Translate,
         iconAccent = cs.primary,
-        title = "启用翻译",
-        subtitle = "翻译 HackerNews 标题/评论、GitHub Trending、HuggingFace 论文等",
+        title = stringResource(R.string.aiservice_translate_enabled),
+        subtitle = stringResource(R.string.aiservice_translate_subtitle),
         showDivider = true,
         trailing = {
             Switch(
@@ -141,8 +158,8 @@ private fun AiServiceSection(
     SettingsRow(
         icon = Icons.Filled.Hub,
         iconAccent = cs.secondary,
-        title = "服务商",
-        subtitle = config.provider.label,
+        title = stringResource(R.string.aiservice_provider),
+        subtitle = stringResource(config.provider.labelRes),
         onClick = { showProviderDialog = true }
     )
 
@@ -151,15 +168,15 @@ private fun AiServiceSection(
         SettingsRow(
             icon = Icons.Filled.Language,
             iconAccent = cs.tertiary,
-            title = "API 地址",
-            subtitle = config.baseUrl.ifBlank { "未设置" },
+            title = apiUrlTitle,
+            subtitle = config.baseUrl.ifBlank { notSetLabel },
             onClick = { editingField = "base" }
         )
     } else {
         SettingsRow(
             icon = Icons.Filled.Language,
             iconAccent = cs.tertiary,
-            title = "API 地址",
+            title = apiUrlTitle,
             subtitle = config.effectiveBaseUrl,
             showChevron = false
         )
@@ -168,16 +185,16 @@ private fun AiServiceSection(
     SettingsRow(
         icon = Icons.Filled.Key,
         iconAccent = cs.primary,
-        title = "API Key",
-        subtitle = if (config.apiKey.isBlank()) "未设置" else "已设置",
+        title = apiKeyTitle,
+        subtitle = if (config.apiKey.isBlank()) notSetLabel else setLabel,
         onClick = { editingField = "key" }
     )
 
     SettingsRow(
         icon = Icons.Filled.Memory,
         iconAccent = cs.secondary,
-        title = "模型",
-        subtitle = config.model.ifBlank { "未设置" },
+        title = modelTitle,
+        subtitle = config.model.ifBlank { notSetLabel },
         showDivider = config.provider == AiProvider.CUSTOM,
         onClick = {
             if (config.provider == AiProvider.CUSTOM) editingField = "model"
@@ -190,15 +207,15 @@ private fun AiServiceSection(
         SettingsRow(
             icon = Icons.Filled.CurrencyYuan,
             iconAccent = cs.tertiary,
-            title = "输入单价",
-            subtitle = config.customInputPrice.ifBlank { "未设置(不估算费用)" },
+            title = inputPriceTitle,
+            subtitle = config.customInputPrice.ifBlank { priceNotSetLabel },
             onClick = { editingField = "inputPrice" }
         )
         SettingsRow(
             icon = Icons.Filled.CurrencyYuan,
             iconAccent = cs.tertiary,
-            title = "输出单价",
-            subtitle = config.customOutputPrice.ifBlank { "未设置(不估算费用)" },
+            title = outputPriceTitle,
+            subtitle = config.customOutputPrice.ifBlank { priceNotSetLabel },
             showDivider = false,
             onClick = { editingField = "outputPrice" }
         )
@@ -248,9 +265,9 @@ private fun AiServiceSection(
     editingField?.let { field ->
         when (field) {
             "base" -> EditDialog(
-                title = "API 地址",
+                title = apiUrlTitle,
                 initial = config.baseUrl,
-                placeholder = "含版本段,如 https://api.example.com/v1",
+                placeholder = apiUrlPlaceholder,
                 onDismiss = { editingField = null },
                 onConfirm = { v ->
                     scope.launch { configStore.update(config.copy(baseUrl = v)) }
@@ -258,7 +275,7 @@ private fun AiServiceSection(
                 }
             )
             "key" -> EditDialog(
-                title = "API Key",
+                title = apiKeyTitle,
                 initial = config.apiKey,
                 isSecret = true,
                 onDismiss = { editingField = null },
@@ -268,9 +285,9 @@ private fun AiServiceSection(
                 }
             )
             "model" -> EditDialog(
-                title = "模型",
+                title = modelTitle,
                 initial = config.model,
-                placeholder = "模型 ID,如 deepseek-v4-flash",
+                placeholder = modelPlaceholder,
                 keyboardType = KeyboardType.Text,
                 onDismiss = { editingField = null },
                 onConfirm = { v ->
@@ -279,9 +296,9 @@ private fun AiServiceSection(
                 }
             )
             "inputPrice" -> EditDialog(
-                title = "输入单价",
+                title = inputPriceTitle,
                 initial = config.customInputPrice,
-                placeholder = "元 / 百万 token,留空不估算",
+                placeholder = pricePlaceholder,
                 keyboardType = KeyboardType.Decimal,
                 onDismiss = { editingField = null },
                 onConfirm = { v ->
@@ -290,9 +307,9 @@ private fun AiServiceSection(
                 }
             )
             "outputPrice" -> EditDialog(
-                title = "输出单价",
+                title = outputPriceTitle,
                 initial = config.customOutputPrice,
-                placeholder = "元 / 百万 token,留空不估算",
+                placeholder = pricePlaceholder,
                 keyboardType = KeyboardType.Decimal,
                 onDismiss = { editingField = null },
                 onConfirm = { v ->
@@ -319,9 +336,13 @@ private fun AiUsageSection(
     val scope = rememberCoroutineScope()
     var confirmClear by rememberSaveable { mutableStateOf(false) }
 
+    // 文案提前取出:forEach/when 等非 Composable lambda 内不能调 stringResource
+    val context = LocalContext.current
+    val costUnpricedLabel = stringResource(R.string.aiservice_cost_unpriced)
+
     if (entries.isEmpty()) {
         Text(
-            text = "暂无用量记录,AI 调用(如翻译)成功后自动统计",
+            text = stringResource(R.string.aiservice_usage_empty),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp)
@@ -330,8 +351,8 @@ private fun AiUsageSection(
     }
 
     val monthEntries = entries.filter { it.month == AiUsageStore.monthNow() }
-    UsageSummaryRow(title = "本月", entries = monthEntries, config = config, showDivider = true)
-    UsageSummaryRow(title = "累计", entries = entries, config = config, showDivider = true)
+    UsageSummaryRow(title = stringResource(R.string.aiservice_this_month), entries = monthEntries, config = config, showDivider = true)
+    UsageSummaryRow(title = stringResource(R.string.aiservice_total), entries = entries, config = config, showDivider = true)
 
     // 按模型明细(跨月合计)
     entries.groupBy { it.model }.forEach { (model, list) ->
@@ -340,11 +361,17 @@ private fun AiUsageSection(
         val calls = list.sumOf { it.calls }
         val pricing = pricingOf(model, config)
         val costText = pricing?.let { (inP, outP) ->
-            "估算 ${formatCost(prompt / 1e6 * inP + completion / 1e6 * outP)}"
-        } ?: "费用未定价"
+            context.getString(
+                R.string.aiservice_cost_estimated,
+                formatCost(context, prompt / 1e6 * inP + completion / 1e6 * outP)
+            )
+        } ?: costUnpricedLabel
         SettingsRow(
             title = model,
-            subtitle = "输入 ${formatTokens(prompt)} · 输出 ${formatTokens(completion)} · $calls 次 · $costText",
+            subtitle = context.getString(
+                R.string.aiservice_usage_stats,
+                formatTokens(prompt), formatTokens(completion), calls, costText
+            ),
             showDivider = true,
             showChevron = false
         )
@@ -357,29 +384,29 @@ private fun AiUsageSection(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = "费用按官方刊例价估算,仅供参考",
+            text = stringResource(R.string.aiservice_cost_disclaimer),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f)
         )
         TextButton(onClick = { confirmClear = true }) {
-            Text("清空统计", color = MaterialTheme.colorScheme.error)
+            Text(stringResource(R.string.aiservice_clear_stats), color = MaterialTheme.colorScheme.error)
         }
     }
 
     if (confirmClear) {
         AlertDialog(
             onDismissRequest = { confirmClear = false },
-            title = { Text("清空统计") },
-            text = { Text("将删除全部 token 用量与费用记录,不可恢复。") },
+            title = { Text(stringResource(R.string.aiservice_clear_stats)) },
+            text = { Text(stringResource(R.string.aiservice_clear_confirm)) },
             confirmButton = {
                 TextButton(onClick = {
                     scope.launch { usageStore.clear() }
                     confirmClear = false
-                }) { Text("清空", color = MaterialTheme.colorScheme.error) }
+                }) { Text(stringResource(R.string.aiservice_clear), color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                TextButton(onClick = { confirmClear = false }) { Text("取消") }
+                TextButton(onClick = { confirmClear = false }) { Text(stringResource(R.string.common_cancel)) }
             }
         )
     }
@@ -393,8 +420,9 @@ private fun UsageSummaryRow(
     config: AiConfig,
     showDivider: Boolean
 ) {
+    val context = LocalContext.current
     if (entries.isEmpty()) {
-        SettingsRow(title = title, subtitle = "暂无记录", showDivider = showDivider, showChevron = false)
+        SettingsRow(title = title, subtitle = stringResource(R.string.aiservice_no_records), showDivider = showDivider, showChevron = false)
         return
     }
     val prompt = entries.sumOf { it.promptTokens }
@@ -407,10 +435,13 @@ private fun UsageSummaryRow(
         if (pricing == null) hasUnpriced = true
         else cost += e.promptTokens / 1e6 * pricing.first + e.completionTokens / 1e6 * pricing.second
     }
-    val costText = (if (hasUnpriced) "≥" else "") + formatCost(cost)
+    val costText = (if (hasUnpriced) "≥" else "") + formatCost(context, cost)
     SettingsRow(
         title = title,
-        subtitle = "输入 ${formatTokens(prompt)} · 输出 ${formatTokens(completion)} · $calls 次 · $costText",
+        subtitle = stringResource(
+            R.string.aiservice_usage_stats,
+            formatTokens(prompt), formatTokens(completion), calls, costText
+        ),
         showDivider = showDivider,
         showChevron = false
     )
@@ -423,9 +454,10 @@ private fun pricingOf(model: String, config: AiConfig): Pair<Double, Double>? =
 
 private fun formatTokens(n: Long): String = "%,d".format(n)
 
-/** 费用格式化:小额保留 4 位小数(翻译单次费用极低),其余 2 位。 */
-private fun formatCost(cost: Double): String =
-    if (cost in 0.0..0.01) "¥%.4f".format(cost) else "¥%.2f".format(cost)
+/** 费用格式化:小额保留 4 位小数(翻译单次费用极低),其余 2 位;货币格式按 locale 资源。 */
+private fun formatCost(context: Context, cost: Double): String =
+    if (cost in 0.0..0.01) context.getString(R.string.aiservice_cost_fmt_precise, cost)
+    else context.getString(R.string.aiservice_cost_fmt, cost)
 
 /** 单价展示:整数不带小数点(1 而非 1.0)。 */
 private fun formatPrice(d: Double): String =
@@ -438,23 +470,25 @@ private fun ProviderDialog(
     onSelect: (AiProvider) -> Unit,
     onDismiss: () -> Unit
 ) {
+    // 文案提前取出:forEach lambda 内不能调 stringResource
+    val customSubtitle = stringResource(R.string.aiservice_provider_custom_subtitle)
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("服务商") },
+        title = { Text(stringResource(R.string.aiservice_provider)) },
         text = {
             Column {
                 AiProvider.entries.forEach { p ->
                     DialogRadioRow(
                         selected = p == selected,
-                        title = p.label,
-                        subtitle = if (p == AiProvider.CUSTOM) "OpenAI 兼容服务,自填地址与模型" else p.baseUrl,
+                        title = stringResource(p.labelRes),
+                        subtitle = if (p == AiProvider.CUSTOM) customSubtitle else p.baseUrl,
                         onClick = { onSelect(p) }
                     )
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text("关闭") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.aiservice_close)) }
         }
     )
 }
@@ -468,30 +502,32 @@ private fun ModelDialog(
     onCustom: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    // 文案提前取出:forEach lambda 内不能调 stringResource
+    val pricingPattern = stringResource(R.string.aiservice_model_pricing)
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("模型") },
+        title = { Text(stringResource(R.string.aiservice_model)) },
         text = {
             Column {
                 provider.models.forEach { m ->
                     DialogRadioRow(
                         selected = m.id == selected,
                         title = m.id,
-                        subtitle = "输入 ¥${formatPrice(m.inputPricePerMillion)} / 输出 ¥${formatPrice(m.outputPricePerMillion)} 每百万 token",
+                        subtitle = pricingPattern.format(formatPrice(m.inputPricePerMillion), formatPrice(m.outputPricePerMillion)),
                         onClick = { onSelect(m.id) }
                     )
                 }
                 val isCustomName = selected.isNotBlank() && provider.models.none { it.id == selected }
                 DialogRadioRow(
                     selected = isCustomName,
-                    title = "自定义模型名…",
+                    title = stringResource(R.string.aiservice_custom_model_name),
                     subtitle = if (isCustomName) selected else null,
                     onClick = onCustom
                 )
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text("关闭") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.aiservice_close)) }
         }
     )
 }
@@ -549,6 +585,10 @@ private fun EditDialog(
     // 故用 LaunchedEffect(title, initial) 在初值变化时同步)
     LaunchedEffect(initial) { text = initial }
 
+    // 文案提前取出:trailingIcon 等 lambda 内不能调 stringResource
+    val hideLabel = stringResource(R.string.aiservice_hide)
+    val showLabel = stringResource(R.string.aiservice_show)
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
@@ -563,7 +603,7 @@ private fun EditDialog(
                 trailingIcon = if (isSecret) {
                     {
                         TextButton(onClick = { visible = !visible }) {
-                            Text(if (visible) "隐藏" else "显示")
+                            Text(if (visible) hideLabel else showLabel)
                         }
                     }
                 } else null,
@@ -575,10 +615,10 @@ private fun EditDialog(
             )
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(text.trim()) }) { Text("保存") }
+            TextButton(onClick = { onConfirm(text.trim()) }) { Text(stringResource(R.string.aiservice_save)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("取消") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
         }
     )
 }

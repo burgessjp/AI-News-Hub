@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  AI 服务页文案(中文全集,默认 locale;英文在 values-en/strings_aiservice.xml)。
+  覆盖:翻译开关、服务商/API 地址/API Key/模型配置、自定义单价、
+  token 用量与费用统计、服务商/模型/编辑/清空对话框。
+  aiservice_cost_fmt_* 是货币格式串(String.format 模式),按 locale 各写各的。
+-->
+<resources>
+    <!-- ===== 页标题 / 区块 ===== -->
+    <string name="aiservice_title">AI 服务</string>
+    <string name="aiservice_usage_section">用量与费用</string>
+
+    <!-- ===== 配置行 ===== -->
+    <string name="aiservice_translate_enabled">启用翻译</string>
+    <string name="aiservice_translate_subtitle">翻译 HackerNews 标题/评论、GitHub Trending、HuggingFace 论文等</string>
+    <string name="aiservice_provider">服务商</string>
+    <string name="aiservice_api_url">API 地址</string>
+    <string name="aiservice_api_key">API Key</string>
+    <string name="aiservice_not_set">未设置</string>
+    <string name="aiservice_set">已设置</string>
+    <string name="aiservice_model">模型</string>
+    <string name="aiservice_input_price">输入单价</string>
+    <string name="aiservice_output_price">输出单价</string>
+    <string name="aiservice_price_not_set">未设置(不估算费用)</string>
+
+    <!-- ===== 编辑对话框占位提示 ===== -->
+    <string name="aiservice_api_url_placeholder">含版本段,如 https://api.example.com/v1</string>
+    <string name="aiservice_model_placeholder">模型 ID,如 deepseek-v4-flash</string>
+    <string name="aiservice_price_placeholder">元 / 百万 token,留空不估算</string>
+
+    <!-- ===== 用量与费用 ===== -->
+    <string name="aiservice_usage_empty">暂无用量记录,AI 调用(如翻译)成功后自动统计</string>
+    <string name="aiservice_this_month">本月</string>
+    <string name="aiservice_total">累计</string>
+    <string name="aiservice_no_records">暂无记录</string>
+    <!-- %1$s=已格式化的费用金额 -->
+    <string name="aiservice_cost_estimated">估算 %1$s</string>
+    <string name="aiservice_cost_unpriced">费用未定价</string>
+    <!-- %1$s=输入 token 数,%2$s=输出 token 数,%3$d=调用次数,%4$s=费用文本 -->
+    <string name="aiservice_usage_stats">输入 %1$s · 输出 %2$s · %3$d 次 · %4$s</string>
+    <string name="aiservice_cost_disclaimer">费用按官方刊例价估算,仅供参考</string>
+    <!-- 货币格式:String.format 模式,小额 4 位小数 / 常规 2 位 -->
+    <string name="aiservice_cost_fmt_precise">¥%1$.4f</string>
+    <string name="aiservice_cost_fmt">¥%1$.2f</string>
+
+    <!-- ===== 清空统计 ===== -->
+    <string name="aiservice_clear_stats">清空统计</string>
+    <string name="aiservice_clear_confirm">将删除全部 token 用量与费用记录,不可恢复。</string>
+    <string name="aiservice_clear">清空</string>
+
+    <!-- ===== 服务商 / 模型对话框 ===== -->
+    <string name="aiservice_provider_custom_subtitle">OpenAI 兼容服务,自填地址与模型</string>
+    <string name="aiservice_close">关闭</string>
+    <!-- %1$s=输入单价,%2$s=输出单价(每百万 token) -->
+    <string name="aiservice_model_pricing">输入 ¥%1$s / 输出 ¥%2$s 每百万 token</string>
+    <string name="aiservice_custom_model_name">自定义模型名…</string>
+
+    <!-- ===== 通用按钮 ===== -->
+    <string name="aiservice_hide">隐藏</string>
+    <string name="aiservice_show">显示</string>
+    <string name="aiservice_save">保存</string>
+</resources>

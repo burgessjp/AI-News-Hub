@@ -20,8 +20,17 @@
 - **不引入 Retrofit / Gson / Moshi**：网络一律 `OkHttpClient`，JSON 用内置 `org.json`，HTML 抓取用 jsoup。`OkHttpClient` 统一经 `data/HttpClients.kt` 的共享 base 派生（`base` 或 `base.newBuilder()`），不各自 `OkHttpClient.Builder().build()`。
 - **不用 Navigation Compose**（见下「导航」），**无 DI 框架**：Repository 在 ViewModel / Composable 内直接构造。
 - 字号一律 `AppText.xxx`、透明度一律 `AppAlpha.xxx`、圆角一律 `MaterialTheme.shapes` 或 `CircleShape`、颜色只走 `colorScheme`——不散落 `.sp`/`.alpha`/hex 字面量（源品牌色集中在 `ui/more/SourceBrandColors.kt` 是唯一例外）。列表排名/统计/章节条/骨架屏统一复用 `ui/components/` 现有组件，不新建私有拷贝。
+- **UI 文案一律走 string 资源，不写硬编码字面量**：`values/` 为中文全集（默认 locale），`values-en/` 为英文，新 feature 必须同步双语。Composable 用 `stringResource()`；VM / 小组件等非 Composable 场景用 `context.localized().getString()`（见下「国际化」）。术语表与 `common_*`/`error_*`/`time_*`/`date_fmt_*` 共用条集中在 `values/strings_common.xml`（头注释含术语表），复用不新造。
 - 协程 + Flow：`StateFlow` 驱动 UI，`collectAsStateWithLifecycle` 订阅；网络在 Repository 内切 `Dispatchers.IO`；并发去重用 `Mutex.withLock`。
 - release 开启 R8 + shrinkResources；`com.peng.ainewshub.data.**` 已全部保留（`app/proguard-rules.pro`），新增需反射/序列化保留的类时同步补规则。
+
+## 国际化（i18n）
+
+- `values/` 为中文全集（默认 locale），`values-en/` 为英文；两档语言，资源按 feature 分文件（`strings_common.xml` 为共用条 + 术语表，其余 `strings_<feature>.xml`）。
+- **应用内语言切换**：设置页「语言」三选项（跟随系统 / 简体中文 / English），持久化于 `display_prefs` 的 `language` 键（`AppLanguage` 枚举按 name 存取）。机制单点为 `ui/i18n/AppLocale.kt`：两个 Activity `attachBaseContext` 包裹 + 切换后 `recreate()` 生效；「跟随系统」时含 Android 13+ 系统 per-app locale（manifest `android:localeConfig`）。语言选择内存缓存，冷启动仅 attachBaseContext 时阻塞读一次 DataStore。
+- VM 错误文案经 `toUiError(getApplication<Application>().localized())` 取词；**已知取舍**：切换语言经 recreate 生效但 ViewModel 存活，切换瞬间已处于 Error/翻译错误态的文案保持旧语言，重试/刷新即更新。
+- 桌面小组件无 attachBaseContext，取词用 `AppLocale.wrap(context)` 后的 context。
+- **流水线内容（AI 摘要 / 总览 / 各源正文）始终为中文**，不随界面语言变化——英文版仅覆盖 App 界面文案。
 
 ## 导航（MainActivity.kt，自实现多栈）
 
@@ -49,7 +58,7 @@
 
 ## 持久化
 
-- DataStore：`display_prefs`（主题 / 动态取色 / 字体族 / 字号档位 / 源模式 / 搜索历史 / 信息源顺序 `source_order`）、`ai_prefs`（全局 AI 服务配置 + 按「模型 × 月」聚合的 token 用量）。
+- DataStore：`display_prefs`（主题 / 动态取色 / 字体族 / 字号档位 / 源模式 / 应用内语言 `language` / 搜索历史 / 信息源顺序 `source_order`）、`ai_prefs`（全局 AI 服务配置 + 按「模型 × 月」聚合的 token 用量）。
 - Room（`ainewshub.db`，version 1，`fallbackToDestructiveMigration`）：仅浏览历史。
 - HN 列表缓存、翻译缓存为 `cacheDir` 下 JSON 文件。
 - 桌面小组件缓存为 SharedPreferences `hot_now_widget`（今日热点列表 JSON + 时间戳，KB 级，`CacheManager` 不涉及）。

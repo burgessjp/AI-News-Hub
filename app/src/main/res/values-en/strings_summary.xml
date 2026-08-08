@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- English translations. Terminology: 摘要 Digest (see values/strings_common.xml header). -->
+<resources>
+    <!-- ===== Digest tab root ===== -->
+    <string name="summary_title">AI Digest</string>
+    <string name="summary_daily_hint">Daily AI picks</string>
+
+    <!-- ===== Single source digest page (header / error state) ===== -->
+    <string name="summary_data_moment">Data as of %1$s</string>
+    <string name="summary_time_unknown">Unknown</string>
+    <string name="summary_view_full_list">View full list</string>
+    <string name="summary_not_generated_yet">Today\'s digest hasn\'t been generated yet</string>
+    <string name="summary_error_title">Couldn\'t load the digest</string>
+
+    <!-- ===== Digest history ===== -->
+    <string name="summary_archive_title">Digest History</string>
+    <string name="summary_archive_load_failed">Failed to load digest history</string>
+    <string name="summary_archive_empty_title">No digest history yet</string>
+    <string name="summary_archive_empty_subtitle">Updated daily at 07:00 / 15:00 (Beijing time)\nHistory accumulates since the feature launched (last 31 days)</string>
+    <plurals name="summary_sources_with_digest">
+        <item quantity="one">%1$d source has a digest for this day</item>
+        <item quantity="other">%1$d sources have digests for this day</item>
+    </plurals>
+    <string name="summary_date_title">Digest for %1$s</string>
+    <string name="summary_date_hint">AI picks of the day</string>
+</resources>

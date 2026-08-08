@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  共用文案(中文全集,默认 locale;英文在 values-en/strings_common.xml)。
+
+  术语表(各 feature 翻译统一遵守):
+    总览 Overview / 摘要 Digest / 更多 More / 今日热点 Hot Now / 突发 Breaking /
+    AI 日报 AI Daily / 信息源 Sources / 浏览历史 History / 阅读模式 Reader Mode /
+    归档 Archive / 设置 Settings / 翻译 Translate / 评论 Comments
+
+  约定:
+  - 新增 UI 文案一律先进资源,不在代码里写字面量;中文进 values/,英文进 values-en/。
+  - 带变量的串用位置占位符(%1$d / %2$s);英文有单复数的用 plurals(中文只写 other)。
+  - date_fmt_* 是 SimpleDateFormat 模式串,按 locale 各写各的。
+-->
+<resources>
+    <!-- ===== 通用动作/状态 ===== -->
+    <string name="common_back">返回</string>
+    <string name="common_retry">重试</string>
+    <string name="common_cancel">取消</string>
+    <string name="common_ok">确定</string>
+    <string name="common_loading">加载中…</string>
+    <string name="common_load_failed">加载失败</string>
+    <string name="common_refresh">刷新</string>
+    <string name="common_refresh_hint">下拉或点下方按钮刷新看看</string>
+    <string name="common_refresh_once">刷新一下</string>
+    <string name="common_empty">暂无内容</string>
+    <string name="common_empty_today">今日暂无内容</string>
+    <string name="common_no_result">未找到相关内容</string>
+    <string name="common_share">分享</string>
+    <string name="common_go_settings">去设置</string>
+    <string name="common_back_to_top">返回顶部</string>
+    <string name="common_all_loaded">已加载全部</string>
+    <string name="common_translate_config_missing">请先在 设置 → 翻译 中配置翻译服务</string>
+
+    <!-- ===== 错误文案(UiState.toUiError 按 ErrorKind 取词) ===== -->
+    <string name="error_no_data">今日内容尚未更新,请稍后再试</string>
+    <string name="error_network">网络异常,请检查连接后重试</string>
+    <string name="error_server">服务暂不可用,请稍后重试</string>
+    <string name="error_ai_service">AI 服务暂时不可用,请稍后重试</string>
+    <string name="error_rate_limited">访问受限,请稍后重试</string>
+    <string name="error_unknown">加载失败,请稍后重试</string>
+    <string name="error_too_short">内容过短</string>
+
+    <!-- ===== 相对时间 / 星期 ===== -->
+    <string name="time_just_now">刚刚</string>
+    <plurals name="time_minutes_ago">
+        <item quantity="other">%1$d 分钟前</item>
+    </plurals>
+    <plurals name="time_hours_ago">
+        <item quantity="other">%1$d 小时前</item>
+    </plurals>
+    <plurals name="time_days_ago">
+        <item quantity="other">%1$d 天前</item>
+    </plurals>
+    <!-- 无空格紧凑变体(NewsCard 等沿用旧样式) -->
+    <plurals name="time_minutes_ago_compact">
+        <item quantity="other">%1$d分钟前</item>
+    </plurals>
+    <plurals name="time_hours_ago_compact">
+        <item quantity="other">%1$d小时前</item>
+    </plurals>
+    <plurals name="time_days_ago_compact">
+        <item quantity="other">%1$d天前</item>
+    </plurals>
+    <string name="time_today">今天</string>
+    <string name="time_yesterday">昨天</string>
+    <string name="time_day_before_yesterday">前天</string>
+    <!-- 周一~周日(SimpleDateFormat "E" 中文会出「星期一」,故保留手工表) -->
+    <string-array name="weekdays">
+        <item>周一</item>
+        <item>周二</item>
+        <item>周三</item>
+        <item>周四</item>
+        <item>周五</item>
+        <item>周六</item>
+        <item>周日</item>
+    </string-array>
+
+    <!-- ===== 日期格式模式(SimpleDateFormat) ===== -->
+    <string name="date_fmt_month_day">M月d日</string>
+    <string name="date_fmt_month_day_week">M月d日 · E</string>
+    <string name="date_fmt_month_day_time">M月d日 HH:mm</string>
+    <string name="date_fmt_full">yyyy-MM-dd</string>
+    <string name="date_fmt_month_day_dash">MM-dd</string>
+    <string name="date_fmt_month_day_time_dash">MM-dd HH:mm</string>
+
+    <!-- ===== 语言设置 ===== -->
+    <string name="settings_language">语言</string>
+    <string name="language_follow_system">跟随系统</string>
+    <string name="language_zh">简体中文</string>
+    <string name="language_en">English</string>
+
+    <!-- ===== 枚举展示名 ===== -->
+    <string name="source_mode_live">实时抓取</string>
+    <string name="source_mode_archive">Gitcode 归档</string>
+    <string name="provider_deepseek">DeepSeek</string>
+    <string name="provider_zhipu_glm">智谱 GLM</string>
+    <string name="provider_custom">自定义</string>
+    <string name="category_model">模型</string>
+    <string name="category_product">产品</string>
+    <string name="category_industry">行业</string>
+    <string name="category_paper">论文</string>
+    <string name="category_tips">技巧与观点</string>
+
+    <!-- ===== 8 源标题/副标题(SourceMeta 与 SummaryRepository.titleOf 共用) ===== -->
+    <string name="source_title_hackernews">HackerNews</string>
+    <string name="source_title_github_trending">GitHub Trending</string>
+    <string name="source_title_openai_anthropic">OpenAI x Anthropic</string>
+    <string name="source_title_huggingface">HuggingFace Paper Trending</string>
+    <string name="source_title_producthunt">Product Hunt</string>
+    <string name="source_title_rundown">The Rundown AI</string>
+    <string name="source_title_aihot_featured">AIHot 精选</string>
+    <string name="source_title_stormzhang">stormzhang AI 资讯</string>
+    <string name="source_subtitle_hackernews">HackerNews 热门榜单</string>
+    <string name="source_subtitle_github_trending">GitHub 热门仓库</string>
+    <string name="source_subtitle_openai_anthropic">OpenAI + Anthropic 厂商动态</string>
+    <string name="source_subtitle_huggingface">热门 AI 论文榜单</string>
+    <string name="source_subtitle_producthunt">每日新产品榜单</string>
+    <string name="source_subtitle_rundown">AI 日更 newsletter</string>
+    <string name="source_subtitle_aihot_featured">自家 AI 资讯精选</string>
+    <string name="source_subtitle_stormzhang">每日 AI 资讯聚合</string>
+
+    <!-- 系统选中翻译 Activity 标签(出现在系统选中菜单) -->
+    <string name="translate_label">译</string>
+</resources>

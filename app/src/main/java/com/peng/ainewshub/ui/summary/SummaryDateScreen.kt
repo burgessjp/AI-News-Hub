@@ -19,9 +19,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.peng.ainewshub.R
 import com.peng.ainewshub.data.SummaryRepository
 import com.peng.ainewshub.ui.SummaryArchiveViewModel
 import com.peng.ainewshub.ui.UiState
@@ -61,11 +63,11 @@ fun SummaryDateScreen(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             AppTopBar(
-                title = "$date 摘要",
+                title = stringResource(R.string.summary_date_title, date),
                 titleFontSize = AppTopBarDefaults.secondaryTitleFontSize,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 }
             )
@@ -79,7 +81,7 @@ fun SummaryDateScreen(
             SummaryHeaderRow(
                 currentPage = pagerState.currentPage,
                 pageCount = cards.size,
-                hint = "当日 AI 精选",
+                hint = stringResource(R.string.summary_date_hint),
                 onDotClick = { i -> scope.launch { pagerState.animateScrollToPage(i) } }
             )
             HorizontalPager(

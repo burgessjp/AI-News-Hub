@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Overview tab strings (English). Terminology: see values/strings_common.xml header. -->
+<resources>
+    <string name="overview_refresh_desc">Regenerate</string>
+    <string name="overview_loading">Loading today\'s overview…</string>
+    <string name="overview_no_data_title">Today\'s overview isn\'t ready yet</string>
+    <string name="overview_no_data_subtitle">Today\'s content is still being prepared. Check back later</string>
+    <string name="overview_load_failed">Failed to load overview</string>
+    <string name="overview_breaking_tag">Breaking</string>
+    <string name="overview_breaking_reason_label">Why it\'s breaking</string>
+
+    <string name="overview_generated_at">Generated at %1$s</string>
+    <string name="overview_data_until">Data as of %1$s</string>
+    <plurals name="overview_based_on_sources">
+        <item quantity="one">Based on today\'s content from %1$d source</item>
+        <item quantity="other">Based on today\'s content from %1$d sources</item>
+    </plurals>
+    <string name="overview_missing_sources">missing %1$s</string>
+    <string name="overview_list_separator">, </string>
+    <string name="overview_time_unknown">unknown</string>
+
+    <string name="overview_error_parse">Failed to parse data, please try again later</string>
+    <string name="overview_error_load_failed">Failed to load the overview, please try again later</string>
+</resources>

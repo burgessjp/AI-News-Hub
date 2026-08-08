@@ -20,8 +20,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.peng.ainewshub.R
 import com.peng.ainewshub.ui.components.AppTopBar
 import com.peng.ainewshub.ui.components.AppTopBarDefaults
 import kotlinx.coroutines.launch
@@ -79,12 +81,12 @@ fun SourcesScreen(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             AppTopBar(
-                title = "信息源",
-                subtitle = "长按拖动可调整顺序",
+                title = stringResource(R.string.sources_title),
+                subtitle = stringResource(R.string.sources_drag_hint),
                 titleFontSize = AppTopBarDefaults.secondaryTitleFontSize,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 }
             )

@@ -48,6 +48,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import coil.compose.AsyncImage
+import androidx.compose.ui.res.stringResource
+import com.peng.ainewshub.R
 import com.peng.ainewshub.data.AiConfig
 import com.peng.ainewshub.data.RundownAiArticle
 import com.peng.ainewshub.data.source.SourceMode
@@ -100,14 +102,17 @@ fun RundownAiScreen(
     val translationStates by vm.translationStates.collectAsStateWithLifecycle()
     val config by vm.configFlow.collectAsStateWithLifecycle(initialValue = AiConfig())
     val snackbarHostState = remember { SnackbarHostState() }
+    // Snackbar 文案须在组合期取词:LaunchedEffect 块不是 Composable 环境,只能捕获提前取好的串
+    val translateConfigMissingMsg = stringResource(R.string.common_translate_config_missing)
+    val goSettingsLabel = stringResource(R.string.common_go_settings)
 
     // 配置未就绪提示:点「译」后若 state 变成 CONFIG_MISSING,弹一次引导
     LaunchedEffect(translationStates) {
         translationStates.values.firstOrNull { it is TranslationState.Error && it.message == TranslationState.CONFIG_MISSING }
             ?.let {
                 val r = snackbarHostState.showSnackbar(
-                    message = "请先在 设置 → 翻译 中配置翻译服务",
-                    actionLabel = "去设置"
+                    message = translateConfigMissingMsg,
+                    actionLabel = goSettingsLabel
                 )
                 if (r == SnackbarResult.ActionPerformed) onOpenSettings()
             }
@@ -124,7 +129,7 @@ fun RundownAiScreen(
                     IconButton(onClick = onBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "返回"
+                            contentDescription = stringResource(R.string.common_back)
                         )
                     }
                 },
@@ -145,10 +150,10 @@ fun RundownAiScreen(
                     val articles = s.data
                     if (articles.isEmpty()) {
                         EmptyState(
-                            title = "暂无内容",
-                            subtitle = "下拉或点下方按钮刷新看看",
+                            title = stringResource(R.string.common_empty),
+                            subtitle = stringResource(R.string.common_refresh_hint),
                             icon = Icons.Outlined.Inventory2,
-                            actionLabel = "刷新一下",
+                            actionLabel = stringResource(R.string.common_refresh_once),
                             onAction = { vm.forceRefresh() }
                         )
                     } else {

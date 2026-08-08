@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- English translations for the AI Service screen. Terminology: see values/strings_common.xml header. -->
+<resources>
+    <!-- ===== Page title / sections ===== -->
+    <string name="aiservice_title">AI Service</string>
+    <string name="aiservice_usage_section">Usage &amp; Cost</string>
+
+    <!-- ===== Config rows ===== -->
+    <string name="aiservice_translate_enabled">Enable translation</string>
+    <string name="aiservice_translate_subtitle">Translate HackerNews titles/comments, GitHub Trending, HuggingFace papers, and more</string>
+    <string name="aiservice_provider">Provider</string>
+    <string name="aiservice_api_url">API URL</string>
+    <string name="aiservice_api_key">API Key</string>
+    <string name="aiservice_not_set">Not set</string>
+    <string name="aiservice_set">Set</string>
+    <string name="aiservice_model">Model</string>
+    <string name="aiservice_input_price">Input price</string>
+    <string name="aiservice_output_price">Output price</string>
+    <string name="aiservice_price_not_set">Not set (no cost estimate)</string>
+
+    <!-- ===== Edit dialog placeholders ===== -->
+    <string name="aiservice_api_url_placeholder">Include the version path, e.g. https://api.example.com/v1</string>
+    <string name="aiservice_model_placeholder">Model ID, e.g. deepseek-v4-flash</string>
+    <string name="aiservice_price_placeholder">CNY per 1M tokens; leave blank to skip cost estimate</string>
+
+    <!-- ===== Usage & cost ===== -->
+    <string name="aiservice_usage_empty">No usage yet. Successful AI calls (e.g. translation) are tracked automatically</string>
+    <string name="aiservice_this_month">This month</string>
+    <string name="aiservice_total">Total</string>
+    <string name="aiservice_no_records">No records</string>
+    <!-- %1$s = formatted cost amount -->
+    <string name="aiservice_cost_estimated">Est. %1$s</string>
+    <string name="aiservice_cost_unpriced">Cost not priced</string>
+    <!-- %1$s = input tokens, %2$s = output tokens, %3$d = calls, %4$s = cost text -->
+    <string name="aiservice_usage_stats">Input %1$s · Output %2$s · %3$d calls · %4$s</string>
+    <string name="aiservice_cost_disclaimer">Costs are estimated from official list prices, for reference only</string>
+    <!-- Currency format: String.format patterns, 4 decimals for tiny amounts / 2 otherwise -->
+    <string name="aiservice_cost_fmt_precise">¥%1$.4f</string>
+    <string name="aiservice_cost_fmt">¥%1$.2f</string>
+
+    <!-- ===== Clear stats ===== -->
+    <string name="aiservice_clear_stats">Clear stats</string>
+    <string name="aiservice_clear_confirm">All token usage and cost records will be deleted and cannot be recovered.</string>
+    <string name="aiservice_clear">Clear</string>
+
+    <!-- ===== Provider / model dialogs ===== -->
+    <string name="aiservice_provider_custom_subtitle">OpenAI-compatible service; set your own URL and model</string>
+    <string name="aiservice_close">Close</string>
+    <!-- %1$s = input price, %2$s = output price (per 1M tokens) -->
+    <string name="aiservice_model_pricing">Input ¥%1$s / Output ¥%2$s per 1M tokens</string>
+    <string name="aiservice_custom_model_name">Custom model name…</string>
+
+    <!-- ===== Common buttons ===== -->
+    <string name="aiservice_hide">Hide</string>
+    <string name="aiservice_show">Show</string>
+    <string name="aiservice_save">Save</string>
+</resources>

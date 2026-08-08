@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AI News Hub</string>
+
+    <!-- Bottom navigation tabs -->
+    <string name="tab_overview">Overview</string>
+    <string name="tab_summary">Digest</string>
+    <string name="tab_more">More</string>
+
+    <!-- Home-screen widget (picker name / description) -->
+    <string name="widget_hot_now_name">Hot Now</string>
+    <string name="widget_hot_now_desc">Today\'s top AI stories, tap to read the original</string>
+</resources>

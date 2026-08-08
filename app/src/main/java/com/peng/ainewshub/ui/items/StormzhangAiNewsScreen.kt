@@ -40,6 +40,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.ui.res.stringResource
+import com.peng.ainewshub.R
 import com.peng.ainewshub.data.StormzhangAiNews
 import com.peng.ainewshub.ui.EmptyState
 import com.peng.ainewshub.ui.ErrorState
@@ -89,13 +91,13 @@ fun StormzhangAiNewsScreen(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             AppTopBar(
-                title = "stormzhang AI 资讯",
+                title = stringResource(R.string.source_title_stormzhang),
                 titleFontSize = AppTopBarDefaults.secondaryTitleFontSize,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "返回"
+                            contentDescription = stringResource(R.string.common_back)
                         )
                     }
                 },
@@ -125,10 +127,10 @@ fun StormzhangAiNewsScreen(
                     if (news.isEmpty()) {
                         // 数据缺失空态(归档快照为空/实时无条目):给刷新恢复路径
                         EmptyState(
-                            title = "暂无内容",
-                            subtitle = "下拉或点下方按钮刷新看看",
+                            title = stringResource(R.string.common_empty),
+                            subtitle = stringResource(R.string.common_refresh_hint),
                             icon = Icons.Outlined.Inventory2,
-                            actionLabel = "刷新一下",
+                            actionLabel = stringResource(R.string.common_refresh_once),
                             onAction = { vm.forceRefresh() }
                         )
                     } else {

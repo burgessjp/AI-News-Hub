@@ -1,5 +1,6 @@
 package com.peng.ainewshub.ui.more
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -8,7 +9,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CleaningServices
-import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -21,13 +21,14 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import com.peng.ainewshub.R
 import com.peng.ainewshub.data.CacheManager
 import com.peng.ainewshub.data.source.SourceMode
 import com.peng.ainewshub.ui.components.AppTopBar
@@ -35,14 +36,15 @@ import com.peng.ainewshub.ui.components.AppTopBarDefaults
 import com.peng.ainewshub.ui.components.SegmentedOptionRow
 import com.peng.ainewshub.ui.components.SectionHeader
 import com.peng.ainewshub.ui.components.SettingsRow
+import com.peng.ainewshub.ui.i18n.AppLanguage
 
 /**
  * 主题模式 —— 由 [com.peng.ainewshub.AiNewsHubApp] 持有,设置页通过回调修改。
  */
-enum class ThemeMode(val label: String) {
-    System("跟随系统"),
-    Light("亮色"),
-    Dark("暗色")
+enum class ThemeMode(@StringRes val labelRes: Int) {
+    System(R.string.settings_theme_system),
+    Light(R.string.settings_theme_light),
+    Dark(R.string.settings_theme_dark)
 }
 
 /**
@@ -53,10 +55,10 @@ enum class ThemeMode(val label: String) {
  *  - Serif:  衬线体(阅读向)
  *  - Mono:   等宽体(代码/技术向)
  */
-enum class FontChoice(val label: String, val fontFamily: FontFamily) {
-    System("默认", FontFamily.SansSerif),
-    Serif("衬线", FontFamily.Serif),
-    Mono("等宽", FontFamily.Monospace)
+enum class FontChoice(@StringRes val labelRes: Int, val fontFamily: FontFamily) {
+    System(R.string.settings_font_default, FontFamily.SansSerif),
+    Serif(R.string.settings_font_serif, FontFamily.Serif),
+    Mono(R.string.settings_font_mono, FontFamily.Monospace)
 }
 
 /**
@@ -65,10 +67,10 @@ enum class FontChoice(val label: String, val fontFamily: FontFamily) {
  * 只缩放 AppText 档位的 fontSize/lineHeight;MD3 typography 不动,
  * 避免 TopAppBar/Chip 等组件内部布局错位。
  */
-enum class FontScale(val label: String, val scale: Float) {
-    Compact("紧凑", 0.9f),
-    Standard("标准", 1.0f),
-    Large("大号", 1.15f)
+enum class FontScale(@StringRes val labelRes: Int, val scale: Float) {
+    Compact(R.string.settings_font_scale_compact, 0.9f),
+    Standard(R.string.settings_font_scale_standard, 1.0f),
+    Large(R.string.settings_font_scale_large, 1.15f)
 }
 
 /**
@@ -79,7 +81,7 @@ enum class FontScale(val label: String, val scale: Float) {
  *  - 外观:主题模式三选一(系统/亮/暗)+ 动态取色开关(Material You,Android 12+)
  *  - 字体:字体族三选一(默认/衬线/等宽)+ 字号三档(紧凑/标准/大号)
  *  - 数据源:Hub 4 源从实时抓取还是 gitcode 归档取数,横向二段式
- *  - 语言:占位项(当前仅简体中文)
+ *  - 语言:跟随系统 / 简体中文 / English,切换后 Activity 重建生效(见 ui/i18n/AppLocale)
  *  - 缓存:一键清理网页缓存/Cookie/图片缓存/浏览历史/搜索历史等可恢复数据
  *
  * AI 服务配置与用量统计已拆到独立二级页 [AiServiceScreen](「更多」→「AI 服务」入口)。
@@ -97,24 +99,26 @@ fun SettingsScreen(
     onSelectFontScale: (FontScale) -> Unit,
     sourceMode: SourceMode,
     onSelectSource: (SourceMode) -> Unit,
+    language: AppLanguage,
+    onSelectLanguage: (AppLanguage) -> Unit,
     cacheSizeBytes: Long,
     onClearCache: () -> Unit,
     onBack: () -> Unit
 ) {
-    val themeOptions = remember { ThemeMode.entries.map { it.label } }
-    val fontOptions = remember { FontChoice.entries.map { it.label } }
-    val fontScaleOptions = remember { FontScale.entries.map { it.label } }
-    val sourceOptions = remember { SourceMode.entries.map { it.label } }
+    val themeOptions = ThemeMode.entries.map { stringResource(it.labelRes) }
+    val fontOptions = FontChoice.entries.map { stringResource(it.labelRes) }
+    val fontScaleOptions = FontScale.entries.map { stringResource(it.labelRes) }
+    val sourceOptions = SourceMode.entries.map { stringResource(it.labelRes) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             AppTopBar(
-                title = "设置",
+                title = stringResource(R.string.settings_title),
                 titleFontSize = AppTopBarDefaults.secondaryTitleFontSize,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 }
             )
@@ -125,7 +129,7 @@ fun SettingsScreen(
             contentPadding = PaddingValues(bottom = 24.dp)
         ) {
             // 外观 section —— 主题三段式(轨道式)+ 动态取色开关
-            item { SectionHeader("外观") }
+            item { SectionHeader(stringResource(R.string.settings_section_appearance)) }
             item {
                 SegmentedOptionRow(
                     options = themeOptions,
@@ -140,8 +144,8 @@ fun SettingsScreen(
                 SettingsRow(
                     icon = Icons.Filled.Palette,
                     iconAccent = MaterialTheme.colorScheme.secondary,
-                    title = "动态取色",
-                    subtitle = if (dynamicSupported) "跟随壁纸生成配色,覆盖品牌色" else "需 Android 12 及以上",
+                    title = stringResource(R.string.settings_dynamic_color),
+                    subtitle = if (dynamicSupported) stringResource(R.string.settings_dynamic_color_subtitle) else stringResource(R.string.settings_dynamic_color_unsupported),
                     showDivider = false,
                     trailing = {
                         Switch(
@@ -155,9 +159,9 @@ fun SettingsScreen(
             }
 
             // 字体 section —— 字体族 + 字号两组轨道式选择器,各带小节标签
-            item { SectionHeader("字体") }
+            item { SectionHeader(stringResource(R.string.settings_section_font)) }
             item {
-                GroupLabel("字体族")
+                GroupLabel(stringResource(R.string.settings_font_family))
                 SegmentedOptionRow(
                     options = fontOptions,
                     selectedIndex = fontChoice.ordinal,
@@ -166,7 +170,7 @@ fun SettingsScreen(
                 )
             }
             item {
-                GroupLabel("字号")
+                GroupLabel(stringResource(R.string.settings_font_scale))
                 SegmentedOptionRow(
                     options = fontScaleOptions,
                     selectedIndex = fontScale.ordinal,
@@ -178,7 +182,7 @@ fun SettingsScreen(
             // 数据源 section —— Hub 4 个稳定源从实时抓取还是 gitcode 归档取数
             // 实时:直连第三方站点(默认,数据最新);归档:读 gitcode 历史快照(稳定不受反爬影响)
             // 切换后下拉刷新即用新源,无需重进页面(ViewModel 订阅 prefsFlow 动态选 repo)。
-            item { SectionHeader("数据源") }
+            item { SectionHeader(stringResource(R.string.settings_section_data_source)) }
             item {
                 SegmentedOptionRow(
                     options = sourceOptions,
@@ -188,27 +192,26 @@ fun SettingsScreen(
                 )
             }
 
-            // 语言 section(占位)
-            item { SectionHeader("语言") }
+            // 语言 section —— 跟随系统 / 简体中文 / English,切换后 Activity 重建生效
+            item { SectionHeader(stringResource(R.string.settings_language)) }
             item {
-                SettingsRow(
-                    icon = Icons.Filled.Language,
-                    iconAccent = MaterialTheme.colorScheme.primary,
-                    title = "简体中文",
-                    showDivider = false,
-                    trailing = {
-                        Text(
-                            text = "仅",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    },
-                    showChevron = false
+                val languageOptions = AppLanguage.entries.map {
+                    when (it) {
+                        AppLanguage.SYSTEM -> stringResource(R.string.language_follow_system)
+                        AppLanguage.ZH_CN -> stringResource(R.string.language_zh)
+                        AppLanguage.EN -> stringResource(R.string.language_en)
+                    }
+                }
+                SegmentedOptionRow(
+                    options = languageOptions,
+                    selectedIndex = language.ordinal,
+                    onSelect = { idx -> onSelectLanguage(AppLanguage.entries[idx]) },
+                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 6.dp)
                 )
             }
 
             // 数据清理 section —— 一键清理已加载的网页/图片/浏览历史/搜索历史等可恢复数据
-            item { SectionHeader("数据清理") }
+            item { SectionHeader(stringResource(R.string.settings_section_data_cleanup)) }
             item {
                 CacheSection(cacheSizeBytes = cacheSizeBytes, onClearCache = onClearCache)
             }
@@ -240,8 +243,8 @@ private fun CacheSection(cacheSizeBytes: Long, onClearCache: () -> Unit) {
     SettingsRow(
         icon = Icons.Filled.CleaningServices,
         iconAccent = MaterialTheme.colorScheme.primary,
-        title = "清理浏览数据",
-        subtitle = "当前占用 ${CacheManager.formatSize(cacheSizeBytes)}",
+        title = stringResource(R.string.settings_clear_data_title),
+        subtitle = stringResource(R.string.settings_clear_data_subtitle, CacheManager.formatSize(cacheSizeBytes)),
         showDivider = false,
         showChevron = false,
         onClick = { confirmClear = true }
@@ -249,18 +252,18 @@ private fun CacheSection(cacheSizeBytes: Long, onClearCache: () -> Unit) {
     if (confirmClear) {
         AlertDialog(
             onDismissRequest = { confirmClear = false },
-            title = { Text("清理浏览数据") },
+            title = { Text(stringResource(R.string.settings_clear_data_title)) },
             text = {
-                Text("将清理已加载的网页、图片、浏览历史与搜索历史等可恢复数据,不影响你的设置和 AI 配置。")
+                Text(stringResource(R.string.settings_clear_data_message))
             },
             confirmButton = {
                 TextButton(onClick = {
                     onClearCache()
                     confirmClear = false
-                }) { Text("清理", color = MaterialTheme.colorScheme.error) }
+                }) { Text(stringResource(R.string.settings_clear_action), color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                TextButton(onClick = { confirmClear = false }) { Text("取消") }
+                TextButton(onClick = { confirmClear = false }) { Text(stringResource(R.string.common_cancel)) }
             }
         )
     }

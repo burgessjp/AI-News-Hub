@@ -21,9 +21,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.peng.ainewshub.R
 import com.peng.ainewshub.ui.theme.AppAlpha
 
 /**
@@ -86,7 +88,7 @@ fun EmptyState(
 fun ErrorState(
     message: String,
     onRetry: () -> Unit,
-    title: String = "加载失败",
+    title: String = stringResource(R.string.common_load_failed),
     icon: ImageVector = Icons.Outlined.CloudOff,
     modifier: Modifier = Modifier
 ) {
@@ -108,7 +110,7 @@ fun ErrorState(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
-            StateActionButton(label = "重试", onClick = onRetry)
+            StateActionButton(label = stringResource(R.string.common_retry), onClick = onRetry)
         }
     }
 }

@@ -33,8 +33,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.peng.ainewshub.R
 import com.peng.ainewshub.ui.components.AppTopBar
 import com.peng.ainewshub.ui.components.BottomBarReservedHeight
 import com.peng.ainewshub.ui.components.BrandWordmark
@@ -91,21 +94,25 @@ fun MoreScreen(
                 IconTileRow(
                     icon = Icons.Filled.Hub,
                     iconColor = IconAccent.Primary,
-                    title = "信息源",
-                    subtitle = "${DEFAULT_SOURCE_ORDER.size} 个 AI 资讯源聚合",
+                    title = stringResource(R.string.sources_title),
+                    subtitle = pluralStringResource(
+                        R.plurals.more_sources_subtitle,
+                        DEFAULT_SOURCE_ORDER.size,
+                        DEFAULT_SOURCE_ORDER.size
+                    ),
                     showDivider = false,
                     onClick = onOpenSources
                 )
             }
 
             // 历史组(tertiary 强调)—— 历史摘要(按日期看各源归档摘要)/ 浏览历史
-            item { SectionHeader("历史", accent = MaterialTheme.colorScheme.tertiary) }
+            item { SectionHeader(stringResource(R.string.more_section_history), accent = MaterialTheme.colorScheme.tertiary) }
             item {
                 IconTileRow(
                     icon = Icons.Filled.CalendarMonth,
                     iconColor = IconAccent.Primary,
-                    title = "历史摘要",
-                    subtitle = "按日期查看各源当日 AI 摘要",
+                    title = stringResource(R.string.more_summary_archive_title),
+                    subtitle = stringResource(R.string.more_summary_archive_subtitle),
                     onClick = onOpenSummaryArchive
                 )
             }
@@ -113,8 +120,8 @@ fun MoreScreen(
                 IconTileRow(
                     icon = Icons.Filled.History,
                     iconColor = IconAccent.Primary,
-                    title = "浏览历史",
-                    subtitle = "打开过的网页",
+                    title = stringResource(R.string.more_browse_history_title),
+                    subtitle = stringResource(R.string.more_browse_history_subtitle),
                     showDivider = false,
                     onClick = onOpenBrowseHistory
                 )
@@ -122,13 +129,13 @@ fun MoreScreen(
 
             // 偏好组(secondary 强调)—— 图标块用浅灰底 + 中性图标,
             // 与浏览组的彩色图标块拉开层次:内容入口彩色、设置项低调
-            item { SectionHeader("偏好", accent = MaterialTheme.colorScheme.secondary) }
+            item { SectionHeader(stringResource(R.string.more_section_preferences), accent = MaterialTheme.colorScheme.secondary) }
             item {
                 IconTileRow(
                     icon = Icons.Filled.SmartToy,
                     iconColor = IconAccent.Neutral,
-                    title = "AI 服务",
-                    subtitle = "服务商、模型、翻译、用量",
+                    title = stringResource(R.string.more_ai_service_title),
+                    subtitle = stringResource(R.string.more_ai_service_subtitle),
                     onClick = onOpenAiService
                 )
             }
@@ -136,8 +143,8 @@ fun MoreScreen(
                 IconTileRow(
                     icon = Icons.Filled.Settings,
                     iconColor = IconAccent.Neutral,
-                    title = "设置",
-                    subtitle = "主题、显示偏好",
+                    title = stringResource(R.string.settings_title),
+                    subtitle = stringResource(R.string.more_settings_subtitle),
                     onClick = onOpenSettings
                 )
             }
@@ -145,8 +152,8 @@ fun MoreScreen(
                 IconTileRow(
                     icon = Icons.Filled.Info,
                     iconColor = IconAccent.Neutral,
-                    title = "关于",
-                    subtitle = "版本、数据源、开源依赖",
+                    title = stringResource(R.string.about_title),
+                    subtitle = stringResource(R.string.more_about_subtitle),
                     showDivider = false,
                     onClick = onOpenAbout
                 )

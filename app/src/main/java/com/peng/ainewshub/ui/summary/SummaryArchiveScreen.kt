@@ -1,5 +1,6 @@
 package com.peng.ainewshub.ui.summary
 
+import android.content.Context
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -27,10 +28,14 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.peng.ainewshub.R
 import com.peng.ainewshub.ui.EmptyState
 import com.peng.ainewshub.ui.ErrorState
 import com.peng.ainewshub.ui.SummaryArchiveViewModel
@@ -38,10 +43,12 @@ import com.peng.ainewshub.ui.UiState
 import com.peng.ainewshub.ui.components.AppTopBar
 import com.peng.ainewshub.ui.components.AppTopBarDefaults
 import com.peng.ainewshub.ui.components.NewsCardSkeletonList
+import com.peng.ainewshub.ui.components.weekdayLabel
 import com.peng.ainewshub.ui.theme.AppText
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
+import java.util.Locale
 
 /**
  * 历史摘要 —— 可选日期列表(index.json `history` 索引:全源日期并集,倒序)。
@@ -68,11 +75,11 @@ fun SummaryArchiveScreen(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             AppTopBar(
-                title = "历史摘要",
+                title = stringResource(R.string.summary_archive_title),
                 titleFontSize = AppTopBarDefaults.secondaryTitleFontSize,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 }
             )
@@ -83,14 +90,14 @@ fun SummaryArchiveScreen(
                 is UiState.Loading -> NewsCardSkeletonList(count = 6)
                 is UiState.Error -> ErrorState(
                     message = s.message,
-                    title = "历史摘要加载失败",
+                    title = stringResource(R.string.summary_archive_load_failed),
                     onRetry = { vm.loadDates() }
                 )
                 is UiState.Success -> {
                     if (s.data.isEmpty()) {
                         EmptyState(
-                            title = "暂无历史摘要",
-                            subtitle = "每天 07:00 / 15:00(北京时间)更新\n历史记录自功能上线起累积(最近 31 天)",
+                            title = stringResource(R.string.summary_archive_empty_title),
+                            subtitle = stringResource(R.string.summary_archive_empty_subtitle),
                             icon = Icons.Outlined.Inventory2
                         )
                     } else {
@@ -132,6 +139,7 @@ fun SummaryArchiveScreen(
 @Composable
 private fun SummaryArchiveRow(date: String, sourceCount: Int, onClick: () -> Unit) {
     val cs = MaterialTheme.colorScheme
+    val context = LocalContext.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -141,13 +149,13 @@ private fun SummaryArchiveRow(date: String, sourceCount: Int, onClick: () -> Uni
         horizontalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         Text(
-            text = dateLabelOf(date),
+            text = dateLabelOf(context, date),
             style = MaterialTheme.typography.labelMedium,
             color = cs.onSurfaceVariant,
             fontWeight = FontWeight.Medium
         )
         Text(
-            text = "$sourceCount 个源有当日摘要",
+            text = pluralStringResource(R.plurals.summary_sources_with_digest, sourceCount, sourceCount),
             style = AppText.bodySmall,
             color = cs.onSurface,
             modifier = Modifier.weight(1f)
@@ -162,29 +170,24 @@ private fun SummaryArchiveRow(date: String, sourceCount: Int, onClick: () -> Uni
 
 /**
  * 日期标签:今天/昨天/前天/M月d日,均带周几(与历史日报列表同规格)。
- * 例:今天 · 周一 / 昨天 · 周日 / 7月4日 · 周六
+ * 例:今天 · 周一 / 昨天 · 周日 / 7月4日 · 周六;取词走 common time_* / date_fmt_month_day / weekdayLabel
  */
-private fun dateLabelOf(date: String): String {
+private fun dateLabelOf(context: Context, date: String): String {
     return runCatching {
         val d = LocalDate.parse(date)
         val today = LocalDate.now()
         val days = ChronoUnit.DAYS.between(d, today)
         val base = when {
-            days == 0L -> "今天"
-            days == 1L -> "昨天"
-            days == 2L -> "前天"
-            else -> d.format(DateTimeFormatter.ofPattern("M月d日"))
+            days == 0L -> context.getString(R.string.time_today)
+            days == 1L -> context.getString(R.string.time_yesterday)
+            days == 2L -> context.getString(R.string.time_day_before_yesterday)
+            else -> d.format(
+                DateTimeFormatter.ofPattern(
+                    context.getString(R.string.date_fmt_month_day),
+                    Locale.getDefault()
+                )
+            )
         }
-        "$base · ${d.dayOfWeek.toChinese()}"
+        "$base · ${weekdayLabel(context, d.dayOfWeek.value)}"
     }.getOrDefault(date)
-}
-
-private fun java.time.DayOfWeek.toChinese(): String = when (this) {
-    java.time.DayOfWeek.MONDAY -> "周一"
-    java.time.DayOfWeek.TUESDAY -> "周二"
-    java.time.DayOfWeek.WEDNESDAY -> "周三"
-    java.time.DayOfWeek.THURSDAY -> "周四"
-    java.time.DayOfWeek.FRIDAY -> "周五"
-    java.time.DayOfWeek.SATURDAY -> "周六"
-    java.time.DayOfWeek.SUNDAY -> "周日"
 }

@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- English translations for the built-in WebView screen. Terminology: see values/strings_common.xml header. -->
+<resources>
+    <!-- ===== Toasts ===== -->
+    <string name="webview_toast_permission_denied">Permission not granted, download canceled</string>
+    <string name="webview_toast_copied">Copied</string>
+    <string name="webview_toast_no_browser">No browser available</string>
+    <string name="webview_toast_reader_extract_failed">Couldn\'t extract the article; this page may not be an article</string>
+    <string name="webview_toast_nothing_to_translate">Nothing to translate</string>
+    <string name="webview_toast_save_image_failed">Couldn\'t save the image</string>
+    <string name="webview_toast_save_image_unsupported">Saving this image isn\'t supported</string>
+    <string name="webview_toast_download_unsupported">This type of link can\'t be downloaded</string>
+    <string name="webview_toast_download_manager_unavailable">Download service unavailable</string>
+    <string name="webview_toast_download_started">Download started: %1$s</string>
+    <string name="webview_toast_download_failed">Download failed, please try again later</string>
+    <string name="webview_toast_saving_file">Saving file…</string>
+    <string name="webview_toast_download_no_data">Download failed: the page didn\'t provide the file data</string>
+    <string name="webview_toast_save_create_failed">Save failed: couldn\'t create the file</string>
+    <string name="webview_toast_saved">Saved: %1$s</string>
+    <string name="webview_toast_save_failed">Save failed, please try again later</string>
+    <string name="webview_toast_no_app_for_link">No app found to open this link</string>
+    <string name="webview_toast_open_link_failed">Couldn\'t open this link</string>
+
+    <!-- ===== More menu (Refresh reuses common_refresh) ===== -->
+    <string name="webview_menu_translate_page">Translate page</string>
+    <string name="webview_menu_copy_link">Copy link</string>
+    <string name="webview_menu_open_browser">Open in browser</string>
+
+    <!-- ===== Load error state ===== -->
+    <string name="webview_error_http">Page failed to load (%1$d)</string>
+    <string name="webview_error_title">Page failed to load</string>
+
+    <!-- ===== Long-press dialog (image/link) ===== -->
+    <string name="webview_dialog_image">Image</string>
+    <string name="webview_dialog_link">Link</string>
+    <string name="webview_action_save_image">Save image</string>
+    <string name="webview_action_copy_image_url">Copy image address</string>
+
+    <!-- ===== Translation sheet ===== -->
+    <string name="webview_translate_sheet_title">Page translation</string>
+    <string name="webview_translate_progress">Translating %1$d/%2$d</string>
+
+    <!-- ===== AI service setup dialog ===== -->
+    <string name="webview_ai_config_title">AI service not set up</string>
+    <string name="webview_ai_config_message">Page translation uses the service configured in Settings → AI Service. Please set up the service and model first.</string>
+
+    <!-- ===== Download/save file names ===== -->
+    <string name="webview_download_image_name">Downloaded image</string>
+    <string name="webview_download_file_name">Downloaded file</string>
+    <string name="webview_download_fallback_name">Downloaded file.bin</string>
+
+    <!-- ===== Bottom bar (Share reuses common_share) ===== -->
+    <string name="webview_bar_back">Back</string>
+    <string name="webview_bar_forward">Forward</string>
+    <string name="webview_bar_reader">Reader Mode</string>
+    <string name="webview_bar_exit_reader">Exit Reader</string>
+</resources>

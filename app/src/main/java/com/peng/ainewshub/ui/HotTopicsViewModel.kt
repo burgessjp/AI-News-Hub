@@ -1,9 +1,12 @@
 package com.peng.ainewshub.ui
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.peng.ainewshub.R
 import com.peng.ainewshub.data.HotTopic
 import com.peng.ainewshub.data.NewsRepository
+import com.peng.ainewshub.ui.i18n.localized
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -15,7 +18,7 @@ import kotlinx.coroutines.launch
  * 独立于 [ItemsViewModel]:热点是精选 tab 顶部的「装饰性」模块,失败/为空时
  * 静默隐藏,不阻塞下方主列表的加载与展示。
  */
-class HotTopicsViewModel : ViewModel() {
+class HotTopicsViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repo = NewsRepository()
 
@@ -32,9 +35,13 @@ class HotTopicsViewModel : ViewModel() {
                 .onSuccess { list ->
                     // 空结果视为「无内容」而非错误:模块整体隐藏。
                     _state.value =
-                        if (list.isEmpty()) UiState.Error("无热点") else UiState.Success(list)
+                        if (list.isEmpty()) {
+                            UiState.Error(getApplication<Application>().localized().getString(R.string.hot_topics_empty))
+                        } else {
+                            UiState.Success(list)
+                        }
                 }
-                .onFailure { _state.value = it.toUiError() }
+                .onFailure { _state.value = it.toUiError(getApplication<Application>().localized()) }
         }
     }
 }

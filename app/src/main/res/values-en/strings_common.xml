@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- English translations. Terminology: see values/strings_common.xml header. -->
+<resources>
+    <!-- ===== Common actions/states ===== -->
+    <string name="common_back">Back</string>
+    <string name="common_retry">Retry</string>
+    <string name="common_cancel">Cancel</string>
+    <string name="common_ok">OK</string>
+    <string name="common_loading">Loading…</string>
+    <string name="common_load_failed">Failed to load</string>
+    <string name="common_refresh">Refresh</string>
+    <string name="common_refresh_hint">Pull down or tap the button below to refresh</string>
+    <string name="common_refresh_once">Refresh</string>
+    <string name="common_empty">No content yet</string>
+    <string name="common_empty_today">Nothing here today</string>
+    <string name="common_no_result">No matching results</string>
+    <string name="common_share">Share</string>
+    <string name="common_go_settings">Open Settings</string>
+    <string name="common_back_to_top">Back to top</string>
+    <string name="common_all_loaded">Everything loaded</string>
+    <string name="common_translate_config_missing">Set up the translation service in Settings → Translate first</string>
+
+    <!-- ===== Error messages (UiState.toUiError by ErrorKind) ===== -->
+    <string name="error_no_data">Today\'s content isn\'t available yet, please try again later</string>
+    <string name="error_network">Network error, check your connection and try again</string>
+    <string name="error_server">Service unavailable, please try again later</string>
+    <string name="error_ai_service">AI service is temporarily unavailable, please try again later</string>
+    <string name="error_rate_limited">Access is limited, please try again later</string>
+    <string name="error_unknown">Failed to load, please try again later</string>
+    <string name="error_too_short">Content too short</string>
+
+    <!-- ===== Relative time / weekdays ===== -->
+    <string name="time_just_now">Just now</string>
+    <plurals name="time_minutes_ago">
+        <item quantity="one">%1$d minute ago</item>
+        <item quantity="other">%1$d minutes ago</item>
+    </plurals>
+    <plurals name="time_hours_ago">
+        <item quantity="one">%1$d hour ago</item>
+        <item quantity="other">%1$d hours ago</item>
+    </plurals>
+    <plurals name="time_days_ago">
+        <item quantity="one">%1$d day ago</item>
+        <item quantity="other">%1$d days ago</item>
+    </plurals>
+    <plurals name="time_minutes_ago_compact">
+        <item quantity="one">%1$d minute ago</item>
+        <item quantity="other">%1$d minutes ago</item>
+    </plurals>
+    <plurals name="time_hours_ago_compact">
+        <item quantity="one">%1$d hour ago</item>
+        <item quantity="other">%1$d hours ago</item>
+    </plurals>
+    <plurals name="time_days_ago_compact">
+        <item quantity="one">%1$d day ago</item>
+        <item quantity="other">%1$d days ago</item>
+    </plurals>
+    <string name="time_today">Today</string>
+    <string name="time_yesterday">Yesterday</string>
+    <string name="time_day_before_yesterday">2 days ago</string>
+    <string-array name="weekdays">
+        <item>Mon</item>
+        <item>Tue</item>
+        <item>Wed</item>
+        <item>Thu</item>
+        <item>Fri</item>
+        <item>Sat</item>
+        <item>Sun</item>
+    </string-array>
+
+    <!-- ===== Date format patterns (SimpleDateFormat) ===== -->
+    <string name="date_fmt_month_day">MMM d</string>
+    <string name="date_fmt_month_day_week">EEE, MMM d</string>
+    <string name="date_fmt_month_day_time">MMM d, HH:mm</string>
+    <string name="date_fmt_full">yyyy-MM-dd</string>
+    <string name="date_fmt_month_day_dash">MM-dd</string>
+    <string name="date_fmt_month_day_time_dash">MM-dd HH:mm</string>
+
+    <!-- ===== Language settings ===== -->
+    <string name="settings_language">Language</string>
+    <string name="language_follow_system">Follow system</string>
+    <string name="language_zh">简体中文</string>
+    <string name="language_en">English</string>
+
+    <!-- ===== Enum display names ===== -->
+    <string name="source_mode_live">Live</string>
+    <string name="source_mode_archive">Gitcode Archive</string>
+    <string name="provider_deepseek">DeepSeek</string>
+    <string name="provider_zhipu_glm">Zhipu GLM</string>
+    <string name="provider_custom">Custom</string>
+    <string name="category_model">Models</string>
+    <string name="category_product">Products</string>
+    <string name="category_industry">Industry</string>
+    <string name="category_paper">Papers</string>
+    <string name="category_tips">Tips &amp; Opinions</string>
+
+    <!-- ===== 8 source titles/subtitles ===== -->
+    <string name="source_title_hackernews">HackerNews</string>
+    <string name="source_title_github_trending">GitHub Trending</string>
+    <string name="source_title_openai_anthropic">OpenAI x Anthropic</string>
+    <string name="source_title_huggingface">HuggingFace Paper Trending</string>
+    <string name="source_title_producthunt">Product Hunt</string>
+    <string name="source_title_rundown">The Rundown AI</string>
+    <string name="source_title_aihot_featured">AIHot Featured</string>
+    <string name="source_title_stormzhang">stormzhang AI News</string>
+    <string name="source_subtitle_hackernews">HackerNews top stories</string>
+    <string name="source_subtitle_github_trending">Trending GitHub repos</string>
+    <string name="source_subtitle_openai_anthropic">OpenAI + Anthropic updates</string>
+    <string name="source_subtitle_huggingface">Trending AI papers</string>
+    <string name="source_subtitle_producthunt">New products, daily</string>
+    <string name="source_subtitle_rundown">Daily AI newsletter</string>
+    <string name="source_subtitle_aihot_featured">AIHot\'s own AI picks</string>
+    <string name="source_subtitle_stormzhang">Daily AI news digest</string>
+
+    <string name="translate_label">Translate</string>
+</resources>

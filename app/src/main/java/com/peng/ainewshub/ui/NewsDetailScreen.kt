@@ -1,4 +1,5 @@
 package com.peng.ainewshub.ui
+import androidx.compose.ui.res.stringResource
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -33,9 +34,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.peng.ainewshub.R
 import com.peng.ainewshub.data.NewsItem
 import com.peng.ainewshub.ui.components.AppTopBar
 import com.peng.ainewshub.ui.components.AppTopBarDefaults
@@ -62,14 +65,17 @@ fun NewsDetailScreen(
     onBack: () -> Unit,
     onOpenUrl: (String, String) -> Unit = { _, _ -> }
 ) {
+    // onClick 是非 Composable 回调,文案提前取出
+    val readerPageLabel = stringResource(R.string.detail_reader_page)
+    val originalLabel = stringResource(R.string.detail_original)
     Scaffold(
         topBar = {
             AppTopBar(
-                title = "详情",
+                title = stringResource(R.string.detail_title),
                 titleFontSize = AppTopBarDefaults.secondaryTitleFontSize,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 }
             )
@@ -122,18 +128,18 @@ fun NewsDetailScreen(
                 if (showPerma) {
                     LinkCard(
                         icon = Icons.AutoMirrored.Filled.MenuBook,
-                        sourceName = "AI HOT 阅读页",
-                        title = "查看中文翻译版(站内无墙)",
-                        onClick = { onOpenUrl(item.permalink, "AI HOT 阅读页") }
+                        sourceName = readerPageLabel,
+                        title = stringResource(R.string.detail_reader_link_title),
+                        onClick = { onOpenUrl(item.permalink, readerPageLabel) }
                     )
                     if (showRaw) Spacer(Modifier.height(10.dp))
                 }
                 if (showRaw) {
                     LinkCard(
                         icon = Icons.AutoMirrored.Filled.Article,
-                        sourceName = item.source.ifBlank { "原文" },
+                        sourceName = item.source.ifBlank { originalLabel },
                         title = item.titleEn?.takeIf { it.isNotBlank() } ?: item.title,
-                        onClick = { onOpenUrl(item.url, item.source.ifBlank { "原文" }) }
+                        onClick = { onOpenUrl(item.url, item.source.ifBlank { originalLabel }) }
                     )
                 }
             }
@@ -150,6 +156,7 @@ fun NewsDetailScreen(
  */
 @Composable
 private fun MetaRow(item: NewsItem) {
+    val context = LocalContext.current
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
@@ -166,11 +173,11 @@ private fun MetaRow(item: NewsItem) {
                     modifier = Modifier.weight(1f, fill = false)
                 )
             }
-            val cat = item.categoryLabel()
+            val cat = item.categoryLabelRes()?.let { stringResource(it) } ?: item.category.orEmpty()
             if (cat.isNotBlank()) {
                 MetaItem(icon = Icons.Outlined.Category, text = cat)
             }
-            val time = relativeTime(item.publishedAt)
+            val time = relativeTime(context, item.publishedAt)
             if (time.isNotBlank()) {
                 MetaItem(icon = Icons.Outlined.Schedule, text = time)
             }
@@ -257,7 +264,7 @@ private fun EnTitleBlock(text: String) {
         Spacer(Modifier.width(10.dp))
         Column {
             Text(
-                text = "原文标题",
+                text = stringResource(R.string.detail_original_title),
                 style = MaterialTheme.typography.labelSmall,
                 color = cs.onSurfaceVariant
             )
@@ -321,7 +328,7 @@ private fun LinkCard(
             Spacer(Modifier.width(8.dp))
             Icon(
                 Icons.AutoMirrored.Filled.ArrowForward,
-                contentDescription = "打开",
+                contentDescription = stringResource(R.string.detail_cd_open),
                 tint = cs.onSurfaceVariant,
                 modifier = Modifier.size(16.dp)
             )

@@ -1,13 +1,16 @@
 package com.peng.ainewshub.ui.components
 
+import android.content.Context
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.peng.ainewshub.R
 import com.peng.ainewshub.data.source.SourceMode
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -37,11 +40,14 @@ fun ListUpdateTimeHeader(
     fetchedAtMillis: Long?
 ) {
     if (fetchedAtMillis == null) return
+    val context = LocalContext.current
     val text = if (sourceMode == SourceMode.ARCHIVE) {
-        val time = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.CHINA).format(Date(fetchedAtMillis))
-        "数据更新时间：$time"
+        val time = SimpleDateFormat(
+            context.getString(R.string.list_update_date_fmt), Locale.getDefault()
+        ).format(Date(fetchedAtMillis))
+        context.getString(R.string.list_update_archive_time, time)
     } else {
-        "上次刷新 ${formatRefreshAgo(fetchedAtMillis)}"
+        context.getString(R.string.list_update_last_refresh, formatRefreshAgo(context, fetchedAtMillis))
     }
     Text(
         text = text,
@@ -61,14 +67,15 @@ fun ListUpdateTimeHeader(
  * 原本各 Hub Screen 各有一份私有拷贝,现集中到此(ListUpdateTimeHeader 实时模式复用)。
  * 仍保留为 public 供顶栏等处按需调用。
  */
-private fun formatRefreshAgo(fetchedAtMillis: Long): String {
+private fun formatRefreshAgo(context: Context, fetchedAtMillis: Long): String {
     val diff = System.currentTimeMillis() - fetchedAtMillis
     val minutes = diff / 60_000L
+    val res = context.resources
     return when {
-        minutes < 1 -> "刚刚"
-        minutes < 60 -> "${minutes} 分钟前"
-        minutes < 60 * 24 -> "${minutes / 60} 小时前"
-        minutes < 60 * 24 * 7 -> "${minutes / (60 * 24)} 天前"
-        else -> SimpleDateFormat("MM-dd HH:mm", Locale.CHINA).format(Date(fetchedAtMillis))
+        minutes < 1 -> context.getString(R.string.time_just_now)
+        minutes < 60 -> minutes.toInt().let { res.getQuantityString(R.plurals.time_minutes_ago, it, it) }
+        minutes < 60 * 24 -> (minutes / 60).toInt().let { res.getQuantityString(R.plurals.time_hours_ago, it, it) }
+        minutes < 60 * 24 * 7 -> (minutes / (60 * 24)).toInt().let { res.getQuantityString(R.plurals.time_days_ago, it, it) }
+        else -> SimpleDateFormat(context.getString(R.string.date_fmt_month_day_time_dash), Locale.getDefault()).format(Date(fetchedAtMillis))
     }
 }

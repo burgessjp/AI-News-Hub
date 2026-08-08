@@ -1,4 +1,6 @@
 package com.peng.ainewshub.ui
+import com.peng.ainewshub.ui.i18n.localized
+import com.peng.ainewshub.R
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
@@ -80,11 +82,11 @@ class StormzhangAiNewsViewModel(application: Application) : AndroidViewModel(app
             runCatching { currentRepo().fetch() }
                 .onSuccess { result ->
                     _state.value =
-                        if (result.news.isEmpty()) UiState.Error("今日暂无内容", ErrorKind.NoData) else UiState.Success(result.news)
+                        if (result.news.isEmpty()) UiState.Error(getApplication<Application>().localized().getString(R.string.common_empty_today), ErrorKind.NoData) else UiState.Success(result.news)
                     _lastRefreshAt.value = result.fetchedAt
                     _pageDate.value = result.pageDate
                 }
-                .onFailure { _state.value = it.toUiError() }
+                .onFailure { _state.value = it.toUiError(getApplication<Application>().localized()) }
         }
     }
 
@@ -102,13 +104,13 @@ class StormzhangAiNewsViewModel(application: Application) : AndroidViewModel(app
             runCatching { currentRepo().forceRefresh() }
                 .onSuccess { result ->
                     _state.value =
-                        if (result.news.isEmpty()) UiState.Error("今日暂无内容", ErrorKind.NoData) else UiState.Success(result.news)
+                        if (result.news.isEmpty()) UiState.Error(getApplication<Application>().localized().getString(R.string.common_empty_today), ErrorKind.NoData) else UiState.Success(result.news)
                     _lastRefreshAt.value = result.fetchedAt
                     _pageDate.value = result.pageDate
                 }
                 .onFailure {
                     if (_state.value !is UiState.Success) {
-                        _state.value = it.toUiError()
+                        _state.value = it.toUiError(getApplication<Application>().localized())
                     }
                 }
             _isRefreshing.value = false

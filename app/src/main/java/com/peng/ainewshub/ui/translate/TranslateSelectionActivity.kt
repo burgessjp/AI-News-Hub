@@ -27,11 +27,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.peng.ainewshub.R
 import com.peng.ainewshub.data.ShortContentException
 import com.peng.ainewshub.data.AiConfigStore
 import com.peng.ainewshub.data.TranslationRepository
+import com.peng.ainewshub.ui.i18n.AppLocale
 import com.peng.ainewshub.ui.toUiError
 import com.peng.ainewshub.ui.theme.AiNewsHubTheme
 import androidx.lifecycle.lifecycleScope
@@ -50,6 +53,11 @@ import kotlinx.coroutines.launch
  */
 class TranslateSelectionActivity : ComponentActivity() {
 
+    /** 应用内语言(设置页「语言」)对本 Activity 生效。 */
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(AppLocale.wrap(newBase))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // 防御:无 EXTRA_PROCESS_TEXT 直接关(理论上不会被无参拉起)
@@ -65,7 +73,7 @@ class TranslateSelectionActivity : ComponentActivity() {
             if (!enabled) {
                 Toast.makeText(
                     this@TranslateSelectionActivity,
-                    "翻译功能未开启",
+                    getString(R.string.translate_not_enabled),
                     Toast.LENGTH_SHORT
                 ).show()
                 finish()
@@ -131,7 +139,7 @@ private fun TranslateSheet(
                 .onFailure { t ->
                     state = TranslateState.Error(
                         if (t is ShortContentException) ErrorKind.TOO_SHORT else ErrorKind.GENERIC,
-                        if (t is ShortContentException) null else t.toUiError().message
+                        if (t is ShortContentException) null else t.toUiError(context).message
                     )
                 }
     }
@@ -175,14 +183,14 @@ private fun LoadingContent() {
         modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
     ) {
         CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-        Text("翻译中…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(stringResource(R.string.translate_in_progress), color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
 @Composable
 private fun SuccessContent(original: String, translated: String) {
     Text(
-        text = "原文",
+        text = stringResource(R.string.translate_original_label),
         style = MaterialTheme.typography.labelMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
@@ -193,7 +201,7 @@ private fun SuccessContent(original: String, translated: String) {
         modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
     )
     Text(
-        text = "译文",
+        text = stringResource(R.string.translate_result_label),
         style = MaterialTheme.typography.labelMedium,
         color = MaterialTheme.colorScheme.primary,
         fontWeight = FontWeight.SemiBold
@@ -213,9 +221,13 @@ private fun ErrorContent(
     onGoSettings: () -> Unit
 ) {
     val (msg, primary) = when (state.kind) {
-        ErrorKind.CONFIG_MISSING -> "翻译服务未配置" to "去设置"
-        ErrorKind.TOO_SHORT -> "内容太短，无需翻译" to null
-        ErrorKind.GENERIC -> "翻译失败${state.message?.let { "：$it" }.orEmpty()}" to "重试"
+        ErrorKind.CONFIG_MISSING ->
+            stringResource(R.string.translate_service_not_configured) to stringResource(R.string.common_go_settings)
+        ErrorKind.TOO_SHORT -> stringResource(R.string.translate_too_short) to null
+        ErrorKind.GENERIC -> (
+            state.message?.let { stringResource(R.string.translate_failed_with_reason, it) }
+                ?: stringResource(R.string.translate_failed)
+            ) to stringResource(R.string.common_retry)
     }
     Text(
         text = msg,

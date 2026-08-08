@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Hot Now home-screen widget + MainActivity strings (English).
+     Terminology: see values/strings_common.xml header. -->
+<resources>
+    <!-- ===== "Hot Now" home-screen widget (picker name/desc: widget_hot_now_* in strings.xml) ===== -->
+    <!-- Header title -->
+    <string name="widget_hot_now_title">AI Hot Now</string>
+    <!-- Breaking capsule -->
+    <string name="widget_breaking">Breaking</string>
+    <!-- Empty state (no cache and fetch failed / not generated today) -->
+    <string name="widget_empty_not_generated">Today\'s Hot Now hasn\'t been generated yet</string>
+    <!-- Empty-state retry capsule button -->
+    <string name="widget_refresh_retry">Refresh to retry</string>
+    <!-- "Data as of" line: %1$s = date (date_fmt_month_day), %2$s = time (HH:mm) -->
+    <string name="widget_data_as_of">%1$s · as of %2$s</string>
+
+    <!-- ===== Browse-history source labels (MainActivity openUrl source, recorded into Room) ===== -->
+    <string name="history_source_daily">AI Daily</string>
+    <string name="history_source_about">About</string>
+</resources>

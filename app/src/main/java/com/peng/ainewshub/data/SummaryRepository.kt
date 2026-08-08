@@ -1,5 +1,8 @@
 package com.peng.ainewshub.data
 
+import android.content.Context
+import androidx.annotation.StringRes
+import com.peng.ainewshub.R
 import org.json.JSONObject
 import com.peng.ainewshub.data.source.ArchiveHttpClient
 
@@ -40,15 +43,15 @@ data class SummaryItem(
  * 写入快照顶层的 `ai_summary_v2` 字段(JSON 数组);历史快照仅有旧 `ai_summary`
  * 纯文本,作回退。这里只保留 key / title 用于 UI 展示与反查。
  */
-private enum class SummarySource(val key: String, val title: String) {
-    HACKERNEWS("hackernews", "HackerNews"),
-    GITHUB_TRENDING("github-trending", "GitHub Trending"),
-    HUGGINGFACE_PAPERS("huggingface-papers", "HuggingFace Papers"),
-    STORMZHANG_AI("stormzhang-ai", "stormzhang AI 资讯"),
-    PRODUCTHUNT("producthunt", "Product Hunt"),
-    RUNDOWN_AI("rundown-ai", "The Rundown AI"),
-    OPENAI_ANTHROPIC_NEWS("openai-anthropic-news", "OpenAI x Anthropic"),
-    AIHOT_FEATURED("aihot-featured", "AIHot 精选");
+private enum class SummarySource(val key: String, @StringRes val titleRes: Int) {
+    HACKERNEWS("hackernews", R.string.source_title_hackernews),
+    GITHUB_TRENDING("github-trending", R.string.source_title_github_trending),
+    HUGGINGFACE_PAPERS("huggingface-papers", R.string.source_title_huggingface),
+    STORMZHANG_AI("stormzhang-ai", R.string.source_title_stormzhang),
+    PRODUCTHUNT("producthunt", R.string.source_title_producthunt),
+    RUNDOWN_AI("rundown-ai", R.string.source_title_rundown),
+    OPENAI_ANTHROPIC_NEWS("openai-anthropic-news", R.string.source_title_openai_anthropic),
+    AIHOT_FEATURED("aihot-featured", R.string.source_title_aihot_featured);
 
     companion object {
         /** 按归档源的 key 反查枚举;未知 key 返回 null。 */
@@ -185,8 +188,8 @@ class SummaryRepository {
             SummarySource.STORMZHANG_AI.key
         )
 
-        /** 源 key → 展示标题。 */
-        fun titleOf(source: String): String =
-            SummarySource.fromKey(source)?.title ?: source
+        /** 源 key → 展示标题(按当前语言取词;未知 key 回退原始 key)。 */
+        fun titleOf(context: Context, source: String): String =
+            SummarySource.fromKey(source)?.let { context.getString(it.titleRes) } ?: source
     }
 }

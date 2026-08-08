@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- English translations for the More area (More / Settings / About / Sources screens).
+     Terminology: see values/strings_common.xml header. -->
+<resources>
+    <!-- ===== More screen ===== -->
+    <plurals name="more_sources_subtitle">
+        <item quantity="one">%1$d AI news source aggregated</item>
+        <item quantity="other">%1$d AI news sources aggregated</item>
+    </plurals>
+    <string name="more_section_history">History</string>
+    <string name="more_summary_archive_title">Digest Archive</string>
+    <string name="more_summary_archive_subtitle">Browse each source\'s daily AI digest by date</string>
+    <string name="more_browse_history_title">Browsing History</string>
+    <string name="more_browse_history_subtitle">Pages you\'ve opened</string>
+    <string name="more_section_preferences">Preferences</string>
+    <string name="more_ai_service_title">AI Service</string>
+    <string name="more_ai_service_subtitle">Providers, models, translation, usage</string>
+    <string name="more_settings_subtitle">Theme and display preferences</string>
+    <string name="more_about_subtitle">Version, data sources, open-source dependencies</string>
+
+    <!-- ===== Settings screen ===== -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_section_appearance">Appearance</string>
+    <string name="settings_theme_system">Follow system</string>
+    <string name="settings_theme_light">Light</string>
+    <string name="settings_theme_dark">Dark</string>
+    <string name="settings_dynamic_color">Dynamic color</string>
+    <string name="settings_dynamic_color_subtitle">Derive colors from your wallpaper, overriding brand colors</string>
+    <string name="settings_dynamic_color_unsupported">Requires Android 12 or later</string>
+    <string name="settings_section_font">Font</string>
+    <string name="settings_font_family">Font family</string>
+    <string name="settings_font_default">Default</string>
+    <string name="settings_font_serif">Serif</string>
+    <string name="settings_font_mono">Mono</string>
+    <string name="settings_font_scale">Font size</string>
+    <string name="settings_font_scale_compact">Compact</string>
+    <string name="settings_font_scale_standard">Standard</string>
+    <string name="settings_font_scale_large">Large</string>
+    <string name="settings_section_data_source">Data Source</string>
+    <string name="settings_section_data_cleanup">Data Cleanup</string>
+    <string name="settings_clear_data_title">Clear browsing data</string>
+    <string name="settings_clear_data_subtitle">Currently using %1$s</string>
+    <string name="settings_clear_data_message">This clears recoverable data such as loaded pages, images, browsing history, and search history. Your settings and AI configuration are not affected.</string>
+    <string name="settings_clear_action">Clear</string>
+
+    <!-- ===== About screen ===== -->
+    <string name="about_title">About</string>
+    <string name="about_slogan">A curated daily AI news aggregator</string>
+    <string name="about_section_data_sources">Data Sources</string>
+    <string name="about_section_project">Project</string>
+    <string name="about_project_source_title">Source Code</string>
+    <string name="about_section_oss">Open-Source Dependencies</string>
+
+    <!-- ===== Sources screen (row title shared with the More screen entry) ===== -->
+    <string name="sources_title">Sources</string>
+    <string name="sources_drag_hint">Long-press and drag to reorder</string>
+</resources>

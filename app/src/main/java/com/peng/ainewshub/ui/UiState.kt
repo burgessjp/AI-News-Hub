@@ -1,6 +1,8 @@
 package com.peng.ainewshub.ui
 
+import android.content.Context
 import android.util.Log
+import com.peng.ainewshub.R
 import com.peng.ainewshub.data.AppException
 import com.peng.ainewshub.data.ShortContentException
 import java.io.IOException
@@ -28,22 +30,23 @@ enum class ErrorKind {
 /**
  * Throwable → [UiState.Error] 统一映射。
  *
- * - 友好文案根据异常类型决定(用户看不到任何技术词);
+ * - 友好文案根据异常类型决定,经 [context] 按当前语言取词(调用方传
+ *   `context.localized()` 或局部化的 Composable context,用户看不到任何技术词);
  * - 原始诊断 message(如 "HTTP 404"、"index.json 无 latest 字段")写进 logcat,
  *   开发者调试不损失信息;
  * - [ShortContentException] 不在本函数处理(走 TOO_SHORT 短路)。
  */
-fun Throwable.toUiError(): UiState.Error {
+fun Throwable.toUiError(context: Context): UiState.Error {
     Log.w("UiError", "原始诊断: ${message ?: "(no message)"}", this)
     return when (this) {
-        is AppException.NoData       -> UiState.Error("今日内容尚未更新,请稍后再试", ErrorKind.NoData)
-        is AppException.Network      -> UiState.Error("网络异常,请检查连接后重试", ErrorKind.Network)
-        is AppException.ServerError  -> UiState.Error("服务暂不可用,请稍后重试", ErrorKind.ServerError)
-        is AppException.AiService    -> UiState.Error("AI 服务暂时不可用,请稍后重试", ErrorKind.AiService)
-        is AppException.RateLimited  -> UiState.Error("访问受限,请稍后重试", ErrorKind.RateLimited)
-        is ShortContentException     -> UiState.Error("内容过短", ErrorKind.Unknown)
+        is AppException.NoData       -> UiState.Error(context.getString(R.string.error_no_data), ErrorKind.NoData)
+        is AppException.Network      -> UiState.Error(context.getString(R.string.error_network), ErrorKind.Network)
+        is AppException.ServerError  -> UiState.Error(context.getString(R.string.error_server), ErrorKind.ServerError)
+        is AppException.AiService    -> UiState.Error(context.getString(R.string.error_ai_service), ErrorKind.AiService)
+        is AppException.RateLimited  -> UiState.Error(context.getString(R.string.error_rate_limited), ErrorKind.RateLimited)
+        is ShortContentException     -> UiState.Error(context.getString(R.string.error_too_short), ErrorKind.Unknown)
         // OkHttp/IO 层抛出的连接失败、超时、SSL 异常等,统一归 Network
-        is IOException               -> UiState.Error("网络异常,请检查连接后重试", ErrorKind.Network)
-        else                         -> UiState.Error("加载失败,请稍后重试", ErrorKind.Unknown)
+        is IOException               -> UiState.Error(context.getString(R.string.error_network), ErrorKind.Network)
+        else                         -> UiState.Error(context.getString(R.string.error_unknown), ErrorKind.Unknown)
     }
 }

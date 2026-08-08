@@ -1,19 +1,22 @@
 package com.peng.ainewshub.data
 
 import android.os.Parcelable
+import androidx.annotation.StringRes
+import com.peng.ainewshub.R
 import kotlinx.parcelize.Parcelize
 import org.json.JSONObject
 
 /**
  * 分类枚举。键名严格对齐官方 API 的 5 个 enum 值
  * (见 /agent 文档:`ai-models / ai-products / industry / paper / tip`)。
+ * 展示名走资源([labelRes]),UI 层 `stringResource(cat.labelRes)`。
  */
-enum class NewsCategory(val api: String, val zh: String) {
-    AI_MODELS("ai-models", "模型"),
-    AI_PRODUCTS("ai-products", "产品"),
-    INDUSTRY("industry", "行业"),
-    PAPER("paper", "论文"),
-    TIP("tip", "技巧与观点");
+enum class NewsCategory(val api: String, @StringRes val labelRes: Int) {
+    AI_MODELS("ai-models", R.string.category_model),
+    AI_PRODUCTS("ai-products", R.string.category_product),
+    INDUSTRY("industry", R.string.category_industry),
+    PAPER("paper", R.string.category_paper),
+    TIP("tip", R.string.category_tips);
 
     companion object {
         fun fromApi(code: String?): NewsCategory? =
@@ -50,8 +53,9 @@ data class NewsItem(
     val score: Int = 0,
     val selected: Boolean = false
 ) : Parcelable {
-    /** 中文分类名;无法识别时回退原始 code。 */
-    fun categoryLabel(): String = NewsCategory.fromApi(category)?.zh ?: category.orEmpty()
+    /** 分类名资源;无法识别时返回 null(UI 层回退原始 code 展示)。 */
+    @StringRes
+    fun categoryLabelRes(): Int? = NewsCategory.fromApi(category)?.labelRes
 
     companion object {
         // optString 在遇到 JSON null 时返回字面字符串 "null"(非空),故需额外 != "null" 过滤,

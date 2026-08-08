@@ -1,12 +1,14 @@
 package com.peng.ainewshub.ui
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.peng.ainewshub.data.Mode
 import com.peng.ainewshub.data.NewsCategory
 import com.peng.ainewshub.data.NewsItem
 import com.peng.ainewshub.data.NewsPage
 import com.peng.ainewshub.data.NewsRepository
+import com.peng.ainewshub.ui.i18n.localized
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,7 +34,7 @@ import kotlinx.coroutines.launch
  *
  * 任一筛选变化 → 自动重新拉首页。分页通过 [loadMore] 触发,基于上次的 cursor。
  */
-class ItemsViewModel : ViewModel() {
+class ItemsViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repo = NewsRepository()
 
@@ -84,7 +86,7 @@ class ItemsViewModel : ViewModel() {
                 _isLoadingMore.value = false
                 runCatching { repo.fetchItems(mode = f.mode, category = f.category, query = f.query) }
                     .onSuccess { page -> applyPage(page, replace = true); emit(UiState.Success(_items.value)) }
-                    .onFailure { emit(it.toUiError()) }
+                    .onFailure { emit(it.toUiError(getApplication<Application>().localized())) }
             }
         }
         // 终态(成功/失败)到达即结束下拉刷新转圈;Loading 不清,避免闪断

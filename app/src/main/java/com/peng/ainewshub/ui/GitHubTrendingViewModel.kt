@@ -1,4 +1,6 @@
 package com.peng.ainewshub.ui
+import com.peng.ainewshub.ui.i18n.localized
+import com.peng.ainewshub.R
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
@@ -99,10 +101,10 @@ class GitHubTrendingViewModel(application: Application) : AndroidViewModel(appli
             runCatching { currentRepo().fetch() }
                 .onSuccess { result ->
                     _state.value =
-                        if (result.repos.isEmpty()) UiState.Error("今日暂无内容", ErrorKind.NoData) else UiState.Success(result.repos)
+                        if (result.repos.isEmpty()) UiState.Error(getApplication<Application>().localized().getString(R.string.common_empty_today), ErrorKind.NoData) else UiState.Success(result.repos)
                     _lastRefreshAt.value = result.fetchedAt
                 }
-                .onFailure { _state.value = it.toUiError() }
+                .onFailure { _state.value = it.toUiError(getApplication<Application>().localized()) }
         }
     }
 
@@ -122,12 +124,12 @@ class GitHubTrendingViewModel(application: Application) : AndroidViewModel(appli
             runCatching { currentRepo().forceRefresh() }
                 .onSuccess { result ->
                     _state.value =
-                        if (result.repos.isEmpty()) UiState.Error("今日暂无内容", ErrorKind.NoData) else UiState.Success(result.repos)
+                        if (result.repos.isEmpty()) UiState.Error(getApplication<Application>().localized().getString(R.string.common_empty_today), ErrorKind.NoData) else UiState.Success(result.repos)
                     _lastRefreshAt.value = result.fetchedAt
                 }
                 .onFailure {
                     if (_state.value !is UiState.Success) {
-                        _state.value = it.toUiError()
+                        _state.value = it.toUiError(getApplication<Application>().localized())
                     }
                 }
             _isRefreshing.value = false
@@ -156,7 +158,7 @@ class GitHubTrendingViewModel(application: Application) : AndroidViewModel(appli
                     if (it is ShortContentException) {
                         TranslationState.Error(TranslationState.TOO_SHORT)
                     } else {
-                        TranslationState.Error(it.toUiError().message)
+                        TranslationState.Error(it.toUiError(getApplication<Application>().localized()).message)
                     }
                 }
             )

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  桌面小组件(HotNowWidget)+ MainActivity 收尾文案。
+  中文全集(默认 locale);英文在 values-en/strings_widget.xml。术语表见 strings_common.xml 头注释。
+-->
+<resources>
+    <!-- ===== 桌面小组件「今日热点」(picker 显示名/描述见 strings.xml 的 widget_hot_now_*) ===== -->
+    <!-- 头部标题 -->
+    <string name="widget_hot_now_title">AI 热点</string>
+    <!-- breaking 实心胶囊 -->
+    <string name="widget_breaking">突发</string>
+    <!-- 空态(无缓存且拉取失败/今日尚未生成) -->
+    <string name="widget_empty_not_generated">今日热点尚未生成</string>
+    <!-- 空态重试胶囊按钮 -->
+    <string name="widget_refresh_retry">刷新重试</string>
+    <!-- 「数据截至」行:%1$s=日期(date_fmt_month_day 格式化),%2$s=时间(HH:mm) -->
+    <string name="widget_data_as_of">%1$s · 截至 %2$s</string>
+
+    <!-- ===== 浏览历史来源标签(MainActivity openUrl 的 source 参数,记录进 Room) ===== -->
+    <string name="history_source_daily">日报</string>
+    <string name="history_source_about">关于</string>
+</resources>

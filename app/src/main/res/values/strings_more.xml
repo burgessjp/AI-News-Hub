@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  「更多」域文案(中文全集,默认 locale;英文在 values-en/strings_more.xml)。
+  覆盖:更多页(MoreScreen)/ 设置页(SettingsScreen)/ 关于页(AboutScreen)/ 信息源页(SourcesScreen)。
+  术语遵守 values/strings_common.xml 头注释术语表;通用条(common_*/error_* 等)复用不重复造。
+-->
+<resources>
+    <!-- ===== 更多页(MoreScreen) ===== -->
+    <plurals name="more_sources_subtitle">
+        <item quantity="other">%1$d 个 AI 资讯源聚合</item>
+    </plurals>
+    <string name="more_section_history">历史</string>
+    <string name="more_summary_archive_title">历史摘要</string>
+    <string name="more_summary_archive_subtitle">按日期查看各源当日 AI 摘要</string>
+    <string name="more_browse_history_title">浏览历史</string>
+    <string name="more_browse_history_subtitle">打开过的网页</string>
+    <string name="more_section_preferences">偏好</string>
+    <string name="more_ai_service_title">AI 服务</string>
+    <string name="more_ai_service_subtitle">服务商、模型、翻译、用量</string>
+    <string name="more_settings_subtitle">主题、显示偏好</string>
+    <string name="more_about_subtitle">版本、数据源、开源依赖</string>
+
+    <!-- ===== 设置页(SettingsScreen) ===== -->
+    <string name="settings_title">设置</string>
+    <string name="settings_section_appearance">外观</string>
+    <string name="settings_theme_system">跟随系统</string>
+    <string name="settings_theme_light">亮色</string>
+    <string name="settings_theme_dark">暗色</string>
+    <string name="settings_dynamic_color">动态取色</string>
+    <string name="settings_dynamic_color_subtitle">跟随壁纸生成配色,覆盖品牌色</string>
+    <string name="settings_dynamic_color_unsupported">需 Android 12 及以上</string>
+    <string name="settings_section_font">字体</string>
+    <string name="settings_font_family">字体族</string>
+    <string name="settings_font_default">默认</string>
+    <string name="settings_font_serif">衬线</string>
+    <string name="settings_font_mono">等宽</string>
+    <string name="settings_font_scale">字号</string>
+    <string name="settings_font_scale_compact">紧凑</string>
+    <string name="settings_font_scale_standard">标准</string>
+    <string name="settings_font_scale_large">大号</string>
+    <string name="settings_section_data_source">数据源</string>
+    <string name="settings_section_data_cleanup">数据清理</string>
+    <string name="settings_clear_data_title">清理浏览数据</string>
+    <string name="settings_clear_data_subtitle">当前占用 %1$s</string>
+    <string name="settings_clear_data_message">将清理已加载的网页、图片、浏览历史与搜索历史等可恢复数据,不影响你的设置和 AI 配置。</string>
+    <string name="settings_clear_action">清理</string>
+
+    <!-- ===== 关于页(AboutScreen) ===== -->
+    <string name="about_title">关于</string>
+    <string name="about_slogan">精选每日 AI 资讯聚合客户端</string>
+    <string name="about_section_data_sources">数据来源</string>
+    <string name="about_section_project">项目</string>
+    <string name="about_project_source_title">项目源码</string>
+    <string name="about_section_oss">开源依赖</string>
+
+    <!-- ===== 信息源页(SourcesScreen,行标题与更多页入口共用 sources_title) ===== -->
+    <string name="sources_title">信息源</string>
+    <string name="sources_drag_hint">长按拖动可调整顺序</string>
+</resources>

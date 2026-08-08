@@ -1,5 +1,6 @@
 package com.peng.ainewshub.ui.summary
 
+import android.content.Context
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
@@ -33,12 +34,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import com.peng.ainewshub.R
 import com.peng.ainewshub.data.SourceSummary
 import com.peng.ainewshub.data.SummaryContent
 import com.peng.ainewshub.data.SummaryItem
@@ -96,7 +100,7 @@ internal fun summaryCardSpecs(
 internal fun SummaryHeaderRow(
     currentPage: Int,
     pageCount: Int,
-    hint: String = "每日 AI 精选",
+    hint: String = stringResource(R.string.summary_daily_hint),
     onDotClick: (Int) -> Unit = {}
 ) {
     val cs = MaterialTheme.colorScheme
@@ -204,6 +208,7 @@ private fun SummaryPageHeader(
 ) {
     val cs = MaterialTheme.colorScheme
     val onOpen = spec.onOpen
+    val context = LocalContext.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -226,7 +231,7 @@ private fun SummaryPageHeader(
         )
         if (state is UiState.Success) {
             Text(
-                text = "数据时刻：${formatFetchedAt(state.data.fetchedAtMs)}",
+                text = stringResource(R.string.summary_data_moment, formatFetchedAt(context, state.data.fetchedAtMs)),
                 style = AppText.caption,
                 color = cs.onSurfaceVariant
             )
@@ -235,7 +240,7 @@ private fun SummaryPageHeader(
             Spacer(Modifier.size(2.dp))
             Icon(
                 Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = "查看完整列表",
+                contentDescription = stringResource(R.string.summary_view_full_list),
                 tint = cs.onSurfaceVariant,
                 modifier = Modifier.size(18.dp)
             )
@@ -440,7 +445,9 @@ private fun SummaryError(
     kind: ErrorKind = ErrorKind.Unknown
 ) {
     // NoData 时显示空态文案;其他 kind 显示错误态文案
-    val title = if (kind == ErrorKind.NoData) "今日摘要尚未生成" else "摘要暂时没加载出来"
+    val title = stringResource(
+        if (kind == ErrorKind.NoData) R.string.summary_not_generated_yet else R.string.summary_error_title
+    )
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -468,15 +475,15 @@ private fun SummaryError(
         )
         Spacer(Modifier.size(8.dp))
         TextButton(onClick = onRetry) {
-            Text("重试", style = AppText.bodySmall, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.common_retry), style = AppText.bodySmall, fontWeight = FontWeight.SemiBold)
         }
     }
 }
 
-/** 把归档 fetchedAtMs 格式化成「M月d日 HH:mm」。 */
-private fun formatFetchedAt(ms: Long): String {
-    if (ms <= 0L) return "未知"
+/** 把归档 fetchedAtMs 格式化成「M月d日 HH:mm」(模式串 date_fmt_month_day_time 随语言)。 */
+private fun formatFetchedAt(context: Context, ms: Long): String {
+    if (ms <= 0L) return context.getString(R.string.summary_time_unknown)
     return runCatching {
-        SimpleDateFormat("M月d日 HH:mm", Locale.CHINA).format(Date(ms))
-    }.getOrDefault("未知")
+        SimpleDateFormat(context.getString(R.string.date_fmt_month_day_time), Locale.getDefault()).format(Date(ms))
+    }.getOrDefault(context.getString(R.string.summary_time_unknown))
 }

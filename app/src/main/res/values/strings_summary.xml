@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  摘要 Tab 文案(中文全集,默认 locale;英文在 values-en/strings_summary.xml)。
+  共用条(common_* / error_* / time_* / date_fmt_* / weekdays / source_title_*)
+  一律复用 strings_common.xml,不在此重复造。
+-->
+<resources>
+    <!-- ===== 摘要 Tab 根屏 ===== -->
+    <string name="summary_title">AI 摘要</string>
+    <!-- 顶部提示行(当日页默认提示) -->
+    <string name="summary_daily_hint">每日 AI 精选</string>
+
+    <!-- ===== 单张源摘要页(扁头 / 错误态) ===== -->
+    <string name="summary_data_moment">数据时刻：%1$s</string>
+    <string name="summary_time_unknown">未知</string>
+    <string name="summary_view_full_list">查看完整列表</string>
+    <string name="summary_not_generated_yet">今日摘要尚未生成</string>
+    <string name="summary_error_title">摘要暂时没加载出来</string>
+
+    <!-- ===== 历史摘要 ===== -->
+    <string name="summary_archive_title">历史摘要</string>
+    <string name="summary_archive_load_failed">历史摘要加载失败</string>
+    <string name="summary_archive_empty_title">暂无历史摘要</string>
+    <string name="summary_archive_empty_subtitle">每天 07:00 / 15:00(北京时间)更新\n历史记录自功能上线起累积(最近 31 天)</string>
+    <plurals name="summary_sources_with_digest">
+        <item quantity="other">%1$d 个源有当日摘要</item>
+    </plurals>
+    <!-- 按日期页:顶栏标题(%1$s = yyyy-MM-dd)与顶部提示行 -->
+    <string name="summary_date_title">%1$s 摘要</string>
+    <string name="summary_date_hint">当日 AI 精选</string>
+</resources>

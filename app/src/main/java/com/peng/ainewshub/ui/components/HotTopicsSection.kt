@@ -20,10 +20,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.peng.ainewshub.R
 import com.peng.ainewshub.data.HotTopic
 import com.peng.ainewshub.ui.HotTopicsViewModel
 import com.peng.ainewshub.ui.UiState
@@ -52,6 +55,8 @@ fun HotTopicsSection(
     vm: HotTopicsViewModel = viewModel(key = "hot-topics")
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
+    // onClick 是非 Composable 回调,文案提前取出
+    val loadingLabel = stringResource(R.string.common_loading)
 
     // 失败(含「无热点」空结果)时静默隐藏,精选列表正常展示。
     val topics = (state as? UiState.Success)?.data ?: return
@@ -70,7 +75,7 @@ fun HotTopicsSection(
                     topic = topic,
                     onClick = {
                         val url = topic.permalink.ifBlank { topic.url }
-                        if (url.isNotBlank()) onOpen(url, topic.title.ifBlank { "加载中…" })
+                        if (url.isNotBlank()) onOpen(url, topic.title.ifBlank { loadingLabel })
                     }
                 )
                 if (index != topics.lastIndex) {
@@ -104,7 +109,7 @@ private fun HotTopicsHeader(count: Int) {
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Text(
-            text = "今日热点",
+            text = stringResource(R.string.hot_topics_title),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
             color = cs.onPrimary
@@ -118,7 +123,7 @@ private fun HotTopicsHeader(count: Int) {
                 .padding(horizontal = 8.dp, vertical = 2.dp)
         ) {
             Text(
-                text = "${count}条",
+                text = pluralStringResource(R.plurals.hot_topics_count, count, count),
                 style = MaterialTheme.typography.labelSmall,
                 color = cs.onPrimary,
                 fontWeight = FontWeight.SemiBold
@@ -169,7 +174,11 @@ private fun HotTopicRow(
                 if (topic.source.isNotBlank()) append(topic.source)
                 if (topic.sourceCount > 1) {
                     if (isNotEmpty()) append(" · ")
-                    append("${topic.sourceCount} 源报道")
+                    append(
+                        pluralStringResource(
+                            R.plurals.hot_topics_source_count, topic.sourceCount, topic.sourceCount
+                        )
+                    )
                 }
             }
             if (meta.isNotEmpty()) {

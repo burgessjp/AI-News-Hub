@@ -1,4 +1,8 @@
 package com.peng.ainewshub.ui.items
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import com.peng.ainewshub.R
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -102,6 +106,7 @@ fun HackerNewsCommentsScreen(
     val config by vm.configFlow.collectAsStateWithLifecycle(initialValue = com.peng.ainewshub.data.AiConfig())
     val titleStates by vm.titleStates.collectAsStateWithLifecycle()
     val snackbarHostState = remember { androidx.compose.material3.SnackbarHostState() }
+    val context = LocalContext.current
 
     // 评论正文 HTML 里的链接(AnnotatedString.fromHtml 的 LinkAnnotation)默认走
     // LocalUriHandler → 外部浏览器,绕过内置 WebView 与浏览历史。这里覆写 handler:
@@ -111,7 +116,7 @@ fun HackerNewsCommentsScreen(
         object : UriHandler {
             override fun openUri(uri: String) {
                 if (uri.startsWith("http://") || uri.startsWith("https://")) {
-                    onOpenUrl(uri, "加载中…")
+                    onOpenUrl(uri, context.getString(R.string.common_loading))
                 } else {
                     defaultUriHandler.openUri(uri)
                 }
@@ -134,8 +139,8 @@ fun HackerNewsCommentsScreen(
         if (titleMissing || commentMissing) {
             configMissingNotified = true
             val r = snackbarHostState.showSnackbar(
-                message = "请先在 设置 → 翻译 中配置翻译服务",
-                actionLabel = "去设置"
+                message = context.getString(R.string.common_translate_config_missing),
+                actionLabel = context.getString(R.string.common_go_settings)
             )
             if (r == androidx.compose.material3.SnackbarResult.ActionPerformed) onOpenSettings()
         }
@@ -146,13 +151,13 @@ fun HackerNewsCommentsScreen(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             AppTopBar(
-                title = "评论",
+                title = stringResource(R.string.hn_comments_title),
                 titleFontSize = AppTopBarDefaults.secondaryTitleFontSize,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "返回"
+                            contentDescription = stringResource(R.string.common_back)
                         )
                     }
                 }
@@ -190,8 +195,8 @@ fun HackerNewsCommentsScreen(
                         if (s.data.isEmpty()) {
                             item(key = "empty") {
                                 EmptyState(
-                                    title = "暂无评论",
-                                    subtitle = "去原文参与讨论",
+                                    title = stringResource(R.string.hn_comments_empty_title),
+                                    subtitle = stringResource(R.string.hn_comments_empty_subtitle),
                                     icon = Icons.AutoMirrored.Filled.Comment
                                 )
                             }
@@ -243,10 +248,12 @@ private fun StoryHeader(
             )
         }
         // meta:赞 · 评论数 · 相对时间(+ 翻译开关开时的「译」按钮内联在末尾)
+        val pointsLabel = pluralStringResource(R.plurals.hn_points, story.score, story.score)
+        val commentsLabel = pluralStringResource(R.plurals.hn_comments, story.descendants, story.descendants)
         val meta = buildString {
-            append("${story.score} 赞")
-            if (story.descendants > 0) append(" · ${story.descendants} 评论")
-            if (story.time > 0L) append(" · ${formatRelativeTime(story.time)}")
+            append(pointsLabel)
+            if (story.descendants > 0) append(" · $commentsLabel")
+            if (story.time > 0L) append(" · ${formatRelativeTime(LocalContext.current, story.time)}")
         }
         if (meta.isNotEmpty() || translateEnabled) {
             Spacer(Modifier.height(8.dp))
@@ -278,10 +285,11 @@ private fun StoryHeader(
         }
         // 查看原文链接行(url 为空时是 Ask HN 等站内帖,展示讨论页)
         Spacer(Modifier.height(14.dp))
+        val loadingLabel = stringResource(R.string.common_loading)
         LinkRow(
             url = story.targetUrl,
-            label = if (story.url.isNotBlank()) "查看原文" else "查看讨论",
-            title = story.title.ifBlank { "加载中…" },
+            label = stringResource(if (story.url.isNotBlank()) R.string.hn_view_original else R.string.hn_view_discussion),
+            title = story.title.ifBlank { loadingLabel },
             onOpenUrl = onOpenUrl
         )
         Spacer(Modifier.height(8.dp))
@@ -294,7 +302,7 @@ private fun StoryHeader(
         )
         Spacer(Modifier.height(10.dp))
         Text(
-            text = "评论",
+            text = stringResource(R.string.hn_comments_title),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
             color = cs.onSurface
@@ -340,7 +348,7 @@ private fun LinkRow(
         }
         Icon(
             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-            contentDescription = "打开",
+            contentDescription = stringResource(R.string.items_open),
             tint = cs.onSurfaceVariant,
             modifier = Modifier.size(16.dp).rotate(180f)
         )
@@ -471,7 +479,7 @@ private fun CommentMeta(
                 )
             }
             Text(
-                text = formatRelativeTime(node.comment.time),
+                text = formatRelativeTime(LocalContext.current, node.comment.time),
                 style = MaterialTheme.typography.labelMedium,
                 color = cs.onSurfaceVariant
             )
@@ -479,7 +487,7 @@ private fun CommentMeta(
         // dead/折叠评论:独立 chip,不再混进作者字符串
         if (node.comment.dead) {
             Spacer(Modifier.width(6.dp))
-            AssistChipPreview(text = "已折叠")
+            AssistChipPreview(text = stringResource(R.string.hn_comment_dead))
         }
         // 「译」按钮内联在时间后(翻译开关开时)
         if (translateState != null) {
@@ -534,10 +542,10 @@ private fun ColumnScope.RepliesToggleButton(
         }
         Text(
             text = when {
-                loading -> "加载中"
-                error != null -> "加载失败,点击重试"
-                expanded -> "收起"
-                else -> "查看 $replyCount 条回复"
+                loading -> stringResource(R.string.hn_replies_loading)
+                error != null -> stringResource(R.string.hn_replies_load_failed)
+                expanded -> stringResource(R.string.hn_replies_collapse)
+                else -> pluralStringResource(R.plurals.hn_view_replies, replyCount, replyCount)
             },
             style = MaterialTheme.typography.labelMedium,
             color = if (error != null) cs.error else cs.onSurfaceVariant

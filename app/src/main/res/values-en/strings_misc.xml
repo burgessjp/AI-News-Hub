@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- English translations. Terminology: see values/strings_common.xml header. -->
+<resources>
+    <!-- ===== Selection translate (system process-text) ===== -->
+    <string name="translate_not_enabled">Translation is not enabled</string>
+    <string name="translate_in_progress">Translating…</string>
+    <string name="translate_original_label">Original</string>
+    <string name="translate_result_label">Translation</string>
+    <string name="translate_service_not_configured">Translation service not set up</string>
+    <string name="translate_too_short">Content too short to translate</string>
+    <string name="translate_failed">Translation failed</string>
+    <string name="translate_failed_with_reason">Translation failed: %1$s</string>
+
+    <!-- ===== News detail ===== -->
+    <string name="detail_title">Details</string>
+    <string name="detail_reader_page">AI HOT Reader</string>
+    <string name="detail_reader_link_title">Read the Chinese translation (hosted on AI HOT)</string>
+    <string name="detail_original">Original</string>
+    <string name="detail_original_title">Original title</string>
+    <string name="detail_cd_open">Open</string>
+
+    <!-- ===== All updates ===== -->
+    <string name="all_tab_title">All Updates</string>
+    <string name="action_search">Search</string>
+
+    <!-- ===== AIHot Featured ===== -->
+    <string name="featured_latest">Latest Featured</string>
+    <string name="featured_all">All ›</string>
+
+    <!-- ===== Hot Now ===== -->
+    <string name="hot_topics_title">Hot Now</string>
+    <plurals name="hot_topics_count">
+        <item quantity="one">%1$d item</item>
+        <item quantity="other">%1$d items</item>
+    </plurals>
+    <plurals name="hot_topics_source_count">
+        <item quantity="one">%1$d source</item>
+        <item quantity="other">%1$d sources</item>
+    </plurals>
+    <string name="hot_topics_empty">No hot topics</string>
+
+    <!-- ===== List data-time banner ===== -->
+    <string name="list_update_archive_time">Data updated: %1$s</string>
+    <string name="list_update_date_fmt">yyyy-MM-dd HH:mm:ss</string>
+    <string name="list_update_last_refresh">Last refreshed %1$s</string>
+
+    <!-- ===== Daily archive entry (contentDescription) ===== -->
+    <string name="archive_history_daily">Daily Archive</string>
+
+    <!-- ===== News card ===== -->
+    <string name="news_card_cd_hot">Popularity</string>
+</resources>

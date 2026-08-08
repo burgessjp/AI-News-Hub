@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- AI 日报文案(中文全集,默认 locale;英文在 values-en/strings_daily.xml)。 -->
+<resources>
+    <!-- 日报页标题 / 顶栏更新节奏说明 -->
+    <string name="daily_title">AI 日报</string>
+    <string name="daily_every_morning">每早八时</string>
+    <!-- 错误态标题(最新日报与指定日期日报共用) -->
+    <string name="daily_load_failed">日报加载失败</string>
+    <!-- 指定日期日报标题;也作日期解析失败的标签回退 -->
+    <string name="daily_date_title">%1$s 日报</string>
+    <!-- 快讯章节标题 -->
+    <string name="daily_flashes">快讯</string>
+
+    <!-- 统计行单位(条目数 / 分类数 / 快讯数 / 预计阅读分钟) -->
+    <string name="daily_stat_items">条</string>
+    <string name="daily_stat_sections">类</string>
+    <string name="daily_stat_flashes">快讯</string>
+    <string name="daily_stat_minutes">分钟</string>
+
+    <!-- 归档列表页 -->
+    <string name="daily_archive_title">历史日报</string>
+    <string name="daily_archive_empty_title">暂无历史日报</string>
+    <string name="daily_archive_empty_subtitle">日报归档还没有内容,稍后再来看看</string>
+</resources>

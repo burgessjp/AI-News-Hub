@@ -50,6 +50,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -57,6 +58,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.peng.ainewshub.R
 import com.peng.ainewshub.data.HotTopic
 import com.peng.ainewshub.data.NewsItem
 import com.peng.ainewshub.data.NewsRepository
@@ -141,8 +143,8 @@ fun SearchScreen(
                 if (searchHistory.isEmpty() && hotTopics.isEmpty()) {
                     // 历史与热词皆空(冷启动 + 热词拉取失败)的兜底引导
                     EmptyState(
-                        title = "搜索 AI 动态",
-                        subtitle = "输入关键词,如「Claude」「OpenAI」「机器人」",
+                        title = stringResource(R.string.search_empty_title),
+                        subtitle = stringResource(R.string.search_empty_subtitle),
                         icon = Icons.Filled.Search
                     )
                 } else {
@@ -157,15 +159,15 @@ fun SearchScreen(
                 is UiState.Loading -> LoadingState()
                 is UiState.Error -> com.peng.ainewshub.ui.ErrorState(
                     message = s.message,
-                    title = "搜索出错了",
+                    title = stringResource(R.string.search_error_title),
                     onRetry = { vm.refresh() }
                 )
                 is UiState.Success -> {
                     if (items.isEmpty()) {
                         // 搜索无结果:SearchOff 图标 + 「换关键词」恢复路径
                         EmptyState(
-                            title = "没有找到相关内容",
-                            subtitle = "换个关键词试试",
+                            title = stringResource(R.string.search_no_result_title),
+                            subtitle = stringResource(R.string.items_try_other_keyword),
                             icon = Icons.Outlined.SearchOff
                         )
                     } else {
@@ -214,11 +216,11 @@ private fun SearchDiscovery(
     ) {
         if (history.isNotEmpty()) {
             SectionHeader(
-                title = "搜索历史",
+                title = stringResource(R.string.search_history_title),
                 trailing = {
                     // 条目少,直接清空,不做二次确认
                     Text(
-                        text = "清空",
+                        text = stringResource(R.string.items_clear),
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.clickable(
@@ -242,7 +244,7 @@ private fun SearchDiscovery(
             }
         }
         if (hotTopics.isNotEmpty()) {
-            SectionHeader(title = "热门")
+            SectionHeader(title = stringResource(R.string.search_hot_title))
             FlowRow(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -308,7 +310,7 @@ private fun SearchTopBar(
         ) {
             Icon(
                 Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "返回",
+                contentDescription = stringResource(R.string.common_back),
                 tint = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier
                     .size(28.dp)
@@ -383,7 +385,7 @@ private fun SearchField(
             decorationBox = { inner ->
                 if (text.isEmpty()) {
                     Text(
-                        text = "搜索 AI 动态…",
+                        text = stringResource(R.string.search_hint),
                         style = MaterialTheme.typography.bodyMedium,
                         color = cs.onSurfaceVariant
                     )
@@ -397,7 +399,7 @@ private fun SearchField(
             Spacer(Modifier.width(6.dp))
             Icon(
                 Icons.Filled.Clear,
-                contentDescription = "清空",
+                contentDescription = stringResource(R.string.items_clear),
                 tint = cs.onSurfaceVariant,
                 modifier = Modifier
                     .size(16.dp)

@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  动态 / 搜索 / 浏览历史 + HackerNews 页文案(中文全集,默认 locale;英文在 values-en/strings_items.xml)。
+  共用动作 / 错误 / 相对时间 / 日期模式串见 strings_common.xml,此处不重复。
+-->
+<resources>
+    <!-- ===== HackerNews 列表 / 评论 ===== -->
+    <!-- 无标题 story 的占位 -->
+    <string name="hn_no_title">(无标题)</string>
+    <!-- 得票数(「N 赞」) -->
+    <plurals name="hn_points">
+        <item quantity="other">%1$d 赞</item>
+    </plurals>
+    <!-- 评论数(「N 评论」) -->
+    <plurals name="hn_comments">
+        <item quantity="other">%1$d 评论</item>
+    </plurals>
+    <!-- 评论页顶栏标题 + 正文区章节标题 -->
+    <string name="hn_comments_title">评论</string>
+    <string name="hn_comments_empty_title">暂无评论</string>
+    <string name="hn_comments_empty_subtitle">去原文参与讨论</string>
+    <!-- story 头部链接行:url 帖「查看原文」,站内帖「查看讨论」 -->
+    <string name="hn_view_original">查看原文</string>
+    <string name="hn_view_discussion">查看讨论</string>
+    <!-- dead 评论的只读标记 -->
+    <string name="hn_comment_dead">已折叠</string>
+    <!-- 「查看回复」按钮三态 + 计数文案 -->
+    <string name="hn_replies_loading">加载中</string>
+    <string name="hn_replies_load_failed">加载失败,点击重试</string>
+    <string name="hn_replies_collapse">收起</string>
+    <plurals name="hn_view_replies">
+        <item quantity="other">查看 %1$d 条回复</item>
+    </plurals>
+
+    <!-- ===== 标题 / 评论翻译按钮(InlineTranslateButton) ===== -->
+    <string name="items_translating">翻译中…</string>
+    <string name="items_show_translation">显示译文</string>
+    <string name="items_hide_translation">收起译文</string>
+    <string name="items_translate_failed_retry">翻译失败,重试</string>
+
+    <!-- ===== 动态列表 ===== -->
+    <!-- 分类 chip「全部」 -->
+    <string name="items_category_all">全部</string>
+    <!-- 非搜索空态副行(common_refresh_hint 的无「下拉」变体) -->
+    <string name="items_refresh_hint_button">点下方按钮刷新看看</string>
+    <!-- 搜索无结果的恢复提示(动态列表与搜索页共用) -->
+    <string name="items_try_other_keyword">换个关键词试试</string>
+    <!-- 链接行箭头图标的无障碍描述 -->
+    <string name="items_open">打开</string>
+    <!-- 「清空」动作(搜索历史 / 浏览历史共用) -->
+    <string name="items_clear">清空</string>
+    <!-- 列表到底提示 -->
+    <string name="items_no_more">没有更多了</string>
+
+    <!-- ===== 搜索 ===== -->
+    <!-- 搜索框占位(带省略号) -->
+    <string name="search_hint">搜索 AI 动态…</string>
+    <!-- 发现区兜底引导(历史与热词皆空时) -->
+    <string name="search_empty_title">搜索 AI 动态</string>
+    <string name="search_empty_subtitle">输入关键词,如「Claude」「OpenAI」「机器人」</string>
+    <string name="search_error_title">搜索出错了</string>
+    <string name="search_no_result_title">没有找到相关内容</string>
+    <string name="search_history_title">搜索历史</string>
+    <string name="search_hot_title">热门</string>
+
+    <!-- ===== 浏览历史 ===== -->
+    <string name="history_title">浏览历史</string>
+    <!-- 左滑删除后的 Snackbar -->
+    <string name="history_deleted">已删除</string>
+    <string name="history_undo">撤销</string>
+    <!-- 清空确认对话框 -->
+    <string name="history_clear_dialog_title">清空浏览历史</string>
+    <plurals name="history_clear_dialog_message">
+        <item quantity="other">将删除全部 %1$d 条记录,此操作不可撤销。</item>
+    </plurals>
+    <!-- 顶栏分组切换按钮(当前按域名分组时显示「时间」,反之显示「域名」) -->
+    <string name="history_group_by_time">时间</string>
+    <string name="history_group_by_host">域名</string>
+    <string name="history_empty_title">还没有浏览记录</string>
+    <string name="history_empty_subtitle">打开过的网页会出现在这里</string>
+    <!-- 左滑删除图标的无障碍描述 -->
+    <string name="history_delete">删除</string>
+</resources>

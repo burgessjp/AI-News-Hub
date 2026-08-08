@@ -1,4 +1,6 @@
 package com.peng.ainewshub.ui
+import com.peng.ainewshub.ui.i18n.localized
+import com.peng.ainewshub.R
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
@@ -47,10 +49,10 @@ class LinuxDoHotViewModel(application: Application) : AndroidViewModel(applicati
             runCatching { repo.fetch() }
                 .onSuccess { result ->
                     _state.value =
-                        if (result.topics.isEmpty()) UiState.Error("今日暂无内容", ErrorKind.NoData) else UiState.Success(result.topics)
+                        if (result.topics.isEmpty()) UiState.Error(getApplication<Application>().localized().getString(R.string.common_empty_today), ErrorKind.NoData) else UiState.Success(result.topics)
                     _lastRefreshAt.value = result.fetchedAt
                 }
-                .onFailure { _state.value = it.toUiError() }
+                .onFailure { _state.value = it.toUiError(getApplication<Application>().localized()) }
         }
     }
 
@@ -68,12 +70,12 @@ class LinuxDoHotViewModel(application: Application) : AndroidViewModel(applicati
             runCatching { repo.forceRefresh() }
                 .onSuccess { result ->
                     _state.value =
-                        if (result.topics.isEmpty()) UiState.Error("今日暂无内容", ErrorKind.NoData) else UiState.Success(result.topics)
+                        if (result.topics.isEmpty()) UiState.Error(getApplication<Application>().localized().getString(R.string.common_empty_today), ErrorKind.NoData) else UiState.Success(result.topics)
                     _lastRefreshAt.value = result.fetchedAt
                 }
                 .onFailure {
                     if (_state.value !is UiState.Success) {
-                        _state.value = it.toUiError()
+                        _state.value = it.toUiError(getApplication<Application>().localized())
                     }
                 }
             _isRefreshing.value = false

@@ -1,4 +1,8 @@
 package com.peng.ainewshub.ui.items
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import com.peng.ainewshub.R
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -99,14 +103,15 @@ fun HackerNewsScreen(
     val titleStates by vm.titleStates.collectAsStateWithLifecycle()
     val config by vm.configFlow.collectAsStateWithLifecycle(initialValue = AiConfig())
     val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
 
     // 配置未就绪提示:点「译」后若 state 变成 CONFIG_MISSING,弹一次引导
     LaunchedEffect(titleStates) {
         titleStates.values.firstOrNull { it is TranslationState.Error && it.message == TranslationState.CONFIG_MISSING }
             ?.let {
                 val r = snackbarHostState.showSnackbar(
-                    message = "请先在 设置 → 翻译 中配置翻译服务",
-                    actionLabel = "去设置"
+                    message = context.getString(R.string.common_translate_config_missing),
+                    actionLabel = context.getString(R.string.common_go_settings)
                 )
                 if (r == SnackbarResult.ActionPerformed) onOpenSettings()
             }
@@ -117,13 +122,13 @@ fun HackerNewsScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             AppTopBar(
-                title = "HackerNews",
+                title = stringResource(R.string.source_title_hackernews),
                 titleFontSize = AppTopBarDefaults.secondaryTitleFontSize,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "返回"
+                            contentDescription = stringResource(R.string.common_back)
                         )
                     }
                 },
@@ -145,10 +150,10 @@ fun HackerNewsScreen(
                     if (stories.isEmpty()) {
                         // 数据缺失空态(归档快照为空/实时无条目):给刷新恢复路径
                         EmptyState(
-                            title = "暂无内容",
-                            subtitle = "下拉或点下方按钮刷新看看",
+                            title = stringResource(R.string.common_empty),
+                            subtitle = stringResource(R.string.common_refresh_hint),
                             icon = Icons.Outlined.Inventory2,
-                            actionLabel = "刷新一下",
+                            actionLabel = stringResource(R.string.common_refresh_once),
                             onAction = { vm.forceRefresh() }
                         )
                     } else {
@@ -256,9 +261,10 @@ private fun HackerNewsRow(
         Column(modifier = Modifier.weight(1f)) {
             // ① 标题 + 内联来源域名 (host) —— HN 原生风,域名 tertiary 色括注在末尾(源识别记忆点)
             val host = storyHost(story)
-            val titleAnnotated = remember(story.title, host, cs.tertiary) {
+            val noTitle = stringResource(R.string.hn_no_title)
+            val titleAnnotated = remember(story.title, host, cs.tertiary, noTitle) {
                 buildAnnotatedString {
-                    append(story.title.ifBlank { "(无标题)" })
+                    append(story.title.ifBlank { noTitle })
                     append("  ")
                     // 域名括注局部 SpanStyle:刻意比 titleCompact(14sp)小一档做弱化,局部样式不抽 token
                     withStyle(SpanStyle(color = cs.tertiary, fontSize = 12.sp)) {
@@ -308,12 +314,14 @@ private fun HackerNewsRow(
                     // 作者与时间之间留一点呼吸间隔(其余项间用 · 分隔)
                     Spacer(Modifier.width(8.dp))
                 }
+                val pointsLabel = pluralStringResource(R.plurals.hn_points, story.score, story.score)
+                val commentsLabel = pluralStringResource(R.plurals.hn_comments, story.descendants, story.descendants)
                 val rest = buildString {
                     if (story.time > 0L) {
-                        append(formatRelativeTime(story.time))
+                        append(formatRelativeTime(LocalContext.current, story.time))
                     }
-                    append(" · ${story.score} 赞")
-                    if (story.descendants > 0) append(" · ${story.descendants} 评论")
+                    append(" · $pointsLabel")
+                    if (story.descendants > 0) append(" · $commentsLabel")
                 }
                 if (rest.isNotEmpty()) {
                     Text(
@@ -349,13 +357,13 @@ internal fun InlineTranslateButton(
 ) {
     val cs = MaterialTheme.colorScheme
     val text = when (state) {
-        TranslationState.Idle -> "译"
-        TranslationState.Loading -> "翻译中…"
-        is TranslationState.Success -> if (collapsed) "显示译文" else "收起译文"
+        TranslationState.Idle -> stringResource(R.string.translate_label)
+        TranslationState.Loading -> stringResource(R.string.items_translating)
+        is TranslationState.Success -> if (collapsed) stringResource(R.string.items_show_translation) else stringResource(R.string.items_hide_translation)
         is TranslationState.Error -> when (state.message) {
-            TranslationState.TOO_SHORT -> "内容过短"
+            TranslationState.TOO_SHORT -> stringResource(R.string.error_too_short)
             TranslationState.CONFIG_MISSING -> return // 由 snackbar 引导,不渲染按钮
-            else -> "翻译失败,重试"
+            else -> stringResource(R.string.items_translate_failed_retry)
         }
     }
     val enabled = state !is TranslationState.Loading

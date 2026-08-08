@@ -1,4 +1,5 @@
 package com.peng.ainewshub.ui
+import com.peng.ainewshub.ui.i18n.localized
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
@@ -79,7 +80,7 @@ class SummaryViewModel(application: Application) : AndroidViewModel(application)
                     val result = summaryRepo.summarize(key)
                     val state: UiState<SourceSummary> = result.fold(
                         onSuccess = { UiState.Success(it) },
-                        onFailure = { it.toUiError() }
+                        onFailure = { it.toUiError(getApplication<Application>().localized()) }
                     )
                     _states.value = _states.value + (key to state)
                 }
@@ -98,7 +99,7 @@ class SummaryViewModel(application: Application) : AndroidViewModel(application)
             val result = summaryRepo.summarize(source)
             val state: UiState<SourceSummary> = result.fold(
                 onSuccess = { UiState.Success(it) },
-                onFailure = { it.toUiError() }
+                onFailure = { it.toUiError(getApplication<Application>().localized()) }
             )
             _states.value = _states.value + (source to state)
         }

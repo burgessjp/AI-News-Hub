@@ -8,12 +8,13 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.peng.ainewshub.data.source.SourceMode
+import com.peng.ainewshub.ui.i18n.AppLanguage
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 /**
- * 显示偏好(主题模式 + 动态取色 + 字体族 + 字号档位 + 数据源模式)持久化;
+ * 显示偏好(主题模式 + 动态取色 + 字体族 + 字号档位 + 数据源模式 + 应用内语言)持久化;
  * 搜索历史([searchHistoryFlow],最近 10 条)同存于此文件,与显示偏好语义轻绑定。
  *
  * 此前 [themeMode] / [fontChoice] 仅靠 rememberSaveable 存内存,App 冷启动
@@ -37,7 +38,8 @@ class SettingsStore(context: Context) {
         val dynamicColor: Boolean = false,
         val fontChoice: FontChoice = FontChoice.System,
         val fontScale: FontScale = FontScale.Standard,
-        val sourceMode: SourceMode = SourceMode.LIVE
+        val sourceMode: SourceMode = SourceMode.LIVE,
+        val language: AppLanguage = AppLanguage.SYSTEM
     )
 
     val prefsFlow: Flow<DisplayPrefs> = dataStore.data.map { p ->
@@ -49,7 +51,9 @@ class SettingsStore(context: Context) {
                 ?: FontChoice.System,
             fontScale = p[KEY_FONT_SCALE]?.let { name -> runCatching { FontScale.valueOf(name) }.getOrNull() }
                 ?: FontScale.Standard,
-            sourceMode = SourceMode.fromStored(p[KEY_SOURCE_MODE])
+            sourceMode = SourceMode.fromStored(p[KEY_SOURCE_MODE]),
+            language = p[KEY_LANGUAGE]?.let { name -> runCatching { AppLanguage.valueOf(name) }.getOrNull() }
+                ?: AppLanguage.SYSTEM
         )
     }
 
@@ -71,6 +75,10 @@ class SettingsStore(context: Context) {
 
     suspend fun updateSourceMode(mode: SourceMode) {
         dataStore.edit { it[KEY_SOURCE_MODE] = mode.name }
+    }
+
+    suspend fun updateLanguage(lang: AppLanguage) {
+        dataStore.edit { it[KEY_LANGUAGE] = lang.name }
     }
 
     // ===== 搜索历史 =====
@@ -155,6 +163,7 @@ class SettingsStore(context: Context) {
         val KEY_FONT = stringPreferencesKey("font_choice")
         val KEY_FONT_SCALE = stringPreferencesKey("font_scale")
         val KEY_SOURCE_MODE = stringPreferencesKey("source_mode")
+        val KEY_LANGUAGE = stringPreferencesKey("language")
         val KEY_SEARCH_HISTORY = stringPreferencesKey("search_history")
         val KEY_SOURCE_ORDER = stringPreferencesKey("source_order")
         const val MAX_SEARCH_HISTORY = 10

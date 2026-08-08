@@ -1,12 +1,14 @@
 package com.peng.ainewshub.data
 
 import android.content.Context
+import androidx.annotation.StringRes
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.peng.ainewshub.R
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
@@ -31,9 +33,9 @@ data class AiModel(
  * - DEEPSEEK / GLM: 内置 baseUrl 与模型列表,模型可从列表选也可自填;
  * - CUSTOM: 完全自定义的 OpenAI 兼容服务,baseUrl 需含版本段(如 `.../v1`)。
  */
-enum class AiProvider(val label: String, val baseUrl: String, val models: List<AiModel>) {
+enum class AiProvider(@StringRes val labelRes: Int, val baseUrl: String, val models: List<AiModel>) {
     DEEPSEEK(
-        "DeepSeek",
+        R.string.provider_deepseek,
         "https://api.deepseek.com/v1",
         listOf(
             AiModel("deepseek-v4-flash", 1.0, 2.0),
@@ -41,7 +43,7 @@ enum class AiProvider(val label: String, val baseUrl: String, val models: List<A
         )
     ),
     GLM(
-        "智谱 GLM",
+        R.string.provider_zhipu_glm,
         "https://open.bigmodel.cn/api/paas/v4",
         listOf(
             AiModel("glm-5.2", 8.0, 28.0),
@@ -49,7 +51,7 @@ enum class AiProvider(val label: String, val baseUrl: String, val models: List<A
             AiModel("glm-4.7", 2.0, 8.0)
         )
     ),
-    CUSTOM("自定义", "", emptyList());
+    CUSTOM(R.string.provider_custom, "", emptyList());
 
     companion object {
         /** 按 baseUrl 域名反查 provider(用于旧翻译配置迁移)。 */

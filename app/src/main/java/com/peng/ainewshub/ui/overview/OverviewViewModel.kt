@@ -4,9 +4,11 @@ import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.peng.ainewshub.R
 import com.peng.ainewshub.data.AppException
 import com.peng.ainewshub.data.OverviewDigest
 import com.peng.ainewshub.data.OverviewRepository
+import com.peng.ainewshub.ui.i18n.localized
 import com.peng.ainewshub.widget.HotNowWidgetUpdater
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -72,12 +74,13 @@ class OverviewViewModel(application: Application) : AndroidViewModel(application
                 },
                 onFailure = { e ->
                     Log.w("UiError", "总览加载失败: ${e.message ?: "(no message)"}", e)
+                    val localized = getApplication<Application>().localized()
                     _state.value = when (e) {
                         is AppException.NoData -> OverviewState.NoData
-                        is AppException.Network -> OverviewState.Error("网络异常,请检查连接后重试")
-                        is AppException.ServerError -> OverviewState.Error("数据解析失败,请稍后重试")
-                        is AppException.RateLimited -> OverviewState.Error("访问受限,请稍后重试")
-                        else -> OverviewState.Error("总览加载失败,请稍后重试")
+                        is AppException.Network -> OverviewState.Error(localized.getString(R.string.error_network))
+                        is AppException.ServerError -> OverviewState.Error(localized.getString(R.string.overview_error_parse))
+                        is AppException.RateLimited -> OverviewState.Error(localized.getString(R.string.error_rate_limited))
+                        else -> OverviewState.Error(localized.getString(R.string.overview_error_load_failed))
                     }
                 }
             )

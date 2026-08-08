@@ -1,5 +1,8 @@
 package com.peng.ainewshub.ui.overview
 
+import android.content.Context
+import androidx.compose.ui.platform.LocalContext
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -45,10 +48,13 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.peng.ainewshub.R
 import com.peng.ainewshub.data.OverviewDigest
 import com.peng.ainewshub.data.OverviewEntry
 import com.peng.ainewshub.data.SummaryRepository
@@ -101,7 +107,8 @@ fun OverviewScreen(
         }
     }
 
-    val dateText = remember { formatToday() }
+    val context = LocalContext.current
+    val dateText = remember { formatToday(context) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
@@ -129,7 +136,7 @@ fun OverviewScreen(
                         IconButton(onClick = { vm.refresh() }, modifier = Modifier.size(32.dp)) {
                             Icon(
                                 Icons.Filled.Refresh,
-                                contentDescription = "重新生成",
+                                contentDescription = stringResource(R.string.overview_refresh_desc),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(18.dp)
                             )
@@ -157,16 +164,16 @@ fun OverviewScreen(
             when (val s = state) {
                 is OverviewState.Loading -> OverviewLoading()
                 is OverviewState.NoData -> EmptyState(
-                    title = "今日总览尚未生成",
-                    subtitle = "今天的内容还在准备中,请稍后再来",
+                    title = stringResource(R.string.overview_no_data_title),
+                    subtitle = stringResource(R.string.overview_no_data_subtitle),
                     icon = Icons.Outlined.HourglassEmpty,
-                    actionLabel = "重试",
+                    actionLabel = stringResource(R.string.common_retry),
                     onAction = { vm.load() }
                 )
                 is OverviewState.Error -> ErrorState(
                     message = s.message,
                     onRetry = { vm.load() },
-                    title = "总览加载失败"
+                    title = stringResource(R.string.overview_load_failed)
                 )
                 is OverviewState.Success -> OverviewContent(
                     digest = s.digest,
@@ -189,7 +196,7 @@ private fun OverviewLoading() {
         CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
         Spacer(Modifier.height(16.dp))
         Text(
-            text = "正在加载今日总览…",
+            text = stringResource(R.string.overview_loading),
             style = AppText.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -202,6 +209,8 @@ private fun OverviewContent(
     listState: LazyListState,
     onOpenUrl: (url: String, title: String, source: String) -> Unit
 ) {
+    // LocalContext.current 只能在 @Composable 上下文取,提前取出供回调内复用
+    val context = LocalContext.current
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
@@ -214,7 +223,7 @@ private fun OverviewContent(
             item(key = "hero-${first.url}", contentType = "hero") {
                 OverviewHero(
                     entry = first,
-                    onClick = { onOpenUrl(first.url, first.title, SummaryRepository.titleOf(first.source)) }
+                    onClick = { onOpenUrl(first.url, first.title, SummaryRepository.titleOf(context, first.source)) }
                 )
             }
         }
@@ -231,7 +240,7 @@ private fun OverviewContent(
                 TopEntryRow(
                     rank = index + 2,
                     entry = entry,
-                    onClick = { onOpenUrl(entry.url, entry.title, SummaryRepository.titleOf(entry.source)) }
+                    onClick = { onOpenUrl(entry.url, entry.title, SummaryRepository.titleOf(context, entry.source)) }
                 )
                 val next = rest.getOrNull(index + 1)
                 if (next != null && entry.breaking == next.breaking) {
@@ -257,7 +266,7 @@ private fun BreakingTag(modifier: Modifier = Modifier) {
             .padding(horizontal = 6.dp, vertical = 2.dp)
     ) {
         Text(
-            text = "Breaking",
+            text = stringResource(R.string.overview_breaking_tag),
             style = AppText.caption,
             fontWeight = FontWeight.Bold,
             color = cs.onTertiary
@@ -312,10 +321,11 @@ private fun OverviewHero(entry: OverviewEntry, onClick: () -> Unit) {
         // 推荐理由面板:onPrimaryOverlay 半透底(与 HotTopicsHeader 计数胶囊同语言)
         if (entry.breaking && entry.breakingReason.isNotBlank()) {
             Spacer(Modifier.height(8.dp))
-            val reason = remember(entry.breakingReason, cs.onPrimary) {
+            val reasonLabel = stringResource(R.string.overview_breaking_reason_label)
+            val reason = remember(entry.breakingReason, cs.onPrimary, reasonLabel) {
                 buildAnnotatedString {
                     withStyle(SpanStyle(color = cs.onPrimary, fontWeight = FontWeight.SemiBold)) {
-                        append("推荐理由 ")
+                        append("$reasonLabel ")
                     }
                     append(entry.breakingReason)
                 }
@@ -356,7 +366,7 @@ private fun OverviewHero(entry: OverviewEntry, onClick: () -> Unit) {
                     .padding(horizontal = 8.dp, vertical = 2.dp)
             ) {
                 Text(
-                    text = SummaryRepository.titleOf(entry.source),
+                    text = SummaryRepository.titleOf(LocalContext.current, entry.source),
                     style = AppText.caption,
                     color = cs.onPrimary,
                     maxLines = 1
@@ -432,10 +442,11 @@ private fun TopEntryRow(
             // 与 comment 语义区分:comment=为什么重要,推荐理由=为什么是突发。
             if (entry.breaking && entry.breakingReason.isNotBlank()) {
                 Spacer(Modifier.height(6.dp))
-                val reason = remember(entry.breakingReason, cs.tertiary) {
+                val reasonLabel = stringResource(R.string.overview_breaking_reason_label)
+                val reason = remember(entry.breakingReason, cs.tertiary, reasonLabel) {
                     buildAnnotatedString {
                         withStyle(SpanStyle(color = cs.tertiary, fontWeight = FontWeight.SemiBold)) {
-                            append("推荐理由 ")
+                            append("$reasonLabel ")
                         }
                         append(entry.breakingReason)
                     }
@@ -461,7 +472,7 @@ private fun TopEntryRow(
             }
             Spacer(Modifier.height(6.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                SourceChip(title = SummaryRepository.titleOf(entry.source))
+                SourceChip(title = SummaryRepository.titleOf(LocalContext.current, entry.source))
                 if (entry.metrics.isNotBlank()) {
                     Spacer(Modifier.size(8.dp))
                     Text(
@@ -507,6 +518,25 @@ private fun SourceChip(title: String) {
 @Composable
 private fun OverviewFooter(digest: OverviewDigest) {
     val cs = MaterialTheme.colorScheme
+    val context = LocalContext.current
+    // 各片段在进 buildString 前算好(stringResource 只能在 @Composable 上下文调)
+    val generatedText = stringResource(R.string.overview_generated_at, formatClock(digest.generatedAt))
+    val fetchedText = if (digest.dataFetchedAt > 0) {
+        stringResource(R.string.overview_data_until, formatFetchedAt(context, digest.dataFetchedAt))
+    } else {
+        null
+    }
+    val sourceCount = SummaryRepository.SOURCE_KEYS.size
+    val basedOnText = pluralStringResource(R.plurals.overview_based_on_sources, sourceCount, sourceCount)
+    val listSeparator = stringResource(R.string.overview_list_separator)
+    val missingText = if (digest.missingSources.isNotEmpty()) {
+        stringResource(
+            R.string.overview_missing_sources,
+            digest.missingSources.joinToString(listSeparator) { SummaryRepository.titleOf(context, it) }
+        )
+    } else {
+        null
+    }
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -515,8 +545,8 @@ private fun OverviewFooter(digest: OverviewDigest) {
     ) {
         Text(
             text = buildString {
-                append("生成于 ${formatClock(digest.generatedAt)}")
-                if (digest.dataFetchedAt > 0) append(" · 数据截至 ${formatFetchedAt(digest.dataFetchedAt)}")
+                append(generatedText)
+                if (fetchedText != null) append(" · $fetchedText")
             },
             style = AppText.caption,
             color = cs.onSurfaceVariant
@@ -524,10 +554,8 @@ private fun OverviewFooter(digest: OverviewDigest) {
         Spacer(Modifier.height(2.dp))
         Text(
             text = buildString {
-                append("基于 ${SummaryRepository.SOURCE_KEYS.size} 源当日内容")
-                if (digest.missingSources.isNotEmpty()) {
-                    append(" · 缺 ${digest.missingSources.joinToString("、") { SummaryRepository.titleOf(it) }}")
-                }
+                append(basedOnText)
+                if (missingText != null) append(" · $missingText")
             },
             style = AppText.caption,
             color = cs.onSurfaceVariant
@@ -535,16 +563,18 @@ private fun OverviewFooter(digest: OverviewDigest) {
     }
 }
 
-/** 今天日期(系统时区),格式「M月d日 · 周x」,与摘要 tab 顶栏日期同规格。 */
-private fun formatToday(): String =
+/** 今天日期(系统时区),中文格式「M月d日 · 周x」,与摘要 tab 顶栏日期同规格;模式串走 date_fmt_month_day_week。 */
+private fun formatToday(context: Context): String =
     runCatching {
-        SimpleDateFormat("M月d日 · E", Locale.CHINA).format(Date())
+        SimpleDateFormat(context.getString(R.string.date_fmt_month_day_week), Locale.getDefault()).format(Date())
     }.getOrDefault("")
 
 /** 生成时刻格式化为「HH:mm」。 */
 private fun formatClock(ms: Long): String =
-    runCatching { SimpleDateFormat("HH:mm", Locale.CHINA).format(Date(ms)) }.getOrDefault("")
+    runCatching { SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(ms)) }.getOrDefault("")
 
-/** 数据时刻格式化为「M月d日 HH:mm」(与摘要卡头同规格)。 */
-private fun formatFetchedAt(ms: Long): String =
-    runCatching { SimpleDateFormat("M月d日 HH:mm", Locale.CHINA).format(Date(ms)) }.getOrDefault("未知")
+/** 数据时刻格式化(中文「M月d日 HH:mm」,与摘要卡头同规格);模式串走 date_fmt_month_day_time。 */
+private fun formatFetchedAt(context: Context, ms: Long): String =
+    runCatching {
+        SimpleDateFormat(context.getString(R.string.date_fmt_month_day_time), Locale.getDefault()).format(Date(ms))
+    }.getOrDefault(context.getString(R.string.overview_time_unknown))

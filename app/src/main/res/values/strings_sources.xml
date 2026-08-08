@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  各信息源屏(ui/items/*Screen + 对应 ViewModel)特有文案。
+  空态/错误态/返回/刷新/翻译配置引导等通用文案一律复用 strings_common.xml 的 common_*,
+  源标题(stormzhang 等)复用 common 的 source_title_*,均不在此重复。
+-->
+<resources>
+    <!-- LinuxDo 热榜(源暂时下线,代码保留):顶栏标题 + 置顶图钉无障碍描述 -->
+    <string name="sources_linuxdo_hot_title">LinuxDo 热榜</string>
+    <string name="sources_linuxdo_pinned">置顶</string>
+</resources>

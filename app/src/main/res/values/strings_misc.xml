@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  杂项文案(中文全集,默认 locale;英文在 values-en/strings_misc.xml)。
+  覆盖:系统选中译(TranslateSelectionActivity)/ 新闻详情 / 全部动态 / AIHot 精选 /
+  今日热点(HotTopicsSection + HotTopicsViewModel)/ 列表数据时间横幅 / 历史日报入口 /
+  新闻卡片。通用动作与相对时间/日期模式复用 strings_common;「AI 日报」复用 daily_title。
+-->
+<resources>
+    <!-- ===== 系统选中译 ===== -->
+    <string name="translate_not_enabled">翻译功能未开启</string>
+    <string name="translate_in_progress">翻译中…</string>
+    <string name="translate_original_label">原文</string>
+    <string name="translate_result_label">译文</string>
+    <string name="translate_service_not_configured">翻译服务未配置</string>
+    <string name="translate_too_short">内容太短，无需翻译</string>
+    <string name="translate_failed">翻译失败</string>
+    <string name="translate_failed_with_reason">翻译失败：%1$s</string>
+
+    <!-- ===== 新闻详情 ===== -->
+    <string name="detail_title">详情</string>
+    <string name="detail_reader_page">AI HOT 阅读页</string>
+    <string name="detail_reader_link_title">查看中文翻译版(站内无墙)</string>
+    <string name="detail_original">原文</string>
+    <string name="detail_original_title">原文标题</string>
+    <string name="detail_cd_open">打开</string>
+
+    <!-- ===== 全部动态 ===== -->
+    <string name="all_tab_title">全部动态</string>
+    <string name="action_search">搜索</string>
+
+    <!-- ===== AIHot 精选 ===== -->
+    <string name="featured_latest">最新精选</string>
+    <string name="featured_all">全部 ›</string>
+
+    <!-- ===== 今日热点 ===== -->
+    <string name="hot_topics_title">今日热点</string>
+    <plurals name="hot_topics_count">
+        <item quantity="other">%1$d条</item>
+    </plurals>
+    <plurals name="hot_topics_source_count">
+        <item quantity="other">%1$d 源报道</item>
+    </plurals>
+    <string name="hot_topics_empty">无热点</string>
+
+    <!-- ===== 列表数据时间横幅 ===== -->
+    <string name="list_update_archive_time">数据更新时间：%1$s</string>
+    <string name="list_update_date_fmt">yyyy-MM-dd HH:mm:ss</string>
+    <string name="list_update_last_refresh">上次刷新 %1$s</string>
+
+    <!-- ===== 历史日报入口(contentDescription) ===== -->
+    <string name="archive_history_daily">历史日报</string>
+
+    <!-- ===== 新闻卡片 ===== -->
+    <string name="news_card_cd_hot">热度</string>
+</resources>

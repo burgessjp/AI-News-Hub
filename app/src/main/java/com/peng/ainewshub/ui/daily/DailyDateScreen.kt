@@ -16,9 +16,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.peng.ainewshub.R
 import com.peng.ainewshub.ui.ErrorState
 import com.peng.ainewshub.ui.LoadingState
 import com.peng.ainewshub.ui.UiState
@@ -47,11 +49,14 @@ fun DailyDateScreen(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             AppTopBar(
-                title = "$date 日报",
+                title = stringResource(R.string.daily_date_title, date),
                 titleFontSize = AppTopBarDefaults.secondaryTitleFontSize,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.common_back)
+                        )
                     }
                 }
             )
@@ -62,7 +67,7 @@ fun DailyDateScreen(
                 is UiState.Loading -> com.peng.ainewshub.ui.components.NewsCardSkeletonList(count = 4)
                 is UiState.Error -> ErrorState(
                     message = s.message,
-                    title = "日报加载失败",
+                    title = stringResource(R.string.daily_load_failed),
                     onRetry = { vm.loadDate(date) }
                 )
                 is UiState.Success -> DailyContent(

@@ -20,9 +20,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.peng.ainewshub.R
 import com.peng.ainewshub.data.Mode
 import com.peng.ainewshub.data.NewsItem
 import com.peng.ainewshub.ui.HotTopicsViewModel
@@ -63,22 +65,23 @@ fun FeaturedTab(
     // 今日热点 ViewModel 提升到本层持有:下拉刷新时与列表联动刷新
     val hotVm: HotTopicsViewModel = viewModel(key = "hot-topics")
 
-    // 实时日期「月日 · 周几」(中文区域格式)
-    val dateText = remember {
-        SimpleDateFormat("M月d日 · E", Locale.CHINA).format(Date())
+    // 实时日期「月日 · 周几」(格式串随界面语言,见 date_fmt_month_day_week)
+    val datePattern = stringResource(R.string.date_fmt_month_day_week)
+    val dateText = remember(datePattern) {
+        SimpleDateFormat(datePattern, Locale.getDefault()).format(Date())
     }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             AppTopBar(
-                title = "AIHot 精选",
+                title = stringResource(R.string.source_title_aihot_featured),
                 titleFontSize = AppTopBarDefaults.secondaryTitleFontSize,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "返回"
+                            contentDescription = stringResource(R.string.common_back)
                         )
                     }
                 },
@@ -119,13 +122,13 @@ fun FeaturedTab(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "最新精选",
+                            text = stringResource(R.string.featured_latest),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "全部 ›",
+                            text = stringResource(R.string.featured_all),
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.clickable { onOpenAll() }

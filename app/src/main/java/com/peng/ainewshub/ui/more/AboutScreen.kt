@@ -33,8 +33,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.peng.ainewshub.R
 import com.peng.ainewshub.ui.components.AppCard
 import com.peng.ainewshub.ui.components.AppTopBar
 import com.peng.ainewshub.ui.components.AppTopBarDefaults
@@ -68,16 +70,18 @@ fun AboutScreen(onBack: () -> Unit, onOpenUrl: (String, String) -> Unit) {
             context.packageManager.getPackageInfo(context.packageName, 0).versionName
         }.getOrNull() ?: "1.0"
     }
+    // 「项目源码」行标题在非 Composable 的 onClick 回调里也要用(onOpenUrl 记录标题),提前取出
+    val projectSourceTitle = stringResource(R.string.about_project_source_title)
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             AppTopBar(
-                title = "关于",
+                title = stringResource(R.string.about_title),
                 titleFontSize = AppTopBarDefaults.secondaryTitleFontSize,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 }
             )
@@ -92,7 +96,7 @@ fun AboutScreen(onBack: () -> Unit, onOpenUrl: (String, String) -> Unit) {
 
             // 数据来源 —— 轻量行(无图标,文字弱化)。顺序固定用 DEFAULT_SOURCE_ORDER,
             // 不跟随用户在「信息源」页的自定义顺序(关于页是 App 静态说明)。
-            item { SectionHeader("数据来源") }
+            item { SectionHeader(stringResource(R.string.about_section_data_sources)) }
             DEFAULT_SOURCE_ORDER.forEachIndexed { idx, key ->
                 item {
                     val src = sourceMeta(key)
@@ -106,18 +110,18 @@ fun AboutScreen(onBack: () -> Unit, onOpenUrl: (String, String) -> Unit) {
             }
 
             // 项目
-            item { SectionHeader("项目") }
+            item { SectionHeader(stringResource(R.string.about_section_project)) }
             item {
                 InfoRow(
-                    title = "项目源码",
+                    title = projectSourceTitle,
                     subtitle = "GitHub · burgessjp/AI-News-Hub",
-                    onClick = { onOpenUrl("https://github.com/burgessjp/AI-News-Hub", "项目源码") },
+                    onClick = { onOpenUrl("https://github.com/burgessjp/AI-News-Hub", projectSourceTitle) },
                     showDivider = false
                 )
             }
 
             // 开源依赖 —— license 用圆角描边 Badge
-            item { SectionHeader("开源依赖") }
+            item { SectionHeader(stringResource(R.string.about_section_oss)) }
             deps.forEachIndexed { idx, (name, license) ->
                 item {
                     InfoRow(
@@ -174,7 +178,7 @@ private fun BrandHeader(versionName: String) {
                 }
                 Spacer(Modifier.height(2.dp))
                 Text(
-                    text = "精选每日 AI 资讯聚合客户端",
+                    text = stringResource(R.string.about_slogan),
                     style = MaterialTheme.typography.bodySmall,
                     color = cs.onSurfaceVariant
                 )

@@ -14,7 +14,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.peng.ainewshub.R
 import com.peng.ainewshub.data.Mode
 import com.peng.ainewshub.data.NewsItem
 import com.peng.ainewshub.ui.ItemsViewModel
@@ -46,13 +48,13 @@ fun AllTab(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             AppTopBar(
-                title = "全部动态",
+                title = stringResource(R.string.all_tab_title),
                 titleFontSize = AppTopBarDefaults.secondaryTitleFontSize,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "返回"
+                            contentDescription = stringResource(R.string.common_back)
                         )
                     }
                 },
@@ -61,13 +63,13 @@ fun AllTab(
                     IconButton(onClick = onOpenDaily) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Outlined.MenuBook,
-                            contentDescription = "AI 日报"
+                            contentDescription = stringResource(R.string.daily_title)
                         )
                     }
                     IconButton(onClick = onOpenSearch) {
                         Icon(
                             imageVector = Icons.Filled.Search,
-                            contentDescription = "搜索"
+                            contentDescription = stringResource(R.string.action_search)
                         )
                     }
                 }

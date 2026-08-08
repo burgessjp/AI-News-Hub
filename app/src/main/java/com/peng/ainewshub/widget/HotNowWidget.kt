@@ -45,6 +45,7 @@ import androidx.glance.text.TextStyle
 import com.peng.ainewshub.MainActivity
 import com.peng.ainewshub.R
 import com.peng.ainewshub.data.SummaryRepository
+import com.peng.ainewshub.ui.i18n.AppLocale
 import com.peng.ainewshub.ui.theme.DarkBackground
 import com.peng.ainewshub.ui.theme.DarkErrorContainer
 import com.peng.ainewshub.ui.theme.DarkOnBackground
@@ -110,17 +111,19 @@ class HotNowWidget : GlanceAppWidget() {
 
     @Composable
     private fun Content(context: Context, state: HotNowWidgetState) {
+        // 小组件无 attachBaseContext:取词统一经 AppLocale.wrap 后的 context(下传各子组件)
+        val ctx = AppLocale.wrap(context)
         Column(
             modifier = GlanceModifier
                 .fillMaxSize()
                 .background(WidgetColors.background)
                 .cornerRadius(16.dp)
         ) {
-            Header(context, state)
+            Header(ctx, state)
             if (state.hasData) {
-                ItemList(context, state.items)
+                ItemList(ctx, state.items)
             } else {
-                EmptyBody()
+                EmptyBody(ctx)
             }
         }
     }
@@ -134,7 +137,7 @@ class HotNowWidget : GlanceAppWidget() {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "AI 热点",
+                text = context.getString(R.string.widget_hot_now_title),
                 style = TextStyle(
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
@@ -154,7 +157,7 @@ class HotNowWidget : GlanceAppWidget() {
             ) {
                 Image(
                     provider = ImageProvider(R.drawable.ic_widget_refresh),
-                    contentDescription = "刷新",
+                    contentDescription = context.getString(R.string.common_refresh),
                     colorFilter = ColorFilter.tint(WidgetColors.refreshIcon),
                     modifier = GlanceModifier.size(16.dp)
                 )
@@ -162,7 +165,7 @@ class HotNowWidget : GlanceAppWidget() {
         }
         if (state.dataFetchedAt > 0) {
             Text(
-                text = formatDataTime(state.dataFetchedAt),
+                text = formatDataTime(context, state.dataFetchedAt),
                 style = TextStyle(fontSize = 11.sp, color = WidgetColors.meta),
                 maxLines = 1,
                 modifier = GlanceModifier
@@ -220,7 +223,7 @@ class HotNowWidget : GlanceAppWidget() {
                 }
                 Column {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        BreakingCapsule()
+                        BreakingCapsule(context)
                         Spacer(GlanceModifier.width(6.dp))
                         Text(text = first, style = titleStyle, maxLines = 1)
                     }
@@ -236,7 +239,7 @@ class HotNowWidget : GlanceAppWidget() {
 
     /** breaking 实心胶囊(errorContainer 底)—— 与标题第 1 行行内排列。 */
     @Composable
-    private fun BreakingCapsule(modifier: GlanceModifier = GlanceModifier) {
+    private fun BreakingCapsule(context: Context, modifier: GlanceModifier = GlanceModifier) {
         Box(
             modifier = modifier
                 .background(WidgetColors.breakingBg)
@@ -244,7 +247,7 @@ class HotNowWidget : GlanceAppWidget() {
                 .padding(start = 4.dp, top = 1.dp, end = 4.dp, bottom = 1.dp)
         ) {
             Text(
-                text = "突发",
+                text = context.getString(R.string.widget_breaking),
                 style = TextStyle(
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
@@ -257,14 +260,14 @@ class HotNowWidget : GlanceAppWidget() {
 
     /** 空态(无缓存且拉取失败/今日尚未生成):文案 + 品牌蓝胶囊按钮重试。 */
     @Composable
-    private fun EmptyBody() {
+    private fun EmptyBody(context: Context) {
         Column(
             modifier = GlanceModifier.fillMaxSize(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "今日热点尚未生成",
+                text = context.getString(R.string.widget_empty_not_generated),
                 style = TextStyle(fontSize = 13.sp, color = WidgetColors.onBackground)
             )
             Spacer(GlanceModifier.height(8.dp))
@@ -276,7 +279,7 @@ class HotNowWidget : GlanceAppWidget() {
                     .padding(start = 14.dp, top = 6.dp, end = 14.dp, bottom = 6.dp)
             ) {
                 Text(
-                    text = "刷新重试",
+                    text = context.getString(R.string.widget_refresh_retry),
                     style = TextStyle(
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
@@ -298,7 +301,7 @@ class HotNowWidget : GlanceAppWidget() {
             .setData(Uri.parse("ainewshub://hotnow/open?url=" + Uri.encode(item.url)))
             .putExtra(MainActivity.EXTRA_OPEN_URL, item.url)
             .putExtra(MainActivity.EXTRA_OPEN_URL_TITLE, item.title)
-            .putExtra(MainActivity.EXTRA_OPEN_URL_SOURCE, SummaryRepository.titleOf(item.source))
+            .putExtra(MainActivity.EXTRA_OPEN_URL_SOURCE, SummaryRepository.titleOf(context, item.source))
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
     /** 点头部标题区:仅把 App 带到前台(总览为默认首屏)。 */
@@ -306,12 +309,12 @@ class HotNowWidget : GlanceAppWidget() {
         Intent(context, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
-    /** 「数据截至」行文案:M月d日 · 截至 HH:mm(每次组合新建实例,避免 SimpleDateFormat 线程问题)。 */
-    private fun formatDataTime(ts: Long): String {
+    /** 「数据截至」行文案:日期模式取 date_fmt_month_day 资源(每次组合新建实例,避免 SimpleDateFormat 线程问题)。 */
+    private fun formatDataTime(context: Context, ts: Long): String {
         val d = Date(ts)
-        val date = SimpleDateFormat("M月d日", Locale.getDefault()).format(d)
+        val date = SimpleDateFormat(context.getString(R.string.date_fmt_month_day), Locale.getDefault()).format(d)
         val time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(d)
-        return "$date · 截至 $time"
+        return context.getString(R.string.widget_data_as_of, date, time)
     }
 
     companion object {

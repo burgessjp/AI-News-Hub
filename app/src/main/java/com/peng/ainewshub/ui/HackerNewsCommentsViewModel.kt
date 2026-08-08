@@ -1,4 +1,5 @@
 package com.peng.ainewshub.ui
+import com.peng.ainewshub.ui.i18n.localized
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
@@ -83,7 +84,7 @@ class HackerNewsCommentsViewModel(application: Application) : AndroidViewModel(a
                     roots.addAll(list.map { Node(it) })
                     emitFlattened()
                 }
-                .onFailure { _state.value = it.toUiError() }
+                .onFailure { _state.value = it.toUiError(getApplication<Application>().localized()) }
         }
     }
 
@@ -128,7 +129,7 @@ class HackerNewsCommentsViewModel(application: Application) : AndroidViewModel(a
                     }
                     .onFailure {
                         node.childrenLoading = false
-                        node.childrenError = it.toUiError().message
+                        node.childrenError = it.toUiError(getApplication<Application>().localized()).message
                         emitFlattened()
                     }
             }
@@ -175,7 +176,7 @@ class HackerNewsCommentsViewModel(application: Application) : AndroidViewModel(a
                     if (it is ShortContentException) {
                         TranslationState.Error(TranslationState.TOO_SHORT)
                     } else {
-                        TranslationState.Error(it.toUiError().message)
+                        TranslationState.Error(it.toUiError(getApplication<Application>().localized()).message)
                     }
                 }
             )

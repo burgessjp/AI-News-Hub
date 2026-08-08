@@ -1,4 +1,6 @@
 package com.peng.ainewshub.ui
+import com.peng.ainewshub.R
+import com.peng.ainewshub.ui.i18n.localized
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
@@ -96,11 +98,11 @@ class HackerNewsViewModel(application: Application) : AndroidViewModel(applicati
                 .onSuccess { result ->
                     // 空结果视为「无内容」而非错误:模块整体隐藏。
                     _state.value =
-                        if (result.stories.isEmpty()) UiState.Error("今日暂无内容", ErrorKind.NoData) else UiState.Success(result.stories)
+                        if (result.stories.isEmpty()) UiState.Error(getApplication<Application>().localized().getString(R.string.common_empty_today), ErrorKind.NoData) else UiState.Success(result.stories)
                     // 记录数据落盘时刻(缓存命中也会更新),供顶栏显示「上次刷新」。
                     _lastRefreshAt.value = result.fetchedAt
                 }
-                .onFailure { _state.value = it.toUiError() }
+                .onFailure { _state.value = it.toUiError(getApplication<Application>().localized()) }
         }
     }
 
@@ -120,13 +122,13 @@ class HackerNewsViewModel(application: Application) : AndroidViewModel(applicati
             runCatching { currentRepo().forceRefresh(limit = 20) }
                 .onSuccess { result ->
                     _state.value =
-                        if (result.stories.isEmpty()) UiState.Error("今日暂无内容", ErrorKind.NoData) else UiState.Success(result.stories)
+                        if (result.stories.isEmpty()) UiState.Error(getApplication<Application>().localized().getString(R.string.common_empty_today), ErrorKind.NoData) else UiState.Success(result.stories)
                     _lastRefreshAt.value = result.fetchedAt
                 }
                 .onFailure {
                     // 有旧数据就保留(保可用),无数据才显示错误。
                     if (_state.value !is UiState.Success) {
-                        _state.value = it.toUiError()
+                        _state.value = it.toUiError(getApplication<Application>().localized())
                     }
                 }
             _isRefreshing.value = false
@@ -155,7 +157,7 @@ class HackerNewsViewModel(application: Application) : AndroidViewModel(applicati
                     if (it is ShortContentException) {
                         TranslationState.Error(TranslationState.TOO_SHORT)
                     } else {
-                        TranslationState.Error(it.toUiError().message)
+                        TranslationState.Error(it.toUiError(getApplication<Application>().localized()).message)
                     }
                 }
             )

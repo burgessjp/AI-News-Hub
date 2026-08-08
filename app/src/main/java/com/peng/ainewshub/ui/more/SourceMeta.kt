@@ -11,6 +11,8 @@ import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
+import com.peng.ainewshub.R
 
 /**
  * Hub 八源元数据单点定义 —— 信息源页 / 摘要 Tab / 关于页三处的源顺序、图标、标题、
@@ -48,35 +50,35 @@ data class SourceMeta(
 fun sourceMeta(key: String): SourceMeta = when (key) {
     SourceKeys.HACKERNEWS -> SourceMeta(
         key, Icons.Filled.Whatshot, SourceBrand.HackerNews,
-        "HackerNews", "HackerNews 热门榜单", "https://news.ycombinator.com"
+        stringResource(R.string.source_title_hackernews), stringResource(R.string.source_subtitle_hackernews), "https://news.ycombinator.com"
     )
     SourceKeys.GITHUB_TRENDING -> SourceMeta(
         key, Icons.Filled.Code, SourceBrand.GitHub,
-        "GitHub Trending", "GitHub 热门仓库", "https://github.com/trending"
+        stringResource(R.string.source_title_github_trending), stringResource(R.string.source_subtitle_github_trending), "https://github.com/trending"
     )
     SourceKeys.OPENAI_ANTHROPIC_NEWS -> SourceMeta(
         key, Icons.Filled.Business, SourceBrand.OpenAiAnthropicNews,
-        "OpenAI x Anthropic", "OpenAI + Anthropic 厂商动态", "https://openai.com"
+        stringResource(R.string.source_title_openai_anthropic), stringResource(R.string.source_subtitle_openai_anthropic), "https://openai.com"
     )
     SourceKeys.HUGGINGFACE_PAPERS -> SourceMeta(
         key, Icons.Filled.School, SourceBrand.HuggingFace,
-        "HuggingFace Paper Trending", "热门 AI 论文榜单", "https://huggingface.co/papers/trending"
+        stringResource(R.string.source_title_huggingface), stringResource(R.string.source_subtitle_huggingface), "https://huggingface.co/papers/trending"
     )
     SourceKeys.PRODUCTHUNT -> SourceMeta(
         key, Icons.Filled.RocketLaunch, SourceBrand.ProductHunt,
-        "Product Hunt", "每日新产品榜单", "https://www.producthunt.com"
+        stringResource(R.string.source_title_producthunt), stringResource(R.string.source_subtitle_producthunt), "https://www.producthunt.com"
     )
     SourceKeys.RUNDOWN_AI -> SourceMeta(
         key, Icons.AutoMirrored.Filled.Article, SourceBrand.TheRundownAi,
-        "The Rundown AI", "AI 日更 newsletter", "https://www.therundown.ai"
+        stringResource(R.string.source_title_rundown), stringResource(R.string.source_subtitle_rundown), "https://www.therundown.ai"
     )
     SourceKeys.AIHOT_FEATURED -> SourceMeta(
         key, Icons.Filled.Whatshot, SourceBrand.AiHot,
-        "AIHot 精选", "自家 AI 资讯精选", "https://aihot.virxact.com"
+        stringResource(R.string.source_title_aihot_featured), stringResource(R.string.source_subtitle_aihot_featured), "https://aihot.virxact.com"
     )
     SourceKeys.STORMZHANG_AI -> SourceMeta(
         key, Icons.Filled.Bolt, SourceBrand.Stormzhang,
-        "stormzhang AI 资讯", "每日 AI 资讯聚合", "https://news.stormzhang.ai"
+        stringResource(R.string.source_title_stormzhang), stringResource(R.string.source_subtitle_stormzhang), "https://news.stormzhang.ai"
     )
     else -> error("未知源 key: $key")
 }

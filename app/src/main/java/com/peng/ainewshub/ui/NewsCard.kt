@@ -1,4 +1,6 @@
 package com.peng.ainewshub.ui
+import android.content.Context
+import androidx.compose.ui.res.stringResource
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -23,11 +25,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.peng.ainewshub.R
 import com.peng.ainewshub.data.NewsItem
 import com.peng.ainewshub.ui.components.SectionHeader
+import com.peng.ainewshub.ui.components.weekdayLabel
 import com.peng.ainewshub.ui.theme.AppAlpha
 import com.peng.ainewshub.ui.theme.AppText
 import java.time.LocalDate
@@ -146,7 +151,7 @@ fun NewsCard(
                 }
                 if (!item.category.isNullOrBlank()) {
                     Text(
-                        text = "· ${item.categoryLabel()}",
+                        text = "· " + (item.categoryLabelRes()?.let { stringResource(it) } ?: item.category.orEmpty()),
                         style = MaterialTheme.typography.labelSmall,
                         color = cs.onSurfaceVariant,
                         maxLines = 1
@@ -190,7 +195,7 @@ private fun HotBadge(score: Int) {
     ) {
         Icon(
             Icons.Filled.LocalFireDepartment,
-            contentDescription = "热度",
+            contentDescription = stringResource(R.string.news_card_cd_hot),
             tint = tint,
             modifier = Modifier.size(14.dp)
         )
@@ -237,51 +242,43 @@ fun dayKeyOf(iso: String?): String {
 }
 
 /**
- * 把日期 key(YYYY-MM-DD)格式化为人类可读的中文标签:
+ * 把日期 key(YYYY-MM-DD)格式化为人类可读的标签(随界面语言):
  *  - 今天 / 昨天 / 前天
- *  - 否则:本周几 / M月d日
+ *  - 否则:本周几 / 月日
  */
-fun dayLabel(dayKey: String): String {
+fun dayLabel(context: Context, dayKey: String): String {
     if (dayKey.isBlank()) return ""
     return runCatching {
         val date = LocalDate.parse(dayKey)
         val today = LocalDate.now()
         val days = ChronoUnit.DAYS.between(date, today)
+        val monthDay = DateTimeFormatter.ofPattern(context.getString(R.string.date_fmt_month_day))
         when {
-            days == 0L -> "今天"
-            days == 1L -> "昨天"
-            days == 2L -> "前天"
-            days in 3..6 -> "${date.dayOfWeek.toChinese()} · ${date.format(DateTimeFormatter.ofPattern("M月d日"))}"
-            else -> date.format(DateTimeFormatter.ofPattern("M月d日"))
+            days == 0L -> context.getString(R.string.time_today)
+            days == 1L -> context.getString(R.string.time_yesterday)
+            days == 2L -> context.getString(R.string.time_day_before_yesterday)
+            days in 3..6 -> "${weekdayLabel(context, date.dayOfWeek.value)} · ${date.format(monthDay)}"
+            else -> date.format(monthDay)
         }
     }.getOrDefault(dayKey)
 }
 
-private fun java.time.DayOfWeek.toChinese(): String = when (this) {
-    java.time.DayOfWeek.MONDAY -> "周一"
-    java.time.DayOfWeek.TUESDAY -> "周二"
-    java.time.DayOfWeek.WEDNESDAY -> "周三"
-    java.time.DayOfWeek.THURSDAY -> "周四"
-    java.time.DayOfWeek.FRIDAY -> "周五"
-    java.time.DayOfWeek.SATURDAY -> "周六"
-    java.time.DayOfWeek.SUNDAY -> "周日"
-}
-
 /**
- * 相对时间(X 小时前)—— 详情页仍在用。
+ * 相对时间(X 小时前,紧凑无空格 plurals)—— 详情页仍在用。
  */
-fun relativeTime(iso: String?): String {
+fun relativeTime(context: Context, iso: String?): String {
     if (iso.isNullOrBlank()) return ""
     return runCatching {
         val dt = LocalDateTime.parse(iso, DateTimeFormatter.ISO_DATE_TIME)
         val now = LocalDateTime.now(ZoneOffset.UTC)
         val mins = dt.toInstant(ZoneOffset.UTC).until(now, ChronoUnit.MINUTES)
+        val res = context.resources
         when {
             mins < 0 -> ""
-            mins < 60 -> "${mins}分钟前"
-            mins < 60 * 24 -> "${mins / 60}小时前"
-            mins < 60 * 24 * 30 -> "${mins / (60 * 24)}天前"
-            else -> dt.format(DateTimeFormatter.ofPattern("MM-dd"))
+            mins < 60 -> mins.toInt().let { res.getQuantityString(R.plurals.time_minutes_ago_compact, it, it) }
+            mins < 60 * 24 -> (mins / 60).toInt().let { res.getQuantityString(R.plurals.time_hours_ago_compact, it, it) }
+            mins < 60 * 24 * 30 -> (mins / (60 * 24)).toInt().let { res.getQuantityString(R.plurals.time_days_ago_compact, it, it) }
+            else -> dt.format(DateTimeFormatter.ofPattern(context.getString(R.string.date_fmt_month_day_dash)))
         }
     }.getOrDefault("")
 }
@@ -292,5 +289,5 @@ fun relativeTime(iso: String?): String {
  */
 @Composable
 fun DateGroupHeader(dayKey: String, modifier: Modifier = Modifier) {
-    SectionHeader(title = dayLabel(dayKey), modifier = modifier)
+    SectionHeader(title = dayLabel(LocalContext.current, dayKey), modifier = modifier)
 }

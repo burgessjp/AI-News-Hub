@@ -1,4 +1,5 @@
 package com.peng.ainewshub.ui
+import com.peng.ainewshub.ui.i18n.localized
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
@@ -43,7 +44,7 @@ class SummaryArchiveViewModel(application: Application) : AndroidViewModel(appli
         viewModelScope.launch {
             _dates.value = runCatching { summaryRepo.availableDates() }.fold(
                 onSuccess = { UiState.Success(it) },
-                onFailure = { it.toUiError() }
+                onFailure = { it.toUiError(getApplication<Application>().localized()) }
             )
         }
     }
@@ -58,7 +59,7 @@ class SummaryArchiveViewModel(application: Application) : AndroidViewModel(appli
                 async {
                     val state: UiState<SourceSummary> = summaryRepo.summarizeOn(key, date).fold(
                         onSuccess = { UiState.Success(it) },
-                        onFailure = { it.toUiError() }
+                        onFailure = { it.toUiError(getApplication<Application>().localized()) }
                     )
                     _dateStates.value = _dateStates.value + (key to state)
                 }
@@ -72,7 +73,7 @@ class SummaryArchiveViewModel(application: Application) : AndroidViewModel(appli
             _dateStates.value = _dateStates.value + (source to UiState.Loading as UiState<SourceSummary>)
             val state: UiState<SourceSummary> = summaryRepo.summarizeOn(source, date).fold(
                 onSuccess = { UiState.Success(it) },
-                onFailure = { it.toUiError() }
+                onFailure = { it.toUiError(getApplication<Application>().localized()) }
             )
             _dateStates.value = _dateStates.value + (source to state)
         }

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- AI Daily strings (English). Terminology: see values/strings_common.xml header. -->
+<resources>
+    <string name="daily_title">AI Daily</string>
+    <string name="daily_every_morning">Daily at 8 AM</string>
+    <string name="daily_load_failed">Failed to load the daily report</string>
+    <string name="daily_date_title">Daily Report %1$s</string>
+    <string name="daily_flashes">Flashes</string>
+
+    <string name="daily_stat_items">items</string>
+    <string name="daily_stat_sections">sections</string>
+    <string name="daily_stat_flashes">flashes</string>
+    <string name="daily_stat_minutes">min</string>
+
+    <string name="daily_archive_title">Daily Archive</string>
+    <string name="daily_archive_empty_title">No past daily reports</string>
+    <string name="daily_archive_empty_subtitle">The daily report archive is empty. Check back later</string>
+</resources>

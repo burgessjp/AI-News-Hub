@@ -35,7 +35,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.activity.BackEventCompat
@@ -87,8 +89,11 @@ import com.peng.ainewshub.ui.tabs.FeaturedTab
 import com.peng.ainewshub.ui.anim.PageNavStyle
 import com.peng.ainewshub.ui.anim.pageTransition
 import com.peng.ainewshub.ui.anim.predictivePopTransition
+import com.peng.ainewshub.ui.i18n.AppLanguage
+import com.peng.ainewshub.ui.i18n.AppLocale
 import com.peng.ainewshub.ui.theme.AiNewsHubTheme
 import com.peng.ainewshub.ui.webview.WebViewScreen
+import com.peng.ainewshub.widget.HotNowWidgetUpdater
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
@@ -109,6 +114,11 @@ class MainActivity : ComponentActivity() {
 
     /** 待消费的小组件深链(Compose 状态:onCreate/onNewIntent 写入,UI 层消费后经回调清空)。 */
     private var pendingOpenUrl by mutableStateOf<Triple<String, String, String?>?>(null)
+
+    /** 应用内语言(设置页「语言」):非「跟随系统」时按用户选择包裹配置。 */
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(AppLocale.wrap(newBase))
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -167,7 +177,8 @@ private sealed interface Page {
     val navStyle: PageNavStyle get() = PageNavStyle.PUSH
 
     data class Detail(val item: NewsItem) : Page
-    data class Web(val url: String, val title: String = "加载中…") : Page {
+    // title 无默认值:占位文案随语言取词,两处构造点(openUrl / pageFromBundle)均显式传入
+    data class Web(val url: String, val title: String) : Page {
         override val navStyle = PageNavStyle.FADE
     }
     data object DailyArchive : Page
@@ -235,10 +246,10 @@ private fun Page.toBundle(): Bundle = Bundle().apply {
 }
 
 @Suppress("DEPRECATION")
-private fun pageFromBundle(b: Bundle): Page? {
+private fun pageFromBundle(b: Bundle, webFallbackTitle: String): Page? {
     return when (b.getString("t")) {
         "Detail" -> b.getParcelable<NewsItem>("item")?.let { Page.Detail(it) }
-        "Web" -> Page.Web(b.getString("url") ?: "", b.getString("title") ?: "加载中…")
+        "Web" -> Page.Web(b.getString("url") ?: "", b.getString("title") ?: webFallbackTitle)
         "DailyDate" -> b.getString("date")?.let { Page.DailyDate(it) }
         "HNComments" -> b.getParcelable<HackerNewsStory>("story")?.let { Page.HackerNewsComments(it) }
         "DailyArchive" -> Page.DailyArchive
@@ -269,8 +280,10 @@ private fun pageFromBundle(b: Bundle): Page? {
  * 导航栈持久化 Saver:把 Map<AppTab, List<Page>> 存进一个 Bundle(Parcelable,
  * 可直接被 rememberSaveable 的 autoSaver 接管,避免 Serializable 容器混入
  * Parcelable 元素的兼容问题)。每个 tab 一个 key,值为 ArrayList<Bundle>。
+ *
+ * webFallbackTitle:恢复 Web 页且 Bundle 缺 title 时的占位文案(随语言取词,common_loading)。
  */
-private val pageStacksSaver = androidx.compose.runtime.saveable.Saver<
+private fun pageStacksSaver(webFallbackTitle: String) = androidx.compose.runtime.saveable.Saver<
     Map<AppTab, List<Page>>, Bundle
 >(
     save = { stacks ->
@@ -286,7 +299,7 @@ private val pageStacksSaver = androidx.compose.runtime.saveable.Saver<
         @Suppress("DEPRECATION")
         AppTab.entries.mapNotNull { tab ->
             val arr = b.getParcelableArrayList<Bundle>(tab.name) ?: return@mapNotNull null
-            tab to arr.mapNotNull { pageFromBundle(it) }
+            tab to arr.mapNotNull { pageFromBundle(it, webFallbackTitle) }
         }.toMap()
     }
 )
@@ -343,6 +356,14 @@ fun AiNewsHubApp(
     val onSelectFont: (FontChoice) -> Unit = { scope.launch { settingsStore.updateFont(it) } }
     val onSelectFontScale: (FontScale) -> Unit = { scope.launch { settingsStore.updateFontScale(it) } }
     val onSelectSource: (SourceMode) -> Unit = { scope.launch { settingsStore.updateSourceMode(it) } }
+    // 应用内语言:持久化 + 重建 Activity 生效;小组件同步刷新文案
+    val activity = LocalContext.current as? Activity
+    val onSelectLanguage: (AppLanguage) -> Unit = { lang ->
+        scope.launch {
+            activity?.let { AppLocale.select(it, settingsStore, lang) }
+            HotNowWidgetUpdater.refreshFromApp(appContext)
+        }
+    }
 
     // 缓存占用(进入设置页时计算一次,清理后刷新)。0 表示未计算,UI 显示「< 1 KB」。
     var cacheSizeBytes by remember { mutableStateOf(0L) }
@@ -376,9 +397,11 @@ fun AiNewsHubApp(
 
     // 当前 tab + 每个 tab 的二级页栈(默认「总览」——端侧 AI 当日分析,首屏即默认首页)
     var currentTab by rememberSaveable { mutableStateOf(AppTab.Overview) }
+    // Web 页占位标题(common_loading):恢复导航栈时 Web 页缺 title 的兜底取词,随语言生效
+    val webLoadingTitle = stringResource(R.string.common_loading)
     // 用 rememberSaveable 持久化导航栈,转屏/进程被杀后仍可恢复(需自定义 Saver,
     // 因 Page 含业务对象、AppTab 是 enum,默认 Bundle 无法直接存 Map)。
-    var pageStacks by rememberSaveable(stateSaver = pageStacksSaver) {
+    var pageStacks by rememberSaveable(stateSaver = pageStacksSaver(webLoadingTitle)) {
         mutableStateOf(emptyMap<AppTab, List<Page>>())
     }
     // 转场方向:push 时为 false(前进),pop 时为 true(返回)。
@@ -600,6 +623,8 @@ fun AiNewsHubApp(
                             onSelectFontScale = onSelectFontScale,
                             sourceMode = sourceMode,
                             onSelectSource = onSelectSource,
+                            language = displayPrefs.language,
+                            onSelectLanguage = onSelectLanguage,
                             onBack = pop,
                             onItemClick = { push(Page.Detail(it)) },
                             // 精选二级页头部的「全部 ›」入口 → 全部动态二级页
@@ -741,6 +766,8 @@ private fun PageView(
     onSelectFontScale: (FontScale) -> Unit,
     sourceMode: SourceMode,
     onSelectSource: (SourceMode) -> Unit,
+    language: AppLanguage,
+    onSelectLanguage: (AppLanguage) -> Unit,
     onBack: () -> Unit,
     onItemClick: (NewsItem) -> Unit,
     onOpenAll: () -> Unit,
@@ -771,6 +798,9 @@ private fun PageView(
     onClearCache: () -> Unit,
     darkTheme: Boolean = false
 ) {
+    // 浏览历史来源标签:下方非 Composable 回调(onOpenUrl lambda)里捕获,提前取词
+    val dailyLabel = stringResource(R.string.history_source_daily)
+    val aboutLabel = stringResource(R.string.history_source_about)
     when (page) {
         is Page.Detail -> NewsDetailScreen(
             item = page.item,
@@ -799,7 +829,7 @@ private fun PageView(
             onItemClick = onItemClick,
             onOpenArchive = onOpenArchive,
             onBack = onBack,
-            onOpenUrl = { url, title -> onOpenUrl(url, title, "日报") },
+            onOpenUrl = { url, title -> onOpenUrl(url, title, dailyLabel) },
             listState = pageListStates.forPage(page)
         )
         Page.DailyArchive -> DailyArchiveScreen(
@@ -810,7 +840,7 @@ private fun PageView(
         is Page.DailyDate -> DailyDateScreen(
             date = page.date,
             onBack = onBack,
-            onOpenUrl = { url, title -> onOpenUrl(url, title, "日报") },
+            onOpenUrl = { url, title -> onOpenUrl(url, title, dailyLabel) },
             listState = pageListStates.forPage(page)
         )
         Page.Search -> SearchScreen(
@@ -829,6 +859,8 @@ private fun PageView(
             onSelectFontScale = onSelectFontScale,
             sourceMode = sourceMode,
             onSelectSource = onSelectSource,
+            language = language,
+            onSelectLanguage = onSelectLanguage,
             cacheSizeBytes = cacheSizeBytes,
             onClearCache = onClearCache,
             onBack = onBack
@@ -840,7 +872,7 @@ private fun PageView(
         )
         Page.About -> AboutScreen(
             onBack = onBack,
-            onOpenUrl = { url, title -> onOpenUrl(url, title, "关于") }
+            onOpenUrl = { url, title -> onOpenUrl(url, title, aboutLabel) }
         )
         Page.HackerNews -> HackerNewsScreen(
             onBack = onBack,

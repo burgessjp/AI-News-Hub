@@ -88,12 +88,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
+import com.peng.ainewshub.R
 import com.peng.ainewshub.data.AiConfig
 import com.peng.ainewshub.data.TranslationRepository
 import com.peng.ainewshub.ui.ErrorState
@@ -133,7 +135,8 @@ import kotlin.math.roundToInt
 @Composable
 fun WebViewScreen(
     url: String,
-    title: String = "加载中…",
+    // 默认空串:顶栏空白标题经 common_loading 资源兜底(调用方一律显式传 title)
+    title: String = "",
     darkTheme: Boolean = false,
     fontScale: FontScale = FontScale.Standard,
     aiConfig: AiConfig = AiConfig(),
@@ -223,7 +226,7 @@ fun WebViewScreen(
         if (granted && params != null) {
             enqueueDownload(context, params)
         } else {
-            Toast.makeText(context, "未授予权限,已取消下载", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.webview_toast_permission_denied), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -233,7 +236,7 @@ fun WebViewScreen(
     fun copyText(text: String) {
         val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
         cm?.setPrimaryClip(ClipData.newPlainText("url", text))
-        toast("已复制")
+        toast(context.getString(R.string.webview_toast_copied))
     }
 
     /** 用系统浏览器打开。 */
@@ -244,7 +247,7 @@ fun WebViewScreen(
                     .addCategory(Intent.CATEGORY_BROWSABLE)
             )
         } catch (e: Exception) {
-            toast("未找到可用的浏览器")
+            toast(context.getString(R.string.webview_toast_no_browser))
         }
     }
 
@@ -268,7 +271,7 @@ fun WebViewScreen(
                 }.also { readabilityRef.js = it }
                 val article = extractReaderArticle(web, lib)
                 if (article == null) {
-                    toast("未能提取正文,当前页可能不是文章页")
+                    toast(context.getString(R.string.webview_toast_reader_extract_failed))
                     return@launch
                 }
                 // 进入新阅读页前清掉上一页的翻译产物
@@ -314,7 +317,7 @@ fun WebViewScreen(
             try {
                 val texts = extractBlockTexts(web)
                 if (texts.isNullOrEmpty() || texts.all { it.isBlank() }) {
-                    toast("没有可翻译的内容")
+                    toast(context.getString(R.string.webview_toast_nothing_to_translate))
                     return@launch
                 }
                 translateOriginals = texts
@@ -343,8 +346,8 @@ fun WebViewScreen(
             imageUrl.startsWith("data:", ignoreCase = true) -> saveDataUrl(context, imageUrl)
             imageUrl.startsWith("blob:", ignoreCase = true) ->
                 webViewRef.web?.let { downloadBlob(it, context, imageUrl, null, null) }
-                    ?: toast("无法保存图片")
-            else -> toast("暂不支持保存此图片")
+                    ?: toast(context.getString(R.string.webview_toast_save_image_failed))
+            else -> toast(context.getString(R.string.webview_toast_save_image_unsupported))
         }
     }
 
@@ -358,18 +361,18 @@ fun WebViewScreen(
             containerColor = MaterialTheme.colorScheme.surface,
             topBar = {
                 AppTopBar(
-                    title = pageTitle.ifBlank { "加载中…" },
+                    title = pageTitle.ifBlank { stringResource(R.string.common_loading) },
                     subtitle = pageHost.ifBlank { null },
                     titleFontSize = AppTopBarDefaults.secondaryTitleFontSize,
                     navigationIcon = {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                         }
                     },
                     actions = {
                         Box {
                             IconButton(onClick = { menuExpanded = true }) {
-                                Icon(Icons.Outlined.MoreVert, contentDescription = "更多")
+                                Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.tab_more))
                             }
                             DropdownMenu(
                                 expanded = menuExpanded,
@@ -379,7 +382,7 @@ fun WebViewScreen(
                                 // 菜单只留低频与场景项
                                 if (!readerActive) {
                                     DropdownMenuItem(
-                                        text = { Text("刷新") },
+                                        text = { Text(stringResource(R.string.common_refresh)) },
                                         leadingIcon = { Icon(Icons.Outlined.Refresh, null) },
                                         onClick = {
                                             menuExpanded = false
@@ -391,7 +394,7 @@ fun WebViewScreen(
                                 // 译文在底部弹层展示,不改写阅读页
                                 if (readerActive && aiConfig.translateEnabled) {
                                     DropdownMenuItem(
-                                        text = { Text("翻译本页") },
+                                        text = { Text(stringResource(R.string.webview_menu_translate_page)) },
                                         leadingIcon = { Icon(Icons.Outlined.Translate, null) },
                                         onClick = {
                                             menuExpanded = false
@@ -401,7 +404,7 @@ fun WebViewScreen(
                                 }
                                 HorizontalDivider()
                                 DropdownMenuItem(
-                                    text = { Text("复制链接") },
+                                    text = { Text(stringResource(R.string.webview_menu_copy_link)) },
                                     leadingIcon = { Icon(Icons.Outlined.ContentCopy, null) },
                                     onClick = {
                                         menuExpanded = false
@@ -409,7 +412,7 @@ fun WebViewScreen(
                                     }
                                 )
                                 DropdownMenuItem(
-                                    text = { Text("在浏览器打开") },
+                                    text = { Text(stringResource(R.string.webview_menu_open_browser)) },
                                     leadingIcon = { Icon(Icons.Outlined.Language, null) },
                                     onClick = {
                                         menuExpanded = false
@@ -527,7 +530,7 @@ fun WebViewScreen(
                                     ) {
                                         // 主帧 HTTP 错误(404/500 等)同样进错误态
                                         if (request.isForMainFrame) {
-                                            loadError = "网页加载失败(${errorResponse.statusCode})"
+                                            loadError = context.getString(R.string.webview_error_http, errorResponse.statusCode)
                                         }
                                     }
                                 }
@@ -609,7 +612,9 @@ fun WebViewScreen(
 
                                         else -> {
                                             Toast.makeText(
-                                                context, "暂不支持下载此类型的链接", Toast.LENGTH_SHORT
+                                                context,
+                                                context.getString(R.string.webview_toast_download_unsupported),
+                                                Toast.LENGTH_SHORT
                                             ).show()
                                         }
                                     }
@@ -634,7 +639,7 @@ fun WebViewScreen(
                     ErrorState(
                         message = err,
                         onRetry = { retryLoad() },
-                        title = "页面加载失败",
+                        title = stringResource(R.string.webview_error_title),
                         modifier = Modifier.background(MaterialTheme.colorScheme.surface)
                     )
                 }
@@ -661,7 +666,14 @@ fun WebViewScreen(
     longPressTarget?.let { target ->
         AlertDialog(
             onDismissRequest = { longPressTarget = null },
-            title = { Text(if (target is LongPressTarget.Image) "图片" else "链接") },
+            title = {
+                Text(
+                    stringResource(
+                        if (target is LongPressTarget.Image) R.string.webview_dialog_image
+                        else R.string.webview_dialog_link
+                    )
+                )
+            },
             text = {
                 Column {
                     Text(
@@ -679,14 +691,14 @@ fun WebViewScreen(
                                 savePressedImage(target.url)
                             },
                             modifier = Modifier.fillMaxWidth()
-                        ) { Text("保存图片") }
+                        ) { Text(stringResource(R.string.webview_action_save_image)) }
                         TextButton(
                             onClick = {
                                 longPressTarget = null
                                 copyText(target.url)
                             },
                             modifier = Modifier.fillMaxWidth()
-                        ) { Text("复制图片地址") }
+                        ) { Text(stringResource(R.string.webview_action_copy_image_url)) }
                     } else {
                         TextButton(
                             onClick = {
@@ -694,19 +706,19 @@ fun WebViewScreen(
                                 copyText(target.url)
                             },
                             modifier = Modifier.fillMaxWidth()
-                        ) { Text("复制链接") }
+                        ) { Text(stringResource(R.string.webview_menu_copy_link)) }
                         TextButton(
                             onClick = {
                                 longPressTarget = null
                                 openInBrowser(target.url)
                             },
                             modifier = Modifier.fillMaxWidth()
-                        ) { Text("在浏览器打开") }
+                        ) { Text(stringResource(R.string.webview_menu_open_browser)) }
                     }
                 }
             },
             confirmButton = {
-                TextButton(onClick = { longPressTarget = null }) { Text("取消") }
+                TextButton(onClick = { longPressTarget = null }) { Text(stringResource(R.string.common_cancel)) }
             }
         )
     }
@@ -728,16 +740,16 @@ fun WebViewScreen(
     if (showAiConfigDialog) {
         AlertDialog(
             onDismissRequest = { showAiConfigDialog = false },
-            title = { Text("未配置 AI 服务") },
-            text = { Text("整页翻译使用「设置 → AI 服务」里的服务配置,请先完成服务与模型设置。") },
+            title = { Text(stringResource(R.string.webview_ai_config_title)) },
+            text = { Text(stringResource(R.string.webview_ai_config_message)) },
             confirmButton = {
                 TextButton(onClick = {
                     showAiConfigDialog = false
                     onOpenSettings()
-                }) { Text("去设置") }
+                }) { Text(stringResource(R.string.common_go_settings)) }
             },
             dismissButton = {
-                TextButton(onClick = { showAiConfigDialog = false }) { Text("取消") }
+                TextButton(onClick = { showAiConfigDialog = false }) { Text(stringResource(R.string.common_cancel)) }
             }
         )
     }
@@ -780,21 +792,21 @@ private fun TranslateSheet(
                 .padding(horizontal = 20.dp)
         ) {
             Text(
-                text = "全文翻译",
+                text = stringResource(R.string.webview_translate_sheet_title),
                 style = AppText.titleItem,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Spacer(modifier = Modifier.weight(1f))
             if (translating && progress != null) {
                 Text(
-                    text = "翻译中 ${progress.first}/${progress.second}",
+                    text = stringResource(R.string.webview_translate_progress, progress.first, progress.second),
                     style = AppText.caption,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             if (translating) {
                 Spacer(modifier = Modifier.width(4.dp))
-                TextButton(onClick = onCancelTranslate) { Text("取消") }
+                TextButton(onClick = onCancelTranslate) { Text(stringResource(R.string.common_cancel)) }
             }
         }
         Spacer(modifier = Modifier.height(4.dp))
@@ -916,7 +928,7 @@ private fun handleDownload(
 
 /** 把下载任务交给系统 DownloadManager,文件存到公共「下载」目录。 */
 private fun enqueueDownload(context: Context, params: DownloadParams) {
-    val filename = guessDownloadName(params.url, params.contentDisposition, params.mimetype)
+    val filename = guessDownloadName(context, params.url, params.contentDisposition, params.mimetype)
     try {
         val request = DownloadManager.Request(Uri.parse(params.url)).apply {
             setMimeType(params.mimetype)
@@ -930,15 +942,15 @@ private fun enqueueDownload(context: Context, params: DownloadParams) {
         }
         val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as? DownloadManager
         if (dm == null) {
-            Toast.makeText(context, "下载服务不可用", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.webview_toast_download_manager_unavailable), Toast.LENGTH_SHORT).show()
             return
         }
         dm.enqueue(request)
-        Toast.makeText(context, "开始下载:$filename", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, context.getString(R.string.webview_toast_download_started, filename), Toast.LENGTH_SHORT).show()
     } catch (e: Exception) {
         // 兜底:非法 URI / 权限 / 路径等任何异常都不再让 App 崩溃
         Log.w("Download", "下载失败", e)
-        Toast.makeText(context, "下载失败,请稍后重试", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, context.getString(R.string.webview_toast_download_failed), Toast.LENGTH_SHORT).show()
     }
 }
 
@@ -953,7 +965,7 @@ private fun downloadBlob(
     contentDisposition: String?,
     mimetype: String?
 ) {
-    val filename = guessDownloadName(blobUrl, contentDisposition, mimetype)
+    val filename = guessDownloadName(context, blobUrl, contentDisposition, mimetype)
     // 块级作用域函数不能用 JS 关键字做变量名,这里用 fn
     val fn = filename.replace("'", "\\'")
     val mt = (mimetype ?: "application/octet-stream").replace("'", "\\'")
@@ -979,7 +991,7 @@ private fun downloadBlob(
     })();
     """.trimIndent()
     webView.evaluateJavascript(js, null)
-    Toast.makeText(context, "正在保存文件…", Toast.LENGTH_SHORT).show()
+    Toast.makeText(context, context.getString(R.string.webview_toast_saving_file), Toast.LENGTH_SHORT).show()
 }
 
 /**
@@ -991,13 +1003,16 @@ private fun saveDataUrl(context: Context, url: String) {
     val comma = url.indexOf(',')
     val meta = if (comma > 5) url.substring(5, comma) else ""
     if (comma < 0 || !meta.contains(";base64")) {
-        Toast.makeText(context, "暂不支持下载此类型的链接", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, context.getString(R.string.webview_toast_download_unsupported), Toast.LENGTH_SHORT).show()
         return
     }
     val mime = meta.substringBefore(';').ifBlank { "application/octet-stream" }
     val ext = MimeTypeMap.getSingleton().getExtensionFromMimeType(mime) ?: "bin"
-    // 中文名更友好:image/* → "下载图片",其余 → "下载文件"
-    val base = if (mime.startsWith("image/")) "下载图片" else "下载文件"
+    // 文件名按类型区分:image/* → "下载图片",其余 → "下载文件"(文案随界面语言)
+    val base = context.getString(
+        if (mime.startsWith("image/")) R.string.webview_download_image_name
+        else R.string.webview_download_file_name
+    )
     saveBlob(context, "$base.$ext", mime, url.substring(comma + 1))
 }
 
@@ -1005,6 +1020,7 @@ private fun saveDataUrl(context: Context, url: String) {
  * 推断下载文件名。blob: URL 没有文件名信息,按 mimetype 生成"下载图片.<ext>"。
  */
 private fun guessDownloadName(
+    context: Context,
     url: String,
     contentDisposition: String?,
     mimetype: String?
@@ -1015,8 +1031,11 @@ private fun guessDownloadName(
     // blob: 无法从 URL 取扩展名,按 mime 推断
     val ext = MimeTypeMap.getSingleton()
         .getExtensionFromMimeType(mimetype) ?: "bin"
-    // 中文名更友好:image/* → "下载图片",其余 → "下载文件"
-    val base = if (mimetype?.startsWith("image/") == true) "下载图片" else "下载文件"
+    // 文件名按类型区分:image/* → "下载图片",其余 → "下载文件"(文案随界面语言)
+    val base = context.getString(
+        if (mimetype?.startsWith("image/") == true) R.string.webview_download_image_name
+        else R.string.webview_download_file_name
+    )
     return "$base.$ext"
 }
 
@@ -1030,12 +1049,12 @@ private fun guessDownloadName(
  */
 private fun saveBlob(context: Context, filename: String, mimetype: String?, data: String?) {
     if (data.isNullOrEmpty()) {
-        Toast.makeText(context, "下载失败:网页未能提供文件数据", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, context.getString(R.string.webview_toast_download_no_data), Toast.LENGTH_SHORT).show()
         return
     }
     try {
         val bytes = Base64.decode(data, Base64.DEFAULT)
-        val displayName = filename.ifBlank { "下载文件.bin" }
+        val displayName = filename.ifBlank { context.getString(R.string.webview_download_fallback_name) }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             // API 29+:MediaStore 写入公共 Downloads,无需任何存储权限
             val resolver = context.contentResolver
@@ -1046,7 +1065,7 @@ private fun saveBlob(context: Context, filename: String, mimetype: String?, data
             }
             val uri = resolver.insert(collection, values)
             if (uri == null) {
-                Toast.makeText(context, "保存失败:无法创建文件", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.webview_toast_save_create_failed), Toast.LENGTH_SHORT).show()
                 return
             }
             resolver.openOutputStream(uri)?.use { it.write(bytes) }
@@ -1063,10 +1082,10 @@ private fun saveBlob(context: Context, filename: String, mimetype: String?, data
                 context, arrayOf(file.absolutePath), arrayOf(mimetype ?: "*/*"), null
             )
         }
-        Toast.makeText(context, "已保存:$displayName", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, context.getString(R.string.webview_toast_saved, displayName), Toast.LENGTH_SHORT).show()
     } catch (e: Exception) {
         Log.w("Save", "保存失败", e)
-        Toast.makeText(context, "保存失败,请稍后重试", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, context.getString(R.string.webview_toast_save_failed), Toast.LENGTH_SHORT).show()
     }
 }
 
@@ -1096,7 +1115,7 @@ private fun shareUrl(context: Context, title: String, url: String) {
         putExtra(Intent.EXTRA_SUBJECT, title)
         putExtra(Intent.EXTRA_TEXT, url)
     }
-    context.startActivity(Intent.createChooser(intent, "分享"))
+    context.startActivity(Intent.createChooser(intent, context.getString(R.string.common_share)))
 }
 
 /**
@@ -1131,7 +1150,7 @@ private fun handleExternalUri(context: Context, uri: Uri) {
                         .addCategory(Intent.CATEGORY_BROWSABLE)
                 )
             } else {
-                Toast.makeText(context, "未找到可打开此链接的应用", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.webview_toast_no_app_for_link), Toast.LENGTH_SHORT).show()
             }
         } else {
             // weixin://、mailto:、tel:、sms: 等普通自定义 scheme
@@ -1140,9 +1159,9 @@ private fun handleExternalUri(context: Context, uri: Uri) {
             )
         }
     } catch (e: android.content.ActivityNotFoundException) {
-        Toast.makeText(context, "未找到可打开此链接的应用", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, context.getString(R.string.webview_toast_no_app_for_link), Toast.LENGTH_SHORT).show()
     } catch (e: Exception) {
-        Toast.makeText(context, "无法打开此链接", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, context.getString(R.string.webview_toast_open_link_failed), Toast.LENGTH_SHORT).show()
     }
 }
 
@@ -1220,28 +1239,30 @@ private fun WebBottomBar(
         ) {
             WebBarItem(
                 icon = Icons.AutoMirrored.Outlined.ArrowBack,
-                label = "后退",
+                label = stringResource(R.string.webview_bar_back),
                 enabled = canGoBack,
                 onClick = onBack,
                 modifier = Modifier.weight(1f)
             )
             WebBarItem(
                 icon = Icons.AutoMirrored.Outlined.ArrowForward,
-                label = "前进",
+                label = stringResource(R.string.webview_bar_forward),
                 enabled = canGoForward,
                 onClick = onForward,
                 modifier = Modifier.weight(1f)
             )
             WebBarItem(
                 icon = if (readerActive) Icons.Outlined.WebAsset else Icons.AutoMirrored.Outlined.MenuBook,
-                label = if (readerActive) "退出阅读" else "阅读模式",
+                label = stringResource(
+                    if (readerActive) R.string.webview_bar_exit_reader else R.string.webview_bar_reader
+                ),
                 enabled = !readerLoading,
                 onClick = onToggleReader,
                 modifier = Modifier.weight(1f)
             )
             WebBarItem(
                 icon = Icons.Outlined.Share,
-                label = "分享",
+                label = stringResource(R.string.common_share),
                 enabled = true,
                 onClick = onShare,
                 modifier = Modifier.weight(1f)

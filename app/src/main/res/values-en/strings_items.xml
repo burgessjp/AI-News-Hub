@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Items / Search / Browsing history + HackerNews strings. Terminology: see values/strings_common.xml header. -->
+<resources>
+    <!-- ===== HackerNews list / comments ===== -->
+    <string name="hn_no_title">(no title)</string>
+    <plurals name="hn_points">
+        <item quantity="one">%1$d point</item>
+        <item quantity="other">%1$d points</item>
+    </plurals>
+    <plurals name="hn_comments">
+        <item quantity="one">%1$d comment</item>
+        <item quantity="other">%1$d comments</item>
+    </plurals>
+    <string name="hn_comments_title">Comments</string>
+    <string name="hn_comments_empty_title">No comments yet</string>
+    <string name="hn_comments_empty_subtitle">Join the discussion on the original post</string>
+    <string name="hn_view_original">View original</string>
+    <string name="hn_view_discussion">View discussion</string>
+    <string name="hn_comment_dead">Collapsed</string>
+    <string name="hn_replies_loading">Loading</string>
+    <string name="hn_replies_load_failed">Failed to load, tap to retry</string>
+    <string name="hn_replies_collapse">Collapse</string>
+    <plurals name="hn_view_replies">
+        <item quantity="one">View %1$d reply</item>
+        <item quantity="other">View %1$d replies</item>
+    </plurals>
+
+    <!-- ===== Translate button (InlineTranslateButton) ===== -->
+    <string name="items_translating">Translating…</string>
+    <string name="items_show_translation">Show translation</string>
+    <string name="items_hide_translation">Hide translation</string>
+    <string name="items_translate_failed_retry">Translation failed, retry</string>
+
+    <!-- ===== Items list ===== -->
+    <string name="items_category_all">All</string>
+    <string name="items_refresh_hint_button">Tap the button below to refresh</string>
+    <string name="items_try_other_keyword">Try a different keyword</string>
+    <string name="items_open">Open</string>
+    <string name="items_clear">Clear</string>
+    <string name="items_no_more">No more items</string>
+
+    <!-- ===== Search ===== -->
+    <string name="search_hint">Search AI news…</string>
+    <string name="search_empty_title">Search AI news</string>
+    <string name="search_empty_subtitle">Try keywords like \"Claude\", \"OpenAI\", \"robots\"</string>
+    <string name="search_error_title">Search failed</string>
+    <string name="search_no_result_title">No results found</string>
+    <string name="search_history_title">Search history</string>
+    <string name="search_hot_title">Trending</string>
+
+    <!-- ===== Browsing history ===== -->
+    <string name="history_title">History</string>
+    <string name="history_deleted">Deleted</string>
+    <string name="history_undo">Undo</string>
+    <string name="history_clear_dialog_title">Clear browsing history</string>
+    <plurals name="history_clear_dialog_message">
+        <item quantity="one">This will delete %1$d record. This cannot be undone.</item>
+        <item quantity="other">This will delete all %1$d records. This cannot be undone.</item>
+    </plurals>
+    <string name="history_group_by_time">Time</string>
+    <string name="history_group_by_host">Domain</string>
+    <string name="history_empty_title">No browsing history yet</string>
+    <string name="history_empty_subtitle">Pages you open will appear here</string>
+    <string name="history_delete">Delete</string>
+</resources>

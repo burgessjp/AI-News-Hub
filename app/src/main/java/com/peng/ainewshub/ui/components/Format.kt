@@ -1,5 +1,7 @@
 package com.peng.ainewshub.ui.components
 
+import android.content.Context
+import com.peng.ainewshub.R
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -12,9 +14,13 @@ import java.util.Locale
  *  - [formatRelativeTime]:HackerNews 列表屏与评论屏逐字相同(Unix 秒),合一
  *  - [formatRelative]:LinuxDo 热榜(毫秒,7 天窗口),随 formatCount 一并收口
  *
+ * 国际化:相对时间/日期模式经 [context] 取词(values 中文全集 / values-en 英文),
+ * 调用方传局部化 context(Composable 的 LocalContext 或 `context.localized()`);
+ * `Locale.getDefault()` 已随应用内语言(见 ui/i18n/AppLocale),不再硬编码 Locale.CHINA。
+ *
  * 刻意不收口的(输入/输出均不同,非重复实现):
  *  - NewsCard.kt 的 absoluteTime/dayLabel/relativeTime:输入是 ISO 字符串(UTC),
- *    输出为时分 / 今天昨天 / 无空格「N分钟前」
+ *    输出为时分 / 今天昨天 / 无空格「N分钟前」(紧凑 plurals 变体)
  *  - BrowseHistoryScreen.formatRelativeAgo:毫秒输入但更早窗口显示「MM-dd HH:mm」
  */
 
@@ -29,28 +35,37 @@ fun formatCount(n: Int): String = when {
 }
 
 /** 把 Unix 秒级时间戳转成相对时间(如 "3 小时前";超过 30 天显示 yyyy-MM-dd)。 */
-fun formatRelativeTime(unixSeconds: Long): String {
+fun formatRelativeTime(context: Context, unixSeconds: Long): String {
+    val res = context.resources
     val now = System.currentTimeMillis()
     val diff = now - unixSeconds * 1000L
     val minutes = diff / 60_000L
     return when {
-        minutes < 1 -> "刚刚"
-        minutes < 60 -> "${minutes} 分钟前"
-        minutes < 60 * 24 -> "${minutes / 60} 小时前"
-        minutes < 60 * 24 * 30 -> "${minutes / (60 * 24)} 天前"
-        else -> SimpleDateFormat("yyyy-MM-dd", Locale.CHINA).format(Date(unixSeconds * 1000L))
+        minutes < 1 -> context.getString(R.string.time_just_now)
+        minutes < 60 -> minutes.toInt().let { res.getQuantityString(R.plurals.time_minutes_ago, it, it) }
+        minutes < 60 * 24 -> (minutes / 60).toInt().let { res.getQuantityString(R.plurals.time_hours_ago, it, it) }
+        minutes < 60 * 24 * 30 -> (minutes / (60 * 24)).toInt().let { res.getQuantityString(R.plurals.time_days_ago, it, it) }
+        else -> SimpleDateFormat(context.getString(R.string.date_fmt_full), Locale.getDefault()).format(Date(unixSeconds * 1000L))
     }
 }
 
 /** 相对时间(毫秒):「刚刚 / N分钟前 / N小时前 / N天前 / 超过 7 天显 MM-dd」。 */
-fun formatRelative(tsMillis: Long): String {
+fun formatRelative(context: Context, tsMillis: Long): String {
+    val res = context.resources
     val diff = System.currentTimeMillis() - tsMillis
     val minutes = diff / 60_000L
     return when {
-        minutes < 1 -> "刚刚"
-        minutes < 60 -> "${minutes}分钟前"
-        minutes < 60 * 24 -> "${minutes / 60}小时前"
-        minutes < 60 * 24 * 7 -> "${minutes / (60 * 24)}天前"
-        else -> SimpleDateFormat("MM-dd", Locale.CHINA).format(Date(tsMillis))
+        minutes < 1 -> context.getString(R.string.time_just_now)
+        minutes < 60 -> minutes.toInt().let { res.getQuantityString(R.plurals.time_minutes_ago_compact, it, it) }
+        minutes < 60 * 24 -> (minutes / 60).toInt().let { res.getQuantityString(R.plurals.time_hours_ago_compact, it, it) }
+        minutes < 60 * 24 * 7 -> (minutes / (60 * 24)).toInt().let { res.getQuantityString(R.plurals.time_days_ago_compact, it, it) }
+        else -> SimpleDateFormat(context.getString(R.string.date_fmt_month_day_dash), Locale.getDefault()).format(Date(tsMillis))
     }
 }
+
+/**
+ * DayOfWeek(1=周一..7=周日)→ 本地化短星期名(「周二」/ "Tue")。
+ * 手工表而非 SimpleDateFormat "E":中文 "E" 输出「星期二」,与 App 旧样式「周二」不符。
+ */
+fun weekdayLabel(context: Context, dayOfWeek: Int): String =
+    context.resources.getStringArray(R.array.weekdays)[(dayOfWeek - 1).coerceIn(0, 6)]

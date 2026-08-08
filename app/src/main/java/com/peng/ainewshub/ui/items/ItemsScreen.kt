@@ -1,4 +1,6 @@
 package com.peng.ainewshub.ui.items
+import androidx.compose.ui.res.stringResource
+import com.peng.ainewshub.R
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -188,10 +190,10 @@ fun ItemsScreen(
                         if (data.isEmpty()) {
                             // 空态场景化:搜索无结果给「换关键词」恢复路径;非搜索空态给刷新动作
                             EmptyState(
-                                title = if (filter.isSearching) "未找到相关内容" else "暂无内容",
-                                subtitle = if (filter.isSearching) "换个关键词试试" else "点下方按钮刷新看看",
+                                title = stringResource(if (filter.isSearching) R.string.common_no_result else R.string.common_empty),
+                                subtitle = stringResource(if (filter.isSearching) R.string.items_try_other_keyword else R.string.items_refresh_hint_button),
                                 icon = if (filter.isSearching) Icons.Outlined.SearchOff else Icons.Outlined.Inbox,
-                                actionLabel = if (filter.isSearching) null else "刷新一下",
+                                actionLabel = if (filter.isSearching) null else stringResource(R.string.common_refresh_once),
                                 onAction = if (filter.isSearching) null else ({ vm.refresh() })
                             )
                         } else {
@@ -303,7 +305,7 @@ fun ItemsScreen(
                     bottom = if (reserveBottomBarSpace) BottomBarReservedHeight else 24.dp
                 )
             ) {
-                Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "返回顶部")
+                Icon(Icons.Filled.KeyboardArrowUp, contentDescription = stringResource(R.string.common_back_to_top))
             }
         }
     }
@@ -334,13 +336,13 @@ private fun ListFooter(loading: Boolean, done: Boolean) {
                     color = MaterialTheme.colorScheme.primary
                 )
                 Text(
-                    "加载中…",
+                    stringResource(R.string.common_loading),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             done -> Text(
-                "已加载全部",
+                stringResource(R.string.common_all_loaded),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -368,7 +370,7 @@ private fun CategoryChips(
             FilterChip(
                 selected = selected == null,
                 onClick = { onSelect(null) },
-                label = { Text("全部") },
+                label = { Text(stringResource(R.string.items_category_all)) },
                 // 完全圆角(药丸),对齐设计系统的 pill 形标签
                 shape = CircleShape,
                 border = androidx.compose.foundation.BorderStroke(
@@ -386,7 +388,7 @@ private fun CategoryChips(
                 FilterChip(
                     selected = selected == cat,
                     onClick = { onSelect(cat) },
-                    label = { Text(cat.zh) },
+                    label = { Text(stringResource(cat.labelRes)) },
                     shape = CircleShape,
                     border = androidx.compose.foundation.BorderStroke(
                         1.dp,

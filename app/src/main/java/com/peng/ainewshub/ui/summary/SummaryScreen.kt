@@ -27,9 +27,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.peng.ainewshub.R
 import com.peng.ainewshub.ui.SummaryViewModel
 import com.peng.ainewshub.ui.UiState
 import com.peng.ainewshub.ui.components.AppTopBar
@@ -103,8 +105,9 @@ fun SummaryScreen(
         }
     }
 
-    // 顶栏日期(与精选 tab 同规格「M月d日 · 周x」):组合期算一次即可
-    val dateText = remember { formatToday() }
+    // 顶栏日期(与精选 tab 同规格「M月d日 · 周x」):组合期算一次即可;模式串随界面语言
+    val datePattern = stringResource(R.string.date_fmt_month_day_week)
+    val dateText = remember(datePattern) { formatToday(datePattern) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
@@ -112,7 +115,7 @@ fun SummaryScreen(
             // 一级根 tab 规格(对齐总览/更多):titleHero 主标题 + 右侧日期,保留刷新。
             // horizontalPadding=18 让标题与下方内容(18dp 边距)左对齐
             AppTopBar(
-                title = "AI 摘要",
+                title = stringResource(R.string.summary_title),
                 horizontalPadding = 18.dp,
                 actions = {
                     // 刷新按钮在左(刷新中转圈),日期文案在右;
@@ -129,7 +132,7 @@ fun SummaryScreen(
                         IconButton(onClick = { vm.refresh() }, modifier = Modifier.size(32.dp)) {
                             Icon(
                                 Icons.Filled.Refresh,
-                                contentDescription = "刷新",
+                                contentDescription = stringResource(R.string.common_refresh),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(18.dp)
                             )
@@ -182,8 +185,8 @@ fun SummaryScreen(
     }
 }
 
-/** 今天日期(系统时区),格式「M月d日 · 周x」,与精选 tab 顶栏日期同规格。 */
-private fun formatToday(): String =
+/** 今天日期(系统时区),格式「M月d日 · 周x」(模式串 date_fmt_month_day_week 随语言),与精选 tab 顶栏日期同规格。 */
+private fun formatToday(pattern: String): String =
     runCatching {
-        SimpleDateFormat("M月d日 · E", Locale.CHINA).format(Date())
+        SimpleDateFormat(pattern, Locale.getDefault()).format(Date())
     }.getOrDefault("")

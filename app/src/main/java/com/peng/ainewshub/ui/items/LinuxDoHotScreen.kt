@@ -1,4 +1,5 @@
 package com.peng.ainewshub.ui.items
+import androidx.compose.ui.platform.LocalContext
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -43,6 +44,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import androidx.compose.ui.res.stringResource
+import com.peng.ainewshub.R
 import com.peng.ainewshub.data.LinuxDoTopic
 import com.peng.ainewshub.data.source.SourceMode
 import com.peng.ainewshub.ui.EmptyState
@@ -95,13 +98,13 @@ fun LinuxDoHotScreen(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             AppTopBar(
-                title = "LinuxDo 热榜",
+                title = stringResource(R.string.sources_linuxdo_hot_title),
                 titleFontSize = AppTopBarDefaults.secondaryTitleFontSize,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "返回"
+                            contentDescription = stringResource(R.string.common_back)
                         )
                     }
                 }
@@ -120,10 +123,10 @@ fun LinuxDoHotScreen(
                     if (topics.isEmpty()) {
                         // 数据缺失空态:给刷新恢复路径
                         EmptyState(
-                            title = "暂无内容",
-                            subtitle = "下拉或点下方按钮刷新看看",
+                            title = stringResource(R.string.common_empty),
+                            subtitle = stringResource(R.string.common_refresh_hint),
                             icon = Icons.Outlined.Inventory2,
-                            actionLabel = "刷新一下",
+                            actionLabel = stringResource(R.string.common_refresh_once),
                             onAction = { vm.forceRefresh() }
                         )
                     } else {
@@ -213,7 +216,7 @@ private fun LinuxDoRow(
             ) {
                 Icon(
                     imageVector = Icons.Filled.PushPin,
-                    contentDescription = "置顶",
+                    contentDescription = stringResource(R.string.sources_linuxdo_pinned),
                     tint = cs.onTertiaryContainer,
                     modifier = Modifier.size(14.dp)
                 )
@@ -297,7 +300,7 @@ private fun LinuxDoRow(
                 if (topic.createdAtMs > 0) {
                     Spacer(Modifier.width(2.dp))
                     Text(
-                        text = formatRelative(topic.createdAtMs),
+                        text = formatRelative(LocalContext.current, topic.createdAtMs),
                         style = MaterialTheme.typography.labelSmall,
                         color = cs.onSurfaceVariant,
                         maxLines = 1
