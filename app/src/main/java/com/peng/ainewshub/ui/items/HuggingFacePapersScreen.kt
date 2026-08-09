@@ -1,5 +1,6 @@
 package com.peng.ainewshub.ui.items
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -9,13 +10,16 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.ThumbUp
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -26,6 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -48,6 +53,7 @@ import com.peng.ainewshub.ui.components.StatBadge
 import com.peng.ainewshub.ui.components.formatCount
 import com.peng.ainewshub.ui.components.updateTimeHeader
 import com.peng.ainewshub.ui.theme.AppText
+import com.peng.ainewshub.ui.theme.AppAlpha
 import androidx.compose.material3.ExperimentalMaterial3Api
 
 /**
@@ -106,6 +112,7 @@ fun HuggingFacePapersScreen(
                 translateEnabled = config.translateEnabled,
                 translationState = translationStates[paper.id] ?: TranslationState.Idle,
                 onClick = { onOpenUrl(paper.url, paper.title) },
+                onOpenGithub = { onOpenUrl(paper.githubUrl, paper.title) },
                 onTranslate = { vm.translatePaper(paper) }
             )
             RowDividerIfNeeded(index, papers.size)
@@ -130,6 +137,7 @@ private fun PaperRow(
     translateEnabled: Boolean,
     translationState: TranslationState,
     onClick: () -> Unit,
+    onOpenGithub: () -> Unit,
     onTranslate: () -> Unit
 ) {
     val cs = MaterialTheme.colorScheme
@@ -216,7 +224,54 @@ private fun PaperRow(
                         value = item.authors
                     )
                 }
+                // GitHub 代码入口:论文关联仓库(部分论文带)。可点胶囊,点击经 onOpenUrl 走内置
+                // WebView(与论文页同入口,统一记录浏览历史)。与 StatBadge 同语言但加 clickable。
+                if (item.githubUrl.isNotBlank()) {
+                    GithubCodeChip(onClick = onOpenGithub)
+                }
             }
         }
+    }
+}
+
+/**
+ * GitHub 代码入口胶囊 —— 论文行的 meta 末位,论文带关联仓库时显示。
+ *
+ * 视觉与 [StatBadge] 同语言(Code 图标 14dp + "Code" 文案),但额外:
+ *  - 底色 primary.badgeOverlay 浅胶囊,与纯文本 StatBadge 拉开层次、提示可点;
+ *  - clickable 消费点击事件,避免触发整行论文页跳转;
+ *  - tint 用 primary,呼应「代码」入口的强调语义。
+ *
+ * @param onClick 点击打开 GitHub 仓库(经外层 onOpenUrl 走内置 WebView)
+ */
+@Composable
+private fun GithubCodeChip(onClick: () -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    Row(
+        modifier = Modifier
+            .clip(MaterialTheme.shapes.small)
+            .background(cs.primary.copy(alpha = AppAlpha.badgeOverlay))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = androidx.compose.material3.ripple(),
+                onClick = onClick
+            )
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Code,
+            contentDescription = null,
+            tint = cs.primary,
+            modifier = Modifier.size(14.dp)
+        )
+        Spacer(Modifier.width(3.dp))
+        Text(
+            text = stringResource(R.string.items_view_code),
+            style = AppText.bodySmall,
+            color = cs.primary,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1
+        )
     }
 }

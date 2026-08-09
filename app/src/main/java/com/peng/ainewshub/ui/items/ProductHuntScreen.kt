@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -28,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -213,6 +215,20 @@ private fun ProductRow(
                 TranslatedText(translated = translationState.translated)
             }
 
+            // ②.6 话题标签(topics):至多 3 个,扁平小胶囊(对齐总览页 SourceChip 写法),
+            //   弱色不抢 upvotes 焦点;纯展示不可点(点击区留给整行跳产品页)。
+            if (item.topics.isNotEmpty()) {
+                Spacer(Modifier.height(6.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    item.topics.take(3).forEach { topic ->
+                        TopicChip(topic)
+                    }
+                }
+            }
+
             // ③ meta:upvotes(primary 强调)· 评论数
             Spacer(Modifier.height(6.dp))
             Row(
@@ -232,5 +248,31 @@ private fun ProductRow(
                 )
             }
         }
+    }
+}
+
+/**
+ * 话题标签胶囊 —— Product Hunt 产品行的话题标签(如 "Artificial Intelligence")。
+ *
+ * 视觉对齐总览页 SourceChip:surfaceContainerHigh 底衬 + caption 弱色文字 + CircleShape。
+ * 纯展示不可点(整行已可点跳产品页)。用 onSurfaceVariant 保持低调,不抢 upvotes 的 primary 焦点。
+ *
+ * @param topic 话题名(原样展示)
+ */
+@Composable
+private fun TopicChip(topic: String) {
+    val cs = MaterialTheme.colorScheme
+    Box(
+        modifier = Modifier
+            .clip(CircleShape)
+            .background(cs.surfaceContainerHigh)
+            .padding(horizontal = 8.dp, vertical = 2.dp)
+    ) {
+        Text(
+            text = topic,
+            style = AppText.caption,
+            color = cs.onSurfaceVariant,
+            maxLines = 1
+        )
     }
 }

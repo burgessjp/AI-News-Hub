@@ -30,6 +30,8 @@
     <string name="items_show_translation">Show translation</string>
     <string name="items_hide_translation">Hide translation</string>
     <string name="items_translate_failed_retry">Translation failed, retry</string>
+    <!-- HuggingFace paper row GitHub code entry chip label -->
+    <string name="items_view_code">Code</string>
 
     <!-- ===== GitHub Trending ===== -->
     <string name="trending_stars_today">%1$s today</string>

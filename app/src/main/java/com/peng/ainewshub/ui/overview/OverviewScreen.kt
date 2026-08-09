@@ -25,6 +25,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.HourglassEmpty
@@ -65,6 +66,7 @@ import com.peng.ainewshub.ui.components.BottomBarPillHeight
 import com.peng.ainewshub.ui.components.BrandWordmark
 import com.peng.ainewshub.ui.components.HairlineDivider
 import com.peng.ainewshub.ui.components.RankBadge
+import com.peng.ainewshub.ui.components.RankRowSkeletonList
 import com.peng.ainewshub.ui.theme.AppAlpha
 import com.peng.ainewshub.ui.theme.AppText
 import com.peng.ainewshub.ui.theme.BrandGradient
@@ -186,22 +188,91 @@ fun OverviewScreen(
     }
 }
 
-/** 加载中:转圈 + 预期耗时说明(AI 长输出,避免用户误以为卡死)。 */
+/**
+ * 加载中:匹配内容态布局的骨架屏(头条 Hero 渐变块 + 4 条排名行),避免转圈→内容态
+ * 的结构跳变。底部保留原「AI 正在生成」文案(AI 长输出,避免用户误以为卡死)。
+ *
+ * Hero 骨架用 [BrandGradient] 通栏块占位(与真实 Hero 同区位),内部用 onPrimary 半透
+ * ShimmerBox 占标题/指标行位;下方直接复用 [RankRowSkeletonList]。
+ */
 @Composable
 private fun OverviewLoading() {
-    Column(
+    val cs = MaterialTheme.colorScheme
+    LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        // 与 OverviewContent 同款末项留白(药丸高 + 16dp 呼吸空间)
+        contentPadding = PaddingValues(bottom = BottomBarPillHeight + 16.dp)
     ) {
-        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-        Spacer(Modifier.height(16.dp))
-        Text(
-            text = stringResource(R.string.overview_loading),
-            style = AppText.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        // 头条 Hero 骨架:BrandGradient 通栏块,内部 onPrimary 半透占位块
+        item(key = "hero_skeleton") {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(BrandGradient)
+                    .padding(horizontal = 18.dp, vertical = 16.dp)
+            ) {
+                // RankBadge + BreakingTag 占位行
+                HeroShimmerBox(modifier = Modifier.size(24.dp), cornerRadius = 6.dp)
+                Spacer(Modifier.height(10.dp))
+                // 标题占位(两行,较宽)
+                HeroShimmerBox(modifier = Modifier.fillMaxWidth(0.92f).height(20.dp))
+                Spacer(Modifier.height(6.dp))
+                HeroShimmerBox(modifier = Modifier.fillMaxWidth(0.75f).height(20.dp))
+                Spacer(Modifier.height(6.dp))
+                // AI 一句话占位(两行,较窄)
+                HeroShimmerBox(modifier = Modifier.fillMaxWidth(0.85f).height(12.dp))
+                Spacer(Modifier.height(4.dp))
+                HeroShimmerBox(modifier = Modifier.fillMaxWidth(0.6f).height(12.dp))
+                Spacer(Modifier.height(10.dp))
+                // 底部来源胶囊 + 指标占位
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    HeroShimmerBox(modifier = Modifier.size(48.dp, 16.dp), cornerRadius = 8.dp)
+                    HeroShimmerBox(modifier = Modifier.size(80.dp, 14.dp), cornerRadius = 4.dp)
+                }
+            }
+        }
+        // 2~10 名排名行骨架(复用通用 RankRowSkeletonList)
+        item(key = "rows_skeleton") {
+            RankRowSkeletonList(count = 4)
+        }
+        // 底部「AI 正在生成」文案(保留原语义提示,居中弱色)
+        item(key = "loading_hint") {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                CircularProgressIndicator(
+                    color = cs.primary,
+                    strokeWidth = 2.dp,
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = stringResource(R.string.overview_loading),
+                    style = AppText.bodySmall,
+                    color = cs.onSurfaceVariant
+                )
+            }
+        }
     }
+}
+
+/**
+ * Hero 骨架占位块 —— 在 [BrandGradient] 深色底上用 onPrimary 半透静态块占位
+ *(Hero 区不做 shimmer 动画,与渐变底叠加会显脏;静态半透块足够表达结构)。
+ */
+@Composable
+private fun HeroShimmerBox(
+    modifier: Modifier,
+    cornerRadius: androidx.compose.ui.unit.Dp = 6.dp
+) {
+    val cs = MaterialTheme.colorScheme
+    Box(
+        modifier = modifier
+            .clip(androidx.compose.foundation.shape.RoundedCornerShape(cornerRadius))
+            .background(cs.onPrimary.copy(alpha = AppAlpha.onPrimaryOverlay))
+    )
 }
 
 @Composable
@@ -375,12 +446,21 @@ private fun OverviewHero(entry: OverviewEntry, onClick: () -> Unit) {
             }
             if (entry.metrics.isNotBlank()) {
                 Spacer(Modifier.size(8.dp))
+                // 指标提权:前缀 TrendingUp 图标,与各源列表页 StatBadge「图标+数值」节奏对齐
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.TrendingUp,
+                    contentDescription = null,
+                    tint = cs.onPrimary.copy(alpha = AppAlpha.primaryEmphasis),
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(Modifier.size(3.dp))
                 Text(
                     text = entry.metrics,
                     style = AppText.caption,
-                    color = cs.onPrimary,
+                    color = cs.onPrimary.copy(alpha = AppAlpha.primaryEmphasis),
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    fontWeight = FontWeight.SemiBold
                 )
             }
         }
@@ -476,6 +556,14 @@ private fun TopEntryRow(
                 SourceChip(title = SummaryRepository.titleOf(LocalContext.current, entry.source))
                 if (entry.metrics.isNotBlank()) {
                     Spacer(Modifier.size(8.dp))
+                    // 指标提权:前缀 TrendingUp 图标,与各源列表页 StatBadge 节奏对齐
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.TrendingUp,
+                        contentDescription = null,
+                        tint = cs.onSurfaceVariant,
+                        modifier = Modifier.size(13.dp)
+                    )
+                    Spacer(Modifier.size(3.dp))
                     Text(
                         text = entry.metrics,
                         style = AppText.caption,

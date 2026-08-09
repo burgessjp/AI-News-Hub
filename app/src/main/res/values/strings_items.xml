@@ -37,6 +37,8 @@
     <string name="items_show_translation">显示译文</string>
     <string name="items_hide_translation">收起译文</string>
     <string name="items_translate_failed_retry">翻译失败,重试</string>
+    <!-- HuggingFace 论文行 GitHub 代码入口胶囊文案 -->
+    <string name="items_view_code">代码</string>
 
     <!-- ===== GitHub Trending ===== -->
     <!-- 今日新增 stars(「1.2k 今日新增」) -->
