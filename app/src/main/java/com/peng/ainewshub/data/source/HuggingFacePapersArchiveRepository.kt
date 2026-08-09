@@ -2,6 +2,7 @@ package com.peng.ainewshub.data.source
 
 import com.peng.ainewshub.data.HuggingFacePaper
 import com.peng.ainewshub.data.HuggingFacePapersResult
+import com.peng.ainewshub.data.SourceKeys
 import org.json.JSONObject
 
 /**
@@ -20,7 +21,7 @@ class HuggingFacePapersArchiveRepository : HuggingFacePapersSource {
     override suspend fun forceRefresh(): HuggingFacePapersResult = load()
 
     private suspend fun load(): HuggingFacePapersResult {
-        val (fetchedAt, papers) = ArchiveHttpClient.fetchItemsList(SOURCE_KEY) { obj, i ->
+        val (fetchedAt, papers) = ArchiveHttpClient.fetchItemsList(SourceKeys.HUGGINGFACE_PAPERS) { obj, i ->
             val id = obj.optString("id")
             val title = obj.optString("title")
             // id 与 title 必有(对齐 fetch_data.py:缺则跳过)
@@ -38,9 +39,5 @@ class HuggingFacePapersArchiveRepository : HuggingFacePapersSource {
             )
         }
         return HuggingFacePapersResult(fetchedAt, papers)
-    }
-
-    private companion object {
-        const val SOURCE_KEY = "huggingface-papers"
     }
 }

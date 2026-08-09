@@ -43,6 +43,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.peng.ainewshub.R
+import com.peng.ainewshub.data.SourceKeys
 import com.peng.ainewshub.data.SourceSummary
 import com.peng.ainewshub.data.SummaryContent
 import com.peng.ainewshub.data.SummaryItem
@@ -267,14 +268,14 @@ private fun SummaryHairline() {
 private fun sourceAccentOf(source: String): Color {
     val cs = MaterialTheme.colorScheme
     return when (source) {
-        "hackernews" -> cs.tertiary            // 暖橙,呼应 HN 品牌与热度语义
-        "github-trending" -> cs.primary
-        "huggingface-papers" -> cs.primary
-        "stormzhang-ai" -> cs.secondary        // 品牌紫,贴「AI 资讯」语义
-        "producthunt" -> cs.primary            // PH 品牌橙红由 SourceBrand 承载,卡片用 primary
-        "rundown-ai" -> cs.secondary           // 品牌紫,贴「AI newsletter」语义(与 stormzhang 同系)
-        "openai-anthropic-news" -> cs.tertiary // 暖橙,呼应 OpenAI 品牌绿与厂商动态热度语义
-        "aihot-featured" -> cs.primary         // 自家源,品牌 Future Blue 由 SourceBrand.AiHot 承载,卡片用 primary
+        SourceKeys.HACKERNEWS -> cs.tertiary            // 暖橙,呼应 HN 品牌与热度语义
+        SourceKeys.GITHUB_TRENDING -> cs.primary
+        SourceKeys.HUGGINGFACE_PAPERS -> cs.primary
+        SourceKeys.STORMZHANG_AI -> cs.secondary        // 品牌紫,贴「AI 资讯」语义
+        SourceKeys.PRODUCTHUNT -> cs.primary            // PH 品牌橙红由 SourceBrand 承载,卡片用 primary
+        SourceKeys.RUNDOWN_AI -> cs.secondary           // 品牌紫,贴「AI newsletter」语义(与 stormzhang 同系)
+        SourceKeys.OPENAI_ANTHROPIC_NEWS -> cs.tertiary // 暖橙,呼应 OpenAI 品牌绿与厂商动态热度语义
+        SourceKeys.AIHOT_FEATURED -> cs.primary         // 自家源,品牌 Future Blue 由 SourceBrand.AiHot 承载,卡片用 primary
         else -> cs.primary
     }
 }

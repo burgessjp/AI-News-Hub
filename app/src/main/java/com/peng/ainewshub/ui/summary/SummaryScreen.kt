@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.peng.ainewshub.R
+import com.peng.ainewshub.data.SourceKeys
 import com.peng.ainewshub.ui.SummaryViewModel
 import com.peng.ainewshub.ui.UiState
 import com.peng.ainewshub.ui.components.AppTopBar
@@ -80,14 +81,14 @@ fun SummaryScreen(
     // 页拖拽自定义的顺序)。标题 / 图标来自 sourceMeta 单点定义。
     val cards = summaryCardSpecs(sourceKeys) { source ->
         when (source) {
-            "hackernews" -> onOpenHackerNews
-            "github-trending" -> onOpenGitHubTrending
-            "huggingface-papers" -> onOpenHuggingFacePapers
-            "producthunt" -> onOpenProductHunt
-            "rundown-ai" -> onOpenRundownAi
-            "stormzhang-ai" -> onOpenStormzhangAiNews
-            "openai-anthropic-news" -> onOpenOpenAiAnthropicNews
-            "aihot-featured" -> onOpenFeaturedHub
+            SourceKeys.HACKERNEWS -> onOpenHackerNews
+            SourceKeys.GITHUB_TRENDING -> onOpenGitHubTrending
+            SourceKeys.HUGGINGFACE_PAPERS -> onOpenHuggingFacePapers
+            SourceKeys.PRODUCTHUNT -> onOpenProductHunt
+            SourceKeys.RUNDOWN_AI -> onOpenRundownAi
+            SourceKeys.STORMZHANG_AI -> onOpenStormzhangAiNews
+            SourceKeys.OPENAI_ANTHROPIC_NEWS -> onOpenOpenAiAnthropicNews
+            SourceKeys.AIHOT_FEATURED -> onOpenFeaturedHub
             else -> null
         }
     }

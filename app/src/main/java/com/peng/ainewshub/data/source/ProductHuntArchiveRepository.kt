@@ -1,6 +1,7 @@
 package com.peng.ainewshub.data.source
 
 import com.peng.ainewshub.data.ProductHunt
+import com.peng.ainewshub.data.SourceKeys
 import org.json.JSONObject
 
 /**
@@ -21,13 +22,9 @@ class ProductHuntArchiveRepository : ProductHuntSource {
     override suspend fun forceRefresh(): ProductHuntResult = load()
 
     private suspend fun load(): ProductHuntResult {
-        val (fetchedAt, products) = ArchiveHttpClient.fetchItemsList(SOURCE_KEY) { obj, i ->
+        val (fetchedAt, products) = ArchiveHttpClient.fetchItemsList(SourceKeys.PRODUCTHUNT) { obj, i ->
             ProductHunt.fromJson(obj, fallbackRank = i + 1)
         }
         return ProductHuntResult(fetchedAt, products)
-    }
-
-    private companion object {
-        const val SOURCE_KEY = "producthunt"
     }
 }

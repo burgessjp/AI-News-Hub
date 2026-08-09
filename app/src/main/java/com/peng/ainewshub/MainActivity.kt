@@ -73,7 +73,7 @@ import com.peng.ainewshub.ui.more.AiServiceScreen
 import com.peng.ainewshub.ui.more.FontScale
 import com.peng.ainewshub.ui.more.MoreScreen
 import com.peng.ainewshub.ui.more.SettingsScreen
-import com.peng.ainewshub.ui.more.SourceKeys
+import com.peng.ainewshub.data.SourceKeys
 import com.peng.ainewshub.ui.more.SourcesScreen
 import com.peng.ainewshub.ui.more.FontChoice
 import com.peng.ainewshub.ui.more.ThemeMode

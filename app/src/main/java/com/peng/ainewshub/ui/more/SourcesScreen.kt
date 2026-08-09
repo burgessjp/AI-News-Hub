@@ -47,7 +47,7 @@ import org.burnoutcrew.reorderable.reorderable
 @Composable
 fun SourcesScreen(
     onBack: () -> Unit,
-    /** 点击源行回调,key 来自 [SourceKeys](如 "hackernews")。 */
+    /** 点击源行回调,key 来自 [com.peng.ainewshub.data.SourceKeys](如 "hackernews")。 */
     onOpen: (String) -> Unit
 ) {
     val context = LocalContext.current

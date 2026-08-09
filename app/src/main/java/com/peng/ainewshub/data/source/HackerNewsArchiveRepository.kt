@@ -2,6 +2,7 @@ package com.peng.ainewshub.data.source
 
 import com.peng.ainewshub.data.HackerNewsStory
 import com.peng.ainewshub.data.HackerNewsTopStories
+import com.peng.ainewshub.data.SourceKeys
 
 /**
  * HackerNews 的 [gitcode 归档]数据源实现。
@@ -22,7 +23,7 @@ class HackerNewsArchiveRepository : HackerNewsSource {
     override suspend fun forceRefresh(limit: Int): HackerNewsTopStories = load()
 
     private suspend fun load(): HackerNewsTopStories {
-        val (fetchedAt, stories) = ArchiveHttpClient.fetchItemsList(SOURCE_KEY) { obj, _ ->
+        val (fetchedAt, stories) = ArchiveHttpClient.fetchItemsList(SourceKeys.HACKERNEWS) { obj, _ ->
             val id = obj.optLong("id", -1L)
             if (id <= 0) null
             else HackerNewsStory(
@@ -38,10 +39,5 @@ class HackerNewsArchiveRepository : HackerNewsSource {
             )
         }
         return HackerNewsTopStories(fetchedAt, stories)
-    }
-
-    private companion object {
-        // 对齐 index.json 的 latest 键与目录名(fetch_data.py 中定义)
-        const val SOURCE_KEY = "hackernews"
     }
 }

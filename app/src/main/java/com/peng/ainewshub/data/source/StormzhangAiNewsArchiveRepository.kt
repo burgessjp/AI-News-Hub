@@ -1,6 +1,7 @@
 package com.peng.ainewshub.data.source
 
 import com.peng.ainewshub.data.AppException
+import com.peng.ainewshub.data.SourceKeys
 import com.peng.ainewshub.data.StormzhangAiNews
 import com.peng.ainewshub.data.StormzhangAiNewsResult
 import org.json.JSONObject
@@ -22,7 +23,7 @@ class StormzhangAiNewsArchiveRepository : StormzhangAiNewsSource {
     override suspend fun forceRefresh(): StormzhangAiNewsResult = load()
 
     private suspend fun load(): StormzhangAiNewsResult {
-        val snapshot = ArchiveHttpClient.fetchLatestSnapshot(SOURCE_KEY)
+        val snapshot = ArchiveHttpClient.fetchLatestSnapshot(SourceKeys.STORMZHANG_AI)
         val fetchedAt = snapshot.optLong("fetched_at_ms", System.currentTimeMillis())
         val pageDate = snapshot.optString("pageDate")
         val items = snapshot.optJSONArray("items")
@@ -44,9 +45,5 @@ class StormzhangAiNewsArchiveRepository : StormzhangAiNewsSource {
         }
         if (news.isEmpty()) throw AppException.NoData()
         return StormzhangAiNewsResult(fetchedAt, news, pageDate)
-    }
-
-    private companion object {
-        const val SOURCE_KEY = "stormzhang-ai"
     }
 }

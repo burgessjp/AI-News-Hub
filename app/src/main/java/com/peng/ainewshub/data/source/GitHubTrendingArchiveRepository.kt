@@ -1,5 +1,6 @@
 package com.peng.ainewshub.data.source
 
+import com.peng.ainewshub.data.SourceKeys
 import com.peng.ainewshub.data.TrendingRepo
 import com.peng.ainewshub.data.TrendingResult
 
@@ -19,7 +20,7 @@ class GitHubTrendingArchiveRepository : GitHubTrendingSource {
     override suspend fun forceRefresh(): TrendingResult = load()
 
     private suspend fun load(): TrendingResult {
-        val (fetchedAt, repos) = ArchiveHttpClient.fetchItemsList(SOURCE_KEY) { obj, i ->
+        val (fetchedAt, repos) = ArchiveHttpClient.fetchItemsList(SourceKeys.GITHUB_TRENDING) { obj, i ->
             TrendingRepo(
                 rank = obj.optInt("rank", i + 1),
                 owner = obj.optString("owner"),
@@ -34,9 +35,5 @@ class GitHubTrendingArchiveRepository : GitHubTrendingSource {
             )
         }
         return TrendingResult(fetchedAt, repos)
-    }
-
-    private companion object {
-        const val SOURCE_KEY = "github-trending"
     }
 }

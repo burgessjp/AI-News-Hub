@@ -44,14 +44,14 @@ data class SummaryItem(
  * 纯文本,作回退。这里只保留 key / title 用于 UI 展示与反查。
  */
 private enum class SummarySource(val key: String, @StringRes val titleRes: Int) {
-    HACKERNEWS("hackernews", R.string.source_title_hackernews),
-    GITHUB_TRENDING("github-trending", R.string.source_title_github_trending),
-    HUGGINGFACE_PAPERS("huggingface-papers", R.string.source_title_huggingface),
-    STORMZHANG_AI("stormzhang-ai", R.string.source_title_stormzhang),
-    PRODUCTHUNT("producthunt", R.string.source_title_producthunt),
-    RUNDOWN_AI("rundown-ai", R.string.source_title_rundown),
-    OPENAI_ANTHROPIC_NEWS("openai-anthropic-news", R.string.source_title_openai_anthropic),
-    AIHOT_FEATURED("aihot-featured", R.string.source_title_aihot_featured);
+    HACKERNEWS(SourceKeys.HACKERNEWS, R.string.source_title_hackernews),
+    GITHUB_TRENDING(SourceKeys.GITHUB_TRENDING, R.string.source_title_github_trending),
+    HUGGINGFACE_PAPERS(SourceKeys.HUGGINGFACE_PAPERS, R.string.source_title_huggingface),
+    STORMZHANG_AI(SourceKeys.STORMZHANG_AI, R.string.source_title_stormzhang),
+    PRODUCTHUNT(SourceKeys.PRODUCTHUNT, R.string.source_title_producthunt),
+    RUNDOWN_AI(SourceKeys.RUNDOWN_AI, R.string.source_title_rundown),
+    OPENAI_ANTHROPIC_NEWS(SourceKeys.OPENAI_ANTHROPIC_NEWS, R.string.source_title_openai_anthropic),
+    AIHOT_FEATURED(SourceKeys.AIHOT_FEATURED, R.string.source_title_aihot_featured);
 
     companion object {
         /** 按归档源的 key 反查枚举;未知 key 返回 null。 */

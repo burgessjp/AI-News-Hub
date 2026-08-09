@@ -1,6 +1,7 @@
 package com.peng.ainewshub.data.source
 
 import com.peng.ainewshub.data.RundownAiArticle
+import com.peng.ainewshub.data.SourceKeys
 
 /**
  * The Rundown AI 的 gitcode 归档数据源实现。
@@ -19,13 +20,9 @@ class RundownAiArchiveRepository : RundownAiSource {
     override suspend fun forceRefresh(): RundownAiResult = load()
 
     private suspend fun load(): RundownAiResult {
-        val (fetchedAt, articles) = ArchiveHttpClient.fetchItemsList(SOURCE_KEY) { obj, i ->
+        val (fetchedAt, articles) = ArchiveHttpClient.fetchItemsList(SourceKeys.RUNDOWN_AI) { obj, i ->
             RundownAiArticle.fromJson(obj, fallbackRank = i + 1)
         }
         return RundownAiResult(fetchedAt, articles)
-    }
-
-    private companion object {
-        const val SOURCE_KEY = "rundown-ai"
     }
 }

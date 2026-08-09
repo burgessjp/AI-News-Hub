@@ -13,6 +13,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import com.peng.ainewshub.R
+import com.peng.ainewshub.data.SourceKeys
 
 /**
  * Hub 八源元数据单点定义 —— 信息源页 / 摘要 Tab / 关于页三处的源顺序、图标、标题、
@@ -23,7 +24,8 @@ import com.peng.ainewshub.R
  *   → HuggingFace Papers → Product Hunt → The Rundown AI → AIHot 精选 → stormzhang AI。
  *   此为全 App 默认顺序,信息源页可拖拽自定义(持久化于 [SettingsStore.sourceOrderFlow]),
  *   摘要 Tab 跟随用户顺序,关于页固定用此默认顺序。
- * - **源 key**:与归档源 key(见 [com.peng.ainewshub.data.SummaryRepository])完全一致,
+ * - **源 key**:字面量集中定义于 [com.peng.ainewshub.data.SourceKeys](data 层),
+ *   与归档源 key(见 [com.peng.ainewshub.data.SummaryRepository])完全一致,
  *   摘要 Tab / PagerState pageCount 均按 key 列表驱动。
  * - **品牌色**:[brand] 复用 [SourceBrand](颜色收口仍归 SourceBrandColors.kt,本文件只引用)。
  */
@@ -78,18 +80,6 @@ fun sourceMeta(key: String): SourceMeta = when (key) {
         stringResource(R.string.source_title_stormzhang), stringResource(R.string.source_subtitle_stormzhang), "https://news.stormzhang.ai"
     )
     else -> error("未知源 key: $key")
-}
-
-/** 八源 key 字面量集中定义,避免散落字符串。 */
-object SourceKeys {
-    const val HACKERNEWS = "hackernews"
-    const val GITHUB_TRENDING = "github-trending"
-    const val OPENAI_ANTHROPIC_NEWS = "openai-anthropic-news"
-    const val HUGGINGFACE_PAPERS = "huggingface-papers"
-    const val PRODUCTHUNT = "producthunt"
-    const val RUNDOWN_AI = "rundown-ai"
-    const val AIHOT_FEATURED = "aihot-featured"
-    const val STORMZHANG_AI = "stormzhang-ai"
 }
 
 /**

@@ -1,6 +1,7 @@
 package com.peng.ainewshub.data.source
 
 import com.peng.ainewshub.data.OpenAiAnthropicNews
+import com.peng.ainewshub.data.SourceKeys
 
 /**
  * OpenAI x Anthropic 厂商动态的 [gitcode 归档]数据源实现。
@@ -19,13 +20,9 @@ class OpenAiAnthropicNewsArchiveRepository : OpenAiAnthropicNewsSource {
     override suspend fun forceRefresh(): OpenAiAnthropicNewsResult = load()
 
     private suspend fun load(): OpenAiAnthropicNewsResult {
-        val (fetchedAt, articles) = ArchiveHttpClient.fetchItemsList(SOURCE_KEY) { obj, i ->
+        val (fetchedAt, articles) = ArchiveHttpClient.fetchItemsList(SourceKeys.OPENAI_ANTHROPIC_NEWS) { obj, i ->
             OpenAiAnthropicNews.fromJson(obj, fallbackRank = i + 1)
         }
         return OpenAiAnthropicNewsResult(fetchedAt, articles)
-    }
-
-    private companion object {
-        const val SOURCE_KEY = "openai-anthropic-news"
     }
 }
