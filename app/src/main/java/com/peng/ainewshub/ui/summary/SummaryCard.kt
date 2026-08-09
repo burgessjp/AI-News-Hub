@@ -2,7 +2,6 @@ package com.peng.ainewshub.ui.summary
 
 import android.content.Context
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -18,7 +17,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -28,6 +29,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,7 +55,6 @@ import com.peng.ainewshub.ui.anim.Motion
 import com.peng.ainewshub.ui.components.BottomBarPillHeight
 import com.peng.ainewshub.ui.components.ShimmerBox
 import com.peng.ainewshub.ui.more.sourceMeta
-import com.peng.ainewshub.ui.theme.AppAlpha
 import com.peng.ainewshub.ui.theme.AppText
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -62,9 +63,10 @@ import java.util.Locale
 /**
  * 摘要页共享件 —— 摘要 Tab(当日)与「历史摘要」按日期页(归档)共用的单页实现。
  *
- * 从 SummaryScreen 抽出:页 spec、顶部提示行+页面指示器(两屏 pager 共用)、
- * 单张源摘要页(紧凑扁头 + 条目正文,平铺无卡片,「查看完整列表」出口收口在扁头)。
- * 两屏保持同构(同一产品语言),差异仅在数据来源(latest 快照 vs history 索引按日期寻址)
+ * 从 SummaryScreen 抽出:页 spec、顶部提示行+源名 chips 导航(两屏 pager 共用)、
+ * 单张源摘要页(紧凑扁头 + 条目正文,平铺无卡片,「查看完整列表」出口收口在扁头;
+ * v2 结构化条目 url 非空时整行可点直达原文)。两屏保持同构(同一产品语言),
+ * 差异仅在数据来源(latest 快照 vs history 索引按日期寻址)
  * 与出口(历史页扁头纯展示、不可点)。
  */
 
@@ -94,52 +96,70 @@ internal fun summaryCardSpecs(
 }
 
 /**
- * 顶部行:左 = 数据来源提示;右 = 页面指示器(当前页横向胶囊,未选中圆点)。
- * 指示器可点击直接跳页;宽度/颜色随切页 tween 过渡(Motion.SHORT)。
+ * 顶部区:上行 = 数据来源提示;下行 = 源名 chips 导航(横向可滚动)。
+ *
+ * chips 取代原圆点页指示器:圆点无语义,用户只能盲滑/盲点;源名 chip 让每页
+ * 归属直接可见,点击即跳页。当前页 chip 为 primary 实底(其余 surfaceContainerHigh),
+ * 颜色随切页 tween 过渡(Motion.SHORT);切页时自动横滚让当前 chip 进入可视区。
  */
 @Composable
 internal fun SummaryHeaderRow(
     currentPage: Int,
-    pageCount: Int,
+    pageTitles: List<String>,
     hint: String = stringResource(R.string.summary_daily_hint),
-    onDotClick: (Int) -> Unit = {}
+    onSelect: (Int) -> Unit = {}
 ) {
     val cs = MaterialTheme.colorScheme
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 18.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(vertical = 6.dp)
     ) {
         Text(
             text = hint,
             style = AppText.caption,
             color = cs.onSurfaceVariant,
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.padding(horizontal = 18.dp)
         )
         Spacer(Modifier.size(8.dp))
-        // 页面指示器(可点击跳页):当前页 16×6 胶囊(primary),未选中 6dp 圆点
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            repeat(pageCount) { i ->
+        val chipsState = rememberLazyListState()
+        // 切页(含手势滑动)后把当前 chip 滚进可视区:8 个源 chip 总宽超出屏宽
+        LaunchedEffect(currentPage) {
+            if (currentPage in pageTitles.indices) chipsState.animateScrollToItem(currentPage)
+        }
+        LazyRow(
+            state = chipsState,
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(horizontal = 18.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            itemsIndexed(pageTitles) { i, title ->
                 val isCurrent = i == currentPage
-                val dotWidth by animateDpAsState(
-                    targetValue = if (isCurrent) 16.dp else 6.dp,
+                val bg by animateColorAsState(
+                    targetValue = if (isCurrent) cs.primary else cs.surfaceContainerHigh,
                     animationSpec = tween(Motion.SHORT, easing = Motion.EmphasizedDecel),
-                    label = "pageIndicatorWidth"
+                    label = "sourceChipBg"
                 )
-                val dotColor by animateColorAsState(
-                    targetValue = if (isCurrent) cs.primary
-                    else cs.onSurfaceVariant.copy(alpha = AppAlpha.hairlineOverlay),
+                val fg by animateColorAsState(
+                    targetValue = if (isCurrent) cs.onPrimary else cs.onSurfaceVariant,
                     animationSpec = tween(Motion.SHORT, easing = Motion.EmphasizedDecel),
-                    label = "pageIndicatorColor"
+                    label = "sourceChipFg"
                 )
                 Box(
                     modifier = Modifier
-                        .size(width = dotWidth, height = 6.dp)
                         .clip(CircleShape)
-                        .background(dotColor)
-                        .clickable { onDotClick(i) }
-                )
+                        .background(bg)
+                        .clickable { onSelect(i) }
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                ) {
+                    Text(
+                        text = title,
+                        style = AppText.caption,
+                        fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal,
+                        color = fg,
+                        maxLines = 1
+                    )
+                }
             }
         }
     }
@@ -156,13 +176,16 @@ internal fun SummaryHeaderRow(
  * @param reserveBottomBarSpace 根 tab(底栏为浮动药丸)传 true:列表可滚入药丸之下,
  * 底部 contentPadding 补「药丸高 + 16dp 呼吸」让末条能停到药丸之上(与总览页同一做法);
  * 二级页(历史摘要)底栏不悬浮,传 false
+ * @param onOpenItem 条目点击回调(仅 v2 结构化条目且 [SummaryItem.url] 非空时可点,
+ * 直达内置 WebView;v1 纯文本与空 url 条目保持只读)
  */
 @Composable
 internal fun SummaryCardPage(
     spec: SummaryCardSpec,
     state: UiState<SourceSummary>,
     onRetry: () -> Unit,
-    reserveBottomBarSpace: Boolean = false
+    reserveBottomBarSpace: Boolean = false,
+    onOpenItem: (SummaryItem) -> Unit = {}
 ) {
     val accent = sourceAccentOf(spec.source)
     Column(modifier = Modifier.fillMaxSize()) {
@@ -185,7 +208,8 @@ internal fun SummaryCardPage(
                 is UiState.Success -> SummaryBody(
                     content = state.data.content,
                     accent = accent,
-                    reserveBottomBarSpace = reserveBottomBarSpace
+                    reserveBottomBarSpace = reserveBottomBarSpace,
+                    onOpenItem = onOpenItem
                 )
             }
         }
@@ -292,13 +316,15 @@ private fun sourceAccentOf(source: String): Color {
 private fun SummaryBody(
     content: SummaryContent,
     accent: Color,
-    reserveBottomBarSpace: Boolean
+    reserveBottomBarSpace: Boolean,
+    onOpenItem: (SummaryItem) -> Unit
 ) {
     when (content) {
         is SummaryContent.Structured -> SummaryItems(
             items = content.items,
             accent = accent,
-            reserveBottomBarSpace = reserveBottomBarSpace
+            reserveBottomBarSpace = reserveBottomBarSpace,
+            onOpenItem = onOpenItem
         )
         is SummaryContent.Plain -> SummaryPlainText(
             text = content.text,
@@ -308,12 +334,13 @@ private fun SummaryBody(
     }
 }
 
-/** v2 结构化条目渲染:title 加粗作导语,desc 常规作正文,同行基线对齐。 */
+/** v2 结构化条目渲染:title 加粗作导语,desc 常规作正文,同行基线对齐;url 非空的条目整行可点(直达原文)。 */
 @Composable
 private fun SummaryItems(
     items: List<SummaryItem>,
     accent: Color,
-    reserveBottomBarSpace: Boolean
+    reserveBottomBarSpace: Boolean,
+    onOpenItem: (SummaryItem) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -326,7 +353,12 @@ private fun SummaryItems(
         )
     ) {
         itemsIndexed(items) { index, item ->
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.then(
+                    if (item.url.isNotBlank()) Modifier.clickable { onOpenItem(item) } else Modifier
+                )
+            ) {
                 Text(
                     text = "%02d".format(index + 1),
                     style = AppText.bodySmall,

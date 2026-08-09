@@ -36,12 +36,15 @@ data class OverviewEntry(
  * @param items 今日热点 Top10(breaking 条目排在最前,全部条目共 ≤10 条)
  * @param generatedAt 流水线生成时刻(毫秒)
  * @param dataFetchedAt 输入快照中最新的 fetched_at_ms(「数据截至」)
+ * @param digest 跨源「今日综述」(2-3 句,流水线 overview_summary.py 生成;
+ *   旧 index.json 无此字段 → 空串,UI 不渲染)
  * @param missingSources 本次未能加载的源 key(页脚标注)
  */
 data class OverviewDigest(
     val items: List<OverviewEntry>,
     val generatedAt: Long,
     val dataFetchedAt: Long,
+    val digest: String = "",
     val missingSources: List<String>
 )
 
@@ -84,6 +87,7 @@ class OverviewRepository {
             items = items,
             generatedAt = json.optLong("generatedAt", 0L),
             dataFetchedAt = json.optLong("dataFetchedAt", 0L),
+            digest = json.optString("digest").orEmpty().trim(),
             missingSources = readStringList(json.optJSONArray("missingSources"))
         )
     }

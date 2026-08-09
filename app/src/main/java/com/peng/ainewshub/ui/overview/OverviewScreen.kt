@@ -78,6 +78,8 @@ import java.util.Locale
  * 今日总览 Tab 根屏 —— 流水线预生成的跨源综合分析(读归档 latest_overview 字段)。
  *
  * 结构(A+B 混合编辑风,去卡片化):
+ *  - 首行 lead 区:数据时效 caption(数据截至)+ 跨源「今日综述」
+ *    (digest,流水线预生成;空串即整块不渲染)——首屏即见新鲜度与当天主线
  *  - 头条 Hero:第 1 条(breaking 条目数据层已排最前)以 [BrandGradient] 通栏
  *    大字号呈现,无圆角无描边;渐变属 AI 特性专用,本页整体即 AI 特性,合规
  *  - 2~10 名平铺列表:无卡片容器,行间 0.5dp 发丝线(缩进对齐文字列);
@@ -290,6 +292,13 @@ private fun OverviewContent(
         // (列表本身可滚入药丸之下,容器已按药丸底缘裁剪)
         contentPadding = PaddingValues(bottom = BottomBarPillHeight + 16.dp)
     ) {
+        // 首行 lead 区:时效 caption + 今日综述(两者都缺失时不占位)
+        if (digest.dataFetchedAt > 0 || digest.digest.isNotBlank()) {
+            item(key = "lead", contentType = "lead") {
+                OverviewLead(digest = digest)
+            }
+        }
+
         // 头条 Hero:第 1 条(breaking 条目数据层已排最前)BrandGradient 通栏大字号
         digest.items.firstOrNull()?.let { first ->
             item(key = "hero-${first.url}", contentType = "hero") {
@@ -323,6 +332,44 @@ private fun OverviewContent(
 
         item(key = "footer", contentType = "footer") {
             OverviewFooter(digest = digest)
+        }
+    }
+}
+
+/**
+ * 首行 lead 区 —— 时效 caption + 跨源「今日综述」。
+ *
+ * 时效:归档每日跑一次批,首屏必须让用户知道数据新鲜度(原只在页脚,
+ * 需滚完 10 条才可见);caption 复用页脚同款「数据截至」取词。
+ * 综述:流水线预生成的 2-3 句 digest(纯文本平铺,不配渐变 —— 渐变只属头条 Hero),
+ * 空串(旧归档无此字段)即不渲染。
+ */
+@Composable
+private fun OverviewLead(digest: OverviewDigest) {
+    val cs = MaterialTheme.colorScheme
+    val context = LocalContext.current
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 18.dp, vertical = 10.dp)
+    ) {
+        if (digest.dataFetchedAt > 0) {
+            Text(
+                text = stringResource(
+                    R.string.overview_data_until,
+                    formatFetchedAt(context, digest.dataFetchedAt)
+                ),
+                style = AppText.caption,
+                color = cs.onSurfaceVariant
+            )
+        }
+        if (digest.digest.isNotBlank()) {
+            if (digest.dataFetchedAt > 0) Spacer(Modifier.height(6.dp))
+            Text(
+                text = digest.digest,
+                style = AppText.body,
+                color = cs.onSurface
+            )
         }
     }
 }

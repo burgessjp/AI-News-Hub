@@ -19,6 +19,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -38,7 +39,8 @@ import kotlinx.coroutines.launch
  * 差异仅在:
  *  - 数据按日期经 history 索引寻址([SummaryArchiveViewModel.loadDate]);
  *  - 二级页语义:顶栏带返回、无刷新按钮、底部不预留浮动底栏高度;
- *  - 卡片无「查看完整列表」出口(列表页展示的是今日数据,从历史跳转语义不符)。
+ *  - 卡片无「查看完整列表」出口(列表页展示的是今日数据,从历史跳转语义不符);
+ *    v2 条目 url 非空时仍可点,经 [onOpenUrl] 直达原文(WebView 与浏览历史语义与日期无关)。
  *
  * [pagerState] 由 MainActivity 按 Page 值上提持有(pagePagerStates),进 Web 页
  * 返回后保持所在卡片;VM 按日期隔离实例(`viewModel(key = "summary-date-$date")`)。
@@ -48,6 +50,7 @@ import kotlinx.coroutines.launch
 fun SummaryDateScreen(
     date: String,
     onBack: () -> Unit,
+    onOpenUrl: (url: String, title: String, source: String) -> Unit,
     pagerState: PagerState,
     vm: SummaryArchiveViewModel = viewModel(key = "summary-date-$date")
 ) {
@@ -80,9 +83,9 @@ fun SummaryDateScreen(
         ) {
             SummaryHeaderRow(
                 currentPage = pagerState.currentPage,
-                pageCount = cards.size,
+                pageTitles = cards.map { it.title },
                 hint = stringResource(R.string.summary_date_hint),
-                onDotClick = { i -> scope.launch { pagerState.animateScrollToPage(i) } }
+                onSelect = { i -> scope.launch { pagerState.animateScrollToPage(i) } }
             )
             HorizontalPager(
                 state = pagerState,
@@ -94,10 +97,14 @@ fun SummaryDateScreen(
                 pageSpacing = 14.dp
             ) { pageIndex ->
                 val spec = cards[pageIndex]
+                val context = LocalContext.current
                 SummaryCardPage(
                     spec = spec,
                     state = states[spec.source] ?: UiState.Loading,
-                    onRetry = { vm.retrySource(date, spec.source) }
+                    onRetry = { vm.retrySource(date, spec.source) },
+                    onOpenItem = { item ->
+                        onOpenUrl(item.url, item.title, SummaryRepository.titleOf(context, spec.source))
+                    }
                 )
             }
         }

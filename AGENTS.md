@@ -36,7 +36,7 @@
 
 - 3 个根 tab（总览/摘要/更多）+ 每 tab 独立二级页栈；`Page` 是 sealed interface，经 `toBundle()`/`pageFromBundle()` + 自定义 `Saver` 挂 `rememberSaveable`，进程被杀可恢复。切 tab 保留各自栈。
 - ⚠️ **新增二级页必须同步加三处**：`Page` 子类、`toBundle`/`pageFromBundle` 分支、`PageView` 分支。
-- ⚠️ **含列表/页码的页，`LazyListState`/`PagerState` 一律在 `AiNewsHubApp` 层持有并下传**——`AnimatedContent` 换页即销毁屏内 `remember`/`rememberSaveable`，屏内自持会丢滚动位置。不要在屏内 `rememberLazyListState()`。摘要 Tab 为「顶部提示行 + 右上角圆点页指示器 + 内容 Pager」结构（与历史摘要按日期页同构），`summaryPagerState` 同理上提。
+- ⚠️ **含列表/页码的页，`LazyListState`/`PagerState` 一律在 `AiNewsHubApp` 层持有并下传**——`AnimatedContent` 换页即销毁屏内 `remember`/`rememberSaveable`，屏内自持会丢滚动位置。不要在屏内 `rememberLazyListState()`。摘要 Tab 为「顶部提示行 + 源名 chips 导航 + 内容 Pager」结构（与历史摘要按日期页同构），`summaryPagerState` 同理上提。
 - ⚠️ 含 WebView 的页转场 override 为 `FADE`（横向位移会让 AndroidView 撕裂），其余约定见 `ui/anim/Motion.kt`。
 - `openUrl` 是打开网页的**唯一入口**（统一记录浏览历史 + push `Page.Web`），全 App 链接都走内置 WebView，不走外部浏览器。
 - 外部深链两个入口：`EXTRA_OPEN_SETTINGS`（系统选中译「去设置」）与 `EXTRA_OPEN_URL`/`_TITLE`/`_SOURCE`（桌面小组件点击直达内置 WebView）。`MainActivity` 为 `singleTask`，冷/热启动分别在 `onCreate`/`onNewIntent` 解析，统一经 `openUrl` 消费；旋转重建不重复 push（与 `EXTRA_OPEN_SETTINGS` 同款 `savedInstanceState == null` 守卫）。
@@ -47,8 +47,8 @@
   - **Product Hunt 只归档**（Developer Token 是服务端 secret 不进 APK，两种模式都走归档）。
   - 归档走 `ArchiveHttpClient`（gitcode **REST API raw 端点**，**不要**用 raw 直链——背后是 WAF 会 403）。
   - **归档失败直接显示 Error 态，不回退实时**。
-- **摘要 Tab 不在 App 端生成 AI 摘要**，直接读归档快照顶层 `ai_summary_v2` 字段（JSON 数组，每项含 `title`+`desc`，流水线预生成），兼容回退旧纯文本 `ai_summary`（历史快照），两者都缺失即失败态。
-- **总览 Tab 同样不在 App 端调 AI**，直接读 `index.json` 顶层 `latest_overview` 字段（流水线 `scripts/overview_summary.py` 预生成的跨源综合分析，含 Top10 items + breaking 标记）。App 端 `OverviewRepository` 只做反序列化，不再有端侧 AI 调用 / 缓存 / ConfigMissing 引导态。字段缺失走 NoData 空态。
+- **摘要 Tab 不在 App 端生成 AI 摘要**，直接读归档快照顶层 `ai_summary_v2` 字段（JSON 数组，每项含 `title`+`desc`+`url`，流水线预生成；`url` 由流水线按 AI 返回的条目编号回填，空串 = 该条只读不可点），兼容回退旧纯文本 `ai_summary`（历史快照），两者都缺失即失败态。v2 条目 `url` 非空时整行可点，经 `openUrl` 直达内置 WebView（摘要 Tab 与历史摘要页同构接入）。
+- **总览 Tab 同样不在 App 端调 AI**，直接读 `index.json` 顶层 `latest_overview` 字段（流水线 `scripts/overview_summary.py` 预生成的跨源综合分析，含 `digest` 今日综述 + Top10 items + breaking 标记；`digest` 可能为空串，空串不渲染）。App 端 `OverviewRepository` 只做反序列化，不再有端侧 AI 调用 / 缓存 / ConfigMissing 引导态。字段缺失走 NoData 空态。首屏 lead 区 = 时效 caption（数据截至）+ digest 综述。
 - **桌面小组件「今日热点」**（`widget/` 包，Glance）：只读归档 `latest_overview`（与总览同源同语义，与 SourceMode 无关）。缓存为 App 级 SharedPreferences `hot_now_widget`（多小组件实例共享，刻意不用 Glance per-id 状态）。刷新三路：系统 30min `updatePeriodMillis` / 头部按钮 `RefreshHotNowAction` / App 总览刷新成功联动（`HotNowWidgetUpdater.refreshFromApp`，同进程命中 ArchiveHttpClient 2 分钟缓存，零额外网络）。拉取失败保留旧数据不清空（小组件无错误交互入口）。配色直接取 `ui/theme/Color.kt` 设计令牌组 day/night `ColorProvider`（App 迷你版，不用壁纸动态色）；条目只展示排名 + 标题（+突发胶囊），来源/互动指标刻意不上小组件；Glance 1.1.1 不支持 res/font 自定义字体，层级靠字号 + 字重。
 - **源标识 / 元数据单点定义**：8 源（HackerNews / GitHub Trending / OpenAI×Anthropic / HuggingFace Papers / Product Hunt / The Rundown AI / AIHot 精选 / stormzhang AI）的 **key 字面量集中于 `data/SourceKeys.kt`**（全 App 唯一真相源，归档 Repository / 摘要 Repository / UI 跳转分发 / 强调色 when 分支一律引用其常量，不写裸字符串，杜绝 key 漂移静默断裂）；**UI 元数据**（icon / 品牌色 / 标题 / 副标题 / URL）集中于 `ui/more/SourceMeta.kt` 的 `sourceMeta(key)`，`DEFAULT_SOURCE_ORDER` 为默认顺序。信息源页 / 摘要 Tab / 关于页三处都从 `sourceMeta(key)` 派生，不再各自硬编码。
   - 用户在「信息源」页长按拖拽自定义顺序（reorderable 库），持久化于 `display_prefs` 的 `source_order` 键；**摘要 Tab 跟随用户顺序**（`SummaryViewModel.sourceKeys` 读 `SettingsStore.sourceOrderFlow`），**关于页固定默认顺序**。
@@ -70,7 +70,7 @@
 AI_NEWS_HUB_AI_BASE_URL / AI_NEWS_HUB_AI_MODEL / AI_NEWS_HUB_AI_API_KEY / GITCODE_TOKEN
 ```
 
-- 抓 8 源（7 个第三方站点 + `aihot.virxact.com` 精选 `/items?mode=selected&take=20`）→ 各源 AI 摘要（`ai_summary.py`，写入快照顶层 `ai_summary_v2`）+ 跨源总览（`overview_summary.py`，写入 `index.json` 顶层 `latest_overview`）→ 推送到 gitcode 数据仓库 `peng1818/AI-News-Hub-Data` 的 `news-hub-data` 分支。
+- 抓 8 源（7 个第三方站点 + `aihot.virxact.com` 精选 `/items?mode=selected&take=20`）→ 各源 AI 摘要（`ai_summary.py`，写入快照顶层 `ai_summary_v2`，每项含 `title`+`desc`+`url`，url 由 AI 返回的条目编号回填）+ 跨源总览（`overview_summary.py`，写入 `index.json` 顶层 `latest_overview`，含 `digest` 综述 + items）→ 推送到 gitcode 数据仓库 `peng1818/AI-News-Hub-Data` 的 `news-hub-data` 分支。
 - 单源失败跳过且 `index.json` latest 指针从上一次继承（客户端永远拿到有效数据）；总览 AI 生成失败时 `latest_overview` 同样继承上一次。≥1 源成功退出码即为 0。日期统一北京时间。
 - 数据格式详见 `docs/news-hub-data-usage.md`；各脚本行为见脚本头注释。
 

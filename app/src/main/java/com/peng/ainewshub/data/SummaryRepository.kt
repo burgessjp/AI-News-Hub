@@ -19,7 +19,7 @@ data class SourceSummary(
 
 /**
  * 摘要正文。兼容两种数据格式:
- * - [Structured]:新格式 `ai_summary_v2`(JSON 数组,每项含 title + desc),数据流水线只产出这种;
+ * - [Structured]:新格式 `ai_summary_v2`(JSON 数组,每项含 title + desc + url),数据流水线只产出这种;
  * - [Plain]:旧格式 `ai_summary`(纯文本 `• **标题**：描述` 串),仅历史快照存在,作回退。
  */
 sealed interface SummaryContent {
@@ -29,10 +29,16 @@ sealed interface SummaryContent {
     data class Plain(val text: String) : SummaryContent
 }
 
-/** v2 摘要的单个条目:title 为加粗导语,desc 为 2-3 句正文。 */
+/**
+ * v2 摘要的单个条目:title 为加粗导语,desc 为 2-3 句正文。
+ *
+ * [url] 为该条对应的原始条目链接(流水线按 AI 返回的 ref 编号回填,见
+ * scripts/ai_summary.py);为空串(历史快照 / ref 无效)时 UI 不可点。
+ */
 data class SummaryItem(
     val title: String,
-    val desc: String
+    val desc: String,
+    val url: String = ""
 )
 
 /**
@@ -64,7 +70,7 @@ private enum class SummarySource(val key: String, @StringRes val titleRes: Int) 
  *
  * 摘要由数据流水线在抓取时生成(OpenAI 兼容调用 + 8 个针对各源定制的 system prompt,
  * 实现见 `scripts/ai_summary.py`),写入快照顶层 `ai_summary_v2`(JSON 数组,每项含
- * title + desc)。App 端不再运行时调用 AI API,直接读字段即可 —— 快照本身就是缓存
+ * title + desc + url)。App 端不再运行时调用 AI API,直接读字段即可 —— 快照本身就是缓存
  * (gitcode CDN + [ArchiveHttpClient] 的 index.json 2 分钟 TTL),无需额外的本地缓存或锁。
  *
  * - 数据始终取自 gitcode 归档([ArchiveHttpClient] 每日快照),与全局
@@ -124,7 +130,7 @@ class SummaryRepository {
 
     /**
      * 从归档快照顶层解析摘要正文(兼容两种格式):
-     * - 优先读 `ai_summary_v2`(JSON 数组,每项 title + desc)→ [SummaryContent.Structured];
+     * - 优先读 `ai_summary_v2`(JSON 数组,每项 title + desc + url)→ [SummaryContent.Structured];
      * - 回退读 `ai_summary`(纯文本)→ [SummaryContent.Plain];
      * - 都缺失或为空 → 失败 [AppException.NoData]。
      */
@@ -136,7 +142,8 @@ class SummaryRepository {
                 val obj = v2.optJSONObject(i) ?: return@mapNotNull null
                 val title = obj.optString("title").orEmpty().trim()
                 val desc = obj.optString("desc").orEmpty().trim()
-                if (title.isNotEmpty() && desc.isNotEmpty()) SummaryItem(title, desc) else null
+                val url = obj.optString("url").orEmpty().trim()
+                if (title.isNotEmpty() && desc.isNotEmpty()) SummaryItem(title, desc, url) else null
             }
             if (items.isNotEmpty()) {
                 return Result.success(SummaryContent.Structured(items))

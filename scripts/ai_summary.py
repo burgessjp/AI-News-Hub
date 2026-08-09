@@ -5,14 +5,17 @@
 抓取脚本每跑完一个源,调用本模块把该源本次落盘的 items 喂给 OpenAI 兼容
 服务,生成一份简体中文要点,作为 `ai_summary_v2` 字段写进快照顶层。
 
-`ai_summary_v2` 是 JSON 数组,每个对象含 `title`(一句话标题)与 `desc`
-(2-3 句描述),替代旧的纯文本 `ai_summary`(已停用,App 端兼容回退)。
+`ai_summary_v2` 是 JSON 数组,每个对象含 `title`(一句话标题)、`desc`
+(2-3 句描述)与 `url`(对应原始条目链接,由数据侧按 AI 返回的 ref 编号回填,
+AI 不输出 URL),替代旧的纯文本 `ai_summary`(已停用,App 端兼容回退)。
 
 设计要点(复刻 App):
   - 总结 8 个稳定源:hackernews / github-trending / openai-anthropic-news /
     huggingface-papers / stormzhang-ai / producthunt / rundown-ai / aihot-featured。
   - 8 个 system prompt 要求模型只输出 JSON 数组(无 markdown / 无解释);
     user prompt 格式化器搬自 App SummaryRepository.kt(lines 102-150)。
+  - 条目回填:url 由 ref(输入条目编号)索引回本次切片 items 取得,
+    与 overview_summary.py 的 ref 回填同范式;ref 无效时 url 留空,条目保留。
   - temperature=0.5(对齐 App 的 requestSummary);读取超时 30s。
   - 配置走环境变量:AI_NEWS_HUB_AI_BASE_URL / AI_NEWS_HUB_AI_MODEL /
     AI_NEWS_HUB_AI_API_KEY(由 pipeline.sh 在执行前统一检测)。
@@ -48,6 +51,19 @@ MAX_ATTEMPTS = 3
 # App 端只对这 8 个源做摘要(对齐 common.SOURCE_KEYS;保留别名供既有 import 引用)
 SUMMARY_SOURCES = SOURCE_KEYS
 
+# 每源喂给 AI 的条目数上限(对齐原各 builder 内 [:N] 切片;切片统一在 summarize_source
+# 做一次,builder 只负责格式化,保证 AI 看到的编号与回填 url 时的下标口径一致)
+SOURCE_TOP_N = {
+    "hackernews": 15,
+    "github-trending": 10,
+    "huggingface-papers": 10,
+    "stormzhang-ai": 15,
+    "producthunt": 15,
+    "rundown-ai": 15,
+    "aihot-featured": 15,
+    "openai-anthropic-news": 15,
+}
+
 
 # ===== system prompt =====
 #
@@ -58,8 +74,9 @@ HACKERNEWS_PROMPT = """你是一位资深技术编辑与 HackerNews 社区观察
 
 【语言要求】必须输出简体中文。即使输入标题是英文，正文也用中文表达；项目名、公司名、技术术语、人名等专有名词保留原文，不要音译。
 
-【输出格式】只输出一个 JSON 数组，6 到 10 个对象，不要输出任何其它内容。每个对象两个字段：
-{"title": "一句话概括标题", "desc": "用 2-3 句中文说明这件事是什么、为什么值得关注或开发者反应如何"}
+【输出格式】只输出一个 JSON 数组，6 到 10 个对象，不要输出任何其它内容。每个对象三个字段：
+{"title": "一句话概括标题", "desc": "用 2-3 句中文说明这件事是什么、为什么值得关注或开发者反应如何", "ref": 对应输入条目的编号}
+ref 必须照抄输入行的 [N] 编号（整数），不得编造；一条合并多条输入时，取最主要一条的编号。
 
 【内容要求】
 - 按得分热度排序，重要的放前面；
@@ -73,8 +90,9 @@ GITHUB_PROMPT = """你是一位开源生态观察者。请把用户提供的 Git
 
 【语言要求】必须输出简体中文。仓库 owner/name、技术名词保留原文，不要翻译。
 
-【输出格式】只输出一个 JSON 数组，6 到 10 个对象，不要输出任何其它内容。每个对象两个字段：
-{"title": "owner/name（一句话价值定位）", "desc": "用 2-3 句中文说明这个项目解决什么问题、适用场景，以及今日新增 star 反映的热度趋势"}
+【输出格式】只输出一个 JSON 数组，6 到 10 个对象，不要输出任何其它内容。每个对象三个字段：
+{"title": "owner/name（一句话价值定位）", "desc": "用 2-3 句中文说明这个项目解决什么问题、适用场景，以及今日新增 star 反映的热度趋势", "ref": 对应输入条目的编号}
+ref 必须照抄输入行的 [N] 编号（整数），不得编造；一条合并多条输入时，取最主要一条的编号。
 
 【内容要求】
 - 结合描述和语言推断项目价值，不要只复述描述；
@@ -87,8 +105,9 @@ PAPERS_PROMPT = """你是一位 AI 研究前沿解读员。请把用户提供的
 
 【语言要求】必须输出简体中文。论文标题先给中文意译，括号内附英文原标题；模型名、方法名、数据集名等专有名词保留原文。
 
-【输出格式】只输出一个 JSON 数组，6 到 10 个对象，不要输出任何其它内容。每个对象两个字段：
-{"title": "中文标题（English Title，↑upvote）", "desc": "用 2-3 句中文说明这篇论文研究什么问题、方法亮点、可能的影响"}
+【输出格式】只输出一个 JSON 数组，6 到 10 个对象，不要输出任何其它内容。每个对象三个字段：
+{"title": "中文标题（English Title，↑upvote）", "desc": "用 2-3 句中文说明这篇论文研究什么问题、方法亮点、可能的影响", "ref": 对应输入条目的编号}
+ref 必须照抄输入行的 [N] 编号（整数），不得编造；一条合并多条输入时，取最主要一条的编号。
 
 【内容要求】
 - upvote 高的排前面；
@@ -101,8 +120,9 @@ STORMZHANG_PROMPT = """你是一位 AI 行业资讯编辑。用户提供的已�
 
 【语言要求】输出简体中文。
 
-【输出格式】只输出一个 JSON 数组，6 到 10 个对象，不要输出任何其它内容。每个对象两个字段：
-{"title": "事件标题", "desc": "用 2-3 句说明核心事实，并在末尾标注信源（如「（来源：Reddit）」）"}
+【输出格式】只输出一个 JSON 数组，6 到 10 个对象，不要输出任何其它内容。每个对象三个字段：
+{"title": "事件标题", "desc": "用 2-3 句说明核心事实，并在末尾标注信源（如「（来源：Reddit）」）", "ref": 对应输入条目的编号}
+ref 必须照抄输入行的 [N] 编号（整数），不得编造；一条合并多条输入时，取最主要一条的编号。
 
 【内容要求】
 - 按主题去重合并：同一事件的多条合成一条，保留最完整的信息；
@@ -115,8 +135,9 @@ PRODUCTHUNT_PROMPT = """你是一位资深产品观察者与 Product Hunt 社区
 
 【语言要求】必须输出简体中文。产品名、公司名保留原文，不翻译；产品定位（tagline）用中文意译，保留原意。
 
-【输出格式】只输出一个 JSON 数组，6 到 10 个对象，不要输出任何其它内容。每个对象两个字段：
-{"title": "产品名（一句话价值定位）", "desc": "用 2-3 句中文说明它解决什么问题、面向谁、有什么亮点（AI/开发者工具/效率等），并在末尾标注热度（如「（↑upvote，💬评论）」）"}
+【输出格式】只输出一个 JSON 数组，6 到 10 个对象，不要输出任何其它内容。每个对象三个字段：
+{"title": "产品名（一句话价值定位）", "desc": "用 2-3 句中文说明它解决什么问题、面向谁、有什么亮点（AI/开发者工具/效率等），并在末尾标注热度（如「（↑upvote，💬评论）」）", "ref": 对应输入条目的编号}
+ref 必须照抄输入行的 [N] 编号（整数），不得编造；一条合并多条输入时，取最主要一条的编号。
 
 【内容要求】
 - 按 upvote 热度排序，重要的放前面；
@@ -132,8 +153,9 @@ RUNDOWN_AI_PROMPT = """你是一位资深 AI 行业观察者与英文 newsletter
 
 【语言要求】必须输出简体中文。公司名、产品名、模型名、人名等专有名词保留原文，不要音译。
 
-【输出格式】只输出一个 JSON 数组，6 到 10 个对象，不要输出任何其它内容。每个对象两个字段：
-{"title": "事件标题", "desc": "用 2-3 句中文说明这件事是什么、为什么值得关注（结合标题与 PLUS 副标题的信息）"}
+【输出格式】只输出一个 JSON 数组，6 到 10 个对象，不要输出任何其它内容。每个对象三个字段：
+{"title": "事件标题", "desc": "用 2-3 句中文说明这件事是什么、为什么值得关注（结合标题与 PLUS 副标题的信息）", "ref": 对应输入条目的编号}
+ref 必须照抄输入行的 [N] 编号（整数），不得编造；一条合并多条输入时，取最主要一条的编号。
 
 【内容要求】
 - 按事件重要性排序，重大发布（新模型、融资、政策、独家访谈）放前面；
@@ -149,8 +171,9 @@ AIHOT_FEATURED_PROMPT = """你是一位资深 AI 行业资讯编辑。用户提�
 
 【语言要求】输出简体中文。公司名、产品名、模型名、人名等专有名词保留原文。
 
-【输出格式】只输出一个 JSON 数组，6 到 10 个对象，不要输出任何其它内容。每个对象两个字段：
-{"title": "事件标题", "desc": "用 2-3 句说明核心事实，必要时在末尾标注信源（如「（来源：TechCrunch）」）"}
+【输出格式】只输出一个 JSON 数组，6 到 10 个对象，不要输出任何其它内容。每个对象三个字段：
+{"title": "事件标题", "desc": "用 2-3 句说明核心事实，必要时在末尾标注信源（如「（来源：TechCrunch）」）", "ref": 对应输入条目的编号}
+ref 必须照抄输入行的 [N] 编号（整数），不得编造；一条合并多条输入时，取最主要一条的编号。
 
 【内容要求】
 - 按主题去重合并：同一事件的多条合成一条，保留最完整的信息；
@@ -166,8 +189,9 @@ OPENAI_ANTHROPIC_NEWS_PROMPT = """你是一位资深 AI 厂商动态观察者。
 
 【语言要求】必须输出简体中文。公司名、产品名、模型名（如 GPT、Claude、Codex）、人名等专有名词保留原文，不要音译。
 
-【输出格式】只输出一个 JSON 数组，6 到 10 个对象，不要输出任何其它内容。每个对象两个字段：
-{"title": "事件标题", "desc": "用 2-3 句中文说明这是哪家厂商（OpenAI/Anthropic）做了什么、有什么影响，必要时在末尾标注厂商（如「（OpenAI）」）"}
+【输出格式】只输出一个 JSON 数组，6 到 10 个对象，不要输出任何其它内容。每个对象三个字段：
+{"title": "事件标题", "desc": "用 2-3 句中文说明这是哪家厂商（OpenAI/Anthropic）做了什么、有什么影响，必要时在末尾标注厂商（如「（OpenAI）」）", "ref": 对应输入条目的编号}
+ref 必须照抄输入行的 [N] 编号（整数），不得编造；一条合并多条输入时，取最主要一条的编号。
 
 【内容要求】
 - 按重要性排序：新模型发布、重大产品更新、融资/政策放前面，常规案例、活动、教程靠后；
@@ -191,62 +215,63 @@ SYSTEM_PROMPTS = {
 
 # ===== user prompt 格式化(逐字搬自 SummaryRepository.kt lines 102-150) =====
 #
-# Top-N 控 token,与 App 取相同条数与格式。字段名对齐 fetch_data.py 的 items 结构。
+# 条数切片统一在 summarize_source 按 SOURCE_TOP_N 完成,builder 收到的即最终列表。
+# 每行带 [N] 编号(列表下标),供 AI 在输出的 ref 字段照抄,数据侧据其回填 url。
 
 def _fmt_hackernews(items):
-    """top 15,每条「• <title>（得分 X，评论 Y）」(对齐 App 的 HACKERNEWS.load)。"""
+    """每条「[N] <title>（得分 X，评论 Y）」(对齐 App 的 HACKERNEWS.load)。"""
     lines = []
-    for s in items[:15]:
+    for i, s in enumerate(items):
         title = (s.get("title") or "").strip()
         if not title:
             continue
-        lines.append(f"• {title}（得分 {s.get('score', 0)}，评论 {s.get('descendants', 0)}）")
+        lines.append(f"[{i}] {title}（得分 {s.get('score', 0)}，评论 {s.get('descendants', 0)}）")
     return "以下是今日 HackerNews 热门（按得分排序）：\n" + "\n".join(lines)
 
 
 def _fmt_github_trending(items):
-    """top 10,每条「• owner/name（今日 +N★，共 M★，lang）：desc」(对齐 App 的 GITHUB_TRENDING.load)。"""
+    """每条「[N] owner/name（今日 +N★，共 M★，lang）：desc」(对齐 App 的 GITHUB_TRENDING.load)。"""
     lines = []
-    for r in items[:10]:
+    for i, r in enumerate(items):
         owner = r.get("owner", "")
         name = r.get("name", "")
         desc = (r.get("description") or "").strip() or "（无描述）"
         lang = (r.get("language") or "").strip() or "未知语言"
         lines.append(
-            f"• {owner}/{name}（今日 +{r.get('starsToday', 0)}★，"
+            f"[{i}] {owner}/{name}（今日 +{r.get('starsToday', 0)}★，"
             f"共 {r.get('totalStars', 0)}★，{lang}）：{desc}"
         )
     return "以下是今日 GitHub Trending（按今日新增 star 排序）：\n" + "\n".join(lines)
 
 
 def _fmt_huggingface_papers(items):
-    """top 10,每条「• <title>（↑upvotes）：summary」(对齐 App 的 HUGGINGFACE_PAPERS.load)。"""
+    """每条「[N] <title>（↑upvotes）：summary」(对齐 App 的 HUGGINGFACE_PAPERS.load)。"""
     lines = []
-    for p in items[:10]:
+    for i, p in enumerate(items):
         title = (p.get("title") or "").strip()
         if not title:
             continue
         summary = (p.get("summary") or "").strip() or "（无摘要）"
-        lines.append(f"• {title}（↑{p.get('upvotes', 0)}）：{summary}")
+        lines.append(f"[{i}] {title}（↑{p.get('upvotes', 0)}）：{summary}")
     return "以下是今日 HuggingFace 热门论文（按 upvote 排序）：\n" + "\n".join(lines)
 
 
 def _fmt_stormzhang_ai(items):
-    """top 15,每条「• [source] summary」(对齐 App 的 STORMZHANG_AI.load)。"""
+    """每条「[N] [source] summary」(对齐 App 的 STORMZHANG_AI.load)。"""
     lines = []
-    for n in items[:15]:
+    for i, n in enumerate(items):
         src = (n.get("source") or "").strip() or "未知来源"
         summary = (n.get("summary") or "").strip()
         if not summary:
             continue
-        lines.append(f"• [{src}] {summary}")
+        lines.append(f"[{i}] [{src}] {summary}")
     return "以下是今日聚合的 AI 资讯（含多个信源）：\n" + "\n".join(lines)
 
 
 def _fmt_producthunt(items):
-    """top 15,每条「• name(↑votes,💬comments)：tagline」(对齐 App PRODUCTHUNT.load)。"""
+    """每条「[N] name(↑votes,💬comments)：tagline」(对齐 App PRODUCTHUNT.load)。"""
     lines = []
-    for p in items[:15]:
+    for i, p in enumerate(items):
         name = (p.get("name") or "").strip()
         if not name:
             continue
@@ -254,65 +279,65 @@ def _fmt_producthunt(items):
         topics = p.get("topics") or []
         topic_str = f"[{','.join(topics[:2])}] " if topics else ""
         lines.append(
-            f"• {name}（↑{p.get('votesCount', 0)}，💬{p.get('commentsCount', 0)}）：{topic_str}{tagline}"
+            f"[{i}] {name}（↑{p.get('votesCount', 0)}，💬{p.get('commentsCount', 0)}）：{topic_str}{tagline}"
         )
     return "以下是今日 Product Hunt 热门产品（按 upvote 排序）：\n" + "\n".join(lines)
 
 
 def _fmt_rundown_ai(items):
-    """top 15,每条「• title：subtitle」(对齐 App RUNDOWN_AI.load)。
+    """每条「[N] title：subtitle」(对齐 App RUNDOWN_AI.load)。
 
     The Rundown AI 每篇 newsletter 含一个主标题 + 一个 PLUS 副标题(次要工具/技巧),
     合并成一行喂给 AI,无统计字段(列表页无 upvote/comments)。
     """
     lines = []
-    for n in items[:15]:
+    for i, n in enumerate(items):
         title = (n.get("title") or "").strip()
         if not title:
             continue
         subtitle = (n.get("subtitle") or "").strip()
         if subtitle:
-            lines.append(f"• {title}（PLUS：{subtitle}）")
+            lines.append(f"[{i}] {title}（PLUS：{subtitle}）")
         else:
-            lines.append(f"• {title}")
+            lines.append(f"[{i}] {title}")
     return "以下是近期 The Rundown AI 的 newsletter 标题（按时间倒序）：\n" + "\n".join(lines)
 
 
 def _fmt_aihot_featured(items):
-    """top 15,每条「• title(score)：summary」(对齐 App AIHOT_FEATURED.load)。
+    """每条「[N] title(score)：summary」(对齐 App AIHOT_FEATURED.load)。
 
     AIHot 精选是中文 AI 资讯(后端已聚合多源),输入含标题和中文摘要,
     无需翻译。附 score 让 AI 感知后端筛选权重(不强制按 score 排序)。
     """
     lines = []
-    for n in items[:15]:
+    for i, n in enumerate(items):
         title = (n.get("title") or "").strip()
         if not title:
             continue
         summary = (n.get("summary") or "").strip()
         score = n.get("score", 0) or 0
         if summary:
-            lines.append(f"• {title}（score {score}）：{summary}")
+            lines.append(f"[{i}] {title}（score {score}）：{summary}")
         else:
-            lines.append(f"• {title}（score {score}）")
+            lines.append(f"[{i}] {title}（score {score}）")
     return "以下是今日 AIHot 精选热门（按后端 score 排序）：\n" + "\n".join(lines)
 
 
 def _fmt_openai_anthropic_news(items):
-    """top 15,每条「• [vendor] title（category）：summary」(对齐 App OPENAI_ANTHROPIC_NEWS.load)。
+    """每条「[N] [vendor] title（category）：summary」(对齐 App OPENAI_ANTHROPIC_NEWS.load)。
 
     OpenAI(RSS)与 Anthropic(HTML)合并源,输入含英文标题/摘要 + vendor/category 标注。
     附 vendor/category 让 AI 感知厂商归属与分类(不强制按某字段排序,本身已按时间倒序)。
     """
     lines = []
-    for n in items[:15]:
+    for i, n in enumerate(items):
         title = (n.get("title") or "").strip()
         if not title:
             continue
         vendor = (n.get("vendor") or "").strip()
         category = (n.get("category") or "").strip()
         summary = (n.get("summary") or "").strip()
-        prefix = f"• [{vendor}]" if vendor else "•"
+        prefix = f"[{i}] [{vendor}]" if vendor else f"[{i}]"
         meta = f"（{category}）" if category else ""
         if summary:
             lines.append(f"{prefix} {title}{meta}：{summary}")
@@ -339,14 +364,38 @@ def config_ready():
     return all(os.getenv(k) for k in (ENV_BASE_URL, ENV_MODEL, ENV_API_KEY))
 
 
+def _item_url(source, item):
+    """从原始条目取落地页 URL(回填用;字段名对齐各源 fetcher 的 items 结构)。"""
+    if not isinstance(item, dict):
+        return ""
+    if source == "hackernews":
+        # HN 外链优先(target_url 为原文,url 为 HN 讨论页兜底)
+        return (item.get("target_url") or "").strip() or (item.get("url") or "").strip()
+    if source == "aihot-featured":
+        return (item.get("permalink") or "").strip() or (item.get("url") or "").strip()
+    return (item.get("url") or "").strip()
+
+
+def _parse_ref(obj, upper):
+    """解析 AI 返回的 ref 编号:容忍 int / 数字字符串;缺失、非法、越界返回 None。"""
+    try:
+        idx = int(str(obj.get("ref")).strip())
+    except (TypeError, ValueError):
+        return None
+    return idx if 0 <= idx < upper else None
+
+
 def summarize_source(source, items):
     """
-    给某源的本次 items 生成中文 AI 摘要。返回 list[dict](每项含 title + desc),失败返回 None。
+    给某源的本次 items 生成中文 AI 摘要。返回 list[dict](每项含 title + desc + url),失败返回 None。
 
     - 不支持的源(未知 key)→ 直接返回 None,不算错。
     - 空 items → 返回 None(没东西可总结)。
     - 配置缺失 → 返回 None,并 stderr 提示(让调用方知道为什么没出摘要)。
     - API 调用 → 3 次重试(间隔 2s/4s),全败返回 None。
+    - url 回填:AI 只返回 ref(输入条目编号),数据侧按编号从切片后的 items 取 URL
+      (与 overview_summary.py 的 ref 回填同范式);ref 缺失/非法/越界 → url 留空,
+      条目保留(端侧该条仅不可点)。
 
     AI 请求/解析(含 markdown 围栏剥离、429 限流快速重试、thinking 开关)统一经
     `ai_client.call_llm`;本函数只做该源的业务校验:过滤掉 title/desc 为空的项,
@@ -361,11 +410,14 @@ def summarize_source(source, items):
         print(f"[AI] 跳过 {source} 摘要:缺少环境变量 {missing}", file=sys.stderr)
         return None
 
+    # 切片统一在这里做(口径 = 喂给 AI 的 [N] 编号下标),builder 不再自行 [:N]
+    sliced = items[:SOURCE_TOP_N.get(source, 15)]
+
     base_url = os.getenv(ENV_BASE_URL)
     model = os.getenv(ENV_MODEL)
     api_key = os.getenv(ENV_API_KEY)
     system_prompt = SYSTEM_PROMPTS[source]
-    user_prompt = USER_PROMPT_BUILDERS[source](items)
+    user_prompt = USER_PROMPT_BUILDERS[source](sliced)
 
     last_err = None
     for attempt in range(1, MAX_ATTEMPTS + 1):
@@ -374,15 +426,19 @@ def summarize_source(source, items):
                 system_prompt, user_prompt, base_url, model, api_key,
                 timeout=TIMEOUT, temperature=TEMPERATURE, expect="array",
             )
-            # 业务校验:过滤掉 title/desc 为空的项(ai_client 只保证是非空数组)。
+            # 业务校验:过滤掉 title/desc 为空的项(ai_client 只保证是非空数组);
+            # 顺带按 ref 回填 url(无效 ref 不丢条目,只留空 url)
             cleaned = []
             for obj in parsed:
                 if not isinstance(obj, dict):
                     continue
                 title = (obj.get("title") or "").strip()
                 desc = (obj.get("desc") or "").strip()
-                if title and desc:
-                    cleaned.append({"title": title, "desc": desc})
+                if not (title and desc):
+                    continue
+                idx = _parse_ref(obj, len(sliced))
+                url = _item_url(source, sliced[idx]) if idx is not None else ""
+                cleaned.append({"title": title, "desc": desc, "url": url})
             if not cleaned:
                 raise RuntimeError("AI 响应解析后无有效条目(无 title/desc 非空项)")
             print(f"[AI]   {source:<20} 摘要 {len(cleaned)} 条(第 {attempt} 次成功)")

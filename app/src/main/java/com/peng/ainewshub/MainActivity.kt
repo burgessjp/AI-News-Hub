@@ -732,7 +732,9 @@ private fun TabRoot(
             onOpenProductHunt = onOpenProductHunt,
             onOpenRundownAi = onOpenRundownAi,
             onOpenOpenAiAnthropicNews = onOpenOpenAiAnthropicNews,
-            onOpenFeaturedHub = onOpenFeaturedHub
+            onOpenFeaturedHub = onOpenFeaturedHub,
+            // 摘要条目点击直达原文(走 openUrl 单点:内置 WebView + 记浏览历史)
+            onOpenUrl = { url, title, source -> onOpenUrl(url, title, source) }
         )
         AppTab.More -> MoreScreen(
             onOpenSources = onOpenSources,
@@ -966,6 +968,7 @@ private fun PageView(
         is Page.SummaryDate -> SummaryDateScreen(
             date = page.date,
             onBack = onBack,
+            onOpenUrl = { url, title, source -> onOpenUrl(url, title, source) },
             pagerState = pagePagerStates.forPagePager(page)
         )
     }

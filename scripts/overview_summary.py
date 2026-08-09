@@ -11,6 +11,7 @@
     "generatedAt": <ms>,           # 本次生成时刻
     "dataFetchedAt": <ms>,         # 输入快照里最大的 fetched_at_ms
     "missingSources": [<source_key>, ...],  # 本次未能加载的源
+    "digest": "...",               # 2-3 句跨源今日综述(可能缺省,App 端空串不渲染)
     "items": [                              # Top10,breaking 排前
       {
         "source": "hackernews",
@@ -90,7 +91,13 @@ MAX_ATTEMPTS = 3
 SYSTEM_PROMPT = """你是「AI News Hub」今日总览栏目的主编。输入是多个资讯源的今日榜单:每源附 AI 要点摘要,以及排名前若干条目(序号、标题、简介、热度档位、原始指标、日期)。请基于全部数据做当天整体研判。
 
 严格输出一个 JSON 对象,不要输出任何解释文字,不要使用 markdown 代码围栏:
-{"items":[{"ref":"源key:序号","analysis":"一句话,不超过40字","breaking":true,"breakingReason":"为什么是突发,40字内"}]}
+{"digest":"今日综述,见第〇节","items":[{"ref":"源key:序号","analysis":"一句话,不超过40字","breaking":true,"breakingReason":"为什么是突发,40字内"}]}
+
+〇、先写「今日综述」(digest):
+- 2 到 3 句简体中文,总计不超过 120 字;
+- 跨源归纳当天主线:今天最重要的几件事是什么、集中在哪些领域(模型发布/开源/产品/政策等);
+- 站在「所以怎样」的视角写给开发者,不复述单条标题,不列举全部事件;
+- 没有明显主线时,如实概述当天热点的分布,禁止硬凑主题。
 
 一、先读懂「热度档位」:
 - 有指标源(hackernews、github-trending、huggingface-papers、producthunt、aihot-featured):档位由真实指标(得分/star/票数/upvotes/权重)归一化而来,可信,直接按数字比较。
@@ -545,6 +552,8 @@ def generate_overview(out_dir, now):
                 "generatedAt": int(now.timestamp() * 1000),
                 "dataFetchedAt": data_date_ms,
                 "missingSources": [k for k in SOURCE_KEYS if k not in snapshots],
+                # 今日综述:不强制(缺失不判失败),App 端空串不渲染
+                "digest": (ai_data.get("digest") or "").strip(),
                 "items": items,
             }
             print(f"[OVERVIEW] 生成成功:{len(items)} 条(第 {attempt} 次成功),"

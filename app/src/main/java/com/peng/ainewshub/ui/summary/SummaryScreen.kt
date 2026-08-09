@@ -27,12 +27,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.peng.ainewshub.R
 import com.peng.ainewshub.data.SourceKeys
+import com.peng.ainewshub.data.SummaryRepository
 import com.peng.ainewshub.ui.SummaryViewModel
 import com.peng.ainewshub.ui.UiState
 import com.peng.ainewshub.ui.components.AppTopBar
@@ -44,16 +46,18 @@ import java.util.Locale
 /**
  * AI 摘要 Tab 根屏 —— 8 个归档源各占一页,[HorizontalPager] 左右滑动切换。
  *
- * 顶部为提示行 + 右上角圆点页指示器(可点跳页),与「历史摘要」按日期页
+ * 顶部为提示行 + 源名 chips 导航(可点跳页),与「历史摘要」按日期页
  * (SummaryDateScreen)共用同一 [SummaryHeaderRow];单页实现(紧凑扁头 / 条目正文)
  * 收口在 [SummaryCard.kt],两屏保持同构。卡片顺序跟随 sourceKeys(用户在「信息源」
  * 页自定义的顺序);pagerState 由 MainActivity 上提持有。
+ *
+ * v2 结构化条目 url 非空时整行可点,经 [onOpenUrl] 直达内置 WebView。
  *
  * 底部与总览页同一做法:内容可滚入浮动药丸 TAB 之下,可视区收在药丸底缘
  * (navigationBarsPadding + 距底 16dp),末条停到药丸之上由页内列表 contentPadding
  * 负责(reserveBottomBarSpace,见 [SummaryCardPage])。
  *
- * 数据来自 gitcode 每日归档快照顶层的 `ai_summary` 字段(由数据流水线预生成),App 端直接读取,
+ * 数据来自 gitcode 每日归档快照顶层的 `ai_summary_v2` 字段(由数据流水线预生成),App 端直接读取,
  * 不再运行时调用 AI API。
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -67,6 +71,8 @@ fun SummaryScreen(
     onOpenRundownAi: () -> Unit,
     onOpenOpenAiAnthropicNews: () -> Unit,
     onOpenFeaturedHub: () -> Unit,
+    // 条目点击:经 MainActivity openUrl 单点入口打开内置 WebView(统一记浏览历史)
+    onOpenUrl: (url: String, title: String, source: String) -> Unit,
     // 页码状态由 MainActivity 上提持有:切 tab / 进二级页返回后保持所在源(见其内注释)
     pagerState: PagerState,
     reselectSignal: Int = 0,
@@ -159,11 +165,11 @@ fun SummaryScreen(
                 .navigationBarsPadding()
                 .padding(bottom = 16.dp)
         ) {
-            // 顶部:数据来源提示 + 页面指示器(右上角圆点,可点跳页)
+            // 顶部:数据来源提示 + 源名 chips 导航(可点跳页,当前页高亮)
             SummaryHeaderRow(
                 currentPage = pagerState.currentPage,
-                pageCount = cards.size,
-                onDotClick = { i -> scope.launch { pagerState.animateScrollToPage(i) } }
+                pageTitles = cards.map { it.title },
+                onSelect = { i -> scope.launch { pagerState.animateScrollToPage(i) } }
             )
 
             // 内容 Pager:每页一个源的摘要(平铺无卡片),左右滑切源
@@ -174,12 +180,17 @@ fun SummaryScreen(
                 pageSpacing = 14.dp
             ) { pageIndex ->
                 val spec = cards.getOrNull(pageIndex) ?: return@HorizontalPager
+                val context = LocalContext.current
                 SummaryCardPage(
                     spec = spec,
                     state = states[spec.source] ?: UiState.Loading,
                     onRetry = { vm.retry(spec.source) },
                     // 根 tab 底栏悬浮:页内列表底部补「药丸高 + 16dp」,末条可停到药丸之上
-                    reserveBottomBarSpace = true
+                    reserveBottomBarSpace = true,
+                    // v2 条目(url 非空)整行可点直达原文;标题取摘要标题,来源标签取源名
+                    onOpenItem = { item ->
+                        onOpenUrl(item.url, item.title, SummaryRepository.titleOf(context, spec.source))
+                    }
                 )
             }
         }

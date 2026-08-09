@@ -1093,7 +1093,8 @@ def write_snapshot(out_dir, source_name, items, meta, now, ai_summary_v2=None):
     落盘单源快照:<out-dir>/<source>/<YYYY-MM-DD>/<HH-MM>-data.json。
     顶层结构:source / fetched_at(ISO CST)/ fetched_at_ms / count / items / meta / ai_summary_v2?。
 
-    ai_summary_v2:AI 摘要对象列表(list[dict],每项含 title + desc),非空时写入顶层
+    ai_summary_v2:AI 摘要对象列表(list[dict],每项含 title + desc + url;
+    url 由 ai_summary.py 按 AI 返回的 ref 编号回填,可能为空串),非空时写入顶层
     `ai_summary_v2` 字段。调用 AI 失败时传 None,该字段直接省略。
     App 端同时兼容旧的纯文本 `ai_summary`(历史快照),新快照只写 v2。
     """

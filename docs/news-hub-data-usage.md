@@ -73,6 +73,7 @@ news-hub-data 分支/
     "generatedAt": 1784073612000,
     "dataFetchedAt": 1784073600000,
     "missingSources": ["openai-anthropic-news"],
+    "digest": "2-3 句跨源今日综述",
     "items": [
       {
         "source": "hackernews",
@@ -181,6 +182,7 @@ print(hn['items'][0]['title'])
     "generatedAt": 1784073612000,
     "dataFetchedAt": 1784073600000,
     "missingSources": ["openai-anthropic-news"],
+    "digest": "今天的主线集中在……",
     "items": [
       {
         "source": "hackernews",
@@ -201,6 +203,7 @@ print(hn['items'][0]['title'])
 | `generatedAt` | 流水线生成时刻,Unix 毫秒时间戳 |
 | `dataFetchedAt` | 输入快照里最大的 `fetched_at_ms`(「数据截至」) |
 | `missingSources` | 本次生成时未能加载的源 key 数组(页脚标注用) |
+| `digest` | 跨源「今日综述」(2-3 句简体中文,≤120 字,AI 生成)。可能为空串(AI 未返回/旧数据无此字段),消费方空串不渲染 |
 | `items` | 今日热点 Top10,breaking 条目排最前。每项含 `source`/`title`/`url`/`metrics`(从快照回填的最终值) + `comment`(AI 写的一句话) + `breaking` + `breakingReason`(仅 breaking=true 有) |
 
 **与单源 `ai_summary_v2` 的区别**:`ai_summary_v2` 是各源快照内的分源要点(8 个独立摘要);`latest_overview` 是跨 8 源的综合研判(1 个总榜),AI 会按跨源归一化热度档位排序、合并同事件、标 breaking。
@@ -219,8 +222,8 @@ print(hn['items'][0]['title'])
   "count": 25,
   "items": [ ... ],
   "ai_summary_v2": [
-    { "title": "owner/name(价值定位)", "desc": "... 中文 AI 要点 ..." },
-    { "title": "...", "desc": "..." }
+    { "title": "owner/name(价值定位)", "desc": "... 中文 AI 要点 ...", "url": "https://..." },
+    { "title": "...", "desc": "...", "url": "..." }
   ]
 }
 ```
@@ -232,7 +235,7 @@ print(hn['items'][0]['title'])
 | `fetched_at_ms` | 抓取时刻,Unix 毫秒时间戳 |
 | `count` | `items` 数组长度 |
 | `items` | 该源的条目数组,结构因源而异(见下) |
-| `ai_summary_v2` | 本次数据的简体中文 AI 要点,JSON 数组(6-10 个对象,每个含 `title` 加粗导语 + `desc` 2-3 句正文)。8 个稳定源都有(hackernews / github-trending / openai-anthropic-news / huggingface-papers / stormzhang-ai / producthunt / rundown-ai / aihot-featured);AI 调用失败时该字段缺省。**新快照只写 `ai_summary_v2`**;旧快照仅有 `ai_summary`(纯文本 `• **标题**：描述` 串),App 兼容回退 |
+| `ai_summary_v2` | 本次数据的简体中文 AI 要点,JSON 数组(6-10 个对象,每个含 `title` 加粗导语 + `desc` 2-3 句正文 + `url` 对应原始条目链接)。`url` 由数据侧按 AI 返回的条目编号回填(AI 不输出 URL);编号无效时为空串,消费方应把空串条目按只读处理(App 端即不可点)。8 个稳定源都有(hackernews / github-trending / openai-anthropic-news / huggingface-papers / stormzhang-ai / producthunt / rundown-ai / aihot-featured);AI 调用失败时该字段缺省。**新快照只写 `ai_summary_v2`**;旧快照仅有 `ai_summary`(纯文本 `• **标题**：描述` 串),App 兼容回退 |
 
 部分源会有额外顶层字段(如 stormzhang-ai 带 `pageDate`)。
 
