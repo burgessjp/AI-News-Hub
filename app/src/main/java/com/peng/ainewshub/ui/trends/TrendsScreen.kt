@@ -1,0 +1,443 @@
+package com.peng.ainewshub.ui.trends
+
+import android.content.Context
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.TrendingDown
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.outlined.HourglassEmpty
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.peng.ainewshub.R
+import com.peng.ainewshub.data.SummaryRepository
+import com.peng.ainewshub.data.TrendKeyword
+import com.peng.ainewshub.data.TrendsDigest
+import com.peng.ainewshub.ui.EmptyState
+import com.peng.ainewshub.ui.ErrorState
+import com.peng.ainewshub.ui.components.AppTopBar
+import com.peng.ainewshub.ui.components.BottomBarPillHeight
+import com.peng.ainewshub.ui.components.BrandWordmark
+import com.peng.ainewshub.ui.components.HairlineDivider
+import com.peng.ainewshub.ui.components.RankBadge
+import com.peng.ainewshub.ui.components.RankRowSkeletonList
+import com.peng.ainewshub.ui.theme.AppText
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+/**
+ * 热词趋势 Tab 根屏 —— 流水线预生成的跨源热词词频统计(读归档 latest_trends 字段,
+ * 纯统计无 AI 参与;与「总览」tab 同范式:流水线预生成、App 只读归档)。
+ *
+ * 结构(编辑风,去卡片化,与总览 Top10 平铺同语言):
+ *  - 顶部时效 caption:「近 N 天热词 · 数据截至 M月d日」(归档每日跑批,先交代新鲜度)
+ *  - 热词榜平铺:[RankBadge] + 热词 + 命中统计 + 14 日 sparkline(Canvas 手绘,
+ *    不引图表库)+ 涨跌箭头;行间 0.5dp 发丝线(缩进对齐文字列)
+ *  - 点击词条整行展开 ≤3 条代表条目(浅底通栏带,标题点击经 openUrl 进内置 WebView)
+ *  - 页脚:生成时间
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TrendsScreen(
+    onOpenUrl: (url: String, title: String, source: String) -> Unit,
+    // 列表状态由 MainActivity 上提持有:切 tab / 进二级页返回后保持滚动位置
+    listState: LazyListState,
+    reselectSignal: Int = 0,
+    vm: TrendsViewModel = viewModel()
+) {
+    val state by vm.state.collectAsStateWithLifecycle()
+    val isRefreshing by vm.isRefreshing.collectAsStateWithLifecycle()
+
+    // 重击当前 tab:滚回顶部 + 重读归档(命中 index.json 2 分钟缓存零开销)。
+    // lastHandled 防「重新进入组合就自动刷新」(同总览 tab 套路)。
+    var lastHandledReselect by remember { mutableIntStateOf(reselectSignal) }
+    LaunchedEffect(reselectSignal) {
+        if (reselectSignal != lastHandledReselect) {
+            lastHandledReselect = reselectSignal
+            listState.animateScrollToItem(0)
+            vm.load()
+        }
+    }
+
+    val context = LocalContext.current
+    val dateText = remember { formatToday(context) }
+
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.surface,
+        topBar = {
+            // 一级根 tab 规格(对齐总览/摘要/更多):品牌 wordmark + 右侧日期 + 刷新
+            AppTopBar(
+                title = "AI NEWS HUB",
+                titleContent = {
+                    BrandWordmark(modifier = Modifier.height(44.dp))
+                },
+                horizontalPadding = 18.dp,
+                actions = {
+                    if (isRefreshing) {
+                        Box(modifier = Modifier.size(32.dp), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    } else {
+                        IconButton(onClick = { vm.refresh() }, modifier = Modifier.size(32.dp)) {
+                            Icon(
+                                Icons.Filled.Refresh,
+                                contentDescription = stringResource(R.string.trends_refresh_desc),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                    Text(
+                        text = dateText,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            )
+        }
+    ) { padding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                // 列表可滚入药丸 TAB 之下,但可视区不超出药丸底缘(同总览)
+                .navigationBarsPadding()
+                .padding(bottom = 16.dp)
+        ) {
+            when (val s = state) {
+                is TrendsState.Loading -> TrendsLoading()
+                is TrendsState.NoData -> EmptyState(
+                    title = stringResource(R.string.trends_no_data_title),
+                    subtitle = stringResource(R.string.trends_no_data_subtitle),
+                    icon = Icons.Outlined.HourglassEmpty,
+                    actionLabel = stringResource(R.string.common_retry),
+                    onAction = { vm.load() }
+                )
+                is TrendsState.Error -> ErrorState(
+                    message = s.message,
+                    onRetry = { vm.load() },
+                    title = stringResource(R.string.trends_load_failed)
+                )
+                is TrendsState.Success -> TrendsContent(
+                    digest = s.digest,
+                    listState = listState,
+                    onOpenUrl = onOpenUrl
+                )
+            }
+        }
+    }
+}
+
+/** 加载中:与内容态同构的排名行骨架,避免转圈→内容态的结构跳变。 */
+@Composable
+private fun TrendsLoading() {
+    val cs = MaterialTheme.colorScheme
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = BottomBarPillHeight + 16.dp)
+    ) {
+        item(key = "rows_skeleton") {
+            RankRowSkeletonList(count = 8)
+        }
+        item(key = "loading_hint") {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                CircularProgressIndicator(
+                    color = cs.primary,
+                    strokeWidth = 2.dp,
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = stringResource(R.string.trends_loading),
+                    style = AppText.bodySmall,
+                    color = cs.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TrendsContent(
+    digest: TrendsDigest,
+    listState: LazyListState,
+    onOpenUrl: (url: String, title: String, source: String) -> Unit
+) {
+    val context = LocalContext.current
+    // 当前展开的词条(单展开,再点收起);瞬态 UI 状态,切 tab 丢失可接受
+    var expandedTerm by remember { mutableStateOf<String?>(null) }
+    LazyColumn(
+        state = listState,
+        modifier = Modifier.fillMaxSize(),
+        // 末项可停到药丸之上:药丸高 + 16dp 呼吸空间(与总览同)
+        contentPadding = PaddingValues(bottom = BottomBarPillHeight + 16.dp)
+    ) {
+        // 顶部时效 caption:窗口 + 数据截至(归档每日跑批,先交代新鲜度)
+        item(key = "caption", contentType = "caption") {
+            Text(
+                text = stringResource(
+                    R.string.trends_window_caption,
+                    digest.windowDays,
+                    formatDay(context, digest.days.lastOrNull().orEmpty())
+                ),
+                style = AppText.caption,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)
+            )
+        }
+
+        val keywords = digest.keywords
+        itemsIndexed(
+            keywords,
+            key = { _, k -> "kw-${k.term}" },
+            contentType = { _, _ -> "keyword" }
+        ) { index, keyword ->
+            Column {
+                KeywordRow(
+                    rank = index + 1,
+                    keyword = keyword,
+                    expanded = expandedTerm == keyword.term,
+                    onToggle = {
+                        expandedTerm = if (expandedTerm == keyword.term) null else keyword.term
+                    },
+                    onOpenUrl = onOpenUrl
+                )
+                if (index < keywords.lastIndex) {
+                    HairlineDivider(startIndent = 54.dp)
+                }
+            }
+        }
+
+        item(key = "footer", contentType = "footer") {
+            Text(
+                text = stringResource(R.string.trends_generated_at, formatClock(digest.generatedAt)),
+                style = AppText.caption,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp, vertical = 12.dp)
+            )
+        }
+    }
+}
+
+/**
+ * 热词行:[RankBadge] + 热词/命中统计 + sparkline + 涨跌箭头。
+ * 展开时下方带出代表条目浅底通栏带(对齐总览 breaking 色带语言:无卡片、色带边缘分隔)。
+ */
+@Composable
+private fun KeywordRow(
+    rank: Int,
+    keyword: TrendKeyword,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    onOpenUrl: (url: String, title: String, source: String) -> Unit
+) {
+    val cs = MaterialTheme.colorScheme
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onToggle)
+                .padding(horizontal = 18.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            RankBadge(rank = rank)
+            Spacer(Modifier.size(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = keyword.display,
+                    style = AppText.body,
+                    fontWeight = FontWeight.SemiBold,
+                    color = cs.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = stringResource(R.string.trends_hits_meta, keyword.total, keyword.daysActive),
+                    style = AppText.caption,
+                    color = cs.onSurfaceVariant,
+                    maxLines = 1
+                )
+            }
+            Spacer(Modifier.size(12.dp))
+            Sparkline(
+                values = keyword.daily,
+                color = cs.primary,
+                modifier = Modifier.size(width = 64.dp, height = 24.dp)
+            )
+            Spacer(Modifier.size(8.dp))
+            TrendArrow(trend = keyword.trend)
+        }
+        if (expanded && keyword.items.isNotEmpty()) {
+            KeywordItems(keyword = keyword, onOpenUrl = onOpenUrl)
+        }
+    }
+}
+
+/** 涨跌箭头:up=primary ↗ / down=tertiary ↘ / flat=弱色 –(近 3 日 vs 前 3 日命中和)。 */
+@Composable
+private fun TrendArrow(trend: String) {
+    val cs = MaterialTheme.colorScheme
+    val (icon, tint) = when (trend) {
+        "up" -> Icons.AutoMirrored.Filled.TrendingUp to cs.primary
+        "down" -> Icons.AutoMirrored.Filled.TrendingDown to cs.tertiary
+        else -> Icons.Filled.Remove to cs.onSurfaceVariant
+    }
+    Icon(
+        imageVector = icon,
+        contentDescription = null,
+        tint = tint,
+        modifier = Modifier.size(16.dp)
+    )
+}
+
+/**
+ * 14 日热度 sparkline —— Canvas 手绘折线(不引图表库):
+ * 归一化到组件高度,末点圆点收束;全零/单点退化为水平线。
+ */
+@Composable
+private fun Sparkline(
+    values: List<Int>,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    androidx.compose.foundation.Canvas(modifier = modifier) {
+        if (values.isEmpty()) return@Canvas
+        val maxV = (values.maxOrNull() ?: 0).coerceAtLeast(1)
+        val stepX = if (values.size > 1) size.width / (values.size - 1) else 0f
+        // 纵向留 15% 呼吸,避免折线贴边
+        val usableH = size.height * 0.7f
+        val topPad = size.height * 0.15f
+        fun pointAt(i: Int): Offset {
+            val x = if (values.size > 1) stepX * i else size.width / 2f
+            val y = topPad + usableH * (1f - values[i].toFloat() / maxV)
+            return Offset(x, y)
+        }
+        val path = androidx.compose.ui.graphics.Path()
+        values.indices.forEach { i ->
+            val p = pointAt(i)
+            if (i == 0) path.moveTo(p.x, p.y) else path.lineTo(p.x, p.y)
+        }
+        drawPath(path, color = color, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx()))
+        // 末点圆点(最新一日)
+        val last = pointAt(values.lastIndex)
+        drawCircle(color = color, radius = 2.5.dp.toPx(), center = last)
+    }
+}
+
+/** 展开的代表条目带:surfaceContainerLow 浅底通栏,标题点击进内置 WebView。 */
+@Composable
+private fun KeywordItems(
+    keyword: TrendKeyword,
+    onOpenUrl: (url: String, title: String, source: String) -> Unit
+) {
+    val cs = MaterialTheme.colorScheme
+    val context = LocalContext.current
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(cs.surfaceContainerLow)
+            .padding(horizontal = 18.dp, vertical = 8.dp)
+    ) {
+        keyword.items.forEachIndexed { i, item ->
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        onOpenUrl(item.url, item.title, SummaryRepository.titleOf(context, item.source))
+                    }
+                    .padding(vertical = 8.dp)
+            ) {
+                Text(
+                    text = item.title,
+                    style = AppText.bodySmall,
+                    color = cs.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(Modifier.height(3.dp))
+                Text(
+                    text = "${SummaryRepository.titleOf(context, item.source)} · ${formatDay(context, item.date)}",
+                    style = AppText.caption,
+                    color = cs.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            if (i < keyword.items.lastIndex) {
+                HairlineDivider()
+            }
+        }
+    }
+}
+
+/** 今天日期(系统时区),中文格式「M月d日 · 周x」,与总览 tab 顶栏日期同规格。 */
+private fun formatToday(context: Context): String =
+    runCatching {
+        SimpleDateFormat(context.getString(R.string.date_fmt_month_day_week), Locale.getDefault()).format(Date())
+    }.getOrDefault("")
+
+/** 窗口日期(yyyy-MM-dd)格式化为「M月d日」;解析失败原样返回。 */
+private fun formatDay(context: Context, day: String): String =
+    runCatching {
+        val parsed = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).parse(day)
+        if (parsed != null) {
+            SimpleDateFormat(context.getString(R.string.date_fmt_month_day), Locale.getDefault()).format(parsed)
+        } else day
+    }.getOrDefault(day)
+
+/** 生成时刻格式化为「HH:mm」。 */
+private fun formatClock(ms: Long): String =
+    runCatching { SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(ms)) }.getOrDefault("")

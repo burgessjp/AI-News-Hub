@@ -4,6 +4,7 @@
     <!-- 底部导航 tab -->
     <string name="tab_overview">总览</string>
     <string name="tab_summary">摘要</string>
+    <string name="tab_trends">趋势</string>
     <string name="tab_more">更多</string>
 
     <!-- 桌面小组件(picker 显示名 / 描述;界面内文案在 widget/ 代码中,与 App 惯例一致) -->

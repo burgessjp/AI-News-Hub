@@ -83,6 +83,7 @@ import com.peng.ainewshub.ui.summary.SummaryDateScreen
 import com.peng.ainewshub.ui.summary.SummaryScreen
 import com.peng.ainewshub.ui.tabs.AllTab
 import com.peng.ainewshub.ui.tabs.FeaturedTab
+import com.peng.ainewshub.ui.trends.TrendsScreen
 import com.peng.ainewshub.ui.anim.PageNavStyle
 import com.peng.ainewshub.ui.anim.pageTransition
 import com.peng.ainewshub.ui.anim.predictivePopTransition
@@ -308,7 +309,7 @@ private fun pageStacksSaver(webFallbackTitle: String) = androidx.compose.runtime
  * App 顶层路由 —— 多栈底部导航。
  *
  * 模型:
- *  - currentTab: 当前选中的 3 个根 tab 之一(总览 / 摘要 / 更多)
+ *  - currentTab: 当前选中的 4 个根 tab 之一(总览 / 摘要 / 趋势 / 更多)
  *  - pageStacks: 每个 tab 独立的二级页栈(栈空 = 处于根)
  *
  * 行为:
@@ -538,6 +539,8 @@ fun AiNewsHubApp(
     val summaryPagerState = rememberPagerState(pageCount = { SummaryRepository.SOURCE_KEYS.size })
     // 总览 tab 的列表滚动状态(与 summaryPagerState 同层上提)
     val overviewListState = rememberLazyListState()
+    // 趋势 tab 的列表滚动状态(同上提)
+    val trendsListState = rememberLazyListState()
     // 二级页滚动状态:以 Page 值(data class,可作 key)索引,页面弹出后清理。
     val pageListStates = remember { mutableMapOf<Page, LazyListState>() }
     // 二级页 Pager 状态(历史摘要按日期页):与列表状态同上提、同清理。
@@ -590,6 +593,7 @@ fun AiNewsHubApp(
                             reselectTick = reselectTick,
                             summaryPagerState = summaryPagerState,
                             overviewListState = overviewListState,
+                            trendsListState = trendsListState,
                             onItemClick = { push(Page.Detail(it)) },
                             onOpenAll = { push(Page.All) },
                             onOpenHackerNews = { push(Page.HackerNews) },
@@ -698,6 +702,7 @@ private fun TabRoot(
     reselectTick: Int,
     summaryPagerState: androidx.compose.foundation.pager.PagerState,
     overviewListState: LazyListState,
+    trendsListState: LazyListState,
     onItemClick: (NewsItem) -> Unit,
     onOpenAll: () -> Unit,
     onOpenHackerNews: () -> Unit,
@@ -735,6 +740,11 @@ private fun TabRoot(
             onOpenFeaturedHub = onOpenFeaturedHub,
             // 摘要条目点击直达原文(走 openUrl 单点:内置 WebView + 记浏览历史)
             onOpenUrl = { url, title, source -> onOpenUrl(url, title, source) }
+        )
+        AppTab.Trends -> TrendsScreen(
+            onOpenUrl = onOpenUrl,
+            listState = trendsListState,
+            reselectSignal = reselectTick
         )
         AppTab.More -> MoreScreen(
             onOpenSources = onOpenSources,

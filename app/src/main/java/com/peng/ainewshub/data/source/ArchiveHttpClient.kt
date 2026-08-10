@@ -175,6 +175,16 @@ object ArchiveHttpClient {
     }
 
     /**
+     * 读 index.json 顶层的 `latest_trends` 字段(跨源热词趋势榜,流水线 trend_keywords.py
+     * 纯统计预生成)。与 latest/history/latest_overview 共享 2 分钟缓存,零额外请求。
+     * 字段缺失或无 keywords 时返回 null(语义:趋势尚未生成,UI 走 NoData 态)。
+     * TrendsRepository 据此反序列化为 TrendsDigest。
+     */
+    suspend fun fetchLatestTrends(): JSONObject? = withContext(Dispatchers.IO) {
+        fetchIndex().optJSONObject("latest_trends")?.takeIf { it.has("keywords") }
+    }
+
+    /**
      * 读 index.json 的 `history` 索引(与 latest 共享 2 分钟缓存),供「历史摘要」按日期寻址。
      *
      * @return source → (date → 相对源目录的快照路径);history 由流水线每次运行时合并写入,

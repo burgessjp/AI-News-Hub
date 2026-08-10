@@ -82,6 +82,20 @@ news-hub-data 分支/
         "breaking": false, "breakingReason": ""
       }
     ]
+  },
+  "latest_trends": {
+    "generatedAt": 1786277998615,
+    "windowDays": 14,
+    "days": ["2026-07-27", "...", "2026-08-09"],
+    "keywords": [
+      {
+        "term": "agent", "display": "Agent",
+        "total": 365, "daysActive": 14,
+        "daily": [25, 29, "...", 24],
+        "trend": "up",
+        "items": [{"title": "...", "url": "...", "source": "hackernews", "date": "2026-08-09"}]
+      }
+    ]
   }
 }
 ```
@@ -91,6 +105,8 @@ news-hub-data 分支/
 `history` 是按日期寻址的历史索引(`{源名: {日期: relpath}}`,上例仅示意一个源,实际每源都有;只收录 2026-07-18 起的日期),详见下文「按日期取历史快照」。
 
 `latest_overview` 是**今日总览**(流水线预生成的跨源综合分析,详见下文「今日总览 latest_overview」)。App 首页「总览」tab 直接读这个字段,不再端侧调 AI。
+
+`latest_trends` 是**热词趋势榜**(流水线对近 14 天快照的纯统计词频分析,不调 AI,详见下文「热词趋势 latest_trends」)。App「趋势」tab 直接读这个字段。
 
 **第二步:拼完整路径拉数据。** `index.latest.<源>` 前面加上 `<源>/` 即得完整路径。
 
@@ -209,6 +225,56 @@ print(hn['items'][0]['title'])
 **与单源 `ai_summary_v2` 的区别**:`ai_summary_v2` 是各源快照内的分源要点(8 个独立摘要);`latest_overview` 是跨 8 源的综合研判(1 个总榜),AI 会按跨源归一化热度档位排序、合并同事件、标 breaking。
 
 **失败保留**:本次总览 AI 生成失败时,`latest_overview` 继承上一次的值(同 `latest` 指针的失败保留机制),避免一次失败导致 App 端总览空掉。字段完全缺失时,App 走「今日总览尚未生成」空态。
+
+## 热词趋势(latest_trends 字段)
+
+`index.json` 顶层还有 `latest_trends` 字段——**跨源热词趋势榜**,流水线(`scripts/trend_keywords.py`)在 push 阶段扫近 14 天各源快照做**纯统计词频分析**(不调 AI、确定性结果),App「趋势」tab 直接读这个字段。
+
+```json
+{
+  "latest_trends": {
+    "generatedAt": 1786277998615,
+    "windowDays": 14,
+    "days": ["2026-07-27", "2026-07-28", "...", "2026-08-09"],
+    "keywords": [
+      {
+        "term": "gpt-5",
+        "display": "GPT-5",
+        "total": 87,
+        "daysActive": 9,
+        "daily": [0, 3, 5, "...", 12],
+        "trend": "up",
+        "items": [
+          {"title": "...", "url": "...", "source": "hackernews", "date": "2026-08-09"}
+        ]
+      }
+    ]
+  }
+}
+```
+
+| 字段 | 说明 |
+|------|------|
+| `generatedAt` | 流水线生成时刻,Unix 毫秒时间戳 |
+| `windowDays` | 统计窗口天数(当前 14) |
+| `days` | 窗口内日历日期序列(yyyy-MM-dd,北京时间,连续 WINDOW_DAYS 天;缺数据的日期命中计 0),与各 keyword 的 `daily` 按下标对齐 |
+| `keywords` | 热词榜,按 `total` 降序 ≤10 个。入榜门槛:窗口期 `total ≥ 3` 且 `daysActive ≥ 2` |
+
+`keywords[]` 单项:
+
+| 字段 | 说明 |
+|------|------|
+| `term` | 归一化 canonical key(小写,如 `gpt-5`) |
+| `display` | 展示形(内置 AI 实体映射表指定形,如 `GPT-5`;或语料中最常见的原始大小写写法) |
+| `total` | 窗口期总命中次数(按「条目命中」计:一个词在一条条目中出现算 1 次) |
+| `daysActive` | 窗口期活跃天数(当日命中 ≥1 即活跃) |
+| `daily` | 每日命中序列,与 `days` 对齐(sparkline 数据源) |
+| `trend` | 涨跌标记:`up` / `down` / `flat`(近 3 日命中和 vs 前 3 日) |
+| `items` | ≤3 条代表条目(日期新的优先,按 URL 去重,源尽量多样),每项含 `title`/`url`/`source`/`date` |
+
+**统计口径**:文本取自各源条目标题/简介(aihot-featured 优先 `titleEn`,stormzhang-ai 优先 `english` 并截掉 "PLUS:" 赞助尾巴);英文按 `[a-z0-9]+` 分词去停用词后取 unigram + 相邻 bigram,内置 AI 实体别名表做归一(GPT-5/OpenAI/Claude/千问 等);中文不分词,只对别名表内含 CJK 的词做子串匹配。
+
+**失败语义**:趋势生成失败不阻断推送,当次 `index.json` 暂缺该字段(下次运行自愈);字段完全缺失时 App 走「热词趋势尚未生成」空态。
 
 ## 单个数据文件的通用结构
 

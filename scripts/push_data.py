@@ -33,6 +33,8 @@ from datetime import datetime
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from common import BEIJING_TZ as CST
 
+import trend_keywords
+
 ENV_GITCODE_TOKEN = "GITCODE_TOKEN"
 
 DEFAULT_REPO_URL = "https://gitcode.com/peng1818/AI-News-Hub-Data.git"
@@ -129,6 +131,10 @@ def _clone_overlay_commit_push(data_dir, repo_dir, authed_url, branch, repo_url,
 
     # 覆盖产物进仓库根:保留仓库既有历史快照,只覆盖 / 新增本次文件
     _overlay(data_dir, repo_dir)
+
+    # 热词趋势:overlay 后仓库 checkout 含全部历史快照,是唯一能免费拿到全部
+    # 历史的环节;纯统计不调 AI,失败只告警不阻断推送(字段暂缺,App 走空态)
+    trend_keywords.write_trends(repo_dir)
 
     # bot 身份(对齐原 workflow:github-actions[bot])
     run(["git", "config", "user.name", "github-actions[bot]"], cwd=repo_dir)
