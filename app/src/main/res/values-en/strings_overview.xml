@@ -8,6 +8,7 @@
     <string name="overview_load_failed">Failed to load overview</string>
     <string name="overview_breaking_tag">Breaking</string>
     <string name="overview_breaking_reason_label">Why it\'s breaking</string>
+    <string name="overview_digest_title">Today\'s Digest</string>
 
     <string name="overview_generated_at">Generated at %1$s</string>
     <string name="overview_data_until">Data as of %1$s</string>

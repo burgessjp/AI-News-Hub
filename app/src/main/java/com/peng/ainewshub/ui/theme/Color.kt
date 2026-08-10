@@ -158,10 +158,10 @@ val DarkColors = darkColorScheme(
 /**
  * 品牌蓝→紫渐变 —— Future Blue(primary)→ Intelligence Purple(secondary)。
  *
- * 设计系统纪律:渐变只用于 AI 特性(今日热点聚合、AI 摘要卡头等),不扩散到普通界面。
+ * 设计系统纪律:渐变只用于 AI 特性(今日热点聚合标题栏、总览页 digest Hero),不扩散到普通界面。
  * 颜色取自 colorScheme 而非固定字面值:深/浅两套色板各自保证渐变上 onPrimary
  * 文字的对比度(浅色=深渐变+白字,深色=浅渐变+深字),调用方无需模式判断。
- * 单一来源:今日热点(HotTopicsSection)与摘要卡头(SummaryScreen)共用。
+ * 单一来源:今日热点(HotTopicsSection)与总览 digest Hero(OverviewScreen)共用。
  */
 val BrandGradient: Brush
     @Composable

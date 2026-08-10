@@ -77,15 +77,14 @@ import java.util.Locale
 /**
  * 今日总览 Tab 根屏 —— 流水线预生成的跨源综合分析(读归档 latest_overview 字段)。
  *
- * 结构(A+B 混合编辑风,去卡片化):
- *  - 首行 lead 区:数据时效 caption(数据截至)+ 跨源「今日综述」
- *    (digest,流水线预生成;空串即整块不渲染)——首屏即见新鲜度与当天主线
- *  - 头条 Hero:第 1 条(breaking 条目数据层已排最前)以 [BrandGradient] 通栏
- *    大字号呈现,无圆角无描边;渐变属 AI 特性专用,本页整体即 AI 特性,合规
- *  - 2~10 名平铺列表:无卡片容器,行间 0.5dp 发丝线(缩进对齐文字列);
+ * 结构(编辑风,去卡片化):
+ *  - 首屏 digest Hero:[BrandGradient] 通栏 = 「今日综述」label + digest 正文
+ *    + 数据时效 caption(digest 空串退化为纯文本时效行)——首屏焦点即 AI 综合产物
+ *    (权重反转:渐变焦点从单条新闻收口到综述,对齐「渐变只用于 AI 特性」纪律)
+ *  - Top10 平铺列表:无卡片容器、无头条特殊位,行间 0.5dp 发丝线(缩进对齐文字列);
  *    breaking 条目整行 tertiary 浅底通栏 + 「Breaking」标签,推荐理由改左侧
  *    2dp 竖条引述块;与浅底带相邻的行间不画分隔线,由色带边缘自然分隔
- *  - 页脚:生成时间 / 基于源数 / 缺源标注(「数据截至」已由首行 lead 区承载,不重复)
+ *  - 页脚:生成时间 / 基于源数 / 缺源标注(「数据截至」已由首屏 Hero 承载,不重复)
  *
  * 与「摘要」tab 同范式:都读流水线预生成的归档字段,App 端不再调 AI。
  */
@@ -191,11 +190,11 @@ fun OverviewScreen(
 }
 
 /**
- * 加载中:匹配内容态布局的骨架屏(头条 Hero 渐变块 + 4 条排名行),避免转圈→内容态
+ * 加载中:匹配内容态布局的骨架屏(digest Hero 渐变块 + 5 条排名行),避免转圈→内容态
  * 的结构跳变。底部保留原「AI 正在生成」文案(AI 长输出,避免用户误以为卡死)。
  *
- * Hero 骨架用 [BrandGradient] 通栏块占位(与真实 Hero 同区位),内部用 onPrimary 半透
- * ShimmerBox 占标题/指标行位;下方直接复用 [RankRowSkeletonList]。
+ * digest Hero 骨架用 [BrandGradient] 通栏块占位(与真实 Hero 同区位),内部用 onPrimary
+ * 半透静态块占 label/正文/时效位;下方直接复用 [RankRowSkeletonList]。
  */
 @Composable
 private fun OverviewLoading() {
@@ -205,7 +204,7 @@ private fun OverviewLoading() {
         // 与 OverviewContent 同款末项留白(药丸高 + 16dp 呼吸空间)
         contentPadding = PaddingValues(bottom = BottomBarPillHeight + 16.dp)
     ) {
-        // 头条 Hero 骨架:BrandGradient 通栏块,内部 onPrimary 半透占位块
+        // digest Hero 骨架:BrandGradient 通栏块,内部 onPrimary 半透占位块
         item(key = "hero_skeleton") {
             Column(
                 modifier = Modifier
@@ -213,29 +212,26 @@ private fun OverviewLoading() {
                     .background(BrandGradient)
                     .padding(horizontal = 18.dp, vertical = 16.dp)
             ) {
-                // RankBadge + BreakingTag 占位行
-                HeroShimmerBox(modifier = Modifier.size(24.dp), cornerRadius = 6.dp)
+                // label 行占位(图标 + 「今日综述」)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    HeroShimmerBox(modifier = Modifier.size(14.dp), cornerRadius = 7.dp)
+                    HeroShimmerBox(modifier = Modifier.size(64.dp, 12.dp), cornerRadius = 6.dp)
+                }
                 Spacer(Modifier.height(10.dp))
-                // 标题占位(两行,较宽)
-                HeroShimmerBox(modifier = Modifier.fillMaxWidth(0.92f).height(20.dp))
+                // digest 正文占位(三行,宽递减)
+                HeroShimmerBox(modifier = Modifier.fillMaxWidth(0.95f).height(12.dp))
                 Spacer(Modifier.height(6.dp))
-                HeroShimmerBox(modifier = Modifier.fillMaxWidth(0.75f).height(20.dp))
+                HeroShimmerBox(modifier = Modifier.fillMaxWidth(0.88f).height(12.dp))
                 Spacer(Modifier.height(6.dp))
-                // AI 一句话占位(两行,较窄)
-                HeroShimmerBox(modifier = Modifier.fillMaxWidth(0.85f).height(12.dp))
-                Spacer(Modifier.height(4.dp))
                 HeroShimmerBox(modifier = Modifier.fillMaxWidth(0.6f).height(12.dp))
                 Spacer(Modifier.height(10.dp))
-                // 底部来源胶囊 + 指标占位
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    HeroShimmerBox(modifier = Modifier.size(48.dp, 16.dp), cornerRadius = 8.dp)
-                    HeroShimmerBox(modifier = Modifier.size(80.dp, 14.dp), cornerRadius = 4.dp)
-                }
+                // 「数据截至」时效占位
+                HeroShimmerBox(modifier = Modifier.size(110.dp, 10.dp), cornerRadius = 5.dp)
             }
         }
-        // 2~10 名排名行骨架(复用通用 RankRowSkeletonList)
+        // Top10 排名行骨架(复用通用 RankRowSkeletonList)
         item(key = "rows_skeleton") {
-            RankRowSkeletonList(count = 4)
+            RankRowSkeletonList(count = 5)
         }
         // 底部「AI 正在生成」文案(保留原语义提示,居中弱色)
         item(key = "loading_hint") {
@@ -292,38 +288,29 @@ private fun OverviewContent(
         // (列表本身可滚入药丸之下,容器已按药丸底缘裁剪)
         contentPadding = PaddingValues(bottom = BottomBarPillHeight + 16.dp)
     ) {
-        // 首行 lead 区:时效 caption + 今日综述(两者都缺失时不占位)
+        // 首屏 digest Hero:今日综述 + 时效 caption(两者都缺失时不占位)
         if (digest.dataFetchedAt > 0 || digest.digest.isNotBlank()) {
             item(key = "lead", contentType = "lead") {
                 OverviewLead(digest = digest)
             }
         }
 
-        // 头条 Hero:第 1 条(breaking 条目数据层已排最前)BrandGradient 通栏大字号
-        digest.items.firstOrNull()?.let { first ->
-            item(key = "hero-${first.url}", contentType = "hero") {
-                OverviewHero(
-                    entry = first,
-                    onClick = { onOpenUrl(first.url, first.title, SummaryRepository.titleOf(context, first.source)) }
-                )
-            }
-        }
-
-        // 2~10 名平铺(去卡片)。发丝线仅在同类型相邻行间绘制;与 breaking
-        // 浅底带相邻时不画,由色带边缘自然分隔
-        val rest = digest.items.drop(1)
+        // Top10 全量平铺(去卡片,无头条特殊位;breaking 条目数据层已排最前,
+        // 由 TopEntryRow 浅底带承接强调)。发丝线仅在同类型相邻行间绘制;
+        // 与 breaking 浅底带相邻时不画,由色带边缘自然分隔
+        val items = digest.items
         itemsIndexed(
-            rest,
-            key = { i, e -> "top-${i + 1}-${e.url}" },
+            items,
+            key = { i, e -> "top-$i-${e.url}" },
             contentType = { _, e -> if (e.breaking) "top10-breaking" else "top10" }
         ) { index, entry ->
             Column {
                 TopEntryRow(
-                    rank = index + 2,
+                    rank = index + 1,
                     entry = entry,
                     onClick = { onOpenUrl(entry.url, entry.title, SummaryRepository.titleOf(context, entry.source)) }
                 )
-                val next = rest.getOrNull(index + 1)
+                val next = items.getOrNull(index + 1)
                 if (next != null && entry.breaking == next.breaking) {
                     RowDivider()
                 }
@@ -337,40 +324,74 @@ private fun OverviewContent(
 }
 
 /**
- * 首行 lead 区 —— 时效 caption + 跨源「今日综述」。
+ * 首屏 digest Hero —— 跨源「今日综述」的页面焦点区(权重反转:原头条渐变 Hero 已去除,
+ * 渐变焦点从单条新闻收口到 AI 综合产物,对齐 Color.kt「渐变只用于 AI 特性」纪律)。
+ *
+ * 视觉:full-bleed [BrandGradient] 通栏(无圆角无描边),内容一律 onPrimary 系:
+ * AutoAwesome 图标 + 「今日综述」label → digest 正文 → 「数据截至」时效 caption。
+ * 语言复用 [HotTopicsSection] 渐变标题栏(图标/标签 + onPrimary 文字)。
  *
  * 时效:归档每日跑一次批,首屏必须让用户知道数据新鲜度(原只在页脚,
  * 需滚完 10 条才可见);「数据截至」由本区独占展示,页脚不再重复。
- * 综述:流水线预生成的 2-3 句 digest(纯文本平铺,不配渐变 —— 渐变只属头条 Hero),
- * 空串(旧归档无此字段)即不渲染。
+ *
+ * 渲染条件:digest 非空 → 渐变 Hero;digest 空但 dataFetchedAt > 0(旧归档无此字段)
+ * → 退化为纯文本时效 caption(不占渐变块);两者都缺 → 不渲染。
  */
 @Composable
 private fun OverviewLead(digest: OverviewDigest) {
     val cs = MaterialTheme.colorScheme
     val context = LocalContext.current
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 18.dp, vertical = 10.dp)
-    ) {
-        if (digest.dataFetchedAt > 0) {
-            Text(
-                text = stringResource(
-                    R.string.overview_data_until,
-                    formatFetchedAt(context, digest.dataFetchedAt)
-                ),
-                style = AppText.caption,
-                color = cs.onSurfaceVariant
-            )
-        }
-        if (digest.digest.isNotBlank()) {
-            if (digest.dataFetchedAt > 0) Spacer(Modifier.height(6.dp))
+    if (digest.digest.isNotBlank()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(BrandGradient)
+                .padding(horizontal = 18.dp, vertical = 16.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Outlined.AutoAwesome,
+                    contentDescription = null,
+                    tint = cs.onPrimary,
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = stringResource(R.string.overview_digest_title),
+                    style = AppText.caption,
+                    fontWeight = FontWeight.SemiBold,
+                    color = cs.onPrimary
+                )
+            }
+            Spacer(Modifier.height(8.dp))
             Text(
                 text = digest.digest,
                 style = AppText.body,
-                color = cs.onSurface
+                color = cs.onPrimary
             )
+            if (digest.dataFetchedAt > 0) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = stringResource(
+                        R.string.overview_data_until,
+                        formatFetchedAt(context, digest.dataFetchedAt)
+                    ),
+                    style = AppText.caption,
+                    color = cs.onPrimary.copy(alpha = AppAlpha.primaryEmphasis)
+                )
+            }
         }
+    } else if (digest.dataFetchedAt > 0) {
+        // 旧归档无 digest 字段:退化为纯文本时效 caption,不占渐变块
+        Text(
+            text = stringResource(
+                R.string.overview_data_until,
+                formatFetchedAt(context, digest.dataFetchedAt)
+            ),
+            style = AppText.caption,
+            color = cs.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)
+        )
     }
 }
 
@@ -394,128 +415,7 @@ private fun BreakingTag(modifier: Modifier = Modifier) {
 }
 
 /**
- * 头条 Hero —— 第 1 条热点的通栏头版(A+B 混合设计的 B)。
- *
- * 视觉:full-bleed [BrandGradient],无圆角无描边,与下方平铺列表形成重量对比;
- * 渐变上文字/徽章一律 onPrimary 系(浅主题深渐变+白字,深主题浅渐变+深字,
- * 对比度说明见 theme/Color.kt)。
- * 内容:[RankBadge](1) + (breaking 时)[BreakingTag] / 大标题(titleSection)/
- * AI 点评 / breaking 推荐理由(onPrimaryOverlay 半透面板)/ 来源胶囊 + 指标。
- */
-@Composable
-private fun OverviewHero(entry: OverviewEntry, onClick: () -> Unit) {
-    val cs = MaterialTheme.colorScheme
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(BrandGradient)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 18.dp, vertical = 16.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            RankBadge(rank = 1)
-            if (entry.breaking) {
-                Spacer(Modifier.width(8.dp))
-                BreakingTag()
-            }
-        }
-        Spacer(Modifier.height(10.dp))
-        Text(
-            text = entry.title,
-            style = AppText.titleSection,
-            color = cs.onPrimary,
-            maxLines = 3,
-            overflow = TextOverflow.Ellipsis
-        )
-        if (entry.comment.isNotBlank()) {
-            Spacer(Modifier.height(6.dp))
-            Text(
-                text = entry.comment,
-                style = AppText.bodySmall,
-                color = cs.onPrimary,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-        // 推荐理由面板:onPrimaryOverlay 半透底(与 HotTopicsHeader 计数胶囊同语言)
-        if (entry.breaking && entry.breakingReason.isNotBlank()) {
-            Spacer(Modifier.height(8.dp))
-            val reasonLabel = stringResource(R.string.overview_breaking_reason_label)
-            val reason = remember(entry.breakingReason, cs.onPrimary, reasonLabel) {
-                buildAnnotatedString {
-                    withStyle(SpanStyle(color = cs.onPrimary, fontWeight = FontWeight.SemiBold)) {
-                        append("$reasonLabel ")
-                    }
-                    append(entry.breakingReason)
-                }
-            }
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(MaterialTheme.shapes.small)
-                    .background(cs.onPrimary.copy(alpha = AppAlpha.onPrimaryOverlay))
-                    .padding(horizontal = 8.dp, vertical = 6.dp)
-            ) {
-                Row(verticalAlignment = Alignment.Top) {
-                    Icon(
-                        Icons.Outlined.AutoAwesome,
-                        contentDescription = null,
-                        tint = cs.onPrimary,
-                        modifier = Modifier.size(13.dp)
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    Text(
-                        text = reason,
-                        style = AppText.bodySmall,
-                        color = cs.onPrimary,
-                        modifier = Modifier.weight(1f),
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-        }
-        Spacer(Modifier.height(10.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            // 来源胶囊:深底浅 chip(onPrimaryOverlay 底 + onPrimary 字)
-            Box(
-                modifier = Modifier
-                    .clip(CircleShape)
-                    .background(cs.onPrimary.copy(alpha = AppAlpha.onPrimaryOverlay))
-                    .padding(horizontal = 8.dp, vertical = 2.dp)
-            ) {
-                Text(
-                    text = SummaryRepository.titleOf(LocalContext.current, entry.source),
-                    style = AppText.caption,
-                    color = cs.onPrimary,
-                    maxLines = 1
-                )
-            }
-            if (entry.metrics.isNotBlank()) {
-                Spacer(Modifier.size(8.dp))
-                // 指标提权:前缀 TrendingUp 图标,与各源列表页 StatBadge「图标+数值」节奏对齐
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.TrendingUp,
-                    contentDescription = null,
-                    tint = cs.onPrimary.copy(alpha = AppAlpha.primaryEmphasis),
-                    modifier = Modifier.size(14.dp)
-                )
-                Spacer(Modifier.size(3.dp))
-                Text(
-                    text = entry.metrics,
-                    style = AppText.caption,
-                    color = cs.onPrimary.copy(alpha = AppAlpha.primaryEmphasis),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-        }
-    }
-}
-
-/**
- * 平铺热点行(2~10 名):[RankBadge] + 原标题 + AI 一句话 + 来源/指标,无卡片容器。
+ * 平铺热点行(1~10 名):[RankBadge] + 原标题 + AI 一句话 + 来源/指标,无卡片容器。
  * breaking 条目:整行 tertiary 浅底通栏(无圆角描边)+「Breaking」标签,
  * 推荐理由为左侧 2dp 竖条引述块(原「卡中卡」面板随卡片容器一并去除)。
  */
@@ -642,7 +542,7 @@ private fun SourceChip(title: String) {
     }
 }
 
-/** 页脚:生成时间 / 基于源数 / 缺源标注(「数据截至」已在首行 lead 区展示,此处不重复)。 */
+/** 页脚:生成时间 / 基于源数 / 缺源标注(「数据截至」已在首屏 digest Hero 展示,此处不重复)。 */
 @Composable
 private fun OverviewFooter(digest: OverviewDigest) {
     val cs = MaterialTheme.colorScheme

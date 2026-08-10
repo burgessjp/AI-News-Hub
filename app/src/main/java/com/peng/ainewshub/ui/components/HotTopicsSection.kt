@@ -95,7 +95,7 @@ fun HotTopicsSection(
 
 /**
  * 卡片顶部标题栏 —— [BrandGradient] 品牌渐变背景 + flame 图标 + 「今日热点」。
- * (渐变单一来源在 theme/Color.kt,与摘要卡头共用;AI 特性专用,不扩散。)
+ * (渐变单一来源在 theme/Color.kt,与总览 digest Hero 共用;AI 特性专用,不扩散。)
  */
 @Composable
 private fun HotTopicsHeader(count: Int) {

@@ -14,6 +14,8 @@
     <string name="overview_breaking_tag">Breaking</string>
     <!-- breaking 推荐理由前缀(引述块/面板加粗段,与正文间补空格) -->
     <string name="overview_breaking_reason_label">推荐理由</string>
+    <!-- 首屏 digest Hero 标题(渐变块内 AutoAwesome 图标旁) -->
+    <string name="overview_digest_title">今日综述</string>
 
     <!-- 页脚:生成时间 / 数据截至 / 源计数 / 缺源标注(段间「 · 」为标点,两语言一致,留代码) -->
     <string name="overview_generated_at">生成于 %1$s</string>

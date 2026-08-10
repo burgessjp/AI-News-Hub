@@ -218,7 +218,7 @@ internal fun SummaryCardPage(
 
 /**
  * 紧凑扁头 —— 一行高:源图标(源强调色 tint)+ 源名 + 右侧数据时刻(caption)。
- * 取代原 BrandGradient 渐变卡头:蓝紫渐变焦点已收口到总览页头条(AI 特性专用),
+ * 取代原 BrandGradient 渐变卡头:蓝紫渐变焦点已收口到总览页 digest Hero(AI 特性专用),
  * 摘要页不再逐源重复渐变带,纵向空间让给正文。
  *
  * 「查看完整列表」出口也收口在此:[SummaryCardSpec.onOpen] 非空时整行可点,
