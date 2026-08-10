@@ -85,7 +85,7 @@ import java.util.Locale
  *  - 2~10 名平铺列表:无卡片容器,行间 0.5dp 发丝线(缩进对齐文字列);
  *    breaking 条目整行 tertiary 浅底通栏 + 「Breaking」标签,推荐理由改左侧
  *    2dp 竖条引述块;与浅底带相邻的行间不画分隔线,由色带边缘自然分隔
- *  - 页脚:生成时间 / 数据截至 / 缺源标注
+ *  - 页脚:生成时间 / 基于源数 / 缺源标注(「数据截至」已由首行 lead 区承载,不重复)
  *
  * 与「摘要」tab 同范式:都读流水线预生成的归档字段,App 端不再调 AI。
  */
@@ -340,7 +340,7 @@ private fun OverviewContent(
  * 首行 lead 区 —— 时效 caption + 跨源「今日综述」。
  *
  * 时效:归档每日跑一次批,首屏必须让用户知道数据新鲜度(原只在页脚,
- * 需滚完 10 条才可见);caption 复用页脚同款「数据截至」取词。
+ * 需滚完 10 条才可见);「数据截至」由本区独占展示,页脚不再重复。
  * 综述:流水线预生成的 2-3 句 digest(纯文本平铺,不配渐变 —— 渐变只属头条 Hero),
  * 空串(旧归档无此字段)即不渲染。
  */
@@ -642,18 +642,13 @@ private fun SourceChip(title: String) {
     }
 }
 
-/** 页脚:生成时间 / 数据截至 / 模型与 token / 缺源标注。 */
+/** 页脚:生成时间 / 基于源数 / 缺源标注(「数据截至」已在首行 lead 区展示,此处不重复)。 */
 @Composable
 private fun OverviewFooter(digest: OverviewDigest) {
     val cs = MaterialTheme.colorScheme
     val context = LocalContext.current
     // 各片段在进 buildString 前算好(stringResource 只能在 @Composable 上下文调)
     val generatedText = stringResource(R.string.overview_generated_at, formatClock(digest.generatedAt))
-    val fetchedText = if (digest.dataFetchedAt > 0) {
-        stringResource(R.string.overview_data_until, formatFetchedAt(context, digest.dataFetchedAt))
-    } else {
-        null
-    }
     val sourceCount = SummaryRepository.SOURCE_KEYS.size
     val basedOnText = pluralStringResource(R.plurals.overview_based_on_sources, sourceCount, sourceCount)
     val listSeparator = stringResource(R.string.overview_list_separator)
@@ -672,10 +667,7 @@ private fun OverviewFooter(digest: OverviewDigest) {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = buildString {
-                append(generatedText)
-                if (fetchedText != null) append(" · $fetchedText")
-            },
+            text = generatedText,
             style = AppText.caption,
             color = cs.onSurfaceVariant
         )

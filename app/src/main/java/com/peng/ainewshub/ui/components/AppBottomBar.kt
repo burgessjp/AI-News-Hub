@@ -80,19 +80,20 @@ enum class AppTab(
  * 避免末项被悬浮底栏遮挡。
  *
  * 组成:药丸自身约 56dp + 距底 16dp margin + 16dp 呼吸空间
- *      + 手势导航栏 inset(约 24-48dp)。取 120dp 覆盖大多数设备的实际悬浮区域。
+ *      + 手势导航栏 inset(约 24-48dp)。取 96dp 覆盖大多数设备的实际悬浮区域。
  */
-val BottomBarReservedHeight = 120.dp
+val BottomBarReservedHeight = 96.dp
 
 /**
  * 药丸自身高度(不含距底 margin 与导航栏 inset):
- * icon 22dp + 图标/文字间距 2dp + 文字行高 ~16dp + 容器 vertical padding 12dp×2。
+ * icon 22dp + 图标/文字间距 2dp + 文字行高 ~16dp
+ * + 项内 vertical padding 4dp×2 + 容器 vertical padding 4dp×2。
  *
  * 用途:列表允许滚入药丸之下、但要把可视区收在药丸底缘时(总览页),容器底部
  * padding 用 navigationBarsPadding + 16dp(与 MainActivity 底栏定位一致),
  * 列表 contentPadding 用本值 + 间距让末项能停到药丸之上。
  */
-val BottomBarPillHeight = 64.dp
+val BottomBarPillHeight = 56.dp
 
 /**
  * 浮动药丸底栏 —— 对齐 "Synthetic Intelligence News" 设计系统
@@ -104,7 +105,8 @@ val BottomBarPillHeight = 64.dp
  *  - 近实底:surface-container × AppAlpha.bottomBarSurface(0.94——Compose 无真模糊,
  *    半透明叠滚动内容显脏,近实底遮透出)+ 3dp 浮起阴影
  *    + 1px 白色半透明描边(AppAlpha.glassEdge,近实底下仍有型的玻璃边缘高光)
- *  - 容器内边距:horizontal 24dp / vertical 12dp(对齐设计稿 px-6 py-3)
+ *  - 容器内边距:horizontal 24dp / vertical 4dp(紧凑化:原 12dp 偏高,
+ *    药丸整体高度压缩约 1/3,只收内间距,图标/字号不动)
  *  - 选中项:secondary-container 实心填充药丸 + on-secondary-container 文字/图标 +
  *    实心图标(FILL 1);未选中:透明 + on-surface-variant + 描边图标(FILL 0)
  *
@@ -135,8 +137,8 @@ fun AppBottomBar(
         )
     ) {
         Row(
-            // 容器内边距对齐设计稿 px-6 py-3
-            modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+            // 容器内边距:横向维持 24dp,纵向收紧到 4dp(原 12dp,压缩药丸高度)
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -152,12 +154,12 @@ fun AppBottomBar(
 }
 
 /**
- * 药丸内单项 —— 严格对齐设计稿。
+ * 药丸内单项。
  *
  * 视觉:
- *  - 选中:secondary-container 实心填充的圆角药丸(px-5 py-2 ≈ 20dp/8dp),
+ *  - 选中:secondary-container 实心填充的圆角药丸(horizontal 20dp / vertical 4dp),
  *    图标用 Filled 实心变体(FILL 1),图标/文字着 on-secondary-container
- *  - 未选中:透明底(p-2 ≈ 8dp),图标用 Outlined 描边变体(FILL 0),
+ *  - 未选中:透明底(horizontal 8dp / vertical 4dp),图标用 Outlined 描边变体(FILL 0),
  *    图标/文字着 on-surface-variant
  *  - 点击:无 ripple;状态靠填充色 + 图标 FILL 表达
  */
@@ -183,13 +185,13 @@ private fun NavPillItem(
                 indication = null,
                 onClick = onClick
             )
-            // 选中态 px-5 py-2(20dp/8dp);未选中 p-2(8dp)
+            // 选中态横向展开(20dp)未选中收紧(8dp);纵向统一 4dp(原 8dp,压缩药丸高度)
             .padding(
                 horizontal = if (selected) 20.dp else 8.dp,
-                vertical = if (selected) 8.dp else 8.dp
+                vertical = 4.dp
             )
             // 触控宽保底 48dp(未选中态 8×2+22=38dp 不达标,补足);
-            // 高 56dp 由内容(icon 22 + 间距 2 + 文字行高 16)+ padding 16 保证
+            // 高 48dp 由内容(icon 22 + 间距 2 + 文字行高 16)+ padding 8 保证,仍达触控下限
             .widthIn(min = 48.dp),
         contentAlignment = Alignment.Center
     ) {
