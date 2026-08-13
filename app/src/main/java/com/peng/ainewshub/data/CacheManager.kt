@@ -12,13 +12,15 @@ import java.io.File
 /**
  * 缓存统一清理入口 —— 集中处理 App 所有「可安全清理」的本地数据。
  *
- * 清理范围(均为可恢复数据,不影响用户配置与 AI key):
+ * 默认清理范围(均为可恢复数据,不影响用户配置与 AI key):
  *  - WebView Cookie / Web Storage(随浏览不断累积的持久化数据)
  *  - Coil 图片缓存(磁盘 + 内存)
- *  - 翻译缓存文件 `hn_translations.json`
  *  - 5 个榜单源列表缓存文件(HackerNews/GitHub/HuggingFace/stormzhang/Rundown)
- *  - 浏览历史([BrowseHistoryRepository.clearAll])
  *  - 搜索历史([SettingsStore.clearSearchHistory])
+ *
+ * 需调用方显式选择才清(有用户价值,误删代价高):
+ *  - 翻译缓存文件 `hn_translations.json`(译文由 AI 生成,重译要再花 token)
+ *  - 浏览历史([BrowseHistoryRepository.clearAll])
  *
  * **不清**:主题/字体/字号/数据源模式、AI 配置与 API key、token 用量统计(另有独立入口)。
  *
@@ -41,12 +43,17 @@ object CacheManager {
      *
      * @param browseHistoryRepository 浏览历史仓库(清空 browse_history 表)
      * @param settingsStore 设置存储(只清 search_history key,不动其它偏好)
+     * @param includeTranslations 同时清翻译缓存(默认 false:译文是用户花 token 生成的,保护性保留)。
+     *   已知取舍:各 TranslationRepository 实例的内存副本不随文件删除失效,重启后才完全干净。
+     * @param includeBrowseHistory 同时清空浏览历史(默认 false:保护性保留)
      */
     @OptIn(ExperimentalCoilApi::class)
     suspend fun clear(
         context: Context,
         browseHistoryRepository: BrowseHistoryRepository,
-        settingsStore: com.peng.ainewshub.ui.more.SettingsStore
+        settingsStore: com.peng.ainewshub.ui.more.SettingsStore,
+        includeTranslations: Boolean = false,
+        includeBrowseHistory: Boolean = false
     ) {
         // WebView 的 Cookie / Web Storage 持久化数据必须在主线程清理。
         // (WebView 的 HTTP 缓存是 per-application 的内存/磁盘缓存,随浏览累积,
@@ -67,14 +74,20 @@ object CacheManager {
                 loader.diskCache?.clear()
                 loader.memoryCache?.clear()
             }
-            // 翻译缓存 + 6 源列表缓存(清空 cacheDir 下所有内容,但保留 cacheDir 根目录本身 ——
+            // 6 源列表缓存等(清空 cacheDir 下所有内容,但保留 cacheDir 根目录本身 ——
             // 若连根目录一起删,WebView 等组件下次访问 cacheDir/WebView 子目录时会打 warning。
             // 各组件会按需重建自己的子目录,删后 App 正常运行。)
+            // 未勾选时跳过翻译缓存文件:译文重译要再花 token,保护性保留。
             runCatching {
-                context.cacheDir.listFiles()?.forEach { it.deleteRecursively() }
+                context.cacheDir.listFiles()?.forEach { f ->
+                    if (!includeTranslations && f.name == TRANSLATION_CACHE_FILE) return@forEach
+                    f.deleteRecursively()
+                }
             }
-            // 浏览历史(Room)
-            runCatching { browseHistoryRepository.clearAll() }
+            // 浏览历史(Room,默认保留,勾选才清)
+            if (includeBrowseHistory) {
+                runCatching { browseHistoryRepository.clearAll() }
+            }
             // 搜索历史(DataStore,只 remove search_history key)
             runCatching { settingsStore.clearSearchHistory() }
         }

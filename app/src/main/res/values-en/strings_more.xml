@@ -40,7 +40,10 @@
     <string name="settings_section_data_cleanup">Data Cleanup</string>
     <string name="settings_clear_data_title">Clear browsing data</string>
     <string name="settings_clear_data_subtitle">Currently using %1$s</string>
-    <string name="settings_clear_data_message">This clears recoverable data such as loaded pages, images, browsing history, and search history. Your settings and AI configuration are not affected.</string>
+    <string name="settings_clear_data_message">This clears recoverable data such as loaded pages, images, list caches, and search history. Your settings and AI configuration are not affected.</string>
+    <string name="settings_clear_data_include_translations">Also clear translation cache</string>
+    <string name="settings_clear_data_include_translations_caption">Translations are AI-generated; re-translating costs tokens</string>
+    <string name="settings_clear_data_include_history">Also clear browsing history</string>
     <string name="settings_clear_action">Clear</string>
 
     <!-- ===== About screen ===== -->

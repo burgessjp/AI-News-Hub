@@ -42,7 +42,10 @@
     <string name="settings_section_data_cleanup">数据清理</string>
     <string name="settings_clear_data_title">清理浏览数据</string>
     <string name="settings_clear_data_subtitle">当前占用 %1$s</string>
-    <string name="settings_clear_data_message">将清理已加载的网页、图片、浏览历史与搜索历史等可恢复数据,不影响你的设置和 AI 配置。</string>
+    <string name="settings_clear_data_message">将清理已加载的网页、图片与列表缓存及搜索历史等可恢复数据,不影响你的设置和 AI 配置。</string>
+    <string name="settings_clear_data_include_translations">同时清除翻译缓存</string>
+    <string name="settings_clear_data_include_translations_caption">译文由 AI 生成,重译需消耗 token</string>
+    <string name="settings_clear_data_include_history">同时清空浏览历史</string>
     <string name="settings_clear_action">清理</string>
 
     <!-- ===== 关于页(AboutScreen) ===== -->

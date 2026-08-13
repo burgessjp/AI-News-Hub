@@ -7,9 +7,11 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
@@ -18,6 +20,7 @@ import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -91,7 +94,8 @@ enum class FontScale(@StringRes val labelRes: Int, val scale: Float) {
  *  - 数据源:Hub 4 源从实时抓取还是 gitcode 归档取数,横向二段式
  *  - 语言:跟随系统 / 简体中文 / English,切换后 Activity 重建生效(见 ui/i18n/AppLocale)
  *  - 通知:每日更新通知开关(WorkManager 本地调度,API 33+ 打开时请求运行时权限)
- *  - 缓存:一键清理网页缓存/Cookie/图片缓存/浏览历史/搜索历史等可恢复数据
+ *  - 缓存:一键清理网页缓存/Cookie/图片缓存/搜索历史等可恢复数据;
+ *    翻译缓存与浏览历史为保护性勾选项,默认保留
  *
  * AI 服务配置与用量统计已拆到独立二级页 [AiServiceScreen](「更多」→「AI 服务」入口)。
  * 数据源模式与主题/字体同存于 display_prefs([com.peng.ainewshub.ui.more.SettingsStore])。
@@ -111,7 +115,7 @@ fun SettingsScreen(
     dailyNotify: Boolean,
     onToggleDailyNotify: (Boolean) -> Unit,
     cacheSizeBytes: Long,
-    onClearCache: () -> Unit,
+    onClearCache: (Boolean, Boolean) -> Unit,
     onBack: () -> Unit
 ) {
     val themeOptions = ThemeMode.entries.map { stringResource(it.labelRes) }
@@ -282,10 +286,12 @@ private fun DailyNotifyRow(dailyNotify: Boolean, onToggle: (Boolean) -> Unit) {
  *
  * 副标题显示当前 cacheDir 占用([CacheManager.formatSize]);点击弹 AlertDialog 二次确认,
  * 确认后回调 [onClearCache](由调用方执行 [CacheManager.clear] 并刷新占用)。
+ * 弹窗内两个保护性勾选项(默认不勾):翻译缓存(重译要花 token)与浏览历史;
+ * 回调参数为 (includeTranslations, includeBrowseHistory)。
  * 确认钮沿用「清空统计」的 error 红色范式。
  */
 @Composable
-private fun CacheSection(cacheSizeBytes: Long, onClearCache: () -> Unit) {
+private fun CacheSection(cacheSizeBytes: Long, onClearCache: (Boolean, Boolean) -> Unit) {
     var confirmClear by rememberSaveable { mutableStateOf(false) }
     SettingsRow(
         icon = Icons.Filled.CleaningServices,
@@ -297,15 +303,33 @@ private fun CacheSection(cacheSizeBytes: Long, onClearCache: () -> Unit) {
         onClick = { confirmClear = true }
     )
     if (confirmClear) {
+        // 翻译缓存 / 浏览历史有用户价值,默认保留(保护性默认),用户显式勾选才一并清;
+        // 每次打开弹窗勾选态重置,防误触残留
+        var includeTranslations by rememberSaveable { mutableStateOf(false) }
+        var includeHistory by rememberSaveable { mutableStateOf(false) }
         AlertDialog(
             onDismissRequest = { confirmClear = false },
             title = { Text(stringResource(R.string.settings_clear_data_title)) },
             text = {
-                Text(stringResource(R.string.settings_clear_data_message))
+                Column {
+                    Text(stringResource(R.string.settings_clear_data_message))
+                    ClearOptionRow(
+                        checked = includeTranslations,
+                        onCheckedChange = { includeTranslations = it },
+                        title = stringResource(R.string.settings_clear_data_include_translations),
+                        caption = stringResource(R.string.settings_clear_data_include_translations_caption)
+                    )
+                    ClearOptionRow(
+                        checked = includeHistory,
+                        onCheckedChange = { includeHistory = it },
+                        title = stringResource(R.string.settings_clear_data_include_history),
+                        caption = null
+                    )
+                }
             },
             confirmButton = {
                 TextButton(onClick = {
-                    onClearCache()
+                    onClearCache(includeTranslations, includeHistory)
                     confirmClear = false
                 }) { Text(stringResource(R.string.settings_clear_action), color = MaterialTheme.colorScheme.error) }
             },
@@ -313,6 +337,35 @@ private fun CacheSection(cacheSizeBytes: Long, onClearCache: () -> Unit) {
                 TextButton(onClick = { confirmClear = false }) { Text(stringResource(R.string.common_cancel)) }
             }
         )
+    }
+}
+
+/** 清理确认弹窗里的可勾选项(整行可点,不限于 Checkbox 本身)。 */
+@Composable
+private fun ClearOptionRow(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    title: String,
+    caption: String?
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onCheckedChange(!checked) }
+            .padding(vertical = 4.dp)
+    ) {
+        Checkbox(checked = checked, onCheckedChange = onCheckedChange)
+        Column {
+            Text(title, style = MaterialTheme.typography.bodyMedium)
+            if (caption != null) {
+                Text(
+                    caption,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
     }
 }
 

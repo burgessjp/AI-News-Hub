@@ -9,6 +9,9 @@ import org.json.JSONObject
 import java.io.File
 import java.security.MessageDigest
 
+/** 翻译缓存文件名 —— [com.peng.ainewshub.data.CacheManager] 的清理排除名单引用此处,防漂移。 */
+internal const val TRANSLATION_CACHE_FILE = "hn_translations.json"
+
 /**
  * 翻译缓存条目。仅存译文 —— 原文不可变,以原文纯文本的 sha256 为 key,
  * 命中即用,永不过期。结构与 [com.peng.ainewshub.data.HackerNewsStoriesCache] 同范式。
@@ -16,7 +19,7 @@ import java.security.MessageDigest
  * 序列化为 `cacheDir/hn_translations.json`:`{ "<sha256前16>": { "text": "..." } }`。
  */
 private object TranslationCache {
-    private const val FILE = "hn_translations.json"
+    private const val FILE = TRANSLATION_CACHE_FILE
 
     fun file(cacheDir: File?): File? = cacheDir?.let { File(it, FILE) }
 

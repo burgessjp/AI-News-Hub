@@ -369,9 +369,9 @@ fun AiNewsHubApp(
     var cacheSizeBytes by remember { mutableStateOf(0L) }
     // 首次组合计算一次;清理后由 onClearCache 内手动再算一次。
     LaunchedEffect(Unit) { cacheSizeBytes = CacheManager.sizeBytes(appContext) }
-    val onClearCache: () -> Unit = {
+    val onClearCache: (Boolean, Boolean) -> Unit = { includeTranslations, includeBrowseHistory ->
         scope.launch {
-            CacheManager.clear(appContext, browseHistoryRepo, settingsStore)
+            CacheManager.clear(appContext, browseHistoryRepo, settingsStore, includeTranslations, includeBrowseHistory)
             cacheSizeBytes = CacheManager.sizeBytes(appContext)
         }
     }
@@ -812,7 +812,7 @@ private fun PageView(
     usageStore: AiUsageStore,
     browseHistoryRepo: BrowseHistoryRepository,
     cacheSizeBytes: Long,
-    onClearCache: () -> Unit,
+    onClearCache: (Boolean, Boolean) -> Unit,
     darkTheme: Boolean = false
 ) {
     // 浏览历史来源标签:下方非 Composable 回调(onOpenUrl lambda)里捕获,提前取词
