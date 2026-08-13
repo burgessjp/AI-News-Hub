@@ -1,5 +1,11 @@
 package com.peng.ainewshub.ui.more
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -9,6 +15,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CleaningServices
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -25,9 +32,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import com.peng.ainewshub.R
 import com.peng.ainewshub.data.CacheManager
 import com.peng.ainewshub.ui.components.AppTopBar
@@ -81,6 +90,7 @@ enum class FontScale(@StringRes val labelRes: Int, val scale: Float) {
  *  - 字体:字体族三选一(默认/衬线/等宽)+ 字号三档(紧凑/标准/大号)
  *  - 数据源:Hub 4 源从实时抓取还是 gitcode 归档取数,横向二段式
  *  - 语言:跟随系统 / 简体中文 / English,切换后 Activity 重建生效(见 ui/i18n/AppLocale)
+ *  - 通知:每日更新通知开关(WorkManager 本地调度,API 33+ 打开时请求运行时权限)
  *  - 缓存:一键清理网页缓存/Cookie/图片缓存/浏览历史/搜索历史等可恢复数据
  *
  * AI 服务配置与用量统计已拆到独立二级页 [AiServiceScreen](「更多」→「AI 服务」入口)。
@@ -98,6 +108,8 @@ fun SettingsScreen(
     onSelectFontScale: (FontScale) -> Unit,
     language: AppLanguage,
     onSelectLanguage: (AppLanguage) -> Unit,
+    dailyNotify: Boolean,
+    onToggleDailyNotify: (Boolean) -> Unit,
     cacheSizeBytes: Long,
     onClearCache: () -> Unit,
     onBack: () -> Unit
@@ -193,6 +205,12 @@ fun SettingsScreen(
                 )
             }
 
+            // 通知 section —— 每日更新通知开关(WorkManager 本地调度;API 33+ 需运行时权限)
+            item { SectionHeader(stringResource(R.string.settings_section_notify)) }
+            item {
+                DailyNotifyRow(dailyNotify = dailyNotify, onToggle = onToggleDailyNotify)
+            }
+
             // 数据清理 section —— 一键清理已加载的网页/图片/浏览历史/搜索历史等可恢复数据
             item { SectionHeader(stringResource(R.string.settings_section_data_cleanup)) }
             item {
@@ -210,6 +228,52 @@ private fun GroupLabel(text: String) {
         style = MaterialTheme.typography.labelMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(start = 18.dp, top = 6.dp)
+    )
+}
+
+/**
+ * 每日更新通知开关行。
+ *
+ * Android 13+(TIRAMISU)通知需运行时权限:打开开关时请求,允许才生效;
+ * 拒绝(含「不再询问」)Toast 引导去系统设置,开关保持关。已授权或 API < 33 直接生效。
+ * 开关状态持久化与 WorkManager 调度同步由调用方(onToggle 回调)完成。
+ */
+@Composable
+private fun DailyNotifyRow(dailyNotify: Boolean, onToggle: (Boolean) -> Unit) {
+    val context = LocalContext.current
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            onToggle(true)
+        } else {
+            Toast.makeText(context, R.string.settings_daily_notify_permission_denied, Toast.LENGTH_LONG).show()
+        }
+    }
+    SettingsRow(
+        icon = Icons.Filled.Notifications,
+        iconAccent = MaterialTheme.colorScheme.tertiary,
+        title = stringResource(R.string.settings_daily_notify),
+        subtitle = stringResource(R.string.settings_daily_notify_subtitle),
+        showDivider = false,
+        trailing = {
+            Switch(
+                checked = dailyNotify,
+                onCheckedChange = { enabled ->
+                    val needsPermission = enabled &&
+                        Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                        ContextCompat.checkSelfPermission(
+                            context, Manifest.permission.POST_NOTIFICATIONS
+                        ) != PackageManager.PERMISSION_GRANTED
+                    if (needsPermission) {
+                        permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    } else {
+                        onToggle(enabled)
+                    }
+                }
+            )
+        },
+        showChevron = false
     )
 }
 

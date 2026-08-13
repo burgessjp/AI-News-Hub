@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Daily update notification (English). See values/strings_notify.xml for the feature pointer. -->
+<resources>
+    <!-- ===== Settings entry ===== -->
+    <string name="settings_section_notify">Notifications</string>
+    <string name="settings_daily_notify">Daily update notification</string>
+    <string name="settings_daily_notify_subtitle">Get notified when today\'s highlights are ready (at most once a day, local schedule)</string>
+    <string name="settings_daily_notify_permission_denied">Notification permission not granted. Please allow notifications in system settings</string>
+
+    <!-- ===== Notification body ===== -->
+    <string name="notify_daily_channel_name">Daily updates</string>
+    <string name="notify_daily_title">Today\'s highlights are ready</string>
+    <string name="notify_daily_text_fallback">Today\'s Top 10 is ready. Tap to read.</string>
+</resources>

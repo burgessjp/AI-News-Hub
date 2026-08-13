@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.peng.ainewshub.data.source.SourceMode
@@ -26,6 +27,9 @@ import kotlinx.coroutines.flow.map
  *
  * [sourceOrderFlow] 持久化用户在「信息源」页拖拽自定义的 8 源顺序(默认
  * [DEFAULT_SOURCE_ORDER]),摘要 Tab 跟随该顺序;关于页固定默认顺序不跟随。
+ *
+ * 每日更新通知:开关存 `daily_notify` 键(进 [DisplayPrefs]);`last_notified_overview_at`
+ * 键存上次通知对应的 generatedAt(Worker 调度状态,不进 DisplayPrefs)。
  */
 private val Context.displayDataStore: DataStore<Preferences> by preferencesDataStore("display_prefs")
 
@@ -39,7 +43,8 @@ class SettingsStore(context: Context) {
         val fontChoice: FontChoice = FontChoice.System,
         val fontScale: FontScale = FontScale.Standard,
         val sourceMode: SourceMode = SourceMode.ARCHIVE,
-        val language: AppLanguage = AppLanguage.SYSTEM
+        val language: AppLanguage = AppLanguage.SYSTEM,
+        val dailyNotify: Boolean = false
     )
 
     val prefsFlow: Flow<DisplayPrefs> = dataStore.data.map { p ->
@@ -55,7 +60,8 @@ class SettingsStore(context: Context) {
             // (底层 LIVE 分支 / SourceMode 枚举 / fromStored 保留待恢复。)
             sourceMode = SourceMode.ARCHIVE,
             language = p[KEY_LANGUAGE]?.let { name -> runCatching { AppLanguage.valueOf(name) }.getOrNull() }
-                ?: AppLanguage.SYSTEM
+                ?: AppLanguage.SYSTEM,
+            dailyNotify = p[KEY_DAILY_NOTIFY] ?: false
         )
     }
 
@@ -81,6 +87,25 @@ class SettingsStore(context: Context) {
 
     suspend fun updateLanguage(lang: AppLanguage) {
         dataStore.edit { it[KEY_LANGUAGE] = lang.name }
+    }
+
+    // ===== 每日更新通知 =====
+
+    /** 设置页「每日更新通知」开关;开关变化由调用方同步 WorkManager 调度(DailyNotifyScheduler.sync)。 */
+    suspend fun updateDailyNotify(enabled: Boolean) {
+        dataStore.edit { it[KEY_DAILY_NOTIFY] = enabled }
+    }
+
+    /**
+     * 上次通知对应的 `latest_overview.generatedAt`(毫秒);0 = 从未通知。
+     * 仅 DailyUpdateWorker 读写,不进 [DisplayPrefs](非用户偏好,是调度状态)。
+     */
+    suspend fun lastNotifiedOverviewAt(): Long = runCatching {
+        dataStore.data.first()[KEY_LAST_NOTIFIED_OVERVIEW_AT]
+    }.getOrNull() ?: 0L
+
+    suspend fun setLastNotifiedOverviewAt(ms: Long) {
+        dataStore.edit { it[KEY_LAST_NOTIFIED_OVERVIEW_AT] = ms }
     }
 
     // ===== 搜索历史 =====
@@ -168,6 +193,8 @@ class SettingsStore(context: Context) {
         val KEY_LANGUAGE = stringPreferencesKey("language")
         val KEY_SEARCH_HISTORY = stringPreferencesKey("search_history")
         val KEY_SOURCE_ORDER = stringPreferencesKey("source_order")
+        val KEY_DAILY_NOTIFY = booleanPreferencesKey("daily_notify")
+        val KEY_LAST_NOTIFIED_OVERVIEW_AT = longPreferencesKey("last_notified_overview_at")
         const val MAX_SEARCH_HISTORY = 10
     }
 }

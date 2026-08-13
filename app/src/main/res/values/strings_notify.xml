@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  每日更新通知(中文全集,默认 locale;英文在 values-en/strings_notify.xml)。
+  功能见 notify/DailyUpdateNotifier.kt:WorkManager 自查链检测新批次,每天至多 1 条。
+-->
+<resources>
+    <!-- ===== 设置项 ===== -->
+    <string name="settings_section_notify">通知</string>
+    <string name="settings_daily_notify">每日更新通知</string>
+    <string name="settings_daily_notify_subtitle">今日热点生成后提醒你(每天至多一条,本地调度)</string>
+    <string name="settings_daily_notify_permission_denied">未授予通知权限,请在系统设置中允许通知</string>
+
+    <!-- ===== 通知本体 ===== -->
+    <string name="notify_daily_channel_name">每日更新</string>
+    <string name="notify_daily_title">今日热点已更新</string>
+    <string name="notify_daily_text_fallback">今日 Top10 已生成,点击查看</string>
+</resources>

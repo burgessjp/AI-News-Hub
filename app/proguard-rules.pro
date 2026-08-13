@@ -38,6 +38,11 @@
 -keep class com.peng.ainewshub.widget.** { *; }
 -dontwarn androidx.glance.**
 
+# ---- WorkManager(每日更新通知) ----
+# WorkManager 按类名反射实例化 Worker(WorkSpec 存类名),双保险防 R8 混淆/裁剪
+-keep class * extends androidx.work.ListenableWorker { *; }
+-dontwarn androidx.work.**
+
 # ---- 通用保护 ----
 -keepattributes Signature, *Annotation*, InnerClasses, EnclosingMethod, RuntimeVisibleAnnotations, RuntimeVisibleParameterAnnotations, AnnotationDefault
 -keepattributes SourceFile,LineNumberTable

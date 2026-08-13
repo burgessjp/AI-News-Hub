@@ -1,5 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 每日更新通知:API 33+ 需在运行时经设置页开关请求,见 notify/DailyUpdateNotifier.kt -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- 网页下载:API<29 经 DownloadManager 写公共「下载」目录需要;API 29+ scoped storage 无需 -->
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"

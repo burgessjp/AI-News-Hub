@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  通知小图标(状态栏/通知左侧):闪电 glyph,取「快讯」意。
+  系统会对小图标统一着色(去 alpha 外颜色),故填充固定白色;
+  不用彩色 launcher 图标——会被涂成色块。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="#FFFFFF">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M7,2v11h3v9l7,-12h-4l4,-8z" />
+</vector>

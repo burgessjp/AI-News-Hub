@@ -50,6 +50,7 @@ import com.peng.ainewshub.data.AiConfigStore
 import com.peng.ainewshub.data.CacheManager
 import com.peng.ainewshub.data.AiUsageStore
 import com.peng.ainewshub.data.SummaryRepository
+import com.peng.ainewshub.notify.DailyNotifyScheduler
 import com.peng.ainewshub.ui.more.SettingsStore
 import com.peng.ainewshub.ui.NewsDetailScreen
 import com.peng.ainewshub.ui.BrowseHistoryViewModel
@@ -375,6 +376,14 @@ fun AiNewsHubApp(
         }
     }
 
+    // 每日更新通知:持久化开关 + 同步 WorkManager 自查链调度(见 notify/DailyUpdateNotifier.kt)
+    val onToggleDailyNotify: (Boolean) -> Unit = { enabled ->
+        scope.launch {
+            settingsStore.updateDailyNotify(enabled)
+            DailyNotifyScheduler.sync(appContext, enabled)
+        }
+    }
+
     val darkTheme = when (themeMode) {
         ThemeMode.System -> isSystemInDarkTheme()
         ThemeMode.Light -> false
@@ -626,6 +635,8 @@ fun AiNewsHubApp(
                             onSelectFontScale = onSelectFontScale,
                             language = displayPrefs.language,
                             onSelectLanguage = onSelectLanguage,
+                            dailyNotify = displayPrefs.dailyNotify,
+                            onToggleDailyNotify = onToggleDailyNotify,
                             onBack = pop,
                             onItemClick = { push(Page.Detail(it)) },
                             // 精选二级页头部的「全部 ›」入口 → 全部动态二级页
@@ -773,6 +784,8 @@ private fun PageView(
     onSelectFontScale: (FontScale) -> Unit,
     language: AppLanguage,
     onSelectLanguage: (AppLanguage) -> Unit,
+    dailyNotify: Boolean,
+    onToggleDailyNotify: (Boolean) -> Unit,
     onBack: () -> Unit,
     onItemClick: (NewsItem) -> Unit,
     onOpenAll: () -> Unit,
@@ -872,6 +885,8 @@ private fun PageView(
             onSelectFontScale = onSelectFontScale,
             language = language,
             onSelectLanguage = onSelectLanguage,
+            dailyNotify = dailyNotify,
+            onToggleDailyNotify = onToggleDailyNotify,
             cacheSizeBytes = cacheSizeBytes,
             onClearCache = onClearCache,
             onBack = onBack
