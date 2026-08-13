@@ -26,16 +26,15 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.HourglassEmpty
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -117,7 +116,7 @@ fun OverviewScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
-            // 一级根 tab 规格(对齐摘要/更多):品牌 wordmark + 右侧日期 + 刷新
+            // 一级根 tab 规格:品牌 wordmark + 右侧日期(刷新收口到下拉手势,顶栏不再放按钮)
             AppTopBar(
                 title = "AI NEWS HUB",
                 titleContent = {
@@ -126,26 +125,6 @@ fun OverviewScreen(
                 },
                 horizontalPadding = 18.dp,
                 actions = {
-                    // 刷新按钮在左(刷新中转圈),日期文案在右;
-                    // 转圈与按钮同占 32dp,保证与日期文案的间距两种状态下一致
-                    if (isRefreshing) {
-                        Box(modifier = Modifier.size(32.dp), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(16.dp),
-                                strokeWidth = 2.dp,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    } else {
-                        IconButton(onClick = { vm.refresh() }, modifier = Modifier.size(32.dp)) {
-                            Icon(
-                                Icons.Filled.Refresh,
-                                contentDescription = stringResource(R.string.overview_refresh_desc),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
                     Text(
                         text = dateText,
                         style = MaterialTheme.typography.bodyMedium,
@@ -179,11 +158,16 @@ fun OverviewScreen(
                     onRetry = { vm.load() },
                     title = stringResource(R.string.overview_load_failed)
                 )
-                is OverviewState.Success -> OverviewContent(
-                    digest = s.digest,
-                    listState = listState,
-                    onOpenUrl = onOpenUrl
-                )
+                is OverviewState.Success -> PullToRefreshBox(
+                    isRefreshing = isRefreshing,
+                    onRefresh = { vm.refresh() }
+                ) {
+                    OverviewContent(
+                        digest = s.digest,
+                        listState = listState,
+                        onOpenUrl = onOpenUrl
+                    )
+                }
             }
         }
     }

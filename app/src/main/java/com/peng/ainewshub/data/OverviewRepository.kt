@@ -70,11 +70,12 @@ class OverviewRepository {
      * 归档只读:经 [ArchiveHttpClient.fetchLatestOverview](复用 index.json 2 分钟缓存)
      * 拉取流水线预生成的 `latest_overview` 字段并反序列化。
      *
+     * @param force true 绕过 index.json 2 分钟缓存(总览 Tab 下拉刷新)
      * @return 成功为 [OverviewDigest];失败为 [AppException.NoData](字段缺失)/
      * 网络/解析失败
      */
-    suspend fun loadDigest(): Result<OverviewDigest> = runCatching {
-        val json = ArchiveHttpClient.fetchLatestOverview()
+    suspend fun loadDigest(force: Boolean = false): Result<OverviewDigest> = runCatching {
+        val json = ArchiveHttpClient.fetchLatestOverview(force)
             ?: throw AppException.NoData()
         parseDigest(json)
     }

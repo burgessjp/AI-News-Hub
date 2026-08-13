@@ -78,11 +78,12 @@ class TrendsRepository {
     /**
      * 加载热词趋势榜。
      *
+     * @param force true 绕过 index.json 2 分钟缓存(趋势 Tab 下拉刷新)
      * @return 成功为 [TrendsDigest];字段缺失/无热词为 [AppException.NoData];
      * 网络/解析失败为对应异常
      */
-    suspend fun loadTrends(): Result<TrendsDigest> = runCatching {
-        val json = ArchiveHttpClient.fetchLatestTrends()
+    suspend fun loadTrends(force: Boolean = false): Result<TrendsDigest> = runCatching {
+        val json = ArchiveHttpClient.fetchLatestTrends(force)
             ?: throw AppException.NoData()
         parseTrends(json)
     }

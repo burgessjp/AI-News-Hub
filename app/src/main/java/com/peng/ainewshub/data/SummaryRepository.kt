@@ -90,13 +90,14 @@ class SummaryRepository {
      *
      * @param source 归档源 key(hackernews / github-trending / huggingface-papers /
      * stormzhang-ai / producthunt / rundown-ai / openai-anthropic-news / aihot-featured)
+     * @param force true 绕过 index.json 2 分钟缓存(摘要 Tab 下拉刷新)
      */
-    suspend fun summarize(source: String): Result<SourceSummary> {
+    suspend fun summarize(source: String, force: Boolean = false): Result<SourceSummary> {
         val src = SummarySource.fromKey(source)
             ?: return Result.failure(IllegalArgumentException("未知源:$source"))
 
         // 拉归档快照(fetchLatestSnapshot 内部已切 IO,返回整个顶层 JSONObject,含 ai_summary_v2 / ai_summary)
-        val snapshot = runCatching { ArchiveHttpClient.fetchLatestSnapshot(src.key) }
+        val snapshot = runCatching { ArchiveHttpClient.fetchLatestSnapshot(src.key, force) }
             .getOrElse { return Result.failure(it) }
 
         return parseSummary(snapshot).map { content ->

@@ -22,16 +22,15 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.TrendingDown
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.outlined.HourglassEmpty
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -101,44 +100,17 @@ fun TrendsScreen(
         }
     }
 
-    val context = LocalContext.current
-    val dateText = remember { formatToday(context) }
-
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
-            // 一级根 tab 规格(对齐总览/摘要/更多):品牌 wordmark + 右侧日期 + 刷新
+            // 一级根 tab 规格:品牌 wordmark;刷新收口到下拉手势,日期仅总览 tab 保留,
+            // 顶栏不再有 actions
             AppTopBar(
                 title = "AI NEWS HUB",
                 titleContent = {
                     BrandWordmark(modifier = Modifier.height(44.dp))
                 },
-                horizontalPadding = 18.dp,
-                actions = {
-                    if (isRefreshing) {
-                        Box(modifier = Modifier.size(32.dp), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(16.dp),
-                                strokeWidth = 2.dp,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    } else {
-                        IconButton(onClick = { vm.refresh() }, modifier = Modifier.size(32.dp)) {
-                            Icon(
-                                Icons.Filled.Refresh,
-                                contentDescription = stringResource(R.string.trends_refresh_desc),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
-                    Text(
-                        text = dateText,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                horizontalPadding = 18.dp
             )
         }
     ) { padding ->
@@ -164,11 +136,16 @@ fun TrendsScreen(
                     onRetry = { vm.load() },
                     title = stringResource(R.string.trends_load_failed)
                 )
-                is TrendsState.Success -> TrendsContent(
-                    digest = s.digest,
-                    listState = listState,
-                    onOpenUrl = onOpenUrl
-                )
+                is TrendsState.Success -> PullToRefreshBox(
+                    isRefreshing = isRefreshing,
+                    onRefresh = { vm.refresh() }
+                ) {
+                    TrendsContent(
+                        digest = s.digest,
+                        listState = listState,
+                        onOpenUrl = onOpenUrl
+                    )
+                }
             }
         }
     }
@@ -422,12 +399,6 @@ private fun KeywordItems(
         }
     }
 }
-
-/** 今天日期(系统时区),中文格式「M月d日 · 周x」,与总览 tab 顶栏日期同规格。 */
-private fun formatToday(context: Context): String =
-    runCatching {
-        SimpleDateFormat(context.getString(R.string.date_fmt_month_day_week), Locale.getDefault()).format(Date())
-    }.getOrDefault("")
 
 /** 窗口日期(yyyy-MM-dd)格式化为「M月d日」;解析失败原样返回。 */
 private fun formatDay(context: Context, day: String): String =

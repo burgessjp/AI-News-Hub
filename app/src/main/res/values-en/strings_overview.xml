@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Overview tab strings (English). Terminology: see values/strings_common.xml header. -->
 <resources>
-    <string name="overview_refresh_desc">Regenerate</string>
     <string name="overview_loading">Loading today\'s overview…</string>
     <string name="overview_no_data_title">Today\'s overview isn\'t ready yet</string>
     <string name="overview_no_data_subtitle">Today\'s content is still being prepared. Check back later</string>

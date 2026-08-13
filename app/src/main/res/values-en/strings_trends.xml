@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Trends tab strings (English; Chinese full set in values/strings_trends.xml). -->
 <resources>
-    <!-- Top bar refresh button contentDescription -->
-    <string name="trends_refresh_desc">Refresh</string>
     <!-- Loading hint -->
     <string name="trends_loading">Loading keyword trends…</string>
     <!-- Empty state: latest_trends field missing from the archive -->

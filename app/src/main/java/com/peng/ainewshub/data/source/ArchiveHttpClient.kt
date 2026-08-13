@@ -26,7 +26,9 @@ import java.util.concurrent.ConcurrentHashMap
  *  2. 拼 `<API_BASE>/<source>/<相对路径>?ref=news-hub-data` GET 该快照 JSON
  *  3. 解析顶层 `fetched_at_ms` 与 `items[]`,交由各 Repository 做字段映射
  *
- * 归档本身是历史快照,无缓存概念:每次都直接打网络(fetch == forceRefresh)。
+ * 缓存与刷新:index.json 有 2 分钟内存缓存(多源并发去重,见 fetchIndex);快照本体
+ * 无缓存,每次都打网络。手动刷新(根 Tab 下拉)经 force=true 绕过 index 缓存,
+ * 保证流水线刚推送时立即可见;自动加载/重击 tab 走缓存(2 分钟外自然失效)。
  * 任一步失败(HTTP 错误 / index 无该源 / items 为空)抛 RuntimeException,
  * 交由 ViewModel 显示 Error 态(归档模式明确提示,不回退实时)。
  *
@@ -83,12 +85,13 @@ object ArchiveHttpClient {
     /**
      * 拉 index.json(带 2 分钟缓存 + 并发去重)。
      *
+     * @param force true 时绕过 TTL 强制打网络(手动刷新路径);并发去重的 Mutex 仍生效
      * @return 解析后的 index JSON;读取或解析失败抛 RuntimeException
      */
-    private suspend fun fetchIndex(): JSONObject = indexMutex.withLock {
+    private suspend fun fetchIndex(force: Boolean = false): JSONObject = indexMutex.withLock {
         // 1) 命中未过期缓存:秒回(4 个源共享同一份,只打 1 次网络)
         val cached = indexCache
-        if (cached != null && System.currentTimeMillis() - indexCacheAt < INDEX_TTL_MS) {
+        if (!force && cached != null && System.currentTimeMillis() - indexCacheAt < INDEX_TTL_MS) {
             return@withLock cached
         }
         // 2) 走网络刷新(仅一次,并发其余调用在此等待后复用结果)
@@ -106,9 +109,9 @@ object ArchiveHttpClient {
      * @param source 源标识,对应 index.json 的 latest 键与目录名
      * @return 该源最新快照的 JSON 对象;index 无该源或快照缺失抛 RuntimeException
      */
-    suspend fun fetchLatestSnapshot(source: String): JSONObject = withContext(Dispatchers.IO) {
-        // 1) 读 index.json(带 2 分钟缓存 + 并发去重,见 fetchIndex)拿最新路径
-        val index = fetchIndex()
+    suspend fun fetchLatestSnapshot(source: String, force: Boolean = false): JSONObject = withContext(Dispatchers.IO) {
+        // 1) 读 index.json(带 2 分钟缓存 + 并发去重,force 绕过 TTL,见 fetchIndex)拿最新路径
+        val index = fetchIndex(force)
         val latest = index.optJSONObject("latest")
             ?: throw AppException.ServerError()
         val relPath = latest.optString(source).takeIf { it.isNotBlank() }
@@ -170,8 +173,8 @@ object ArchiveHttpClient {
      * 与 latest/history 共享 2 分钟缓存。字段缺失或无 items 时返回 null
      * (语义:今日总览尚未生成,UI 走 NoData 态)。OverviewRepository 据此反序列化为 OverviewDigest。
      */
-    suspend fun fetchLatestOverview(): JSONObject? = withContext(Dispatchers.IO) {
-        fetchIndex().optJSONObject("latest_overview")?.takeIf { it.has("items") }
+    suspend fun fetchLatestOverview(force: Boolean = false): JSONObject? = withContext(Dispatchers.IO) {
+        fetchIndex(force).optJSONObject("latest_overview")?.takeIf { it.has("items") }
     }
 
     /**
@@ -180,8 +183,8 @@ object ArchiveHttpClient {
      * 字段缺失或无 keywords 时返回 null(语义:趋势尚未生成,UI 走 NoData 态)。
      * TrendsRepository 据此反序列化为 TrendsDigest。
      */
-    suspend fun fetchLatestTrends(): JSONObject? = withContext(Dispatchers.IO) {
-        fetchIndex().optJSONObject("latest_trends")?.takeIf { it.has("keywords") }
+    suspend fun fetchLatestTrends(force: Boolean = false): JSONObject? = withContext(Dispatchers.IO) {
+        fetchIndex(force).optJSONObject("latest_trends")?.takeIf { it.has("keywords") }
     }
 
     /**

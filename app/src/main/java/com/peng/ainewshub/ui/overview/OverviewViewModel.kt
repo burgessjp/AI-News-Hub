@@ -33,10 +33,10 @@ sealed interface OverviewState {
  *
  * 总览由流水线预生成,本 VM 只读归档(对齐 SummaryRepository 范式):
  *  - init 自动 [load](命中 index.json 2 分钟缓存即秒回);
- *  - [refresh]:顶栏刷新按钮,触发一次网络重读(归档缓存仍生效);
+ *  - [refresh]:下拉刷新,绕过 index 缓存强制重读(流水线刚推送立即可见);
  *  - 重击 tab 走 [load] 即可。
  *
- * 加载中保留旧内容(Success 不回落 Loading),只亮顶栏转圈。
+ * 加载中保留旧内容(Success 不回落 Loading),只亮下拉刷新指示。
  */
 class OverviewViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -45,7 +45,7 @@ class OverviewViewModel(application: Application) : AndroidViewModel(application
     private val _state = MutableStateFlow<OverviewState>(OverviewState.Loading)
     val state: StateFlow<OverviewState> = _state.asStateFlow()
 
-    /** 读取进行中(顶栏转圈 + 防重复)。 */
+    /** 读取进行中(下拉刷新指示 + 防重复)。 */
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
@@ -54,37 +54,41 @@ class OverviewViewModel(application: Application) : AndroidViewModel(application
     }
 
     /** 自动加载:读归档 latest_overview 字段(命中 2 分钟缓存秒回)。 */
-    fun load() = run()
+    fun load() = run(false)
 
-    /** 手动刷新:触发一次网络重读(归档只读,刷新仅绕过 UI 防抖,缓存层仍生效)。 */
-    fun refresh() = run()
+    /** 下拉刷新:绕过 index.json 2 分钟缓存强制重读。 */
+    fun refresh() = run(true)
 
-    private fun run() {
+    private fun run(force: Boolean) {
         if (_isRefreshing.value) return
         _isRefreshing.value = true
         // 已有内容时保留展示,后台重读;否则进 Loading
         if (_state.value !is OverviewState.Success) _state.value = OverviewState.Loading
         viewModelScope.launch {
-            repo.loadDigest().fold(
-                onSuccess = {
-                    _state.value = OverviewState.Success(it)
-                    // 联动刷新「今日热点」小组件(同进程命中 ArchiveHttpClient 2 分钟
-                    // 内存缓存,零额外网络;失败静默,不影响本页 UI 态)
-                    HotNowWidgetUpdater.refreshFromApp(getApplication())
-                },
-                onFailure = { e ->
-                    Log.w("UiError", "总览加载失败: ${e.message ?: "(no message)"}", e)
-                    val localized = getApplication<Application>().localized()
-                    _state.value = when (e) {
-                        is AppException.NoData -> OverviewState.NoData
-                        is AppException.Network -> OverviewState.Error(localized.getString(R.string.error_network))
-                        is AppException.ServerError -> OverviewState.Error(localized.getString(R.string.overview_error_parse))
-                        is AppException.RateLimited -> OverviewState.Error(localized.getString(R.string.error_rate_limited))
-                        else -> OverviewState.Error(localized.getString(R.string.overview_error_load_failed))
+            try {
+                repo.loadDigest(force).fold(
+                    onSuccess = {
+                        _state.value = OverviewState.Success(it)
+                        // 联动刷新「今日热点」小组件(同进程命中 ArchiveHttpClient 2 分钟
+                        // 内存缓存,零额外网络;失败静默,不影响本页 UI 态)
+                        HotNowWidgetUpdater.refreshFromApp(getApplication())
+                    },
+                    onFailure = { e ->
+                        Log.w("UiError", "总览加载失败: ${e.message ?: "(no message)"}", e)
+                        val localized = getApplication<Application>().localized()
+                        _state.value = when (e) {
+                            is AppException.NoData -> OverviewState.NoData
+                            is AppException.Network -> OverviewState.Error(localized.getString(R.string.error_network))
+                            is AppException.ServerError -> OverviewState.Error(localized.getString(R.string.overview_error_parse))
+                            is AppException.RateLimited -> OverviewState.Error(localized.getString(R.string.error_rate_limited))
+                            else -> OverviewState.Error(localized.getString(R.string.overview_error_load_failed))
+                        }
                     }
-                }
-            )
-            _isRefreshing.value = false
+                )
+            } finally {
+                // finally 复位:非预期异常(JSON OOM 等)也不能让刷新态永久卡 true
+                _isRefreshing.value = false
+            }
         }
     }
 }

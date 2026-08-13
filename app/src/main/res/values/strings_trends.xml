@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- 趋势 Tab 文案(中文全集,默认 locale;英文在 values-en/strings_trends.xml)。 -->
 <resources>
-    <!-- 顶栏刷新按钮 contentDescription -->
-    <string name="trends_refresh_desc">刷新</string>
     <!-- 加载中说明 -->
     <string name="trends_loading">正在加载热词趋势…</string>
     <!-- 空态:归档 latest_trends 字段缺失 -->

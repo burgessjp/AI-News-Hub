@@ -1,23 +1,16 @@
 package com.peng.ainewshub.ui.summary
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -25,7 +18,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -39,9 +31,6 @@ import com.peng.ainewshub.ui.SummaryViewModel
 import com.peng.ainewshub.ui.UiState
 import com.peng.ainewshub.ui.components.AppTopBar
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 /**
  * AI 摘要 Tab 根屏 —— 8 个归档源各占一页,[HorizontalPager] 左右滑动切换。
@@ -112,45 +101,14 @@ fun SummaryScreen(
         }
     }
 
-    // 顶栏日期(与精选 tab 同规格「M月d日 · 周x」):组合期算一次即可;模式串随界面语言
-    val datePattern = stringResource(R.string.date_fmt_month_day_week)
-    val dateText = remember(datePattern) { formatToday(datePattern) }
-
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
-            // 一级根 tab 规格(对齐总览/更多):titleHero 主标题 + 右侧日期,保留刷新。
-            // horizontalPadding=18 让标题与下方内容(18dp 边距)左对齐
+            // 一级根 tab 规格:titleHero 主标题;刷新收口到下拉手势,日期仅总览 tab 保留,
+            // 顶栏不再有 actions。horizontalPadding=18 让标题与下方内容(18dp 边距)左对齐
             AppTopBar(
                 title = stringResource(R.string.summary_title),
-                horizontalPadding = 18.dp,
-                actions = {
-                    // 刷新按钮在左(刷新中转圈),日期文案在右;
-                    // 转圈与按钮同占 32dp,保证与日期文案的间距两种状态下一致
-                    if (isRefreshing) {
-                        Box(modifier = Modifier.size(32.dp), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(16.dp),
-                                strokeWidth = 2.dp,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    } else {
-                        IconButton(onClick = { vm.refresh() }, modifier = Modifier.size(32.dp)) {
-                            Icon(
-                                Icons.Filled.Refresh,
-                                contentDescription = stringResource(R.string.common_refresh),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
-                    Text(
-                        text = dateText,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                horizontalPadding = 18.dp
             )
         }
     ) { padding ->
@@ -172,33 +130,34 @@ fun SummaryScreen(
                 onSelect = { i -> scope.launch { pagerState.animateScrollToPage(i) } }
             )
 
-            // 内容 Pager:每页一个源的摘要(平铺无卡片),左右滑切源
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 18.dp),
-                pageSpacing = 14.dp
-            ) { pageIndex ->
-                val spec = cards.getOrNull(pageIndex) ?: return@HorizontalPager
-                val context = LocalContext.current
-                SummaryCardPage(
-                    spec = spec,
-                    state = states[spec.source] ?: UiState.Loading,
-                    onRetry = { vm.retry(spec.source) },
-                    // 根 tab 底栏悬浮:页内列表底部补「药丸高 + 16dp」,末条可停到药丸之上
-                    reserveBottomBarSpace = true,
-                    // v2 条目(url 非空)整行可点直达原文;标题取摘要标题,来源标签取源名
-                    onOpenItem = { item ->
-                        onOpenUrl(item.url, item.title, SummaryRepository.titleOf(context, spec.source))
-                    }
-                )
+            // 内容 Pager:每页一个源的摘要(平铺无卡片),左右滑切源;
+            // 下拉手势经 PullToRefreshBox 触发 vm.refresh()(纵向手势不与横向 Pager 冲突)
+            PullToRefreshBox(
+                isRefreshing = isRefreshing,
+                onRefresh = { vm.refresh() },
+                modifier = Modifier.fillMaxSize()
+            ) {
+                HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(horizontal = 18.dp),
+                    pageSpacing = 14.dp
+                ) { pageIndex ->
+                    val spec = cards.getOrNull(pageIndex) ?: return@HorizontalPager
+                    val context = LocalContext.current
+                    SummaryCardPage(
+                        spec = spec,
+                        state = states[spec.source] ?: UiState.Loading,
+                        onRetry = { vm.retry(spec.source) },
+                        // 根 tab 底栏悬浮:页内列表底部补「药丸高 + 16dp」,末条可停到药丸之上
+                        reserveBottomBarSpace = true,
+                        // v2 条目(url 非空)整行可点直达原文;标题取摘要标题,来源标签取源名
+                        onOpenItem = { item ->
+                            onOpenUrl(item.url, item.title, SummaryRepository.titleOf(context, spec.source))
+                        }
+                    )
+                }
             }
         }
     }
 }
-
-/** 今天日期(系统时区),格式「M月d日 · 周x」(模式串 date_fmt_month_day_week 随语言),与精选 tab 顶栏日期同规格。 */
-private fun formatToday(pattern: String): String =
-    runCatching {
-        SimpleDateFormat(pattern, Locale.getDefault()).format(Date())
-    }.getOrDefault("")
