@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 「今日热点」小组件渐变头(light):品牌 Future Blue → Intelligence Purple 水平渐变,
+     与 App 内 BrandGradient(今日热点卡/总览 Hero)同源;顶部两角 16dp —— pre-12 无系统圆角裁切,需自带。 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <gradient
+        android:startColor="#003EC7"
+        android:endColor="#6B38D4"
+        android:angle="0" />
+    <corners
+        android:topLeftRadius="16dp"
+        android:topRightRadius="16dp" />
+</shape>

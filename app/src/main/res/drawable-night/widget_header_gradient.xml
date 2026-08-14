@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 「今日热点」小组件渐变头(night):深色 BrandGradient 同源(primary→secondary 亮渐变),
+     头部文字/图标换深色 onPrimary(#002C9A)保证对比,与 App 深色热点卡观感一致。 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <gradient
+        android:startColor="#B7C4FF"
+        android:endColor="#D0BCFF"
+        android:angle="0" />
+    <corners
+        android:topLeftRadius="16dp"
+        android:topRightRadius="16dp" />
+</shape>

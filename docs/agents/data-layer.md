@@ -22,6 +22,7 @@
 - 只读归档 `latest_overview`（与总览同源同语义，与 SourceMode 无关）。缓存为 App 级 SharedPreferences `hot_now_widget`（多小组件实例共享，刻意不用 Glance per-id 状态）。
 - 刷新三路：系统 30min `updatePeriodMillis` / 头部按钮 `RefreshHotNowAction` / App 总览刷新成功联动（`HotNowWidgetUpdater.refreshFromApp`，同进程命中 ArchiveHttpClient 2 分钟缓存，零额外网络）。拉取失败保留旧数据不清空（小组件无错误交互入口）。
 - 配色直接取 `ui/theme/Color.kt` 设计令牌组 day/night `ColorProvider`（App 迷你版，不用壁纸动态色）；条目只展示排名 + 标题（+突发胶囊），来源/互动指标刻意不上小组件；Glance 1.1.1 不支持 res/font 自定义字体，层级靠字号 + 字重。
+- 视觉对齐 App 内「今日热点」卡（`HotTopicsSection`）：头部品牌渐变 Hero（`widget_header_gradient` day/night drawable，BrandGradient 同源）= 标题行 + 「今日综述」digest 正文（≤2 行截断，空串不渲染，与总览 Tab digest Hero 同构；digest 随 items 一同存入 `hot_now_widget` SharedPreferences 的 `digest` 键）+ 卡面色描边背景（`widget_bg` day/night drawable，surfaceContainerLow + 1dp outlineVariant 描边）；条目为迷你排名徽章（18dp，分档同 App RankBadge：1 名 tertiary 实心 / 2-3 tertiaryContainer / 其余 surfaceContainerHigh）+ Bold 标题，行间发丝线。改徽章分档/渐变色须与 `ui/components/RankBadge.kt`、`theme/Color.kt` 保持同步。
 
 ## 每日更新本地通知（notify/ 包）
 

@@ -7,6 +7,7 @@ import android.graphics.Typeface
 import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -22,6 +23,7 @@ import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.action.actionStartActivity
+import androidx.glance.appwidget.background
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.lazy.LazyColumn
 import androidx.glance.appwidget.lazy.items
@@ -46,22 +48,30 @@ import com.peng.ainewshub.MainActivity
 import com.peng.ainewshub.R
 import com.peng.ainewshub.data.SummaryRepository
 import com.peng.ainewshub.ui.i18n.AppLocale
-import com.peng.ainewshub.ui.theme.DarkBackground
 import com.peng.ainewshub.ui.theme.DarkErrorContainer
 import com.peng.ainewshub.ui.theme.DarkOnBackground
 import com.peng.ainewshub.ui.theme.DarkOnErrorContainer
+import com.peng.ainewshub.ui.theme.DarkOnPrimary
 import com.peng.ainewshub.ui.theme.DarkOnPrimaryContainer
 import com.peng.ainewshub.ui.theme.DarkOnSurfaceVariant
+import com.peng.ainewshub.ui.theme.DarkOnTertiary
+import com.peng.ainewshub.ui.theme.DarkOnTertiaryContainer
 import com.peng.ainewshub.ui.theme.DarkPrimary
 import com.peng.ainewshub.ui.theme.DarkPrimaryContainer
-import com.peng.ainewshub.ui.theme.LightBackground
+import com.peng.ainewshub.ui.theme.DarkSurfaceContainerHigh
+import com.peng.ainewshub.ui.theme.DarkTertiary
+import com.peng.ainewshub.ui.theme.DarkTertiaryContainer
 import com.peng.ainewshub.ui.theme.LightErrorContainer
 import com.peng.ainewshub.ui.theme.LightOnBackground
 import com.peng.ainewshub.ui.theme.LightOnErrorContainer
 import com.peng.ainewshub.ui.theme.LightOnPrimary
 import com.peng.ainewshub.ui.theme.LightOnSurfaceVariant
+import com.peng.ainewshub.ui.theme.LightOnTertiary
+import com.peng.ainewshub.ui.theme.LightOnTertiaryContainer
 import com.peng.ainewshub.ui.theme.LightPrimary
-import com.peng.ainewshub.ui.theme.LightPrimaryContainer
+import com.peng.ainewshub.ui.theme.LightSurfaceContainerHigh
+import com.peng.ainewshub.ui.theme.LightTertiary
+import com.peng.ainewshub.ui.theme.LightTertiaryContainer
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -77,10 +87,16 @@ import java.util.Locale
  * provideGlance 补网策略:无缓存,或距上次成功超过 [STALE_MS] → 挂起拉一次再渲染;
  * 其余情况直接渲染本地缓存(秒出)。失败保留旧数据(见 HotNowWidgetUpdater 注释)。
  *
- * 设计:配色直接取 App 设计令牌(ui/theme/Color.kt 顶层常量)组 day/night ColorProvider,
- * 做成 App 的「迷你版」(品牌观感一致),不用 GlanceTheme 的壁纸动态色;条目极简 ——
- * 排名 + 标题,breaking 胶囊与标题「内联」(测量断行,见 [splitAroundCapsule]);
- * 行间靠留白分隔(无分隔线)。
+ * 设计:App 内「今日热点」卡(HotTopicsSection)的迷你版 ——
+ *  - 背景:卡片色 drawable(surfaceContainerLow + 1dp outlineVariant 描边,widget_bg day/night 变体),
+ *    对齐 App 卡「描边分层不靠阴影」;
+ *  - 头部:品牌渐变 Hero(widget_header_gradient,BrandGradient 同源)—— 标题行(标题 + 「截至」时间 +
+ *    半透明刷新圆钮,onPrimary 18% overlay 同 App 渐变头上 chip 工艺)+ 「今日综述」正文(≤2 行,
+ *    空串不渲染,与总览 Tab digest Hero 同构);
+ *  - 条目:迷你排名徽章(18dp,分档同 App RankBadge:1 名 tertiary 实心/2-3 tertiaryContainer/其余灰)+
+ *    Bold 标题,行间发丝线;breaking 胶囊与标题「内联」(测量断行,见 [splitAroundCapsule]);
+ *    来源(源名/品牌色)与互动指标刻意不上小组件 —— 桌面场景只留「什么新闻、有多急」。
+ * 配色取 ui/theme/Color.kt 顶层令牌组 day/night ColorProvider,不用 GlanceTheme 的壁纸动态色。
  * 字体:Glance 1.1.1 不支持 res/font 自定义字体,层级靠字号 + 字重(Normal/Medium/Bold)建立。
  */
 class HotNowWidget : GlanceAppWidget() {
@@ -116,8 +132,8 @@ class HotNowWidget : GlanceAppWidget() {
         Column(
             modifier = GlanceModifier
                 .fillMaxSize()
-                .background(WidgetColors.background)
-                .cornerRadius(16.dp)
+                // 卡片背景(卡面色 + 1dp 描边 + 16dp 圆角)由 drawable 承担,day/night 资源限定符自动切换
+                .background(ImageProvider(R.drawable.widget_bg))
         ) {
             Header(ctx, state)
             if (state.hasData) {
@@ -128,94 +144,120 @@ class HotNowWidget : GlanceAppWidget() {
         }
     }
 
-    /** 头部:标题行(「AI 热点」+ 品牌蓝圆形刷新按钮)+ 「数据截至」行。 */
+    /**
+     * 头部:品牌渐变 Hero —— 标题行(标题 + 「数据截至」+ 半透明刷新圆钮)+
+     * 「今日综述」正文(≤2 行截断;空串 = 旧归档无此字段,不渲染,退化为单行头)。
+     * 与总览 Tab 的 digest Hero(BrandGradient 通栏)同构,是 widget 上的信息密度担当。
+     */
     @Composable
     private fun Header(context: Context, state: HotNowWidgetState) {
-        Row(
-            modifier = GlanceModifier.fillMaxWidth()
-                .padding(start = 14.dp, top = 10.dp, end = 10.dp, bottom = 0.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = GlanceModifier
+                .fillMaxWidth()
+                .background(ImageProvider(R.drawable.widget_header_gradient))
         ) {
-            Text(
-                text = context.getString(R.string.widget_hot_now_title),
-                style = TextStyle(
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = WidgetColors.onBackground
-                ),
-                maxLines = 1,
-                modifier = GlanceModifier.defaultWeight()
-                    .clickable(actionStartActivity(openAppIntent(context)))
-            )
-            // 刷新:品牌蓝圆底按钮(比裸图标更像可点控件)
-            Box(
-                modifier = GlanceModifier.size(30.dp)
-                    .background(WidgetColors.refreshBg)
-                    .cornerRadius(15.dp)
-                    .clickable(actionRunCallback<RefreshHotNowAction>()),
-                contentAlignment = Alignment.Center
+            Row(
+                modifier = GlanceModifier
+                    .fillMaxWidth()
+                    .padding(start = 14.dp, top = 8.dp, end = 10.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Image(
-                    provider = ImageProvider(R.drawable.ic_widget_refresh),
-                    contentDescription = context.getString(R.string.common_refresh),
-                    colorFilter = ColorFilter.tint(WidgetColors.refreshIcon),
-                    modifier = GlanceModifier.size(16.dp)
+                Text(
+                    text = context.getString(R.string.widget_hot_now_title),
+                    style = TextStyle(
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = WidgetColors.headerText
+                    ),
+                    maxLines = 1,
+                    modifier = GlanceModifier.defaultWeight()
+                        .clickable(actionStartActivity(openAppIntent(context)))
+                )
+                if (state.dataFetchedAt > 0) {
+                    Text(
+                        text = formatDataTime(context, state.dataFetchedAt),
+                        style = TextStyle(fontSize = 10.sp, color = WidgetColors.headerMeta),
+                        maxLines = 1,
+                        modifier = GlanceModifier
+                            .padding(start = 8.dp)
+                            .clickable(actionStartActivity(openAppIntent(context)))
+                    )
+                }
+                Spacer(GlanceModifier.width(8.dp))
+                // 刷新:渐变头上的半透明圆钮(onPrimary 18% overlay 底),比大块品牌蓝实心钮更融入渐变
+                Box(
+                    modifier = GlanceModifier.size(26.dp)
+                        .background(WidgetColors.headerBtnBg)
+                        .cornerRadius(13.dp)
+                        .clickable(actionRunCallback<RefreshHotNowAction>()),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Image(
+                        provider = ImageProvider(R.drawable.ic_widget_refresh),
+                        contentDescription = context.getString(R.string.common_refresh),
+                        colorFilter = ColorFilter.tint(WidgetColors.headerText),
+                        modifier = GlanceModifier.size(14.dp)
+                    )
+                }
+            }
+            if (state.digest.isNotBlank()) {
+                Text(
+                    text = state.digest,
+                    style = TextStyle(
+                        fontSize = 11.sp,
+                        color = WidgetColors.headerText
+                    ),
+                    maxLines = 2,
+                    modifier = GlanceModifier
+                        .fillMaxWidth()
+                        .padding(start = 14.dp, top = 0.dp, end = 14.dp, bottom = 10.dp)
+                        .clickable(actionStartActivity(openAppIntent(context)))
                 )
             }
-        }
-        if (state.dataFetchedAt > 0) {
-            Text(
-                text = formatDataTime(context, state.dataFetchedAt),
-                style = TextStyle(fontSize = 11.sp, color = WidgetColors.meta),
-                maxLines = 1,
-                modifier = GlanceModifier
-                    .padding(start = 14.dp, top = 0.dp, end = 14.dp, bottom = 8.dp)
-                    .clickable(actionStartActivity(openAppIntent(context)))
-            )
-        } else {
-            Spacer(GlanceModifier.height(8.dp))
         }
     }
 
     @Composable
     private fun ItemList(context: Context, items: List<HotNowWidgetState.Item>) {
-        // 无分隔线:条目仅 2~3 个元素,靠行距分隔更干净(这个密度下分隔线是噪音)
         LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
             items(items.size) { index ->
-                ItemRow(context, rank = index + 1, item = items[index])
+                Column {
+                    ItemRow(context, rank = index + 1, item = items[index])
+                    // 行间发丝线(App HairlineDivider 观感):缩进对齐标题列,最后一条不画
+                    if (index < items.lastIndex) {
+                        Box(
+                            modifier = GlanceModifier
+                                .fillMaxWidth()
+                                .padding(start = 38.dp, end = 12.dp)
+                                .height(1.dp)
+                                .background(WidgetColors.divider)
+                        ) {}
+                    }
+                }
             }
         }
     }
 
     /**
-     * 单条:排名 + 标题(≤2 行,绝对主角)。
+     * 单条:迷你排名徽章 + 标题(≤2 行,Bold;Glance 无 SemiBold 档,以 Bold 承担强调)。
      * breaking 条目:胶囊与标题内联 —— 实测标题在胶囊旁能放下的前缀作第 1 行,
      * 余量全宽作第 2 行,视觉上是文本绕胶囊自然换行(而非整体右缩的 tag 前缀)。
-     * 来源(源名/品牌色)与互动指标均不上小组件 —— 桌面场景只留「什么新闻、有多急」。
      */
     @Composable
     private fun ItemRow(context: Context, rank: Int, item: HotNowWidgetState.Item) {
-        val top3 = rank <= 3
         val titleStyle = TextStyle(
             fontSize = 14.sp,
-            fontWeight = FontWeight.Medium,
+            fontWeight = FontWeight.Bold,
             color = WidgetColors.onBackground
         )
         Row(
             modifier = GlanceModifier.fillMaxWidth()
                 .clickable(actionStartActivity(openItemIntent(context, item)))
-                .padding(start = 14.dp, top = 9.dp, end = 14.dp, bottom = 9.dp),
+                .padding(start = 12.dp, top = 8.dp, end = 12.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "$rank",
-                style = TextStyle(
-                    fontSize = 13.sp,
-                    fontWeight = if (top3) FontWeight.Bold else FontWeight.Medium,
-                    color = if (top3) WidgetColors.rankTop else WidgetColors.meta
-                ),
-                modifier = GlanceModifier.width(20.dp)
-            )
+            RankBadgeMini(rank)
+            Spacer(GlanceModifier.width(8.dp))
             if (item.breaking) {
                 val width = LocalSize.current.width
                 val (first, rest) = remember(width, item.title) {
@@ -234,6 +276,35 @@ class HotNowWidget : GlanceAppWidget() {
             } else {
                 Text(text = item.title, style = titleStyle, maxLines = 2)
             }
+        }
+    }
+
+    /**
+     * 迷你排名徽章:App RankBadge(ui/components/RankBadge.kt)的 18dp 桌面版,分档配色一致 ——
+     * 第 1 名 tertiary 实心(唯一强强调)/ 2-3 名 tertiaryContainer / 其余 surfaceContainerHigh 低对比。
+     */
+    @Composable
+    private fun RankBadgeMini(rank: Int) {
+        val (bg, fg) = when {
+            rank == 1 -> WidgetColors.badgeTopBg to WidgetColors.badgeTopFg
+            rank <= 3 -> WidgetColors.badgeMidBg to WidgetColors.badgeMidFg
+            else -> WidgetColors.badgeRestBg to WidgetColors.badgeRestFg
+        }
+        Box(
+            modifier = GlanceModifier.size(18.dp)
+                .background(bg)
+                .cornerRadius(5.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "$rank",
+                style = TextStyle(
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = fg
+                ),
+                maxLines = 1
+            )
         }
     }
 
@@ -258,7 +329,7 @@ class HotNowWidget : GlanceAppWidget() {
         }
     }
 
-    /** 空态(无缓存且拉取失败/今日尚未生成):文案 + 品牌蓝胶囊按钮重试。 */
+    /** 空态(无缓存且拉取失败/今日尚未生成):文案 + 品牌蓝胶囊按钮重试(渐变头保留,观感统一)。 */
     @Composable
     private fun EmptyBody(context: Context) {
         Column(
@@ -273,7 +344,7 @@ class HotNowWidget : GlanceAppWidget() {
             Spacer(GlanceModifier.height(8.dp))
             Box(
                 modifier = GlanceModifier
-                    .background(WidgetColors.refreshBg)
+                    .background(WidgetColors.emptyActionBg)
                     .cornerRadius(14.dp)
                     .clickable(actionRunCallback<RefreshHotNowAction>())
                     .padding(start = 14.dp, top = 6.dp, end = 14.dp, bottom = 6.dp)
@@ -283,7 +354,7 @@ class HotNowWidget : GlanceAppWidget() {
                     style = TextStyle(
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
-                        color = WidgetColors.refreshIcon
+                        color = WidgetColors.emptyActionText
                     ),
                     maxLines = 1
                 )
@@ -318,14 +389,14 @@ class HotNowWidget : GlanceAppWidget() {
     }
 
     companion object {
-        // 内联断行的宽度预算(dp):行左右 padding 14*2、排名列 20、胶囊约 30、胶囊后间距 6。
-        private const val H_PADDING_DP = 28f
-        private const val RANK_WIDTH_DP = 20f
+        // 内联断行的宽度预算(dp):行左右 padding 12*2、徽章列 18+8、胶囊约 30、胶囊后间距 6。
+        private const val H_PADDING_DP = 24f
+        private const val RANK_WIDTH_DP = 26f
         private const val CAPSULE_WIDTH_DP = 30f
         private const val CAPSULE_GAP_DP = 6f
 
-        /** 测量安全余量:OEM 字体度量差异 + FontWeight.Medium 比 DEFAULT 略宽。 */
-        private const val SAFE_MARGIN_DP = 6f
+        /** 测量安全余量:OEM 字体度量差异 + Bold 比 DEFAULT 略宽。 */
+        private const val SAFE_MARGIN_DP = 8f
 
         /**
          * 把标题切成「胶囊旁第 1 行前缀」+「全宽第 2 行余量」,模拟文本绕胶囊内联换行。
@@ -342,7 +413,8 @@ class HotNowWidget : GlanceAppWidget() {
             val scaledDensity = metrics.density * context.resources.configuration.fontScale
             val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 textSize = 14f * scaledDensity   // 与标题 TextStyle(14.sp)一致
-                typeface = Typeface.DEFAULT
+                // 标题现为 Bold 档,测量字体同步加粗,否则前缀实测偏窄导致换行错位
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             }
             val fullWidthPx =
                 (widthDp.value - H_PADDING_DP - RANK_WIDTH_DP - SAFE_MARGIN_DP) * metrics.density
@@ -369,17 +441,44 @@ class HotNowWidget : GlanceAppWidget() {
 /**
  * 小组件配色 —— App 设计令牌(ui/theme/Color.kt)的 day/night ColorProvider 封装。
  * 不用 GlanceTheme 壁纸动态色,保证小组件与 App 观感同源。
+ * 背景与渐变头是 drawable 资源(widget_bg / widget_header_gradient 的 day/night 限定符变体),不在此列。
  */
 private object WidgetColors {
-    val background = ColorProvider(day = LightBackground, night = DarkBackground)
+    /** 标题/空态正文。 */
     val onBackground = ColorProvider(day = LightOnBackground, night = DarkOnBackground)
-    /** 元信息/次级文字(「截至」行、非 Top3 排名)。 */
-    val meta = ColorProvider(day = LightOnSurfaceVariant, night = DarkOnSurfaceVariant)
-    /** Top3 排名品牌蓝(Future Blue;深色取 primary-fixed-dim 保对比)。 */
-    val rankTop = ColorProvider(day = LightPrimary, night = DarkPrimary)
-    /** 刷新按钮/重试胶囊:品牌蓝圆底 + 对比前景。 */
-    val refreshBg = ColorProvider(day = LightPrimary, night = DarkPrimaryContainer)
-    val refreshIcon = ColorProvider(day = LightOnPrimary, night = DarkOnPrimaryContainer)
+
+    // —— 渐变头(BrandGradient 同源:light 深渐变白字,night 亮渐变深字)——
+
+    /** 头部标题/图标前景(onPrimary)。 */
+    val headerText = ColorProvider(day = LightOnPrimary, night = DarkOnPrimary)
+
+    /** 头部「截至」时间(onPrimary 85% 弱化,对应 App Alpha.primaryEmphasis)。 */
+    val headerMeta = ColorProvider(day = Color(0xD9FFFFFF), night = Color(0xD9002C9A))
+
+    /** 头部刷新圆钮底(onPrimary 18% overlay,对应 AppAlpha.onPrimaryOverlay)。 */
+    val headerBtnBg = ColorProvider(day = Color(0x2EFFFFFF), night = Color(0x2E002C9A))
+
+    // —— 排名徽章(分档同 App RankBadge)——
+
+    /** 第 1 名:tertiary 实心(唯一强强调)。 */
+    val badgeTopBg = ColorProvider(day = LightTertiary, night = DarkTertiary)
+    val badgeTopFg = ColorProvider(day = LightOnTertiary, night = DarkOnTertiary)
+
+    /** 第 2-3 名:tertiaryContainer。 */
+    val badgeMidBg = ColorProvider(day = LightTertiaryContainer, night = DarkTertiaryContainer)
+    val badgeMidFg = ColorProvider(day = LightOnTertiaryContainer, night = DarkOnTertiaryContainer)
+
+    /** 其余:surfaceContainerHigh 低对比。 */
+    val badgeRestBg = ColorProvider(day = LightSurfaceContainerHigh, night = DarkSurfaceContainerHigh)
+    val badgeRestFg = ColorProvider(day = LightOnSurfaceVariant, night = DarkOnSurfaceVariant)
+
+    /** 行间发丝线(outlineVariant 50%,App HairlineDivider 观感)。 */
+    val divider = ColorProvider(day = Color(0x80C3C5D9), night = Color(0x80434656))
+
+    /** 空态重试胶囊:品牌蓝实心 + 对比前景。 */
+    val emptyActionBg = ColorProvider(day = LightPrimary, night = DarkPrimaryContainer)
+    val emptyActionText = ColorProvider(day = LightOnPrimary, night = DarkOnPrimaryContainer)
+
     /** breaking 胶囊:errorContainer 底 + onErrorContainer 字。 */
     val breakingBg = ColorProvider(day = LightErrorContainer, night = DarkErrorContainer)
     val breakingText = ColorProvider(day = LightOnErrorContainer, night = DarkOnErrorContainer)

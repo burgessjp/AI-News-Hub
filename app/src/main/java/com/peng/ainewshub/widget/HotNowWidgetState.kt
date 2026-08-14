@@ -13,6 +13,8 @@ import org.json.JSONObject
  */
 data class HotNowWidgetState(
     val items: List<Item> = emptyList(),
+    /** 跨源「今日综述」(2-3 句,流水线生成;空串 = 旧归档无此字段,不渲染) */
+    val digest: String = "",
     /** 流水线生成时刻(毫秒),0 = 未知 */
     val generatedAt: Long = 0L,
     /** 「数据截至」时刻(输入快照最新 fetched_at_ms),0 = 未知 */
@@ -37,6 +39,7 @@ internal object HotNowWidgetStore {
 
     private const val PREFS_NAME = "hot_now_widget"
     private const val KEY_ITEMS = "items_json"
+    private const val KEY_DIGEST = "digest"
     private const val KEY_GENERATED_AT = "generated_at"
     private const val KEY_DATA_FETCHED_AT = "data_fetched_at"
     private const val KEY_LAST_SUCCESS_AT = "last_success_at"
@@ -50,6 +53,7 @@ internal object HotNowWidgetStore {
         val p = prefs(context)
         return HotNowWidgetState(
             items = parseItems(p.getString(KEY_ITEMS, null)),
+            digest = p.getString(KEY_DIGEST, "").orEmpty(),
             generatedAt = p.getLong(KEY_GENERATED_AT, 0L),
             dataFetchedAt = p.getLong(KEY_DATA_FETCHED_AT, 0L),
             lastSuccessAt = p.getLong(KEY_LAST_SUCCESS_AT, 0L),
@@ -61,6 +65,7 @@ internal object HotNowWidgetStore {
     fun write(
         context: Context,
         items: List<HotNowWidgetState.Item>,
+        digest: String,
         generatedAt: Long,
         dataFetchedAt: Long,
         successAt: Long
@@ -76,6 +81,7 @@ internal object HotNowWidgetStore {
         }
         prefs(context).edit()
             .putString(KEY_ITEMS, arr.toString())
+            .putString(KEY_DIGEST, digest)
             .putLong(KEY_GENERATED_AT, generatedAt)
             .putLong(KEY_DATA_FETCHED_AT, dataFetchedAt)
             .putLong(KEY_LAST_SUCCESS_AT, successAt)

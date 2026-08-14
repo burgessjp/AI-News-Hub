@@ -52,6 +52,7 @@ object HotNowWidgetUpdater {
                             breaking = it.breaking
                         )
                     },
+                    digest = digest.digest,
                     generatedAt = digest.generatedAt,
                     dataFetchedAt = digest.dataFetchedAt,
                     successAt = now
