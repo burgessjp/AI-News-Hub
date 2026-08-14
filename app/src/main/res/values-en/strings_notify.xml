@@ -5,6 +5,11 @@
     <string name="settings_section_notify">Notifications</string>
     <string name="settings_daily_notify">Daily update notification</string>
     <string name="settings_daily_notify_subtitle">Get notified when today\'s highlights are ready (at most once a day, local schedule)</string>
+    <!-- Appended to the subtitle when enabled: last self-check run time (troubleshooting) -->
+    <string name="settings_daily_notify_last_check">Last check: %1$s</string>
+    <!-- Guidance for OEMs known to block background execution (Samsung = One UI sleeping apps list) -->
+    <string name="settings_daily_notify_hint_samsung">Not receiving notifications? Add this app to \"Never sleeping apps\" (Settings → Battery → Background usage limits)</string>
+    <string name="settings_daily_notify_hint_oem">Not receiving notifications? Allow this app to run in the background (autostart) in system settings</string>
     <string name="settings_daily_notify_permission_denied">Notification permission not granted. Please allow notifications in system settings</string>
 
     <!-- ===== Notification body ===== -->

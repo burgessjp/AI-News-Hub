@@ -28,8 +28,11 @@ import kotlinx.coroutines.flow.map
  * [sourceOrderFlow] 持久化用户在「信息源」页拖拽自定义的 8 源顺序(默认
  * [DEFAULT_SOURCE_ORDER]),摘要 Tab 跟随该顺序;关于页固定默认顺序不跟随。
  *
- * 每日更新通知:开关存 `daily_notify` 键(进 [DisplayPrefs]);`last_notified_overview_at`
- * 键存上次通知对应的 generatedAt(Worker 调度状态,不进 DisplayPrefs)。
+ * 每日更新通知:开关存 `daily_notify` 键(进 [DisplayPrefs],同时控制通知与冷启动
+ * 新数据弹窗);`last_notified_overview_at` 键存上次已感知批次的 generatedAt
+ * (Worker 发通知与冷启动弹窗确认/忽略时写回,`last_notify_check_at` 键存自查链
+ * 上次运行时刻 —— 后两者均为调度状态,不进 DisplayPrefs;check_at 供设置页显示
+ * 「上次检查」,用于区分「链被系统后台限制拦住没跑」和「跑了但档内没新数据」)。
  */
 private val Context.displayDataStore: DataStore<Preferences> by preferencesDataStore("display_prefs")
 
@@ -98,7 +101,9 @@ class SettingsStore(context: Context) {
 
     /**
      * 上次通知对应的 `latest_overview.generatedAt`(毫秒);0 = 从未通知。
-     * 仅 DailyUpdateWorker 读写,不进 [DisplayPrefs](非用户偏好,是调度状态)。
+     * 写方:DailyUpdateWorker(发通知时)与 MainActivity 冷启动新数据弹窗(确认/忽略时,
+     * 与通知互补 —— 每天至多 1 条提醒,任一形式先触达即写回指纹)。不进 [DisplayPrefs]
+     * (非用户偏好,是调度状态)。
      */
     suspend fun lastNotifiedOverviewAt(): Long = runCatching {
         dataStore.data.first()[KEY_LAST_NOTIFIED_OVERVIEW_AT]
@@ -106,6 +111,18 @@ class SettingsStore(context: Context) {
 
     suspend fun setLastNotifiedOverviewAt(ms: Long) {
         dataStore.edit { it[KEY_LAST_NOTIFIED_OVERVIEW_AT] = ms }
+    }
+
+    /**
+     * 自查链上次实际运行时刻(毫秒)流;0 = 从未运行(开关从未开过或链从未被系统放行)。
+     * Worker 每次运行先记一笔再干活,设置页开关下显示「上次检查」即为可观测出口。
+     */
+    val lastNotifyCheckAtFlow: Flow<Long> = dataStore.data.map { p ->
+        p[KEY_LAST_NOTIFY_CHECK_AT] ?: 0L
+    }
+
+    suspend fun setLastNotifyCheckAt(ms: Long) {
+        dataStore.edit { it[KEY_LAST_NOTIFY_CHECK_AT] = ms }
     }
 
     // ===== 搜索历史 =====
@@ -195,6 +212,7 @@ class SettingsStore(context: Context) {
         val KEY_SOURCE_ORDER = stringPreferencesKey("source_order")
         val KEY_DAILY_NOTIFY = booleanPreferencesKey("daily_notify")
         val KEY_LAST_NOTIFIED_OVERVIEW_AT = longPreferencesKey("last_notified_overview_at")
+        val KEY_LAST_NOTIFY_CHECK_AT = longPreferencesKey("last_notify_check_at")
         const val MAX_SEARCH_HISTORY = 10
     }
 }

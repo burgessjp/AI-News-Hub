@@ -18,6 +18,8 @@
     <string name="common_retry">重试</string>
     <string name="common_cancel">取消</string>
     <string name="common_ok">确定</string>
+    <string name="common_view">查看</string>
+    <string name="common_ignore">忽略</string>
     <string name="common_loading">加载中…</string>
     <string name="common_load_failed">加载失败</string>
     <string name="common_refresh">刷新</string>

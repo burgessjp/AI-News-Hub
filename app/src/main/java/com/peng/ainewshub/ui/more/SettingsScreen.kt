@@ -48,6 +48,9 @@ import com.peng.ainewshub.ui.components.SegmentedOptionRow
 import com.peng.ainewshub.ui.components.SectionHeader
 import com.peng.ainewshub.ui.components.SettingsRow
 import com.peng.ainewshub.ui.i18n.AppLanguage
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
  * 主题模式 —— 由 [com.peng.ainewshub.AiNewsHubApp] 持有,设置页通过回调修改。
@@ -113,6 +116,7 @@ fun SettingsScreen(
     language: AppLanguage,
     onSelectLanguage: (AppLanguage) -> Unit,
     dailyNotify: Boolean,
+    lastNotifyCheckAt: Long,
     onToggleDailyNotify: (Boolean) -> Unit,
     cacheSizeBytes: Long,
     onClearCache: (Boolean, Boolean) -> Unit,
@@ -209,10 +213,15 @@ fun SettingsScreen(
                 )
             }
 
-            // 通知 section —— 每日更新通知开关(WorkManager 本地调度;API 33+ 需运行时权限)
+            // 通知 section —— 每日更新通知开关(WorkManager 本地调度;API 33+ 需运行时权限);
+            // 开启后副标题追加「上次检查」时刻与厂商后台限制引导(排障可观测出口)
             item { SectionHeader(stringResource(R.string.settings_section_notify)) }
             item {
-                DailyNotifyRow(dailyNotify = dailyNotify, onToggle = onToggleDailyNotify)
+                DailyNotifyRow(
+                    dailyNotify = dailyNotify,
+                    lastNotifyCheckAt = lastNotifyCheckAt,
+                    onToggle = onToggleDailyNotify
+                )
             }
 
             // 数据清理 section —— 一键清理已加载的网页/图片/浏览历史/搜索历史等可恢复数据
@@ -241,9 +250,14 @@ private fun GroupLabel(text: String) {
  * Android 13+(TIRAMISU)通知需运行时权限:打开开关时请求,允许才生效;
  * 拒绝(含「不再询问」)Toast 引导去系统设置,开关保持关。已授权或 API < 33 直接生效。
  * 开关状态持久化与 WorkManager 调度同步由调用方(onToggle 回调)完成。
+ *
+ * 开启后副标题追加两行排障信息:
+ *  - 「上次检查」时刻(Worker 每次运行记录)—— 区分「链被系统后台限制拦住没跑」
+ *    和「跑了但档内没新数据」;
+ *  - 已知拦截后台执行的厂商(One UI 休眠列表等)引导文案,见 [notifyBgRestrictionHintRes]。
  */
 @Composable
-private fun DailyNotifyRow(dailyNotify: Boolean, onToggle: (Boolean) -> Unit) {
+private fun DailyNotifyRow(dailyNotify: Boolean, lastNotifyCheckAt: Long, onToggle: (Boolean) -> Unit) {
     val context = LocalContext.current
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -254,11 +268,23 @@ private fun DailyNotifyRow(dailyNotify: Boolean, onToggle: (Boolean) -> Unit) {
             Toast.makeText(context, R.string.settings_daily_notify_permission_denied, Toast.LENGTH_LONG).show()
         }
     }
+    val lastCheckLine = lastNotifyCheckAt.takeIf { dailyNotify && it > 0L }?.let { ts ->
+        val time = SimpleDateFormat(
+            context.getString(R.string.date_fmt_month_day_time_dash), Locale.getDefault()
+        ).format(Date(ts))
+        stringResource(R.string.settings_daily_notify_last_check, time)
+    }
+    val hintRes = notifyBgRestrictionHintRes().takeIf { dailyNotify }
+    val subtitle = listOfNotNull(
+        stringResource(R.string.settings_daily_notify_subtitle),
+        lastCheckLine,
+        hintRes?.let { stringResource(it) }
+    ).joinToString("\n")
     SettingsRow(
         icon = Icons.Filled.Notifications,
         iconAccent = MaterialTheme.colorScheme.tertiary,
         title = stringResource(R.string.settings_daily_notify),
-        subtitle = stringResource(R.string.settings_daily_notify_subtitle),
+        subtitle = subtitle,
         showDivider = false,
         trailing = {
             Switch(
@@ -279,6 +305,25 @@ private fun DailyNotifyRow(dailyNotify: Boolean, onToggle: (Boolean) -> Unit) {
         },
         showChevron = false
     )
+}
+
+/**
+ * 已知会拦截 WorkManager 后台执行的厂商 → 设置页引导文案;null = 无需提示。
+ *
+ * 三星 One UI 的「休眠/深度休眠」列表最典型(会直接掐掉 JobScheduler),单独给准确路径;
+ * 其余国产 ROM(MIUI / 鸿蒙 / ColorOS / OriginOS 等)统一引导允许后台运行/自启动。
+ * Pixel 等原生系无此问题,不提示(避免无谓打扰)。
+ */
+private fun notifyBgRestrictionHintRes(): Int? {
+    val manufacturer = Build.MANUFACTURER.lowercase()
+    return when {
+        "samsung" in manufacturer -> R.string.settings_daily_notify_hint_samsung
+        listOf(
+            "xiaomi", "redmi", "huawei", "honor", "oppo", "vivo",
+            "oneplus", "meizu", "realme", "iqoo"
+        ).any { it in manufacturer } -> R.string.settings_daily_notify_hint_oem
+        else -> null
+    }
 }
 
 /**

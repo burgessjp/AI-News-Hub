@@ -6,6 +6,8 @@
     <string name="common_retry">Retry</string>
     <string name="common_cancel">Cancel</string>
     <string name="common_ok">OK</string>
+    <string name="common_view">View</string>
+    <string name="common_ignore">Ignore</string>
     <string name="common_loading">Loading…</string>
     <string name="common_load_failed">Failed to load</string>
     <string name="common_refresh">Refresh</string>

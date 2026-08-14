@@ -24,7 +24,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -50,6 +53,7 @@ import com.peng.ainewshub.data.AiConfigStore
 import com.peng.ainewshub.data.CacheManager
 import com.peng.ainewshub.data.AiUsageStore
 import com.peng.ainewshub.data.SummaryRepository
+import com.peng.ainewshub.data.source.ArchiveHttpClient
 import com.peng.ainewshub.notify.DailyNotifyScheduler
 import com.peng.ainewshub.ui.more.SettingsStore
 import com.peng.ainewshub.ui.NewsDetailScreen
@@ -97,6 +101,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 
 /** 浅色系统栏 scrim(与 AndroidX enableEdgeToEdge 默认值一致)。ARGB 32 位带符号整数。 */
@@ -348,6 +353,10 @@ fun AiNewsHubApp(
     val dynamicColor = displayPrefs.dynamicColor
     val fontChoice = displayPrefs.fontChoice
     val fontScale = displayPrefs.fontScale
+    // 每日更新通知自查链上次运行时刻(设置页「上次检查」,排障可观测出口)
+    val lastNotifyCheckAt by settingsStore.lastNotifyCheckAtFlow.collectAsStateWithLifecycle(
+        initialValue = 0L
+    )
     // AI 服务全局配置:除设置页外,WebView 整页翻译也读取(开关/就绪态判定)
     val aiConfig by configStore.configFlow.collectAsStateWithLifecycle(
         initialValue = AiConfig()
@@ -381,6 +390,27 @@ fun AiNewsHubApp(
         scope.launch {
             settingsStore.updateDailyNotify(enabled)
             DailyNotifyScheduler.sync(appContext, enabled)
+        }
+    }
+
+    // 冷启动新数据弹窗:随「每日更新通知」开关,与通知共用批次指纹 lastNotifiedOverviewAt
+    // —— 开关开启且最新 latest_overview.generatedAt 领先指纹 → 全局弹窗提示。
+    // 确认/忽略都写回指纹(= 用户已感知该批次),语义上与每日通知互补:每天至多 1 条
+    // 提醒,通知与弹窗任一形式先触达即静默;用户冷启动在先,当天批次就不再推送打扰。
+    var newDataPrompt by remember { mutableStateOf<NewDataPrompt?>(null) }
+    val dismissNewDataPrompt: (NewDataPrompt) -> Unit = { prompt ->
+        newDataPrompt = null
+        scope.launch { settingsStore.setLastNotifiedOverviewAt(prompt.generatedAt) }
+    }
+    LaunchedEffect(Unit) {
+        // 开关关闭不支持弹窗;首帧默认值不可信,须读 DataStore 真值
+        if (!settingsStore.prefsFlow.first().dailyNotify) return@LaunchedEffect
+        val json = runCatching { ArchiveHttpClient.fetchLatestOverview() }.getOrNull()
+            ?: return@LaunchedEffect
+        val generatedAt = json.optLong("generatedAt", 0L)
+        if (generatedAt > 0 && generatedAt > settingsStore.lastNotifiedOverviewAt()) {
+            val digest = json.optString("digest").orEmpty().trim().takeIf { it.isNotEmpty() }
+            newDataPrompt = NewDataPrompt(generatedAt, digest)
         }
     }
 
@@ -636,6 +666,7 @@ fun AiNewsHubApp(
                             language = displayPrefs.language,
                             onSelectLanguage = onSelectLanguage,
                             dailyNotify = displayPrefs.dailyNotify,
+                            lastNotifyCheckAt = lastNotifyCheckAt,
                             onToggleDailyNotify = onToggleDailyNotify,
                             onBack = pop,
                             onItemClick = { push(Page.Detail(it)) },
@@ -687,6 +718,30 @@ fun AiNewsHubApp(
             }
         }
     }
+
+    // 冷启动新数据全局弹窗:悬浮于任意 tab / 二级页之上(见上方状态与检查逻辑)。
+    // 「查看」直达总览根页:切 tab + 清空该 tab 二级栈;数据经 ArchiveHttpClient
+    // 共享 2 分钟缓存(与总览 Tab 取数同源),到屏时已是最新,无需再触发刷新。
+    newDataPrompt?.let { prompt ->
+        AlertDialog(
+            onDismissRequest = { dismissNewDataPrompt(prompt) },
+            title = { Text(stringResource(R.string.notify_daily_title)) },
+            text = { Text(prompt.digest ?: stringResource(R.string.notify_daily_text_fallback)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    dismissNewDataPrompt(prompt)
+                    isNavigatingBack = false
+                    currentTab = AppTab.Overview
+                    pageStacks = pageStacks.toMutableMap().apply { this[AppTab.Overview] = emptyList() }
+                }) { Text(stringResource(R.string.common_view)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { dismissNewDataPrompt(prompt) }) {
+                    Text(stringResource(R.string.common_ignore))
+                }
+            }
+        )
+    }
 }
 
 /**
@@ -705,6 +760,18 @@ private sealed interface Screen {
         override val navStyle get() = page.navStyle
     }
 }
+
+/**
+ * 冷启动新数据弹窗载荷。
+ *
+ * [generatedAt] 为最新批次指纹(latest_overview.generatedAt),弹窗确认/忽略时写回
+ * `lastNotified_overview_at`(与每日通知共用,见弹窗状态注释);[digest] 为今日综述
+ * 正文(流水线内容,始终中文;空则弹窗正文退回 fallback 文案)。
+ */
+private data class NewDataPrompt(
+    val generatedAt: Long,
+    val digest: String?
+)
 
 /** 渲染某个 tab 的根屏幕。 */
 @Composable
@@ -785,6 +852,7 @@ private fun PageView(
     language: AppLanguage,
     onSelectLanguage: (AppLanguage) -> Unit,
     dailyNotify: Boolean,
+    lastNotifyCheckAt: Long,
     onToggleDailyNotify: (Boolean) -> Unit,
     onBack: () -> Unit,
     onItemClick: (NewsItem) -> Unit,
@@ -886,6 +954,7 @@ private fun PageView(
             language = language,
             onSelectLanguage = onSelectLanguage,
             dailyNotify = dailyNotify,
+            lastNotifyCheckAt = lastNotifyCheckAt,
             onToggleDailyNotify = onToggleDailyNotify,
             cacheSizeBytes = cacheSizeBytes,
             onClearCache = onClearCache,

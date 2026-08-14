@@ -190,13 +190,16 @@ class DailyUpdateWorker(
      *
      * 调度纪律:
      *  - 除「开关已关」外,所有路径都先续链(enqueueNext)再干活 —— 任何失败不断链;
-     *  - 不用 Result.retry():WorkManager 退避重试与自查链语义冲突,失败一律 success + 自排下一跳。
+     *  - 不用 Result.retry():WorkManager 退避重试与自查链语义冲突,失败一律 success + 自排下一跳;
+     *  - 每次运行记 `last_notify_check_at`(设置页「上次检查」),用于区分
+     *    「链被系统后台限制(One UI 休眠等)拦住没跑」和「跑了但档内没新数据」。
      */
     override suspend fun doWork(): Result {
         val store = SettingsStore(applicationContext)
         // 开关已关:链终止(正常路径 sync 已 cancel 全部任务,此为竞态兜底)
         if (!store.prefsFlow.first().dailyNotify) return Result.success()
         DailyNotifyScheduler.enqueueNext(applicationContext)
+        store.setLastNotifyCheckAt(System.currentTimeMillis())
 
         val attempt = inputData.getInt(DailyNotifyScheduler.KEY_ATTEMPT, 0)
         // 拉最新总览:网络/解析失败与「当日尚未生成」(null)都走档内补查,不区分
