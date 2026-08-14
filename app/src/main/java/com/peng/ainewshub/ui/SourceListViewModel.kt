@@ -139,7 +139,7 @@ class TranslateSupport(
     application: Application
 ) {
     private val appContext = application.applicationContext
-    private val translationRepo = TranslationRepository(application)
+    private val translationRepo = TranslationRepository.get(application)
     private val configStore = AiConfigStore(application)
 
     /** 翻译配置流(UI 订阅以决定是否显示「译」按钮)。 */

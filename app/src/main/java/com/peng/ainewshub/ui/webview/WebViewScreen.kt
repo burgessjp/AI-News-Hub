@@ -102,6 +102,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
@@ -164,7 +167,7 @@ fun WebViewScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     // 无 DI,Repository 就地构造(与项目惯例一致);翻译缓存/用量统计由仓库内部处理
-    val translationRepo = remember { TranslationRepository(context) }
+    val translationRepo = remember { TranslationRepository.get(context) }
 
     var pageTitle by remember { mutableStateOf(title) }
     // 当前页真实 URL(随导航更新,已剥阅读页哨兵),分享/复制/打开浏览器都用它
@@ -226,6 +229,23 @@ fun WebViewScreen(
                 web.destroy()
             }
         }
+    }
+
+    // WebView 随宿主生命周期暂停/恢复:App 切后台时停掉该页 JS 定时器/动画/音视频的
+    // 处理,避免后台白耗 CPU/电量(新闻站大量埋点脚本尤其明显);回前台恢复。
+    // 用 per-WebView 的 onPause/onResume,不用全局 pauseTimers —— 后者作用域跨实例,
+    // 若在暂停态销毁又新开 WebView,新实例可能继承暂停态。
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_PAUSE -> webViewRef.web?.onPause()
+                Lifecycle.Event.ON_RESUME -> webViewRef.web?.onResume()
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     // 系统返回键:网页有内部历史时先退历史(WebView 内的站内跳转不应一键退出整页);
@@ -300,10 +320,13 @@ fun WebViewScreen(
                 translateOriginals = null
                 translateResults = null
                 showTranslateSheet = false
+                // 模板拼接(数十 KB 级大字符串)挪到 Default 线程;loadDataWithBaseURL
+                // 是 View 调用,回到主线程执行
+                val html = withContext(Dispatchers.Default) { buildReaderHtml(article) }
                 // baseUrl 带哨兵 fragment 标记阅读页;相对路径资源仍按原 URL 解析
                 web.loadDataWithBaseURL(
                     currentUrl + READER_SENTINEL,
-                    buildReaderHtml(article),
+                    html,
                     "text/html", "utf-8", null
                 )
             } finally {
@@ -365,7 +388,8 @@ fun WebViewScreen(
                 DownloadParams(imageUrl, webViewRef.web?.settings?.userAgentString, null, null),
                 storagePermissionLauncher
             ) { pendingDownload = it }
-            imageUrl.startsWith("data:", ignoreCase = true) -> saveDataUrl(context, imageUrl)
+            imageUrl.startsWith("data:", ignoreCase = true) ->
+                scope.launch { saveDataUrl(context, imageUrl) }
             imageUrl.startsWith("blob:", ignoreCase = true) ->
                 webViewRef.web?.let { downloadBlob(it, context, imageUrl, null, null) }
                     ?: toast(context.getString(R.string.webview_toast_save_image_failed))
@@ -626,7 +650,9 @@ fun WebViewScreen(
                                 //  - data:(base64):canvas 导出图片的常见形态,解码后同 blob 写文件。
                                 //  - 其它:直接提示无法下载,不再崩溃。
                                 addJavascriptInterface(
-                                    BlobSaver(context) { name, mime, data -> saveBlob(context, name, mime, data) },
+                                    BlobSaver(context) { name, mime, data ->
+                                        scope.launch { saveBlob(context, name, mime, data) }
+                                    },
                                     "AndroidBlobSaver"
                                 )
                                 setDownloadListener { downloadUrl, userAgent, contentDisposition, mimetype, _ ->
@@ -647,7 +673,7 @@ fun WebViewScreen(
                                         }
 
                                         downloadUrl.startsWith("data:", ignoreCase = true) ->
-                                            saveDataUrl(context, downloadUrl)
+                                            scope.launch { saveDataUrl(context, downloadUrl) }
 
                                         else -> {
                                             Toast.makeText(
@@ -1127,7 +1153,7 @@ private fun downloadBlob(
  * 下载 data: URL(canvas 导出图片的常见形态)。仅处理 base64 形态,
  * 解码后走与 blob 相同的写文件路径;非 base64 的 data: 提示不支持。
  */
-private fun saveDataUrl(context: Context, url: String) {
+private suspend fun saveDataUrl(context: Context, url: String) {
     // data:[<mime>][;base64],<data>
     val comma = url.indexOf(',')
     val meta = if (comma > 5) url.substring(5, comma) else ""
@@ -1175,47 +1201,61 @@ private fun guessDownloadName(
  * - API < 29:走传统 File 路径 + MediaScanner 扫描。
  *
  * [data] 为 null 表示网页侧 fetch 失败 —— 提示后返回,不写空文件。
+ * 挂起函数:Base64 解码与写盘在 IO 线程执行(canvas 导出图常见 1-5MB,主线程做
+ * 会超帧预算甚至 ANR);须从主线程协程调用 —— 结果 Toast 留在调用方上下文(主线程)。
  */
-private fun saveBlob(context: Context, filename: String, mimetype: String?, data: String?) {
+private suspend fun saveBlob(context: Context, filename: String, mimetype: String?, data: String?) {
     if (data.isNullOrEmpty()) {
         Toast.makeText(context, context.getString(R.string.webview_toast_download_no_data), Toast.LENGTH_SHORT).show()
         return
     }
-    try {
-        val bytes = Base64.decode(data, Base64.DEFAULT)
-        val displayName = filename.ifBlank { context.getString(R.string.webview_download_fallback_name) }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            // API 29+:MediaStore 写入公共 Downloads,无需任何存储权限
-            val resolver = context.contentResolver
-            val collection = android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI
-            val values = android.content.ContentValues().apply {
-                put(android.provider.MediaStore.Downloads.DISPLAY_NAME, displayName)
-                mimetype?.let { put(android.provider.MediaStore.Downloads.MIME_TYPE, it) }
+    val outcome = withContext(Dispatchers.IO) {
+        try {
+            val bytes = Base64.decode(data, Base64.DEFAULT)
+            val displayName = filename.ifBlank { context.getString(R.string.webview_download_fallback_name) }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                // API 29+:MediaStore 写入公共 Downloads,无需任何存储权限
+                val resolver = context.contentResolver
+                val collection = android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI
+                val values = android.content.ContentValues().apply {
+                    put(android.provider.MediaStore.Downloads.DISPLAY_NAME, displayName)
+                    mimetype?.let { put(android.provider.MediaStore.Downloads.MIME_TYPE, it) }
+                }
+                val uri = resolver.insert(collection, values)
+                    ?: return@withContext BlobSaveOutcome.CreateFailed
+                resolver.openOutputStream(uri)?.use { it.write(bytes) }
+            } else {
+                // API < 29:传统公共目录 File 写入
+                val downloads = Environment.getExternalStoragePublicDirectory(
+                    Environment.DIRECTORY_DOWNLOADS
+                )
+                if (!downloads.exists()) downloads.mkdirs()
+                val file = java.io.File(downloads, displayName)
+                java.io.FileOutputStream(file).use { it.write(bytes) }
+                // 扫描媒体,使文件立刻在相册/文件 App 中可见
+                android.media.MediaScannerConnection.scanFile(
+                    context, arrayOf(file.absolutePath), arrayOf(mimetype ?: "*/*"), null
+                )
             }
-            val uri = resolver.insert(collection, values)
-            if (uri == null) {
-                Toast.makeText(context, context.getString(R.string.webview_toast_save_create_failed), Toast.LENGTH_SHORT).show()
-                return
-            }
-            resolver.openOutputStream(uri)?.use { it.write(bytes) }
-        } else {
-            // API < 29:传统公共目录 File 写入
-            val downloads = Environment.getExternalStoragePublicDirectory(
-                Environment.DIRECTORY_DOWNLOADS
-            )
-            if (!downloads.exists()) downloads.mkdirs()
-            val file = java.io.File(downloads, displayName)
-            java.io.FileOutputStream(file).use { it.write(bytes) }
-            // 扫描媒体,使文件立刻在相册/文件 App 中可见
-            android.media.MediaScannerConnection.scanFile(
-                context, arrayOf(file.absolutePath), arrayOf(mimetype ?: "*/*"), null
-            )
+            BlobSaveOutcome.Saved(displayName)
+        } catch (e: Exception) {
+            Log.w("Save", "保存失败", e)
+            BlobSaveOutcome.Failed
         }
-        Toast.makeText(context, context.getString(R.string.webview_toast_saved, displayName), Toast.LENGTH_SHORT).show()
-    } catch (e: Exception) {
-        Log.w("Save", "保存失败", e)
-        Toast.makeText(context, context.getString(R.string.webview_toast_save_failed), Toast.LENGTH_SHORT).show()
     }
+    val msg = when (outcome) {
+        is BlobSaveOutcome.Saved -> context.getString(R.string.webview_toast_saved, outcome.displayName)
+        BlobSaveOutcome.CreateFailed -> context.getString(R.string.webview_toast_save_create_failed)
+        BlobSaveOutcome.Failed -> context.getString(R.string.webview_toast_save_failed)
+    }
+    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+}
+
+/** [saveBlob] 的落盘结果:成功携带展示名;失败区分「建 MediaStore 记录失败」与「其他异常」。 */
+private sealed interface BlobSaveOutcome {
+    data class Saved(val displayName: String) : BlobSaveOutcome
+    data object CreateFailed : BlobSaveOutcome
+    data object Failed : BlobSaveOutcome
 }
 
 /**

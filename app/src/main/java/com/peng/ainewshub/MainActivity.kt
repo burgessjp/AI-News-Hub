@@ -50,7 +50,6 @@ import com.peng.ainewshub.data.HackerNewsStory
 import com.peng.ainewshub.data.NewsItem
 import com.peng.ainewshub.data.AiConfig
 import com.peng.ainewshub.data.AiConfigStore
-import com.peng.ainewshub.data.CacheManager
 import com.peng.ainewshub.data.FavoritesRepository
 import com.peng.ainewshub.data.AiUsageStore
 import com.peng.ainewshub.data.SummaryRepository
@@ -376,25 +375,21 @@ fun AiNewsHubApp(
     val onToggleDynamicColor: (Boolean) -> Unit = { scope.launch { settingsStore.updateDynamicColor(it) } }
     val onSelectFont: (FontChoice) -> Unit = { scope.launch { settingsStore.updateFont(it) } }
     val onSelectFontScale: (FontScale) -> Unit = { scope.launch { settingsStore.updateFontScale(it) } }
-    // 应用内语言:持久化 + 重建 Activity 生效;小组件同步刷新文案
+    // 应用内语言:持久化 + 重建 Activity 生效;小组件同步刷新文案。
+    // recreate 会销毁组合并取消 rememberCoroutineScope,故整体包 NonCancellable ——
+    // 否则 select 之后的「小组件刷新」大概率被中途取消,语言切换后小组件文案不更新
     val activity = LocalContext.current as? Activity
     val onSelectLanguage: (AppLanguage) -> Unit = { lang ->
         scope.launch {
-            activity?.let { AppLocale.select(it, settingsStore, lang) }
-            HotNowWidgetUpdater.refreshFromApp(appContext)
+            withContext(NonCancellable) {
+                activity?.let { AppLocale.select(it, settingsStore, lang) }
+                HotNowWidgetUpdater.refreshFromApp(appContext)
+            }
         }
     }
 
-    // 缓存占用(进入设置页时计算一次,清理后刷新)。0 表示未计算,UI 显示「< 1 KB」。
-    var cacheSizeBytes by remember { mutableStateOf(0L) }
-    // 首次组合计算一次;清理后由 onClearCache 内手动再算一次。
-    LaunchedEffect(Unit) { cacheSizeBytes = CacheManager.sizeBytes(appContext) }
-    val onClearCache: (Boolean, Boolean) -> Unit = { includeTranslations, includeBrowseHistory ->
-        scope.launch {
-            CacheManager.clear(appContext, browseHistoryRepo, settingsStore, includeTranslations, includeBrowseHistory)
-            cacheSizeBytes = CacheManager.sizeBytes(appContext)
-        }
-    }
+    // 缓存占用统计与清理:状态已下沉到 SettingsScreen —— 全 cacheDir 递归 walk 是
+    // 重活,随冷启动白做(多数用户根本不进设置页),改为首次进入设置页时才计算。
 
     // 每日更新通知:持久化开关 + 同步 WorkManager 自查链调度(见 notify/DailyUpdateNotifier.kt)
     val onToggleDailyNotify: (Boolean) -> Unit = { enabled ->
@@ -414,10 +409,21 @@ fun AiNewsHubApp(
         scope.launch { settingsStore.setLastNotifiedOverviewAt(prompt.generatedAt) }
     }
     LaunchedEffect(Unit) {
+        // 会话闸门:一次进程启动只查一次(见 NewDataPromptGate);查过即关闭,
+        // recreate 后的重组不再重复触发网络检查与弹窗
+        if (!NewDataPromptGate.shouldCheck) return@LaunchedEffect
+        NewDataPromptGate.shouldCheck = false
         // 开关关闭不支持弹窗;首帧默认值不可信,须读 DataStore 真值
         if (!settingsStore.prefsFlow.first().dailyNotify) return@LaunchedEffect
-        val json = runCatching { ArchiveHttpClient.fetchLatestOverview() }.getOrNull()
-            ?: return@LaunchedEffect
+        val json = try {
+            ArchiveHttpClient.fetchLatestOverview()
+        } catch (e: CancellationException) {
+            // 组合销毁的取消要放行重抛,不能当失败吞掉(否则继续走完剩余判断,
+            // 破坏结构化取消语义)
+            throw e
+        } catch (e: Exception) {
+            null
+        } ?: return@LaunchedEffect
         val generatedAt = json.optLong("generatedAt", 0L)
         if (generatedAt > 0 && generatedAt > settingsStore.lastNotifiedOverviewAt()) {
             val digest = json.optString("digest").orEmpty().trim().takeIf { it.isNotEmpty() }
@@ -707,10 +713,9 @@ fun AiNewsHubApp(
                             configStore = configStore,
                             aiConfig = aiConfig,
                             usageStore = usageStore,
+                            settingsStore = settingsStore,
                             browseHistoryRepo = browseHistoryRepo,
                             favoritesRepo = favoritesRepo,
-                            cacheSizeBytes = cacheSizeBytes,
-                            onClearCache = onClearCache,
                             darkTheme = darkTheme
                         )
                     }
@@ -788,6 +793,16 @@ private data class NewDataPrompt(
     val generatedAt: Long,
     val digest: String?
 )
+
+/**
+ * 冷启动弹窗检查的进程级会话闸门:每次进程启动只查一次。
+ * 弹窗检查挂在根组合 `LaunchedEffect(Unit)` 上,旋转/语言切换 recreate 等任何
+ * Activity 重建都会重跑 effect —— 若不加闸门,一次会话内会重复打网络、重复弹窗。
+ */
+private object NewDataPromptGate {
+    @Volatile
+    var shouldCheck = true
+}
 
 /** 渲染某个 tab 的根屏幕。 */
 @Composable
@@ -896,10 +911,9 @@ private fun PageView(
     configStore: AiConfigStore,
     aiConfig: AiConfig,
     usageStore: AiUsageStore,
+    settingsStore: SettingsStore,
     browseHistoryRepo: BrowseHistoryRepository,
     favoritesRepo: FavoritesRepository,
-    cacheSizeBytes: Long,
-    onClearCache: (Boolean, Boolean) -> Unit,
     darkTheme: Boolean = false
 ) {
     // 浏览历史来源标签:下方非 Composable 回调(onOpenUrl lambda)里捕获,提前取词
@@ -977,8 +991,8 @@ private fun PageView(
             dailyNotify = dailyNotify,
             lastNotifyCheckAt = lastNotifyCheckAt,
             onToggleDailyNotify = onToggleDailyNotify,
-            cacheSizeBytes = cacheSizeBytes,
-            onClearCache = onClearCache,
+            settingsStore = settingsStore,
+            browseHistoryRepo = browseHistoryRepo,
             onBack = onBack
         )
         Page.AiService -> AiServiceScreen(

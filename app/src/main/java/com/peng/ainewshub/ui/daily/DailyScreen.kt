@@ -32,6 +32,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -134,6 +135,21 @@ fun DailyScreen(
 
 @Composable
 internal fun DailyContent(report: DailyReport, onOpen: (String) -> Unit, listState: LazyListState) {
+    // 空分节过滤 + 每分节稳定 key 都 remember:避免列表 content 每次重组重算;
+    // key 用 permalink/sourceUrl(重排/刷新时 Compose 走 move 复用而非销毁重建),
+    // 重复或空时以出现序号消歧,保证 key 唯一(重复 key 会直接崩溃)
+    val visibleSections = remember(report) { report.sections.filter { it.items.isNotEmpty() } }
+    val entryKeys = remember(report) {
+        visibleSections.map { section ->
+            val seen = mutableMapOf<String, Int>()
+            section.items.map { entry ->
+                val base = (entry.permalink ?: entry.sourceUrl).ifBlank { "entry" }
+                val dup = seen.getOrPut(base) { 0 }
+                seen[base] = dup + 1
+                "sec-${section.label}-$base" + if (dup == 0) "" else "#$dup"
+            }
+        }
+    }
     LazyColumn(
         state = listState,
         // 现作为二级页(底栏隐藏),底部只需常规留白,不再预留浮动底栏高度
@@ -146,15 +162,14 @@ internal fun DailyContent(report: DailyReport, onOpen: (String) -> Unit, listSta
         }
 
         // 各分节:分节标题(统一 SectionHeader,透明底 + 小竖条) + 扁平行 + hairline 分隔线
-        val visibleSections = report.sections.filter { it.items.isNotEmpty() }
         visibleSections.forEachIndexed { sIdx, section ->
-            item(key = "divider-$sIdx") { DailyRowDivider() }
-            item(key = "section-title-$sIdx") {
+            item(key = "divider-${section.label}") { DailyRowDivider() }
+            item(key = "section-title-${section.label}") {
                 SectionHeader(title = section.label)
             }
             itemsIndexed(
                 items = section.items,
-                key = { i, _ -> "entry-$sIdx-$i" }
+                key = { i, _ -> entryKeys[sIdx][i] }
             ) { i, entry ->
                 DailyEntryRow(entry = entry, onOpen = onOpen)
                 if (i != section.items.lastIndex) {

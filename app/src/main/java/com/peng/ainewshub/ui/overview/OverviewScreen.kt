@@ -265,6 +265,17 @@ private fun OverviewContent(
 ) {
     // LocalContext.current 只能在 @Composable 上下文取,提前取出供回调内复用
     val context = LocalContext.current
+    // Top10 稳定 key:url 优先(breaking 前移等排序变化时走 move 复用而非销毁重建),
+    // 重复/空 url 以出现序号消歧保证唯一(重复 key 会直接崩溃)
+    val topKeys = remember(digest.items) {
+        val seen = mutableMapOf<String, Int>()
+        digest.items.map { e ->
+            val base = e.url.ifBlank { "top" }
+            val dup = seen.getOrPut(base) { 0 }
+            seen[base] = dup + 1
+            base + if (dup == 0) "" else "#$dup"
+        }
+    }
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
@@ -285,7 +296,7 @@ private fun OverviewContent(
         val items = digest.items
         itemsIndexed(
             items,
-            key = { i, e -> "top-$i-${e.url}" },
+            key = { i, _ -> topKeys[i] },
             contentType = { _, e -> if (e.breaking) "top10-breaking" else "top10" }
         ) { index, entry ->
             Column {

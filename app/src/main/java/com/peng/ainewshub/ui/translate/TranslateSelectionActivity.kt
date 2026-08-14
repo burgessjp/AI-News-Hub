@@ -121,7 +121,7 @@ private fun TranslateSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     // repository 进程级缓存依赖 cacheDir,remember 复用同一实例(缓存/锁才有效)。
-    val repo = remember { TranslationRepository(context.applicationContext) }
+    val repo = remember { TranslationRepository.get(context) }
     val configStore = remember { AiConfigStore(context.applicationContext) }
 
     var state by remember { mutableStateOf<TranslateState>(TranslateState.Loading) }

@@ -76,7 +76,8 @@ fun NewsCard(
     ) {
         // 左栏:时分 HH:mm(年月日已由日期分组条承担)。
         // alignByBaseline 与右栏首行(标题)基线对齐,取代旧 top padding 硬调
-        val time = absoluteTime(item.publishedAt)
+        // remember:行重组(滚动入视口等)不再重复做 ISO 解析 + 建 Formatter
+        val time = remember(item.publishedAt) { absoluteTime(item.publishedAt) }
         if (time.isNotEmpty()) {
             Text(
                 text = time,

@@ -53,7 +53,7 @@ sealed interface TranslationState {
 class HackerNewsCommentsViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repo = HackerNewsRepository()
-    private val translationRepo = TranslationRepository(application)
+    private val translationRepo = TranslationRepository.get(application)
     private val configStore = AiConfigStore(application)
 
     private val _state = MutableStateFlow<UiState<List<FlatComment>>>(UiState.Loading)

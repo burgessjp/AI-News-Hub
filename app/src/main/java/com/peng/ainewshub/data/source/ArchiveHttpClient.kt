@@ -27,8 +27,10 @@ import java.util.concurrent.ConcurrentHashMap
  *  3. 解析顶层 `fetched_at_ms` 与 `items[]`,交由各 Repository 做字段映射
  *
  * 缓存与刷新:index.json 有 2 分钟内存缓存(多源并发去重,见 fetchIndex);快照本体
- * 无缓存,每次都打网络。手动刷新(根 Tab 下拉)经 force=true 绕过 index 缓存,
- * 保证流水线刚推送时立即可见;自动加载/重击 tab 走缓存(2 分钟外自然失效)。
+ * 按路径缓存(内容不可变,见 fetchSnapshot)+ 同 URL in-flight 去重,重进 tab 不重复下载。
+ * 手动刷新(根 Tab 下拉)经 force=true 绕过 index 缓存,保证流水线刚推送时立即可见
+ * (锁内秒级去重窗口把同一波并发 force 收敛为 1 次网络);自动加载/重击 tab 走缓存
+ * (2 分钟外自然失效)。
  * 任一步失败(HTTP 错误 / index 无该源 / items 为空)抛 RuntimeException,
  * 交由 ViewModel 显示 Error 态(归档模式明确提示,不回退实时)。
  *
@@ -58,6 +60,22 @@ object ArchiveHttpClient {
     /** index.json 内存缓存有效期:2 分钟(index 实际几小时才更新一次,短 TTL 足够)。 */
     private const val INDEX_TTL_MS = 2L * 60 * 1000
 
+    /**
+     * force 请求的锁内去重窗口:摘要页下拉刷新对 8 个源并发 force,在 Mutex 上排队;
+     * 首个请求打完网络后,等待者在此窗口内直接复用刚刷新的 index,不再逐个真打
+     * (否则一次下拉 = 串行下载 8 次 index.json)。窗口只需覆盖「首个完成 → 等待者
+     * 依次获锁醒来」的毫秒级间隙,2s 已很宽裕 —— 不能放宽,否则用户进 tab 后几秒内
+     * 的手动下拉刷新会被吞掉(瞬间返回旧缓存,刷新形同未触发)。
+     */
+    private const val FORCE_FETCH_DEDUP_MS = 2_000L
+
+    /**
+     * 快照内存缓存条数上限:覆盖 latest 8 源 + 一页历史摘要(8+8)。
+     * 快照内容按路径不可变(路径含日期+时间,流水线只追加不覆写),无需 TTL;
+     * 超限时淘汰任意一条,仅作内存容量护栏(非严格 LRU,单条数百 KB 级)。
+     */
+    private const val SNAPSHOT_CACHE_LIMIT = 16
+
     private val client by lazy {
         // 共享 base 派生:连接池/线程池与全 App 复用,仅覆盖 cookieJar
         HttpClients.base.newBuilder()
@@ -82,16 +100,30 @@ object ArchiveHttpClient {
     /** 串行化 index 刷新,避免并发重复打网络。 */
     private val indexMutex = Mutex()
 
+    // ===== 快照路径缓存 + 同 URL in-flight 去重 =====
+    // 快照内容按路径不可变(见 SNAPSHOT_CACHE_LIMIT 注释),缓存命中即零网络。
+    // 不同源/不同路径互不阻塞,保持 8 源并发加载;同 URL 并发经 per-key Mutex 去重。
+
+    /** 快照缓存:source/relPath → 解析后的 JSON(只读共享)。 */
+    private val snapshotCache = ConcurrentHashMap<String, JSONObject>()
+
+    /** in-flight 去重锁:同 URL 并发只打 1 次网络,其余等锁后复用缓存。 */
+    private val snapshotLocks = ConcurrentHashMap<String, Mutex>()
+
     /**
      * 拉 index.json(带 2 分钟缓存 + 并发去重)。
      *
-     * @param force true 时绕过 TTL 强制打网络(手动刷新路径);并发去重的 Mutex 仍生效
+     * @param force true 时绕过 TTL 强制打网络(手动刷新路径);并发去重的 Mutex 仍生效,
+     *              且锁内做短窗口二次校验 —— 排队等锁期间 index 已被首个 force 刷新过
+     *              则直接复用,同一波并发 force 收敛为 1 次网络请求
      * @return 解析后的 index JSON;读取或解析失败抛 RuntimeException
      */
     private suspend fun fetchIndex(force: Boolean = false): JSONObject = indexMutex.withLock {
-        // 1) 命中未过期缓存:秒回(4 个源共享同一份,只打 1 次网络)
+        // 1) 命中缓存:非 force 看 2 分钟 TTL;force 只看秒级去重窗口
+        //    (等待锁期间已被刷新 → 复用,不重复打网络)。
         val cached = indexCache
-        if (!force && cached != null && System.currentTimeMillis() - indexCacheAt < INDEX_TTL_MS) {
+        val freshWithin = if (force) FORCE_FETCH_DEDUP_MS else INDEX_TTL_MS
+        if (cached != null && System.currentTimeMillis() - indexCacheAt < freshWithin) {
             return@withLock cached
         }
         // 2) 走网络刷新(仅一次,并发其余调用在此等待后复用结果)
@@ -211,26 +243,45 @@ object ArchiveHttpClient {
 
     /**
      * 按相对路径拉某源的归档快照,返回解析后的顶层 JSON(历史日期寻址入口)。
+     * 带 source/relPath 路径缓存(内容不可变)与同 URL in-flight 去重:2 分钟内重进
+     * tab / 历史日期页来回翻不再重复下载同一快照。
      *
      * @param source 源标识(目录名)
      * @param relPath 相对源目录的快照路径(形如 `2026-07-19/10-12-data.json`,
      *                取自 latest / history 索引)
      * @return 该快照的 JSON 对象;缺失或 items 为空抛 RuntimeException
      */
-    suspend fun fetchSnapshot(source: String, relPath: String): JSONObject =
-        withContext(Dispatchers.IO) {
-            val snapshotUrl = "$API_BASE/$source/$relPath?ref=$REF"
-            val snapshotText = getRaw(snapshotUrl, "读取归档快照失败")
-            val snapshot = runCatching { JSONObject(snapshotText) }
-                .getOrElse { throw AppException.ServerError() }
+    suspend fun fetchSnapshot(source: String, relPath: String): JSONObject {
+        val cacheKey = "$source/$relPath"
+        snapshotCache[cacheKey]?.let { return it }
+        val lock = snapshotLocks.computeIfAbsent(cacheKey) { Mutex() }
+        val snapshot = lock.withLock {
+            // 二次检查:等锁期间可能已被同 URL 的并发请求拉完
+            snapshotCache[cacheKey]
+                ?: withContext(Dispatchers.IO) {
+                    val snapshotUrl = "$API_BASE/$source/$relPath?ref=$REF"
+                    val snapshotText = getRaw(snapshotUrl, "读取归档快照失败")
+                    val snapshot = runCatching { JSONObject(snapshotText) }
+                        .getOrElse { throw AppException.ServerError() }
 
-            // items 为空视为无数据
-            val items = snapshot.optJSONArray("items")
-            if (items == null || items.length() == 0) {
-                throw AppException.NoData()
-            }
-            snapshot
+                    // items 为空视为无数据(失败不缓存,下次重试)
+                    val items = snapshot.optJSONArray("items")
+                    if (items == null || items.length() == 0) {
+                        throw AppException.NoData()
+                    }
+                    snapshot
+                }.also {
+                    snapshotCache[cacheKey] = it
+                    if (snapshotCache.size > SNAPSHOT_CACHE_LIMIT) {
+                        snapshotCache.keys.firstOrNull()?.let { eldest -> snapshotCache.remove(eldest) }
+                    }
+                }
         }
+        // 清掉 in-flight 锁:已拿引用的等待者仍会正常获锁并命中二次检查;
+        // 后续新调用要么命中缓存,要么建新锁,均无死锁
+        snapshotLocks.remove(cacheKey)
+        return snapshot
+    }
 
     /**
      * GET 一个 URL,返回响应正文;非 2xx 或空响应抛 [AppException.Network]。

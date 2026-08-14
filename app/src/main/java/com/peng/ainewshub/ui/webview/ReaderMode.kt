@@ -83,16 +83,20 @@ suspend fun extractReaderArticle(webView: WebView, readabilityJs: String): Reade
         })();
     """.trimIndent()
     val raw = evaluateJs(webView, readabilityJs + extractJs) ?: return null
-    // evaluateJavascript 的返回值是 JSON 编码:字符串结果外面还包一层引号,先解包再解析
-    val inner = (JSONTokener(raw).nextValue() as? String) ?: return null
-    val obj = runCatching { JSONObject(inner) }.getOrNull() ?: return null
-    val content = obj.optString("content")
-    if (content.isBlank()) return null
-    return ReaderArticle(
-        title = obj.optString("title"),
-        byline = obj.optString("byline"),
-        contentHtml = content
-    )
+    // 解码 + JSON 解析挪到 Default 线程:evaluateJavascript 回调在主线程,长文正文
+    // 可达数百 KB,主线程解析会卡住「阅读模式」点击瞬间
+    return withContext(Dispatchers.Default) {
+        // evaluateJavascript 的返回值是 JSON 编码:字符串结果外面还包一层引号,先解包再解析
+        val inner = (JSONTokener(raw).nextValue() as? String) ?: return@withContext null
+        val obj = runCatching { JSONObject(inner) }.getOrNull() ?: return@withContext null
+        val content = obj.optString("content")
+        if (content.isBlank()) return@withContext null
+        ReaderArticle(
+            title = obj.optString("title"),
+            byline = obj.optString("byline"),
+            contentHtml = content
+        )
+    }
 }
 
 /**
@@ -160,9 +164,13 @@ suspend fun extractBlockTexts(webView: WebView): List<String>? {
         })();
     """.trimIndent()
     val raw = evaluateJs(webView, js) ?: return null
-    val inner = (JSONTokener(raw).nextValue() as? String) ?: return null
-    val arr = runCatching { JSONArray(inner) }.getOrNull() ?: return null
-    return List(arr.length()) { arr.optString(it) }
+    // 与 extractReaderArticle 同理:块文本合计可达几十 KB,解析挪到 Default 线程
+    return withContext(Dispatchers.Default) {
+        // evaluateJavascript 的返回值是 JSON 编码:字符串结果外面还包一层引号,先解包再解析
+        val inner = (JSONTokener(raw).nextValue() as? String) ?: return@withContext null
+        val arr = runCatching { JSONArray(inner) }.getOrNull() ?: return@withContext null
+        List(arr.length()) { arr.optString(it) }
+    }
 }
 
 /**

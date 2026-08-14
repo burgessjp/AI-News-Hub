@@ -253,14 +253,19 @@ private fun HistoryList(
         if (reachedBottom && hasMore) onLoadMore()
     }
 
+    // 按 host 分组,保留组内时间倒序(DB 已按 visitedAt DESC 返回)。
+    // remember:分页累积/滑删等任何重组不再每次全量 groupBy(列表 content 内不能
+    // 调 remember,故上提到 LazyColumn 之前)
+    val grouped = remember(items, groupByHost) {
+        if (groupByHost) items.groupBy { it.host } else emptyMap()
+    }
+
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(vertical = 8.dp)
     ) {
         if (groupByHost) {
-            // 按 host 分组,保留组内时间倒序(DB 已按 visitedAt DESC 返回)
-            val grouped = items.groupBy { it.host }
             grouped.forEach { (host, group) ->
                 item(key = "header_$host") {
                     SectionHeader(

@@ -31,6 +31,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -343,6 +344,16 @@ private fun SummaryItems(
     reserveBottomBarSpace: Boolean,
     onOpenItem: (SummaryItem) -> Unit
 ) {
+    // 稳定 key:url 优先,重复/空以出现序号消歧保证唯一(重复 key 会直接崩溃)
+    val itemKeys = remember(items) {
+        val seen = mutableMapOf<String, Int>()
+        items.map { item ->
+            val base = item.url.ifBlank { "item" }
+            val dup = seen.getOrPut(base) { 0 }
+            seen[base] = dup + 1
+            base + if (dup == 0) "" else "#$dup"
+        }
+    }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -353,7 +364,11 @@ private fun SummaryItems(
             bottom = if (reserveBottomBarSpace) BottomBarPillHeight + 16.dp else 4.dp
         )
     ) {
-        itemsIndexed(items) { index, item ->
+        itemsIndexed(items, key = { i, _ -> itemKeys[i] }) { index, item ->
+            // AnnotatedString 构建 remember:行重组(滚动入视口/点击涟漪)不再重复拼装
+            val line = remember(item.title, item.desc) {
+                renderItemLine(item.title, item.desc)
+            }
             Row(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.then(
@@ -368,7 +383,7 @@ private fun SummaryItems(
                     modifier = Modifier.alignByBaseline()
                 )
                 Text(
-                    text = renderItemLine(item.title, item.desc),
+                    text = line,
                     style = AppText.body,
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.alignByBaseline()
@@ -385,7 +400,8 @@ private fun SummaryPlainText(
     accent: Color,
     reserveBottomBarSpace: Boolean
 ) {
-    val lines = text.lines().filter { it.isNotBlank() }
+    // 行切分 remember:整段文本只在内容变化时重切一次,行重组不再重复处理
+    val lines = remember(text) { text.lines().filter { it.isNotBlank() } }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -396,6 +412,8 @@ private fun SummaryPlainText(
         )
     ) {
         itemsIndexed(lines) { index, line ->
+            // 加粗段解析 remember:行重组不再重复跑正则
+            val rich = remember(line) { renderRichLine(line) }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
                     text = "%02d".format(index + 1),
@@ -405,7 +423,7 @@ private fun SummaryPlainText(
                     modifier = Modifier.alignByBaseline()
                 )
                 Text(
-                    text = renderRichLine(line),
+                    text = rich,
                     style = AppText.body,
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.alignByBaseline()
@@ -430,6 +448,9 @@ private fun renderItemLine(title: String, desc: String): AnnotatedString {
     }
 }
 
+/** 加粗段 `**...**` 匹配(非贪婪,不允许内部换行);进程一份,不随行重建。 */
+private val BOLD_SEGMENT_REGEX = Regex("\\*\\*(.+?)\\*\\*")
+
 /**
  * 把单行文本解析为 [AnnotatedString]:**...** 段落渲染为 SemiBold,其余 Normal。
  *
@@ -443,10 +464,8 @@ private fun renderRichLine(line: String): AnnotatedString {
     val boldStyle = SpanStyle(fontWeight = FontWeight.SemiBold)
     return buildAnnotatedString {
         var idx = 0
-        // 匹配 **...**(非贪婪,不允许内部换行)
-        val regex = Regex("\\*\\*(.+?)\\*\\*")
         var lastEnd = 0
-        for (m in regex.findAll(raw)) {
+        for (m in BOLD_SEGMENT_REGEX.findAll(raw)) {
             if (m.range.first > lastEnd) append(raw.substring(lastEnd, m.range.first))
             withStyle(boldStyle) { append(m.groupValues[1]) }
             lastEnd = m.range.last + 1
