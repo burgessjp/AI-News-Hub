@@ -43,9 +43,9 @@
 |:---:|:---:|:---:|:---:|:---:|
 | <img src="docs/screenshots/01-overview.png" width="160" alt="总览"> | <img src="docs/screenshots/02-trends.png" width="160" alt="趋势"> | <img src="docs/screenshots/03-summary.png" width="160" alt="摘要"> | <img src="docs/screenshots/04-sources.png" width="160" alt="信息源"> | <img src="docs/screenshots/05-hackernews.png" width="160" alt="HackerNews"> |
 
-| GitHub Trending | OpenAI × Anthropic | The Rundown AI | 设置 | |
+| GitHub Trending | OpenAI × Anthropic | The Rundown AI | 网页 | 设置 |
 |:---:|:---:|:---:|:---:|:---:|
-| <img src="docs/screenshots/06-github-trending.png" width="160" alt="GitHub Trending"> | <img src="docs/screenshots/07-openai-anthropic.png" width="160" alt="OpenAI × Anthropic"> | <img src="docs/screenshots/08-the-rundown-ai.png" width="160" alt="The Rundown AI"> | <img src="docs/screenshots/09-settings.png" width="160" alt="设置"> | |
+| <img src="docs/screenshots/06-github-trending.png" width="160" alt="GitHub Trending"> | <img src="docs/screenshots/07-openai-anthropic.png" width="160" alt="OpenAI × Anthropic"> | <img src="docs/screenshots/08-the-rundown-ai.png" width="160" alt="The Rundown AI"> | <img src="docs/screenshots/09-webview.png" width="160" alt="网页"> | <img src="docs/screenshots/10-settings.png" width="160" alt="设置"> |
 
 ---
 

@@ -43,9 +43,9 @@ Download the latest APK from the [Releases](https://github.com/burgessjp/AI-News
 |:---:|:---:|:---:|:---:|:---:|
 | <img src="docs/screenshots/01-overview.png" width="160" alt="Overview"> | <img src="docs/screenshots/02-trends.png" width="160" alt="Trends"> | <img src="docs/screenshots/03-summary.png" width="160" alt="Summary"> | <img src="docs/screenshots/04-sources.png" width="160" alt="Sources"> | <img src="docs/screenshots/05-hackernews.png" width="160" alt="HackerNews"> |
 
-| GitHub Trending | OpenAI × Anthropic | The Rundown AI | Settings | |
+| GitHub Trending | OpenAI × Anthropic | The Rundown AI | Web | Settings |
 |:---:|:---:|:---:|:---:|:---:|
-| <img src="docs/screenshots/06-github-trending.png" width="160" alt="GitHub Trending"> | <img src="docs/screenshots/07-openai-anthropic.png" width="160" alt="OpenAI × Anthropic"> | <img src="docs/screenshots/08-the-rundown-ai.png" width="160" alt="The Rundown AI"> | <img src="docs/screenshots/09-settings.png" width="160" alt="Settings"> | |
+| <img src="docs/screenshots/06-github-trending.png" width="160" alt="GitHub Trending"> | <img src="docs/screenshots/07-openai-anthropic.png" width="160" alt="OpenAI × Anthropic"> | <img src="docs/screenshots/08-the-rundown-ai.png" width="160" alt="The Rundown AI"> | <img src="docs/screenshots/09-webview.png" width="160" alt="Web"> | <img src="docs/screenshots/10-settings.png" width="160" alt="Settings"> |
 
 ---
 
