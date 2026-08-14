@@ -80,6 +80,8 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -94,6 +96,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -127,7 +130,9 @@ import kotlin.math.roundToInt
  *  - 顶栏:返回 + 标题(随网页加载动态更新)+ 当前域名副标题 + 星标收藏
  *    (toggle 当前页,状态跟随站内导航后的真实 URL)+ 「更多」菜单
  *    (刷新 / 翻译本页 / 复制链接 / 在浏览器打开)
- *  - 底部工具栏:后退 / 前进 / 阅读模式 / 分享(高频导航一级操作,视频全屏时隐藏)
+ *  - 底部工具栏:后退 / 前进 / 阅读模式 / 分享(高频导航一级操作,视频全屏时隐藏)。
+ *    悬浮于 WebView 之上(网页布局高度固定,不占 bottomBar 槽),网页向下滚动时
+ *    滑出隐藏以扩大阅读空间,向上滚动或打开新页时滑回
  *  - 顶部线性进度条(加载中;整页翻译时复用为翻译进度)
  *  - 主帧加载失败错误态([ErrorState] + 重试),不再是空白页
  *  - 站内导航(主帧 http(s) 交 WebView 原生处理;子框架不拦截;外部 scheme 唤起外部 App)
@@ -179,6 +184,11 @@ fun WebViewScreen(
     var showAiConfigDialog by remember { mutableStateOf(false) }
     // 全屏视频:onShowCustomView 给的 View 非空即覆盖全屏
     var fullscreenView by remember { mutableStateOf<View?>(null) }
+    // 底部工具栏随网页滚动隐现:向下滚动隐藏扩大阅读空间,向上滚动滑回(浏览器惯例)。
+    // 累积量为瞬态值(普通 var 即可),方向反转即清零防边缘抖动;阈值按 dp 换算。
+    var webBottomBarVisible by remember { mutableStateOf(true) }
+    var scrollAccum = 0
+    val bottomBarScrollThreshold = with(LocalDensity.current) { 8.dp.toPx() }
     // 阅读模式:readerActive 由 onPageStarted 按哨兵 URL 判定(见 ReaderMode.kt);
     // 翻译状态:原文块 + 译文结果(底部弹层对照展示,不改写原页 DOM)
     var readerActive by remember { mutableStateOf(false) }
@@ -450,24 +460,6 @@ fun WebViewScreen(
                         }
                     }
                 )
-            },
-            bottomBar = {
-                // 高频导航一级操作(浏览器惯例);视频全屏时隐藏,不挡画面
-                if (fullscreenView == null) {
-                    WebBottomBar(
-                        canGoBack = webCanGoBack,
-                        canGoForward = webCanGoForward,
-                        readerActive = readerActive,
-                        readerLoading = readerLoading,
-                        translateEnabled = aiConfig.translateEnabled,
-                        translateActive = translating || translateResults != null,
-                        onBack = { webViewRef.web?.goBack() },
-                        onForward = { webViewRef.web?.goForward() },
-                        onToggleReader = { if (readerActive) exitReaderMode() else enterReaderMode() },
-                        onTranslate = { startTranslate() },
-                        onShare = { shareUrl(context, pageTitle, currentUrl) }
-                    )
-                }
             }
         ) { padding ->
             Box(
@@ -482,6 +474,21 @@ fun WebViewScreen(
                             WebView(ctx).apply {
                                 webViewRef.web = this
                                 configureWebSettings(darkTheme, fontScale)
+                                // 滚动隐现底部栏:按方向累积位移,超阈值切换显隐;方向反转先清零
+                                setOnScrollChangeListener { _, _, scrollY, _, oldScrollY ->
+                                    val dy = scrollY - oldScrollY
+                                    if (dy != 0) {
+                                        if ((scrollAccum > 0) != (dy > 0)) scrollAccum = 0
+                                        scrollAccum += dy
+                                        if (scrollAccum > bottomBarScrollThreshold && webBottomBarVisible) {
+                                            webBottomBarVisible = false
+                                            scrollAccum = 0
+                                        } else if (scrollAccum < -bottomBarScrollThreshold && !webBottomBarVisible) {
+                                            webBottomBarVisible = true
+                                            scrollAccum = 0
+                                        }
+                                    }
+                                }
                                 webViewClient = object : WebViewClient() {
                                     override fun shouldOverrideUrlLoading(
                                         view: WebView,
@@ -508,6 +515,8 @@ fun WebViewScreen(
                                     override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
                                         loading = true
                                         loadError = null
+                                        // 新页面起始:底部栏复位为可见(浏览器惯例)
+                                        webBottomBarVisible = true
                                         val isReader = url?.endsWith(READER_SENTINEL) == true
                                         if (!isReader) {
                                             // 离开阅读页(点链接/回退/退出):清理翻译状态
@@ -678,6 +687,31 @@ fun WebViewScreen(
                 if (readerLoading) {
                     LoadingState()
                 }
+            }
+        }
+
+        // 底部工具栏:悬浮在 WebView 之上(网页布局高度固定,栏隐现不触发网页重排)。
+        // 网页向下滚动时向下滑出以扩大阅读空间,向上滚动/打开新页时滑回;视频全屏时隐藏。
+        if (fullscreenView == null) {
+            AnimatedVisibility(
+                visible = webBottomBarVisible,
+                modifier = Modifier.align(Alignment.BottomCenter),
+                enter = slideInVertically(initialOffsetY = { it }),
+                exit = slideOutVertically(targetOffsetY = { it })
+            ) {
+                WebBottomBar(
+                    canGoBack = webCanGoBack,
+                    canGoForward = webCanGoForward,
+                    readerActive = readerActive,
+                    readerLoading = readerLoading,
+                    translateEnabled = aiConfig.translateEnabled,
+                    translateActive = translating || translateResults != null,
+                    onBack = { webViewRef.web?.goBack() },
+                    onForward = { webViewRef.web?.goForward() },
+                    onToggleReader = { if (readerActive) exitReaderMode() else enterReaderMode() },
+                    onTranslate = { startTranslate() },
+                    onShare = { shareUrl(context, pageTitle, currentUrl) }
+                )
             }
         }
 
