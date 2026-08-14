@@ -86,4 +86,17 @@
     <string name="history_empty_subtitle">打开过的网页会出现在这里</string>
     <!-- 左滑删除图标的无障碍描述 -->
     <string name="history_delete">删除</string>
+
+    <!-- ===== 收藏(稍后读) ===== -->
+    <string name="favorites_title">收藏</string>
+    <string name="favorites_empty_title">还没有收藏</string>
+    <string name="favorites_empty_subtitle">在网页右上角点星标,收藏的文章会出现在这里</string>
+    <!-- 清空确认对话框 -->
+    <string name="favorites_clear_dialog_title">清空收藏</string>
+    <plurals name="favorites_clear_dialog_message">
+        <item quantity="other">将删除全部 %1$d 条收藏,此操作不可撤销。</item>
+    </plurals>
+    <!-- WebView 顶栏星标按钮的无障碍描述 -->
+    <string name="favorites_add_desc">收藏本页</string>
+    <string name="favorites_remove_desc">取消收藏</string>
 </resources>

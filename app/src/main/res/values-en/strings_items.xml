@@ -67,4 +67,17 @@
     <string name="history_empty_title">No browsing history yet</string>
     <string name="history_empty_subtitle">Pages you open will appear here</string>
     <string name="history_delete">Delete</string>
+
+    <!-- ===== Favorites (read later) ===== -->
+    <string name="favorites_title">Favorites</string>
+    <string name="favorites_empty_title">No favorites yet</string>
+    <string name="favorites_empty_subtitle">Tap the star on a page and it will appear here</string>
+    <string name="favorites_clear_dialog_title">Clear favorites</string>
+    <plurals name="favorites_clear_dialog_message">
+        <item quantity="one">This will delete %1$d favorite. This cannot be undone.</item>
+        <item quantity="other">This will delete all %1$d favorites. This cannot be undone.</item>
+    </plurals>
+    <!-- Accessibility labels for the WebView top-bar star button -->
+    <string name="favorites_add_desc">Save to Favorites</string>
+    <string name="favorites_remove_desc">Remove from Favorites</string>
 </resources>

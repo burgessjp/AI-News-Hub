@@ -61,7 +61,7 @@
 ## 持久化
 
 - DataStore：`display_prefs`（主题 / 动态取色 / 字体族 / 字号档位 / 源模式 / 应用内语言 `language` / 搜索历史 / 信息源顺序 `source_order` / 每日更新通知开关 `daily_notify` 与调度状态 `last_notified_overview_at`、`last_notify_check_at`——后者为自查链上次运行时刻，设置页开关下显示「上次检查」，用于区分链被厂商后台限制拦住与档内没新数据）、`ai_prefs`（全局 AI 服务配置 + 按「模型 × 月」聚合的 token 用量）。
-- Room（`ainewshub.db`，version 1，`fallbackToDestructiveMigration`）：仅浏览历史。
+- Room（`ainewshub.db`，version 2，`fallbackToDestructiveMigration` 兜底 + 显式 `MIGRATION_1_2`）：浏览历史 + 收藏（favorites 表，v2 新增；升级走 Migration 保住老数据）。**收藏（稍后读）**：入口为 WebView 顶栏星标（toggle 当前真实 URL，全 App 链接都经 `openUrl` 进 WebView 故全源覆盖），`Page.Web` 带 `source` 标签随收藏落库；管理页为「更多 → 收藏」二级页（`Page.Favorites`，镜像浏览历史三件套：`FavoriteEntity/FavoriteDao/FavoritesRepository` + `FavoritesViewModel/FavoritesScreen`）；缓存清理任何开关都不触碰 favorites 表。
 - HN 列表缓存、翻译缓存为 `cacheDir` 下 JSON 文件。
 - 桌面小组件缓存为 SharedPreferences `hot_now_widget`（今日热点列表 JSON + 时间戳，KB 级，`CacheManager` 不涉及）。
 

@@ -25,6 +25,9 @@
     <string name="webview_toast_save_failed">保存失败,请稍后重试</string>
     <string name="webview_toast_no_app_for_link">未找到可打开此链接的应用</string>
     <string name="webview_toast_open_link_failed">无法打开此链接</string>
+    <!-- 顶栏星标:收藏/取消收藏当前页 -->
+    <string name="webview_toast_favorited">已收藏</string>
+    <string name="webview_toast_unfavorited">已取消收藏</string>
 
     <!-- ===== 「更多」菜单(刷新复用 common_refresh) ===== -->
     <string name="webview_menu_translate_page">翻译本页</string>

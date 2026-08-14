@@ -51,6 +51,7 @@ import com.peng.ainewshub.data.NewsItem
 import com.peng.ainewshub.data.AiConfig
 import com.peng.ainewshub.data.AiConfigStore
 import com.peng.ainewshub.data.CacheManager
+import com.peng.ainewshub.data.FavoritesRepository
 import com.peng.ainewshub.data.AiUsageStore
 import com.peng.ainewshub.data.SummaryRepository
 import com.peng.ainewshub.data.source.ArchiveHttpClient
@@ -67,6 +68,7 @@ import com.peng.ainewshub.ui.items.HackerNewsCommentsScreen
 import com.peng.ainewshub.ui.items.HackerNewsScreen
 import com.peng.ainewshub.ui.items.GitHubTrendingScreen
 import com.peng.ainewshub.ui.items.BrowseHistoryScreen
+import com.peng.ainewshub.ui.items.FavoritesScreen
 import com.peng.ainewshub.ui.items.HuggingFacePapersScreen
 import com.peng.ainewshub.ui.items.ProductHuntScreen
 import com.peng.ainewshub.ui.items.RundownAiScreen
@@ -188,7 +190,8 @@ private sealed interface Page {
 
     data class Detail(val item: NewsItem) : Page
     // title 无默认值:占位文案随语言取词,两处构造点(openUrl / pageFromBundle)均显式传入
-    data class Web(val url: String, val title: String) : Page {
+    // source:来源标签(如 "GitHub Trending"),随 Page 传递供收藏落库;可空
+    data class Web(val url: String, val title: String, val source: String? = null) : Page {
         override val navStyle = PageNavStyle.FADE
     }
     data object DailyArchive : Page
@@ -215,6 +218,8 @@ private sealed interface Page {
     /** 信息源(Sources) —— Hub 浏览区独立页,聚合 8 个源全集入口。从「更多」页进入。 */
     data object Sources : Page
     data object BrowseHistory : Page
+    /** 收藏(稍后读) —— WebView 顶栏星标的文章列表,从「更多」页进入。 */
+    data object Favorites : Page
     /** 历史摘要 —— 可选日期列表(归档 history 索引),从「更多」页进入。 */
     data object SummaryArchive : Page
     /** 历史摘要 —— 指定日期的全源摘要卡页(复用摘要卡片实现)。 */
@@ -228,7 +233,7 @@ private sealed interface Page {
 private fun Page.toBundle(): Bundle = Bundle().apply {
     when (this@toBundle) {
         is Page.Detail -> { putString("t", "Detail"); putParcelable("item", item) }
-        is Page.Web -> { putString("t", "Web"); putString("url", url); putString("title", title) }
+        is Page.Web -> { putString("t", "Web"); putString("url", url); putString("title", title); putString("source", source) }
         is Page.DailyDate -> { putString("t", "DailyDate"); putString("date", date) }
         is Page.HackerNewsComments -> { putString("t", "HNComments"); putParcelable("story", story) }
         is Page.DailyArchive -> putString("t", "DailyArchive")
@@ -248,6 +253,7 @@ private fun Page.toBundle(): Bundle = Bundle().apply {
         is Page.FeaturedHub -> putString("t", "FeaturedHub")
         is Page.Sources -> putString("t", "Sources")
         is Page.BrowseHistory -> putString("t", "BrowseHistory")
+        is Page.Favorites -> putString("t", "Favorites")
         is Page.SummaryArchive -> putString("t", "SummaryArchive")
         is Page.SummaryDate -> { putString("t", "SummaryDate"); putString("date", date) }
     }
@@ -257,7 +263,7 @@ private fun Page.toBundle(): Bundle = Bundle().apply {
 private fun pageFromBundle(b: Bundle, webFallbackTitle: String): Page? {
     return when (b.getString("t")) {
         "Detail" -> b.getParcelable<NewsItem>("item")?.let { Page.Detail(it) }
-        "Web" -> Page.Web(b.getString("url") ?: "", b.getString("title") ?: webFallbackTitle)
+        "Web" -> Page.Web(b.getString("url") ?: "", b.getString("title") ?: webFallbackTitle, b.getString("source"))
         "DailyDate" -> b.getString("date")?.let { Page.DailyDate(it) }
         "HNComments" -> b.getParcelable<HackerNewsStory>("story")?.let { Page.HackerNewsComments(it) }
         "DailyArchive" -> Page.DailyArchive
@@ -277,6 +283,7 @@ private fun pageFromBundle(b: Bundle, webFallbackTitle: String): Page? {
         "FeaturedHub" -> Page.FeaturedHub
         "Sources" -> Page.Sources
         "BrowseHistory" -> Page.BrowseHistory
+        "Favorites" -> Page.Favorites
         "SummaryArchive" -> Page.SummaryArchive
         "SummaryDate" -> b.getString("date")?.let { Page.SummaryDate(it) }
         else -> null
@@ -342,6 +349,10 @@ fun AiNewsHubApp(
     // 浏览历史仓库(进程级单例):基于 Room,记录所有通过 openUrl 打开的网页。
     val browseHistoryRepo = remember {
         BrowseHistoryRepository(AppDatabase.get(appContext).browseHistoryDao())
+    }
+    // 收藏(稍后读)仓库(进程级单例):同一 Room 库,WebView 顶栏星标读写。
+    val favoritesRepo = remember {
+        FavoritesRepository(AppDatabase.get(appContext).favoriteDao())
     }
 
     // 主题模式 + 字体族:订阅持久化 Flow。Flow 首帧前用默认值(System),
@@ -495,13 +506,16 @@ fun AiNewsHubApp(
     // ("GitHub Trending"/"日报"/"AI HOT"…),由各调用点显式传入,可空。
     val openUrl: (String, String, String?) -> Unit = { url, title, source ->
         scope.launch { browseHistoryRepo.record(url, title, source) }
-        push(Page.Web(url, title))
+        push(Page.Web(url, title, source))
     }
 
     // 网页标题回写:WebView 加载完成后拿到真实标题,更新历史记录(而非占位"加载中…")。
-    // 不更新 visitedAt,避免回写把条目顶到最前。
+    // 不更新 visitedAt,避免回写把条目顶到最前。同一 URL 已收藏时同步更新收藏标题。
     val onTitleResolved: (String, String) -> Unit = { url, resolvedTitle ->
-        scope.launch { browseHistoryRepo.updateTitle(url, resolvedTitle) }
+        scope.launch {
+            browseHistoryRepo.updateTitle(url, resolvedTitle)
+            favoritesRepo.updateTitle(url, resolvedTitle)
+        }
     }
 
     // 外部入口要求直达设置页(如系统选中翻译的「去设置」)
@@ -645,6 +659,7 @@ fun AiNewsHubApp(
                             onOpenFeaturedHub = { push(Page.FeaturedHub) },
                             onOpenSources = { push(Page.Sources) },
                             onOpenBrowseHistory = { push(Page.BrowseHistory) },
+                            onOpenFavorites = { push(Page.Favorites) },
                             onOpenSummaryArchive = { push(Page.SummaryArchive) },
                             onOpenUrl = openUrl,
                             onOpenSettings = { push(Page.Settings) },
@@ -693,6 +708,7 @@ fun AiNewsHubApp(
                             aiConfig = aiConfig,
                             usageStore = usageStore,
                             browseHistoryRepo = browseHistoryRepo,
+                            favoritesRepo = favoritesRepo,
                             cacheSizeBytes = cacheSizeBytes,
                             onClearCache = onClearCache,
                             darkTheme = darkTheme
@@ -793,6 +809,7 @@ private fun TabRoot(
     onOpenFeaturedHub: () -> Unit,
     onOpenSources: () -> Unit,
     onOpenBrowseHistory: () -> Unit,
+    onOpenFavorites: () -> Unit,
     onOpenSummaryArchive: () -> Unit,
     onOpenUrl: (String, String, String?) -> Unit,
     onOpenSettings: () -> Unit,
@@ -827,6 +844,7 @@ private fun TabRoot(
         AppTab.More -> MoreScreen(
             onOpenSources = onOpenSources,
             onOpenBrowseHistory = onOpenBrowseHistory,
+            onOpenFavorites = onOpenFavorites,
             onOpenSummaryArchive = onOpenSummaryArchive,
             onOpenSettings = onOpenSettings,
             onOpenAiService = onOpenAiService,
@@ -879,6 +897,7 @@ private fun PageView(
     aiConfig: AiConfig,
     usageStore: AiUsageStore,
     browseHistoryRepo: BrowseHistoryRepository,
+    favoritesRepo: FavoritesRepository,
     cacheSizeBytes: Long,
     onClearCache: (Boolean, Boolean) -> Unit,
     darkTheme: Boolean = false
@@ -908,6 +927,8 @@ private fun PageView(
             darkTheme = darkTheme,
             fontScale = fontScale,
             aiConfig = aiConfig,
+            favoritesRepo = favoritesRepo,
+            source = page.source,
             onBack = onBack,
             onOpenSettings = onOpenSettings,
             onTitleResolved = onTitleResolved
@@ -1048,6 +1069,12 @@ private fun PageView(
         )
         Page.BrowseHistory -> BrowseHistoryScreen(
             repo = browseHistoryRepo,
+            onBack = onBack,
+            onOpenUrl = { url, title, source -> onOpenUrl(url, title, source) },
+            listState = pageListStates.forPage(page)
+        )
+        Page.Favorites -> FavoritesScreen(
+            repo = favoritesRepo,
             onBack = onBack,
             onOpenUrl = { url, title, source -> onOpenUrl(url, title, source) },
             listState = pageListStates.forPage(page)

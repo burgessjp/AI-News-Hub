@@ -20,6 +20,9 @@
     <string name="webview_toast_save_failed">Save failed, please try again later</string>
     <string name="webview_toast_no_app_for_link">No app found to open this link</string>
     <string name="webview_toast_open_link_failed">Couldn\'t open this link</string>
+    <!-- Top-bar star: favorite / unfavorite the current page -->
+    <string name="webview_toast_favorited">Saved to Favorites</string>
+    <string name="webview_toast_unfavorited">Removed from Favorites</string>
 
     <!-- ===== More menu (Refresh reuses common_refresh) ===== -->
     <string name="webview_menu_translate_page">Translate page</string>

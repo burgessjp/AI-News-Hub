@@ -19,6 +19,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Hub
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.SmartToy
@@ -52,7 +53,7 @@ import com.peng.ainewshub.ui.theme.AppText
  * 结构(自顶向下,简洁直入):
      *  - 信息源入口:点开 [SourcesScreen] 二级页(Hub 浏览区,8 个源全集,
      *    原内嵌在更多页的「浏览」组,现独立成页)
- *  - 历史组(tertiary 强调):历史摘要 / 浏览历史 —— 彩色图标块行
+ *  - 历史组(tertiary 强调):历史摘要 / 浏览历史 / 收藏 —— 彩色图标块行
  *  - 偏好组(secondary 强调):AI 服务 / 设置 / 关于 —— 浅灰图标块行
  *
  * 「AIHot 精选」原为首页独立根 tab,现收进 [SourcesScreen] 作为末位二级页(复用 FeaturedTab,
@@ -64,6 +65,7 @@ import com.peng.ainewshub.ui.theme.AppText
 fun MoreScreen(
     onOpenSources: () -> Unit,
     onOpenBrowseHistory: () -> Unit,
+    onOpenFavorites: () -> Unit,
     onOpenSummaryArchive: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenAiService: () -> Unit,
@@ -122,8 +124,18 @@ fun MoreScreen(
                     iconColor = IconAccent.Primary,
                     title = stringResource(R.string.more_browse_history_title),
                     subtitle = stringResource(R.string.more_browse_history_subtitle),
-                    showDivider = false,
                     onClick = onOpenBrowseHistory
+                )
+            }
+            // 收藏(稍后读):WebView 顶栏星标的文章列表
+            item {
+                IconTileRow(
+                    icon = Icons.Filled.Star,
+                    iconColor = IconAccent.Primary,
+                    title = stringResource(R.string.more_favorites_title),
+                    subtitle = stringResource(R.string.more_favorites_subtitle),
+                    showDivider = false,
+                    onClick = onOpenFavorites
                 )
             }
 

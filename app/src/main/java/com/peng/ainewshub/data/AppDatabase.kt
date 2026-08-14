@@ -4,24 +4,47 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.sqlite.db.SupportSQLiteDatabase
 
 /**
- * App 数据库 —— 目前仅承载浏览历史。
+ * App 数据库 —— 承载浏览历史与收藏(稍后读)。
  *
  * 单例:同一进程复用同一实例,避免 Room 打开多个文件句柄。
- * [fallbackToDestructiveMigration]:历史数据可丢,迁移缺失时直接重建表,
- * 不为 v1 投入正式迁移成本(后续正式迭代再加 Migration)。
+ *
+ * 版本史:
+ *  - v1:仅 browse_history(当时可丢,[fallbackToDestructiveMigration] 直接重建)
+ *  - v2:新增 favorites 表。老设备升级走 [MIGRATION_1_2](仅 CREATE TABLE),
+ *    保住既有浏览历史;destructive 兜底仍保留,迁移缺失时重建(开发期分支)。
  */
 @Database(
-    entities = [BrowseHistoryEntity::class],
-    version = 1,
+    entities = [BrowseHistoryEntity::class, FavoriteEntity::class],
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun browseHistoryDao(): BrowseHistoryDao
+    abstract fun favoriteDao(): FavoriteDao
 
     companion object {
+        /** v1 → v2:新增收藏表(不影响既有 browse_history 数据)。 */
+        private val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `favorites` (" +
+                        "`url` TEXT NOT NULL, " +
+                        "`title` TEXT NOT NULL, " +
+                        "`host` TEXT NOT NULL, " +
+                        "`source` TEXT, " +
+                        "`savedAt` INTEGER NOT NULL, " +
+                        "PRIMARY KEY(`url`))"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_favorites_savedAt` ON `favorites` (`savedAt`)"
+                )
+            }
+        }
+
         @Volatile
         private var instance: AppDatabase? = null
 
@@ -32,6 +55,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "ainewshub.db"
                 )
+                    .addMigrations(MIGRATION_1_2)
                     .fallbackToDestructiveMigration()
                     .build()
                     .also { instance = it }

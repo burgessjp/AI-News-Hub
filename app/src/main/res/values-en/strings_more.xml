@@ -12,6 +12,8 @@
     <string name="more_summary_archive_subtitle">Browse each source\'s daily AI digest by date</string>
     <string name="more_browse_history_title">Browsing History</string>
     <string name="more_browse_history_subtitle">Pages you\'ve opened</string>
+    <string name="more_favorites_title">Favorites</string>
+    <string name="more_favorites_subtitle">Starred articles to read later</string>
     <string name="more_section_preferences">Preferences</string>
     <string name="more_ai_service_title">AI Service</string>
     <string name="more_ai_service_subtitle">Providers, models, translation, usage</string>

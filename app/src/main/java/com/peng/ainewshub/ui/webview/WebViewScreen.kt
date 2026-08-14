@@ -52,12 +52,14 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material.icons.outlined.WebAsset
 import androidx.compose.material3.AlertDialog
@@ -97,10 +99,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
 import com.peng.ainewshub.R
 import com.peng.ainewshub.data.AiConfig
+import com.peng.ainewshub.data.FavoritesRepository
 import com.peng.ainewshub.data.TranslationRepository
 import com.peng.ainewshub.ui.ErrorState
 import com.peng.ainewshub.ui.LoadingState
@@ -120,7 +124,8 @@ import kotlin.math.roundToInt
  * 内置 WebView 屏幕 — 不跳出 App。
  *
  * 显示原文 / AI HOT 阅读页,带:
- *  - 顶栏:返回 + 标题(随网页加载动态更新)+ 当前域名副标题 + 「更多」菜单
+ *  - 顶栏:返回 + 标题(随网页加载动态更新)+ 当前域名副标题 + 星标收藏
+ *    (toggle 当前页,状态跟随站内导航后的真实 URL)+ 「更多」菜单
  *    (刷新 / 翻译本页 / 复制链接 / 在浏览器打开)
  *  - 底部工具栏:后退 / 前进 / 阅读模式 / 分享(高频导航一级操作,视频全屏时隐藏)
  *  - 顶部线性进度条(加载中;整页翻译时复用为翻译进度)
@@ -144,6 +149,9 @@ fun WebViewScreen(
     darkTheme: Boolean = false,
     fontScale: FontScale = FontScale.Standard,
     aiConfig: AiConfig = AiConfig(),
+    favoritesRepo: FavoritesRepository,
+    // 来源标签(如 "GitHub Trending"),随收藏落库;少数入口未标注时为 null
+    source: String? = null,
     onBack: () -> Unit,
     onOpenSettings: () -> Unit = {},
     onTitleResolved: (url: String, title: String) -> Unit = { _, _ -> }
@@ -360,6 +368,10 @@ fun WebViewScreen(
         runCatching { Uri.parse(currentUrl).host }.getOrNull().orEmpty()
     }
 
+    // 星标收藏状态:跟随当前真实 URL(站内导航后 currentUrl 变化,星标随之切换)
+    val favoriteEntity by remember(currentUrl) { favoritesRepo.observeByUrl(currentUrl) }
+        .collectAsStateWithLifecycle(initialValue = null)
+
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             containerColor = MaterialTheme.colorScheme.surface,
@@ -374,6 +386,28 @@ fun WebViewScreen(
                         }
                     },
                     actions = {
+                        // 星标收藏当前页(toggle);已收藏实心主色,未收藏描边
+                        IconButton(onClick = {
+                            scope.launch {
+                                val favorited = favoritesRepo.toggle(currentUrl, pageTitle, source)
+                                toast(
+                                    context.getString(
+                                        if (favorited) R.string.webview_toast_favorited
+                                        else R.string.webview_toast_unfavorited
+                                    )
+                                )
+                            }
+                        }) {
+                            Icon(
+                                imageVector = if (favoriteEntity != null) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                                contentDescription = stringResource(
+                                    if (favoriteEntity != null) R.string.favorites_remove_desc
+                                    else R.string.favorites_add_desc
+                                ),
+                                tint = if (favoriteEntity != null) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                         Box {
                             IconButton(onClick = { menuExpanded = true }) {
                                 Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.tab_more))
