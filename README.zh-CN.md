@@ -21,7 +21,7 @@
 ## 为什么用它
 
 - **一屏读完今日 AI 圈** — 聚合 HackerNews、GitHub Trending、HuggingFace Papers、Product Hunt 等 8 个高质量源，一个 App 看完当日动态。
-- **AI 帮你抓重点** — 配套流水线每天把每个源的中文要点、跨源「今日热点 Top10」预生成好，打开即看、零等待；突发重磅条目带 Breaking 标记。
+- **AI 帮你抓重点** — 配套流水线每天把每个源的中文要点、跨源「今日热点 Top10」、跨源热词趋势榜预生成好，打开即看、零等待；突发重磅条目带 Breaking 标记。
 - **数据源你自己说了算** — 信息源磁贴长按拖拽自定义顺序。
 - **AI Key 你自己掌握** — 整页翻译等运行时 AI 能力不内置任何 key，用户自配服务商（DeepSeek / 智谱 GLM / 任意 OpenAI 兼容服务），仅存应用私有目录。
 - **应用内读完一切** — 全 App 链接走内置 WebView，集成阅读模式与整页翻译，不跳外部浏览器。
@@ -31,7 +31,7 @@
 
 ## 📖 简介
 
-**AI News Hub** 聚合了多个高质量的 AI 信息源——HackerNews、GitHub Trending、HuggingFace Papers、Product Hunt、stormzhang AI 资讯、The Rundown AI、OpenAI × Anthropic 动态，以及 `aihot.virxact.com` 提供的「AIHot 精选」与 AI 日报——并在此基础上叠加「今日热点 Top10」「中文摘要」「整页翻译」等能力，让用户在一个应用里就能读完 AI 圈当日动态。
+**AI News Hub** 聚合了多个高质量的 AI 信息源——HackerNews、GitHub Trending、HuggingFace Papers、Product Hunt、stormzhang AI 资讯、The Rundown AI、OpenAI × Anthropic 动态，以及 `aihot.virxact.com` 提供的「AIHot 精选」与 AI 日报——并在此基础上叠加「今日热点 Top10」「热词趋势」「中文摘要」「整页翻译」等能力，让用户在一个应用里就能读完 AI 圈当日动态。
 
 - 技术栈：Kotlin + Jetpack Compose + Material 3
 - 单模块工程，包名 `com.peng.ainewshub`
@@ -39,25 +39,28 @@
 
 ## 截图
 
-| 总览 | 摘要 | 信息源 | HackerNews |
-|:---:|:---:|:---:|:---:|
-| <img src="docs/screenshots/01-overview.png" width="200" alt="总览"> | <img src="docs/screenshots/02-summary.png" width="200" alt="摘要"> | <img src="docs/screenshots/03-sources.png" width="200" alt="信息源"> | <img src="docs/screenshots/04-hackernews.png" width="200" alt="HackerNews"> |
+| 总览 | 趋势 | 摘要 | 信息源 | HackerNews |
+|:---:|:---:|:---:|:---:|:---:|
+| <img src="docs/screenshots/01-overview.png" width="160" alt="总览"> | <img src="docs/screenshots/02-trends.png" width="160" alt="趋势"> | <img src="docs/screenshots/03-summary.png" width="160" alt="摘要"> | <img src="docs/screenshots/04-sources.png" width="160" alt="信息源"> | <img src="docs/screenshots/05-hackernews.png" width="160" alt="HackerNews"> |
 
-| OpenAI × Anthropic | GitHub Trending | The Rundown AI | 设置 |
-|:---:|:---:|:---:|:---:|
-| <img src="docs/screenshots/05-openai-anthropic.png" width="200" alt="OpenAI × Anthropic"> | <img src="docs/screenshots/06-github-trending.png" width="200" alt="GitHub Trending"> | <img src="docs/screenshots/07-the-rundown-ai.png" width="200" alt="The Rundown AI"> | <img src="docs/screenshots/08-settings.png" width="200" alt="设置"> |
+| GitHub Trending | OpenAI × Anthropic | The Rundown AI | 设置 | |
+|:---:|:---:|:---:|:---:|:---:|
+| <img src="docs/screenshots/06-github-trending.png" width="160" alt="GitHub Trending"> | <img src="docs/screenshots/07-openai-anthropic.png" width="160" alt="OpenAI × Anthropic"> | <img src="docs/screenshots/08-the-rundown-ai.png" width="160" alt="The Rundown AI"> | <img src="docs/screenshots/09-settings.png" width="160" alt="设置"> | |
 
 ---
 
 ## ✨ 核心功能
 
-### 三大根 Tab
+### 四大根 Tab
 
 | Tab | 做什么 |
 |-----|--------|
-| **总览** | 跨源「今日热点 Top10」——流水线预生成的综合分析，AI 判定为「突发重磅」的条目带 Breaking 标签、特殊样式，最前展示。打开即看、零等待。 |
-| **摘要** | 8 个归档源当日的 AI 中文要点（流水线预生成），打开即看、无需等待。 |
-| **更多** | 设置、AI 服务配置、信息源聚合入口、历史摘要、AI 日报归档、关于页等。 |
+| **总览** | 当日跨源「今日综述」导读（2-3 句 hero）+「今日热点 Top10」——均由流水线预生成；AI 判定为「突发重磅」的条目带 Breaking 标签、特殊样式，排最前。打开即看、零等待。 |
+| **摘要** | 8 个归档源当日的 AI 中文要点（流水线预生成），条目整行可点、经内置 WebView 直达原文。打开即看、无需等待。 |
+| **趋势** | 跨源热词排行榜——流水线对近 14 天快照的纯统计词频（不调 AI）：窗口命中数、迷你趋势曲线、涨跌箭头；点击词条展开代表文章。 |
+| **更多** | 设置、AI 服务配置、信息源聚合入口、收藏（稍后读）、历史摘要、AI 日报归档、关于页等。 |
+
+三个内容 Tab（总览 / 摘要 / 趋势）支持**下拉刷新**，绕过归档缓存立即拉取流水线最新批次。
 
 ### 浏览区（更多 → 信息源）
 
@@ -86,6 +89,8 @@
 
 - 阅读模式（注入 Mozilla Readability 提取正文）
 - 整页翻译（与原文对照、可拖拽半/全屏弹层）
+- 顶栏星标收藏当前页面（稍后读）
+- 底栏随网页下滚自动隐藏、上滚复现
 - 网页下载、HTML5 视频全屏、长按图片/链接操作
 - 字号跟随系统设置
 
@@ -93,7 +98,8 @@
 
 - **AI 日报** 与 **历史归档**（按日期回溯）
 - **搜索**：本地搜索历史 + 今日热点热词引导
-- **浏览历史**（本地 Room 存储）
+- **浏览历史与收藏**（本地 Room 存储；WebView 顶栏星标任意页面即可稍后读）
+- **每日更新通知**（可选、默认关）：流水线有新内容时本地通知提醒，每天至多 1 条；开启后冷启动遇到新数据还会弹「查看」快捷弹窗
 - **主题**：Material You 动态取色（Android 12+）、字体族切换（默认/衬线/等宽）、字号档位、暗色模式
 - **多语言**：简体中文 / English 切换
 
@@ -160,8 +166,8 @@ AI News Hub 的整页翻译等运行时 AI 能力**不内置任何 key**，由�
 | 类别 | 来源 | 说明 |
 |------|------|------|
 | 第三方 API | `aihot.virxact.com` 公开 API | AIHot 精选（今日热点 + TOP20）、AI 日报与归档 |
-| 第三方 · 实时 | HackerNews、GitHub Trending、HuggingFace Papers 等 | App 内直接抓取 |
-| 第三方 · 归档 | 配套数据流水线 | 每日 15:30（北京时间）抓取 + AI 总结 + 推送到 [gitcode 数据仓库](https://gitcode.com/peng1818/AI-News-Hub-Data) |
+| 第三方 · 实时（局部） | HackerNews 评论 | 应用内实时拉自 Firebase API；各源列表一律读归档快照（实时模式未开放入口） |
+| 第三方 · 归档 | 配套数据流水线 | 每天多批次（北京时间；仓库 CI 承载 15:30 批）抓取 + AI 总结 + 推送到 [gitcode 数据仓库](https://gitcode.com/peng1818/AI-News-Hub-Data) |
 | 运行时 AI（用户自配 key） | 用户填入 | 网页整页翻译、系统选中翻译 |
 
 数据仓库格式详见 [`docs/news-hub-data-usage.md`](docs/news-hub-data-usage.md)。
@@ -232,6 +238,7 @@ bash scripts/pipeline.sh
 | Coil | 2.7.0 |
 | Room | 2.6.1 |
 | DataStore | 1.1.1 |
+| WorkManager（每日通知） | 2.10.0 |
 | Glance（桌面小组件） | 1.1.1 |
 | KSP | 2.0.21-1.0.28 |
 | minSdk | 24 (Android 7.0) |
@@ -259,7 +266,6 @@ bash scripts/pipeline.sh
 | 库 / 资源 | 用途 | License |
 |---|---|---|
 | [Mozilla Readability](https://github.com/mozilla/readability) | WebView 阅读模式正文提取 | Apache-2.0 |
-| [Inter Font](https://github.com/rsms/inter) | 内嵌字体 | SIL OFL 1.1 |
 
 ### AndroidX / Jetpack
 
@@ -269,6 +275,7 @@ bash scripts/pipeline.sh
 | [Activity-Compose](https://developer.android.com/jetpack/androidx/releases/activity) | Compose 集成（含预测返回手势） | Apache-2.0 |
 | [Lifecycle](https://developer.android.com/jetpack/androidx/releases/lifecycle) + [ViewModel](https://developer.android.com/topic/libraries/architecture/viewmodel) | 生命周期与状态管理 | Apache-2.0 |
 | [DataStore](https://developer.android.com/topic/libraries/architecture/datastore) | 偏好持久化 | Apache-2.0 |
+| [WorkManager](https://developer.android.com/topic/libraries/architecture/workmanager) | 每日更新通知调度 | Apache-2.0 |
 | [Room](https://developer.android.com/jetpack/androidx/releases/room) | SQLite 抽象层（浏览历史） | Apache-2.0 |
 | [Glance](https://developer.android.com/jetpack/androidx/releases/glance) | 桌面小组件 | Apache-2.0 |
 | [WebKit](https://developer.android.com/jetpack/androidx/releases/webkit) | 内置 WebView 能力增强 | Apache-2.0 |

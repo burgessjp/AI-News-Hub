@@ -3,11 +3,11 @@
 数据仓库:[gitcode.com/peng1818/AI-News-Hub-Data](https://gitcode.com/peng1818/AI-News-Hub-Data)
 分支:`news-hub-data`
 
-本仓库定时抓取 [AI News Hub](../) App「Hub」tab 浏览区域的 8 个数据源(7 个第三方站点源 + AIHot 精选 TOP20,后者来自第三方服务 aihot.virxact.com),解析成 JSON 后按日期归档。本文档说明数据结构、获取方式与消费示例。
+本仓库定时抓取 [AI News Hub](../) App 浏览区域(更多 → 信息源)的 8 个数据源(7 个第三方站点源 + AIHot 精选 TOP20,后者来自第三方服务 aihot.virxact.com),解析成 JSON 后按日期归档。本文档说明数据结构、获取方式与消费示例。
 
 ## 更新频率
 
-- **定时**:每天北京时间 15:30 抓一次(GitHub cron 不保证准点,通常 ±15 分钟内)
+- **定时**:每天多个批次(北京时间 08:00 / 15:30 / 18:00)。其中 15:30 批由本仓库 GitHub Actions 触发(cron 不保证准点,通常 ±15 分钟内);08:00 / 18:00 批由仓库外机器调度,不在本仓库 workflow 内
 - **手动**:workflow 支持 `workflow_dispatch`,可随时手动触发补抓
 - 任何源抓取失败会自动重试最多 3 次(间隔 2s/4s);3 次全败才跳过,不影响其余源
 - 失败源的 `index.json` latest 指针会保留上一次成功的指向(见下「失败保留机制」)
@@ -465,7 +465,7 @@ The Rundown AI(beehiiv 托管的头部英文 AI 日更 newsletter)首页文章�
 
 2. **无历史数据保证**:数据从 workflow 首次成功运行起开始积累。某源若从未成功过,对应目录不会存在。
 
-3. **频率与配额**:每天 1 次定时 + 偶发手动触发。不要高频轮询 raw URL,gitcode 有访问频率限制。客户端建议缓存 `index.json` 的 `updated_at` 判断是否需要刷新。
+3. **频率与配额**:每天多批次定时 + 偶发手动触发。不要高频轮询 raw URL,gitcode 有访问频率限制。客户端建议缓存 `index.json` 的 `updated_at` 判断是否需要刷新。
 
 4. **字段可能变化**:各源抓自第三方页面(GitHub Trending / HuggingFace 等)或第三方 API(aihot-featured 来自 aihot.virxact.com),若对方改版/接口调整导致字段缺失,会在 `manifest.json` 的 error 中体现。字段语义遵循上述文档,新增字段不破坏旧消费者。
 
