@@ -54,6 +54,7 @@ import com.peng.ainewshub.ui.UiState
 import com.peng.ainewshub.ui.anim.Motion
 import com.peng.ainewshub.ui.components.BottomBarPillHeight
 import com.peng.ainewshub.ui.components.ShimmerBox
+import com.peng.ainewshub.ui.components.ShimmerHost
 import com.peng.ainewshub.ui.more.sourceMeta
 import com.peng.ainewshub.ui.theme.AppText
 import java.text.SimpleDateFormat
@@ -457,15 +458,17 @@ private fun renderRichLine(line: String): AnnotatedString {
 
 @Composable
 private fun SummarySkeleton() {
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        repeat(6) { i ->
-            val width = if (i % 3 == 2) 0.7f else if (i % 3 == 1) 0.9f else 1f
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                ShimmerBox(modifier = Modifier.fillMaxWidth(width).height(14.dp), cornerRadius = 4.dp)
-                ShimmerBox(modifier = Modifier.fillMaxWidth(0.95f).height(12.dp), cornerRadius = 4.dp)
+    ShimmerHost {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            repeat(6) { i ->
+                val width = if (i % 3 == 2) 0.7f else if (i % 3 == 1) 0.9f else 1f
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    ShimmerBox(modifier = Modifier.fillMaxWidth(width).height(14.dp), cornerRadius = 4.dp)
+                    ShimmerBox(modifier = Modifier.fillMaxWidth(0.95f).height(12.dp), cornerRadius = 4.dp)
+                }
             }
         }
     }

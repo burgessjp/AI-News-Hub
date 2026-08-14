@@ -5,8 +5,6 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,32 +14,50 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.State
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
  * 骨架屏组件 — 加载时的 shimmer 占位,提升感知性能。
  *
  * shimmer 效果:base 色块上滑过高光渐变带。
+ *
+ * 动画实例约束:一屏骨架往往含几十个 ShimmerBox,若每盒各自创建无限动画,
+ * 加载首帧会同时跑几十个 transition。故扫动进度经 [LocalShimmerProgress] 单点
+ * 共享:骨架列表封装与整屏骨架外层包 [ShimmerHost],子树内所有盒子复用同一动画;
+ * 未包宿主的散用盒子自动回退自建。进度值在 draw 阶段读取,动画逐帧只重绘不重组。
  */
 
+/** shimmer 扫动进度,由 [ShimmerHost] 提供;null 表示无宿主,ShimmerBox 需自建动画。 */
+private val LocalShimmerProgress = staticCompositionLocalOf<State<Float>?> { null }
+
+/**
+ * 骨架屏共享宿主:整个子树只创建一个 shimmer 无限动画。
+ * 一屏内多处骨架应包在同一个宿主里(所有盒子同相位扫动,与原先各自建时的视觉一致)。
+ */
 @Composable
-fun ShimmerBox(
-    modifier: Modifier = Modifier,
-    cornerRadius: androidx.compose.ui.unit.Dp = 6.dp
-) {
+fun ShimmerHost(content: @Composable () -> Unit) {
+    CompositionLocalProvider(LocalShimmerProgress provides rememberShimmerProgress()) {
+        content()
+    }
+}
+
+/** shimmer 扫动动画(-2f→2f 循环),宿主共享与散用兜底共用同一套参数。 */
+@Composable
+private fun rememberShimmerProgress(): State<Float> {
     val transition = rememberInfiniteTransition(label = "shimmer")
-    val translateAnim by transition.animateFloat(
+    return transition.animateFloat(
         initialValue = -2f,
         targetValue = 2f,
         animationSpec = infiniteRepeatable(
@@ -50,21 +66,31 @@ fun ShimmerBox(
         ),
         label = "shimmerTranslate"
     )
+}
 
+@Composable
+fun ShimmerBox(
+    modifier: Modifier = Modifier,
+    cornerRadius: Dp = 6.dp
+) {
+    val progress = LocalShimmerProgress.current ?: rememberShimmerProgress()
     val cs = MaterialTheme.colorScheme
-    val baseColor = cs.surfaceContainerHigh
-    val highlightColor = cs.surfaceContainerHighest
-
-    val brush = Brush.linearGradient(
-        colors = listOf(baseColor, highlightColor, baseColor),
-        start = Offset(translateAnim * 300f - 300f, 0f),
-        end = Offset(translateAnim * 300f, 0f)
-    )
+    val colors = listOf(cs.surfaceContainerHigh, cs.surfaceContainerHighest, cs.surfaceContainerHigh)
 
     Box(
         modifier = modifier
-            .clip(androidx.compose.foundation.shape.RoundedCornerShape(cornerRadius))
-            .background(brush)
+            .clip(RoundedCornerShape(cornerRadius))
+            .drawBehind {
+                // 进度在 draw 阶段读取:共享动画逐帧只触发重绘,不产生重组
+                val p = progress.value
+                drawRect(
+                    brush = Brush.linearGradient(
+                        colors = colors,
+                        start = Offset(p * 300f - 300f, 0f),
+                        end = Offset(p * 300f, 0f)
+                    )
+                )
+            }
     )
 }
 
@@ -108,16 +134,18 @@ fun NewsCardSkeleton(
     }
 }
 
-/** 一组卡片骨架,通常用于列表加载占位。 */
+/** 一组卡片骨架,通常用于列表加载占位。整组共享一个 shimmer 动画(见 [ShimmerHost])。 */
 @Composable
 fun NewsCardSkeletonList(
     count: Int = 4,
     modifier: Modifier = Modifier
 ) {
-    Column(modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-        repeat(count) {
-            NewsCardSkeleton()
-            Spacer(Modifier.height(12.dp))
+    ShimmerHost {
+        Column(modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+            repeat(count) {
+                NewsCardSkeleton()
+                Spacer(Modifier.height(12.dp))
+            }
         }
     }
 }
@@ -158,15 +186,18 @@ fun RankRowSkeleton(
 /**
  * 一组排名行骨架 —— Hub 五源屏等「徽章行」列表的加载占位。
  * 行间不再额外留空:真实行靠行内 vertical padding 呼吸,骨架保持同一节奏。
+ * 整组共享一个 shimmer 动画(见 [ShimmerHost])。
  */
 @Composable
 fun RankRowSkeletonList(
     count: Int = 8,
     modifier: Modifier = Modifier
 ) {
-    Column(modifier = modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        repeat(count) {
-            RankRowSkeleton()
+    ShimmerHost {
+        Column(modifier = modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+            repeat(count) {
+                RankRowSkeleton()
+            }
         }
     }
 }

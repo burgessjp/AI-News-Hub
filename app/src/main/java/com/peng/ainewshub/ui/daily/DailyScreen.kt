@@ -445,21 +445,23 @@ private fun DailyEntryRow(entry: DailyEntry, onOpen: (String) -> Unit) {
     }
 }
 
-/** 日报加载骨架:大头条块 + 几条骨架卡片。 */
+/** 日报加载骨架:大头条块 + 几条骨架卡片(整屏共享一个 shimmer 动画)。 */
 @Composable
 private fun DailySkeleton() {
-    androidx.compose.foundation.layout.Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        // 头条 lead 块骨架
-        com.peng.ainewshub.ui.components.ShimmerBox(
-            modifier = Modifier.fillMaxWidth().height(120.dp),
-            cornerRadius = 22.dp
-        )
-        // 几条 section 骨架
-        com.peng.ainewshub.ui.components.NewsCardSkeleton()
-        com.peng.ainewshub.ui.components.NewsCardSkeleton()
-        com.peng.ainewshub.ui.components.NewsCardSkeleton()
+    com.peng.ainewshub.ui.components.ShimmerHost {
+        androidx.compose.foundation.layout.Column(
+            modifier = Modifier.fillMaxSize().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // 头条 lead 块骨架
+            com.peng.ainewshub.ui.components.ShimmerBox(
+                modifier = Modifier.fillMaxWidth().height(120.dp),
+                cornerRadius = 22.dp
+            )
+            // 几条 section 骨架
+            com.peng.ainewshub.ui.components.NewsCardSkeleton()
+            com.peng.ainewshub.ui.components.NewsCardSkeleton()
+            com.peng.ainewshub.ui.components.NewsCardSkeleton()
+        }
     }
 }
