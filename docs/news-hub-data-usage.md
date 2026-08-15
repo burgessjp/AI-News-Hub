@@ -21,10 +21,14 @@ news-hub-data 分支/
 ├── history.json                        ← 摘要历史索引:{源名: {日期: relpath}}(每源 31 天)
 ├── overview_history.json               ← 总览归档索引:{日期: relpath}(保留 90 天)
 ├── trends.json                         ← 热词趋势榜(纯统计,每次批次整文件覆盖)
+├── trends_history.json                 ← 趋势归档索引:{日期: relpath}(保留 90 天,App 暂不读取)
 ├── manifest.json                       ← 最近一次运行总览(成功/失败状态)
 ├── overview/                           ← 今日总览按日归档(内容与 index 的 latest_overview 同构)
 │   └── 2026-08-15/
 │       └── 11-49-data.json
+├── trends/                             ← 热词趋势榜按日归档(内容与当期 trends.json 同构)
+│   └── 2026-08-15/
+│       └── 18-00-data.json
 ├── hackernews/
 │   ├── 2026-07-14/
 │   │   └── 08-00-data.json
@@ -87,7 +91,7 @@ news-hub-data 分支/
 }
 ```
 
-`index.json` 只含**即时字段**(每次批次整体刷新,体量有界不随保留期增长)。其余内容在根级独立文件按需拉取:`trends.json`(热词趋势)、`history.json`(摘要历史索引)与 `overview_history.json`(总览归档索引),详见下文对应章节。
+`index.json` 只含**即时字段**(每次批次整体刷新,体量有界不随保留期增长)。其余内容在根级独立文件按需拉取:`trends.json`(热词趋势)、`history.json`(摘要历史索引)与 `overview_history.json`(总览归档索引),详见下文对应章节。另有 `trends_history.json`(趋势归档索引,App 暂不拉取,供流水线计算排名变化基准)。
 
 `latest` 里的路径是**相对于源目录**的。设计行为:某源当天抓取失败时,`index.json` 会保留它最后一次成功的指向(可能落在前一天),客户端永远能拿到有效数据。
 
@@ -245,6 +249,7 @@ print(hn['items'][0]['title'])
       "daysActive": 9,
       "daily": [0, 3, 5, "...", 12],
       "trend": "up",
+      "rankChange": 2,
       "items": [
         {"title": "...", "url": "...", "source": "hackernews", "date": "2026-08-09"}
       ]
@@ -270,11 +275,31 @@ print(hn['items'][0]['title'])
 | `daysActive` | 窗口期活跃天数(当日命中 ≥1 即活跃) |
 | `daily` | 每日命中序列,与 `days` 对齐(sparkline 数据源) |
 | `trend` | 涨跌标记:`up` / `down` / `flat`(近 3 日命中和 vs 前 3 日) |
+| `rankChange` | 排名变化(较昨日最后一期榜单):正 = 上升 N 名、0 = 持平、负 = 下降。仅流水线有历史基准时输出(首期运行 / 基准归档缺失时整个字段不输出,App 不显示标记) |
+| `isNewEntry` | 新上榜标记(昨日最后一期不在榜),与 `rankChange` 互斥;同样仅在存在历史基准时输出 |
 | `items` | ≤3 条代表条目(日期新的优先,按 URL 去重,源尽量多样),每项含 `title`/`url`/`source`/`date` |
 
 **统计口径**:文本取自各源条目标题/简介(aihot-featured 优先 `titleEn`,stormzhang-ai 优先 `english` 并截掉 "PLUS:" 赞助尾巴);英文按 `[a-z0-9]+` 分词去停用词后取 unigram + 相邻 bigram,内置 AI 实体别名表做归一(GPT-5/OpenAI/Claude/千问 等);中文不分词,只对别名表内含 CJK 的词做子串匹配。
 
 **失败语义**:趋势生成失败不阻断推送,当次 `trends.json` 暂缺(下次运行自愈;趋势可从快照全量重算,无继承语义);文件完全缺失时 App 走「热词趋势尚未生成」空态。
+
+## 趋势历史归档(trends/ 目录 + trends_history.json 独立索引)
+
+`trends.json` 只保留最新一期,历史版本以**按日归档文件**留痕:趋势生成成功时,流水线把同一对象落盘到 `trends/<YYYY-MM-DD>/<HH-MM>-data.json`(北京时间),并在根级独立文件 `trends_history.json` 维护索引(结构与 `overview_history.json` 同构):
+
+```json
+{
+  "2026-08-15": "2026-08-15/18-00-data.json",
+  "2026-08-14": "2026-08-14/18-00-data.json"
+}
+```
+
+- **日期 → 当日最后一期榜单**:一天多批次(08:00 / 15:30 / 18:00)时索引取最后一次;当日趋势生成失败的批次不落归档(该日期沿用早批次指向)。
+- **保留最近 90 天指针**;旧归档目录只增不删,超出保留期的日期仅不再被索引指向。
+- **历史日期可追至 2026-08-10**(趋势功能上线日,更早无数据)。存量历史由 `backfill_trends.py` 从数据仓库 git 历史一次性回填(遍历每次提交的 `trends.json`,拆分前回退读 index.json 内联 `latest_trends`,按 `generatedAt` 去重)。
+- **relpath 相对 `trends/` 目录**,拼前缀后走 gitcode raw API(同 history / overview_history 消费方式)。
+- **归档文件内容与当期 `trends.json` 完全同构**(同一对象两处落盘)。
+- **用途**:① 每期 `rankChange` / `isNewEntry` 以「昨日最后一期」归档为基准计算(基准读取失败只是少这两个字段,不影响榜单本身);② 为后续热词历史浏览 / 长期演变分析预留(App 暂未读取该索引)。
 
 ## 单个数据文件的通用结构
 

@@ -6,6 +6,10 @@
 按「条目命中」做词频统计(一个词在一条条目中出现算 1 次,同日同条不重复计),
 产出一个热词榜(每日命中序列 + 涨跌 + 代表条目),写进根级独立文件
 `trends.json`(内容与原 index.json 内联 `latest_trends` 字段同构,整文件覆盖)。
+同时每批落一份按日归档 `trends/<date>/<HH-MM>-data.json`(根级索引
+`trends_history.json` 维护 {date: relpath},保留 90 天指针,旧归档目录只增不删),
+并基于「昨日最后一期」归档为每个热词附上排名变化字段 rankChange / isNewEntry
+(App 端显示 +N / -N / 持平 / 新上榜;无历史基准时不输出这两个字段)。
 
 挂载点:push_data.py 在 overlay 之后、git add 之前调用 write_trends(repo_dir)。
 选 push 阶段而非 fetch 阶段的原因:fetch 的 out/ 只有当天快照,而 push 阶段
@@ -52,6 +56,11 @@ TOP_KEYWORDS = 10           # 入榜热词数
 MIN_TOTAL = 3               # 窗口期总命中下限
 MIN_DAYS_ACTIVE = 2         # 窗口期活跃天数下限(有命中即算活跃)
 MAX_ITEMS_PER_KEYWORD = 3   # 每词代表条目上限
+
+# 趋势历史索引(trends_history.json)的指针保留天数。对齐总览归档
+# (fetch_data.OVERVIEW_RETENTION_DAYS)的 90 天档位:趋势归档每份仅十几 KB,
+# 多留价值高;旧归档目录只增不删,超出保留期的日期仅不再被索引指向。
+TRENDS_RETENTION_DAYS = 90
 
 # 英文停用词:标准停用词 + 标题高频填充词 + 领域泛词(ai/model 之类在 AI 资讯
 # 语境里无区分度,入榜只会霸榜)。
@@ -390,25 +399,119 @@ def generate_trends(repo_dir, now=None):
     }
 
 
+def _load_trends_history(repo_dir):
+    """读根级独立索引 trends_history.json:{date: relpath}(relpath 相对 trends/)。
+
+    缺失(首期运行)/损坏一律返回 {}(按「无历史」处理,不告警不阻断——
+    索引本来就是锦上添花,坏掉了下一批写回即自愈)。
+    """
+    try:
+        with open(os.path.join(repo_dir, "trends_history.json"), "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception:
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    return {d: p for d, p in data.items() if isinstance(d, str) and isinstance(p, str)}
+
+
+def attach_rank_changes(trends, repo_dir, today):
+    """
+    给榜单逐项附上排名变化字段(就地修改 trends["keywords"]):
+
+      基准 = 索引中日期早于 today 的最近一期归档(昨日最后一期;昨日无运行时
+      自动回退更早的最近一日。一天内多批共用同一基准,标记稳定不漂移)
+      - 上期在榜   → rankChange = 上期排名 - 新排名(正 = 上升)
+      - 上期不在榜 → isNewEntry = True(新上榜)
+      - 无历史基准 → 不附加任何字段(App 侧不显示标记)
+
+    必须在写入今日归档 / 更新索引**之前**调用(排除今日早批的干扰)。
+    返回基准日期(无可用基准时返回 None,供调用方日志)。
+    """
+    history = _load_trends_history(repo_dir)
+    baseline_date = max((d for d in history if d < today), default=None)
+    if baseline_date is None:
+        return None
+    try:
+        with open(os.path.join(repo_dir, "trends", history[baseline_date]),
+                  "r", encoding="utf-8") as f:
+            baseline = json.load(f)
+    except Exception as e:
+        print(f"[TRENDS] 读基准归档失败({baseline_date},不附加变化字段):"
+              f"{type(e).__name__}: {e}", file=sys.stderr)
+        return None
+    prev_ranks = {}
+    for i, kw in enumerate(baseline.get("keywords") or []):
+        term = kw.get("term") if isinstance(kw, dict) else None
+        if term:
+            prev_ranks[term] = i + 1
+    if not prev_ranks:
+        return None
+    for i, kw in enumerate(trends["keywords"]):
+        prev = prev_ranks.get(kw["term"])
+        if prev is None:
+            kw["isNewEntry"] = True
+        else:
+            kw["rankChange"] = prev - (i + 1)
+    return baseline_date
+
+
+def _write_trends_archive(repo_dir, trends, now):
+    """
+    写按日归档 trends/<date>/<HH-MM>-data.json(内容与根级 trends.json 相同),
+    并更新根级索引 trends_history.json:{date: relpath}(relpath 相对 trends/,
+    同日多批后写的覆盖指针,即索引始终指向当日最后一期)。
+
+    索引合并规则与 overview_history 同构:旧索引整体继承 + 今日覆盖 →
+    按日期倒序截前 TRENDS_RETENTION_DAYS 天(dict 保持插入序,写出可读)。
+    """
+    date = now.strftime("%Y-%m-%d")
+    rel = f"{date}/{now.strftime('%H-%M')}-data.json"
+    arc_path = os.path.join(repo_dir, "trends", *rel.split("/"))
+    os.makedirs(os.path.dirname(arc_path), exist_ok=True)
+    with open(arc_path, "w", encoding="utf-8") as f:
+        json.dump(trends, f, ensure_ascii=False, indent=2)
+        f.write("\n")
+    merged = _load_trends_history(repo_dir)
+    merged[date] = rel
+    keep = sorted(merged, reverse=True)[:TRENDS_RETENTION_DAYS]
+    with open(os.path.join(repo_dir, "trends_history.json"), "w", encoding="utf-8") as f:
+        json.dump({d: merged[d] for d in keep}, f, ensure_ascii=False, indent=2)
+        f.write("\n")
+
+
 def write_trends(repo_dir):
     """
     生成趋势并写根级独立文件 <repo_dir>/trends.json(整文件覆盖,内容与原
-    index.json 内联 `latest_trends` 字段同构)。
+    index.json 内联 `latest_trends` 字段同构),同时落一份按日归档并维护
+    trends_history.json 索引。
 
     任何失败只告警、返回 False,不抛异常——趋势是纯统计的锦上添花,
     不得阻断 push 主流程(对齐单源失败的降级哲学;文件暂缺时 App 走空态,
-    下次运行自愈。趋势可从快照全量重算,无继承语义)。
+    下次运行自愈。趋势可从快照全量重算,无继承语义)。归档/索引失败时根级
+    trends.json 已写入,仍视为成功;基准读取失败只是少 rankChange 字段。
     """
     try:
         trends = generate_trends(repo_dir)
         if trends is None:
             return False
+        now = now_cst()
+        today = now.strftime("%Y-%m-%d")
+        # 排名变化:先算基准,再写今日归档(否则会把今日早批当成基准)
+        baseline = attach_rank_changes(trends, repo_dir, today)
+        if baseline:
+            print(f"[TRENDS] 排名变化基准:{baseline} 最后一期")
         trends_path = os.path.join(repo_dir, "trends.json")
         with open(trends_path, "w", encoding="utf-8") as f:
             json.dump(trends, f, ensure_ascii=False, indent=2)
             f.write("\n")
         print(f"[TRENDS] 已写入 trends.json:{len(trends['keywords'])} 个热词,"
               f"窗口 {trends['days'][0]} ~ {trends['days'][-1]}")
+        try:
+            _write_trends_archive(repo_dir, trends, now)
+        except Exception as e:
+            print(f"[TRENDS] 历史归档失败(不阻断,trends.json 已写入):"
+                  f"{type(e).__name__}: {e}", file=sys.stderr)
         return True
     except Exception as e:
         print(f"[TRENDS] 生成失败(不阻断推送):{type(e).__name__}: {e}", file=sys.stderr)
@@ -426,11 +529,20 @@ def main():
     trends = generate_trends(args.repo_dir)
     if trends is None:
         return 1
+    # dry-run 也附上排名变化字段(纯读旧索引/归档,不写任何文件)
+    baseline = attach_rank_changes(trends, args.repo_dir, now_cst().strftime("%Y-%m-%d"))
     print(f"窗口:{trends['days'][0]} ~ {trends['days'][-1]}({trends['windowDays']} 天)")
+    print(f"排名变化基准:{baseline + ' 最后一期' if baseline else '无(不附加变化字段)'}")
     for i, kw in enumerate(trends["keywords"], 1):
         arrow = {"up": "↑", "down": "↓", "flat": "→"}[kw["trend"]]
+        if kw.get("isNewEntry"):
+            delta = "新上榜"
+        elif "rankChange" in kw:
+            delta = "持平" if kw["rankChange"] == 0 else f"{kw['rankChange']:+d}"
+        else:
+            delta = "--"
         print(f"  #{i} {kw['display']:<20} 总 {kw['total']:>3} 次 / "
-              f"{kw['daysActive']:>2} 天 {arrow}  daily={kw['daily']}")
+              f"{kw['daysActive']:>2} 天 {arrow} {delta:<4} daily={kw['daily']}")
         for it in kw["items"]:
             print(f"      - [{it['source']}] {it['date']} {it['title'][:50]}")
     if args.dry_run:
