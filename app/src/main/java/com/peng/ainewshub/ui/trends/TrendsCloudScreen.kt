@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.BubbleChart
+import androidx.compose.material.icons.outlined.Cyclone
 import androidx.compose.material.icons.outlined.HourglassEmpty
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -52,24 +54,27 @@ import com.peng.ainewshub.ui.ErrorState
 import com.peng.ainewshub.ui.UiState
 import com.peng.ainewshub.ui.components.AppTopBar
 import com.peng.ainewshub.ui.components.AppTopBarDefaults
-import com.peng.ainewshub.ui.components.SegmentedOptionRow
+import com.peng.ainewshub.ui.theme.AppAlpha
 import com.peng.ainewshub.ui.theme.AppText
+import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.hypot
 import kotlin.math.sin
+import kotlin.math.sqrt
 
 /**
- * 趋势词云页 —— 近窗口期热词的全景词云(趋势 Tab caption 行进入的二级页)。
+ * 趋势词云页 —— 近窗口期热词的全景可视化(趋势 Tab caption 行进入的二级页)。
  *
  * 数据走根级独立文件 `trends_cloud.json`(流水线与热词榜同批生成的纯统计
  * 词云候选 top ~60,专用数据文件,见 [TrendsCloudViewModel]);文件暂缺
  * (尚未生成)走空态,下次批次自愈。
  *
- * 布局支持多种形态(页面内分段按钮切换,瞬态偏好):Canvas +
- * [androidx.compose.ui.text.TextMeasurer] 自研排布 ——
- *  - 螺旋(默认):阿基米德螺线碰撞检测,大词先落位、天然居中,部分词竖排;
- *  - 圆环:同心圆环排布,大词内环、小词外环,逐字沿弧弯排(真实弧度,下半环
- *    自动翻转保持可读);
+ * 布局支持两种形态(顶栏右侧单图标按钮循环切换,瞬态偏好,不占正文空间):
+ * Canvas + [androidx.compose.ui.text.TextMeasurer] 自研排布 ——
+ *  - 螺旋(默认):阿基米德螺线碰撞词云([layoutSpiralCloud]),大词先落位、
+ *    天然居中,部分词竖排;
+ *  - 圆形气泡([layoutBubbleCloud]):词入圆形气泡(半径 ∝ √权重且不小于文字
+ *    所需),贪心正切链把气泡堆成紧致圆簇 —— 零重叠、零丢词、天然圆形轮廓;
  *  - 字号统一从 [AppText] 六档(caption→titleHero)按名次加权分档派生(头部少、
  *    尾部多的金字塔分布),不出现散落 sp 字面量,且随设置页字号档位整体缩放。
  *
@@ -83,6 +88,9 @@ fun TrendsCloudScreen(
     vm: TrendsCloudViewModel = viewModel()
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
+    // 布局模式为瞬态偏好(rememberSaveable,旋转/进程恢复不丢);上提到本层
+    // 以便顶栏图标按钮直接切换,图标随当前模式变化、点击循环到下一形态
+    var mode by rememberSaveable { mutableStateOf(CloudLayoutMode.SPIRAL) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
@@ -93,6 +101,20 @@ fun TrendsCloudScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
+                    }
+                },
+                actions = {
+                    if (state is UiState.Success) {
+                        IconButton(onClick = { mode = mode.next() }) {
+                            Icon(
+                                imageVector = if (mode == CloudLayoutMode.SPIRAL) {
+                                    Icons.Outlined.Cyclone
+                                } else {
+                                    Icons.Outlined.BubbleChart
+                                },
+                                contentDescription = stringResource(R.string.trends_cloud_switch_layout)
+                            )
+                        }
                     }
                 }
             )
@@ -120,7 +142,7 @@ fun TrendsCloudScreen(
                         title = stringResource(R.string.trends_cloud_load_failed)
                     )
                 }
-                is UiState.Success -> TrendsCloudContent(digest = s.data)
+                is UiState.Success -> TrendsCloudContent(digest = s.data, mode = mode)
             }
         }
     }
@@ -149,14 +171,10 @@ private fun TrendsCloudLoading() {
     }
 }
 
-/**
- * 词云内容:顶部时效 caption(与趋势 Tab 同词条)+ 布局切换器 + 词云画布 +
- * 生成时间页脚。布局模式为瞬态偏好(rememberSaveable,旋转/进程恢复不丢)。
- */
+/** 词云内容:顶部时效 caption(与趋势 Tab 同词条)+ 词云画布 + 生成时间页脚。 */
 @Composable
-private fun TrendsCloudContent(digest: TrendsCloudDigest) {
+private fun TrendsCloudContent(digest: TrendsCloudDigest, mode: CloudLayoutMode) {
     val context = LocalContext.current
-    var mode by rememberSaveable { mutableStateOf(CloudLayoutMode.SPIRAL) }
     Column(modifier = Modifier.fillMaxSize()) {
         Text(
             text = stringResource(
@@ -167,16 +185,6 @@ private fun TrendsCloudContent(digest: TrendsCloudDigest) {
             style = AppText.caption,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)
-        )
-        // 布局切换(螺旋/圆环):MD3 单选分段按钮,选项文案顺序与枚举一致
-        SegmentedOptionRow(
-            options = listOf(
-                stringResource(R.string.trends_cloud_mode_spiral),
-                stringResource(R.string.trends_cloud_mode_circle)
-            ),
-            selectedIndex = mode.ordinal,
-            onSelect = { mode = CloudLayoutMode.entries[it] },
-            modifier = Modifier.padding(horizontal = 18.dp)
         )
         WordCloudCanvas(
             words = digest.words,
@@ -202,6 +210,7 @@ private fun TrendsCloudContent(digest: TrendsCloudDigest) {
 /**
  * 词云画布:BoxWithConstraints 拿到可用像素尺寸后一次性算好全部落位
  * (remember 缓存,数据 / 布局模式 / 尺寸 / 字号档变化才重排),Canvas 只负责描画。
+ * 两种布局模式共用字号分档与配色映射,仅排布引擎与绘制路径不同。
  */
 @Composable
 private fun WordCloudCanvas(
@@ -219,68 +228,108 @@ private fun WordCloudCanvas(
         )
         val widthPx = with(density) { maxWidth.toPx() }
         val heightPx = with(density) { maxHeight.toPx() }
-        val placed = remember(words, mode, widthPx, heightPx, tierStyles, density) {
-            with(density) {
-                layoutWordCloud(
-                    mode = mode,
-                    measurer = measurer,
-                    words = words,
-                    canvasWidth = widthPx,
-                    canvasHeight = heightPx,
-                    tierStyles = tierStyles,
-                    wordGapPx = 5.dp.toPx(),
-                    edgeMarginPx = 4.dp.toPx(),
-                    spiralPitchPx = 2.5.dp.toPx()
-                )
-            }
-        }
-        // 颜色按档位映射(只走 colorScheme):最大词 primary 强调,次档中性主文,
-        // 中档 tertiary/secondary 轮换,最小两档弱化 —— 尺寸与色彩同层级语义
-        val cs = MaterialTheme.colorScheme
-        val tierColors = listOf(
-            cs.primary, cs.onSurface, cs.tertiary, cs.secondary,
-            cs.onSurfaceVariant, cs.onSurfaceVariant
-        )
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            placed.forEach { word ->
-                val color = tierColors[word.tier]
-                word.glyphs.forEach { g ->
-                    // 落位以字心记录,描画换算回左上角;非零旋转角绕字心转正
-                    val topLeft = Offset(
-                        g.center.x - g.layout.size.width / 2f,
-                        g.center.y - g.layout.size.height / 2f
+        // 颜色走词云专用调色板(CloudWordColors.kt,hex 集中例外,不走 colorScheme):
+        // 字号档定色相(蓝/橙/绿/紫/玫红/青灰),落位序号定明暗变体 —— 尺寸与色彩同层级语义
+        val tierColors = cloudTierColors()
+        if (mode == CloudLayoutMode.SPIRAL) {
+            val placed = remember(words, widthPx, heightPx, tierStyles, density) {
+                with(density) {
+                    layoutSpiralCloud(
+                        measurer = measurer,
+                        words = words,
+                        canvasWidth = widthPx,
+                        canvasHeight = heightPx,
+                        tierStyles = tierStyles,
+                        wordGapPx = 5.dp.toPx(),
+                        edgeMarginPx = 4.dp.toPx(),
+                        spiralPitchPx = 2.5.dp.toPx()
                     )
-                    if (g.rotationDeg != 0f) {
-                        rotate(degrees = g.rotationDeg, pivot = g.center) {
-                            drawText(g.layout, color = color, topLeft = topLeft)
+                }
+            }
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                placed.forEach { word ->
+                    val color = tierColors[word.tier][word.shade]
+                    // 落位以词心记录,描画换算回左上角;竖排词绕词心转正
+                    val topLeft = Offset(
+                        word.center.x - word.layout.size.width / 2f,
+                        word.center.y - word.layout.size.height / 2f
+                    )
+                    if (word.rotationDeg != 0f) {
+                        rotate(degrees = word.rotationDeg, pivot = word.center) {
+                            drawText(word.layout, color = color, topLeft = topLeft)
                         }
                     } else {
-                        drawText(g.layout, color = color, topLeft = topLeft)
+                        drawText(word.layout, color = color, topLeft = topLeft)
                     }
+                }
+            }
+        } else {
+            val bubbles = remember(words, widthPx, heightPx, tierStyles, density) {
+                with(density) {
+                    layoutBubbleCloud(
+                        measurer = measurer,
+                        words = words,
+                        canvasWidth = widthPx,
+                        canvasHeight = heightPx,
+                        tierStyles = tierStyles,
+                        bubbleGapPx = 3.dp.toPx(),
+                        edgeMarginPx = 4.dp.toPx()
+                    )
+                }
+            }
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                bubbles.forEach { b ->
+                    val color = tierColors[b.tier][b.shade]
+                    // 气泡底走分档色弱化档(徽章/药丸同款透明度),文字全透明压底,
+                    // 相邻气泡靠档位色差区分,不加描边保持干净
+                    drawCircle(
+                        color = color,
+                        alpha = AppAlpha.badgeOverlay,
+                        radius = b.radius,
+                        center = b.center
+                    )
+                    drawText(
+                        b.layout,
+                        color = color,
+                        topLeft = Offset(
+                            b.center.x - b.layout.size.width / 2f,
+                            b.center.y - b.layout.size.height / 2f
+                        )
+                    )
                 }
             }
         }
     }
 }
 
-/** 单个字形的落位:测量布局 + 中心点 + 旋转角(度;0 = 正立)。 */
-private data class CloudGlyph(
-    val layout: TextLayoutResult,
-    val center: Offset,
-    val rotationDeg: Float
-)
-
 /**
- * 词云词条落位结果:一个词的全部字形 + 字号档(档位决定颜色)。
- * 螺旋模式整词一个字形;圆环模式逐字沿弧弯排,每字一个字形。
+ * 词云词条落位结果(螺旋模式):整词一次测量布局 + 词心位置 +
+ * 旋转角(度;0 = 正立)+ 字号档与明暗变体序号(两者共同决定调色板取色)。
  */
 private data class PlacedCloudWord(
-    val glyphs: List<CloudGlyph>,
-    val tier: Int
+    val layout: TextLayoutResult,
+    val center: Offset,
+    val rotationDeg: Float,
+    val tier: Int,
+    val shade: Int
 )
 
-/** 词云布局模式:螺旋散布(默认)与圆环弧排;新增形态在此扩展一枚即可接入切换器。 */
-private enum class CloudLayoutMode { SPIRAL, CIRCLE }
+/** 气泡落位结果(圆形气泡模式):文字布局(字号可能已随整体缩放)+ 圆心 + 半径 + 字号档与明暗变体序号。 */
+private data class PlacedBubbleWord(
+    val layout: TextLayoutResult,
+    val center: Offset,
+    val radius: Float,
+    val tier: Int,
+    val shade: Int
+)
+
+/** 词云布局模式:螺旋散布(默认,词填满矩形画布)与圆形气泡(词入泡、泡堆成圆簇);新增形态在此扩展一枚即可接入顶栏切换。 */
+private enum class CloudLayoutMode {
+    SPIRAL, CIRCLE;
+
+    /** 循环切换到下一形态(顶栏单图标按钮,两态互切)。 */
+    fun next(): CloudLayoutMode = entries[(ordinal + 1) % entries.size]
+}
 
 /**
  * 字号档分界(名次占比的累计边界):头部少、尾部多的金字塔分布——60 词时约
@@ -295,29 +344,7 @@ private fun tierIndexFor(rank: Int, count: Int): Int {
 }
 
 /**
- * 词云排布统一入口(按 [CloudLayoutMode] 分发,纯函数便于 remember 缓存):
- *  - 螺旋([layoutSpiralCloud]):阿基米德螺线 + AABB 碰撞,大词先落位居中;
- *  - 圆环([layoutRingCloud]):同心圆环逐字沿弧弯排,大词内环小词外环,几何无重叠。
- */
-private fun layoutWordCloud(
-    mode: CloudLayoutMode,
-    measurer: TextMeasurer,
-    words: List<TrendCloudWord>,
-    canvasWidth: Float,
-    canvasHeight: Float,
-    tierStyles: List<TextStyle>,
-    wordGapPx: Float,
-    edgeMarginPx: Float,
-    spiralPitchPx: Float
-): List<PlacedCloudWord> = when (mode) {
-    CloudLayoutMode.SPIRAL ->
-        layoutSpiralCloud(measurer, words, canvasWidth, canvasHeight, tierStyles, wordGapPx, edgeMarginPx, spiralPitchPx)
-    CloudLayoutMode.CIRCLE ->
-        layoutRingCloud(measurer, words, canvasWidth, canvasHeight, tierStyles, wordGapPx, edgeMarginPx)
-}
-
-/**
- * 阿基米德螺线词云排布。
+ * 阿基米德螺线词云排布(螺旋模式)。
  *
  * 每个词沿螺线 r = pitch·θ 逐点试探(θ 步进 0.12rad):候选位置的 AABB
  * (含词间距 padding;竖排交换宽高)不与已放盒子重叠、且在画布边距内即落位,
@@ -345,6 +372,7 @@ private fun layoutSpiralCloud(
     val ranked = words.sortedByDescending { it.total }
     val placed = mutableListOf<PlacedCloudWord>()
     val boxes = mutableListOf<Rect>()
+    val tierPlaced = IntArray(tierStyles.size)  // 各档已放词数,取 % 2 定明暗变体交替
     ranked.forEachIndexed { rank, word ->
         val tier = tierIndexFor(rank, ranked.size)
         val layout = measurer.measure(word.display, tierStyles[tier])
@@ -374,15 +402,13 @@ private fun layoutSpiralCloud(
                 boxes.any { it.overlaps(box) }
             if (!collides) {
                 placed += PlacedCloudWord(
-                    glyphs = listOf(
-                        CloudGlyph(
-                            layout = layout,
-                            center = Offset(x, y),
-                            rotationDeg = if (vertical) 90f else 0f
-                        )
-                    ),
-                    tier = tier
+                    layout = layout,
+                    center = Offset(x, y),
+                    rotationDeg = if (vertical) 90f else 0f,
+                    tier = tier,
+                    shade = tierPlaced[tier] % 2
                 )
+                tierPlaced[tier]++
                 boxes += box
                 break
             }
@@ -392,125 +418,153 @@ private fun layoutSpiralCloud(
     return placed
 }
 
-/** 弧度转度(绕过 kotlin.math 的 Double 版本,保持 Float 运算)。 */
-private const val RAD_TO_DEG = 57.29578f
-
-/** 圆环模式单字弯排的最大弧度(≈172°):词心居中时两端不越过水平线,不出现倒立字。 */
-private const val RING_ARC_CAP = 3.0f
-
-/** 圆环模式的词用料:逐字测量布局 + 弧长(Σ字宽 + 字距)+ 最大字高。 */
-private class RingWord(
-    val tier: Int,
-    val chars: List<TextLayoutResult>,
-    val arcPx: Float,
-    val maxCharH: Float
-)
-
 /**
- * 圆环词云排布:词条按分值序填入同心圆环 —— 大词在内环、小词外环,每个词
- * **拆成单字沿环弧逐字弯排**(每字按自身在弧上的位置独立旋转,带真实弧度,
- * 而非整词切线平移),上半环顺弧上凸、下半环翻转 180° 顺弧下垂,字始终不倒立。
+ * 圆形气泡排布(贪心正切链打包,~60 个气泡的规模足够,d3.pack 同款思路的简化版)。
  *
- * 无碰撞检测:环内按「词弧长 + 间隙」占角累计装环(留 8% 呼吸),剩余角均摊
- * 到词间隙;环距按上一环最大字高外移,几何上环内环间天然不重叠。单词弯排弧
- * 度超 [RING_ARC_CAP] 时:空环先扩环半径再装,非空环则封环把词留给更外环;
- * 扩到可用半径仍放不下则丢弃。起始角随环序交错(TAU/6 步进)避免各环词径向
- * 对齐;外环超出可用半径后剩余词丢弃(与螺线一致,丢弃集中在最小的词)。
+ * 词按分值降序:气泡半径 = max(权重半径, 文字所需半径) —— 权重半径按
+ * r ∝ √total(面积 ∝ 权重)在短边 10%~34% 间映射;文字所需半径取文字对角一半
+ * 加内留白,长词低分也装得下,**零丢词**。每个新气泡放在「与已放任意两气泡
+ * 同时相切」的候选点中离圆心最近者(不与任何已放气泡重叠),得到紧致的近圆
+ * 形簇;簇超出画布时整体等比缩放(字号同步缩小重测,文字仍装得进气泡)。
+ * 相切候选全灭的极端情况走螺线兜底,理论上不可达的失败才丢词。
  */
-private fun layoutRingCloud(
+private fun layoutBubbleCloud(
     measurer: TextMeasurer,
     words: List<TrendCloudWord>,
     canvasWidth: Float,
     canvasHeight: Float,
     tierStyles: List<TextStyle>,
-    wordGapPx: Float,
+    bubbleGapPx: Float,
     edgeMarginPx: Float
-): List<PlacedCloudWord> {
+): List<PlacedBubbleWord> {
     if (words.isEmpty() || canvasWidth <= 0f || canvasHeight <= 0f) return emptyList()
+    val availR = minOf(canvasWidth, canvasHeight) / 2f - edgeMarginPx
+    if (availR <= 0f) return emptyList()
+    val ranked = words.sortedByDescending { it.total }
+
+    /** 打包中的气泡:圆心随打包推进写入。 */
+    class Bubble(
+        val display: String,
+        val tier: Int,
+        val layout: TextLayoutResult,
+        val r: Float
+    ) {
+        var x = 0f
+        var y = 0f
+        var shade = 0
+    }
+
+    // 权重半径:面积 ∝ 权重 → r ∝ √total,首末半径锚定可用半径的 34% / 10%
+    val maxTotal = ranked.first().total.toFloat()
+    val minTotal = ranked.last().total.toFloat()
+    val span = maxTotal - minTotal
+    fun weightRadius(total: Int): Float {
+        val t = if (span <= 0f) 1f else ((total.toFloat() - minTotal) / span).coerceIn(0f, 1f)
+        return availR * (0.10f + 0.24f * sqrt(t))
+    }
+    val bubbles = ranked.mapIndexed { rank, w ->
+        val tier = tierIndexFor(rank, ranked.size)
+        val layout = measurer.measure(w.display, tierStyles[tier])
+        // 文字所需半径:对角一半 + 12% 内留白,保证文字完整落在气泡内
+        val textR = hypot(layout.size.width.toFloat(), layout.size.height.toFloat()) * 0.56f
+        Bubble(w.display, tier, layout, maxOf(weightRadius(w.total), textR))
+    }
+
+    val placedCircles = mutableListOf<Bubble>()
+    val tierPlaced = IntArray(tierStyles.size)  // 各档已放词数,取 % 2 定明暗变体交替
+    /** 候选点是否与已放气泡全部无重叠(留 0.5px 浮点余量)。 */
+    fun fits(px: Float, py: Float, r: Float): Boolean =
+        placedCircles.none { hypot(px - it.x, py - it.y) + 0.5f < it.r + r + bubbleGapPx }
+
+    bubbles.forEach { b ->
+        // 候选点:与已放任意两气泡同时相切的圆交点,取离圆心最近的有效者
+        var bestX = Float.NaN
+        var bestY = Float.NaN
+        var bestD = Float.MAX_VALUE
+        for (i in placedCircles.indices) {
+            for (j in i + 1 until placedCircles.size) {
+                val a = placedCircles[i]
+                val c = placedCircles[j]
+                val ra = a.r + b.r + bubbleGapPx
+                val rc = c.r + b.r + bubbleGapPx
+                val dx = c.x - a.x
+                val dy = c.y - a.y
+                val d = hypot(dx, dy)
+                if (d >= ra + rc || d <= abs(ra - rc) || d == 0f) continue
+                val along = (ra * ra - rc * rc + d * d) / (2f * d)
+                val h2 = ra * ra - along * along
+                if (h2 <= 0f) continue
+                val h = sqrt(h2)
+                val mx = a.x + along * dx / d
+                val my = a.y + along * dy / d
+                val ox = -dy / d * h
+                val oy = dx / d * h
+                for (sign in intArrayOf(1, -1)) {
+                    val px = mx + ox * sign
+                    val py = my + oy * sign
+                    val dc = hypot(px, py)
+                    if (dc < bestD && fits(px, py, b.r)) {
+                        bestD = dc
+                        bestX = px
+                        bestY = py
+                    }
+                }
+            }
+        }
+        when {
+            // 首词(最大)居中
+            placedCircles.isEmpty() -> {
+                bestX = 0f
+                bestY = 0f
+            }
+            // 只有 1 个已放气泡时无交点对:直接放其右侧相切(距圆心最近等价)
+            placedCircles.size == 1 -> {
+                val a = placedCircles.first()
+                bestX = a.x + a.r + b.r + bubbleGapPx
+                bestY = a.y
+            }
+            // 相切候选全灭(极端):沿螺线外扩找最近空位兜底
+            bestX.isNaN() -> {
+                var theta = 0f
+                while (theta < 628f) {
+                    val rr = bubbleGapPx * 2f * theta
+                    val px = rr * cos(theta)
+                    val py = rr * sin(theta)
+                    if (fits(px, py, b.r)) {
+                        bestX = px
+                        bestY = py
+                        break
+                    }
+                    theta += 0.2f
+                }
+            }
+        }
+        if (bestX.isNaN()) return@forEach  // 兜底失败才丢词(理论上不可达)
+        b.shade = tierPlaced[b.tier] % 2
+        tierPlaced[b.tier]++
+        b.x = bestX
+        b.y = bestY
+        placedCircles += b
+    }
+    if (placedCircles.isEmpty()) return emptyList()
+    // 整体等比缩放进画布(打包是齐次的,缩放不产生重叠);字号同步缩小重测,
+    // 文字尺寸随字号近似线性缩放,仍装得进气泡
+    val clusterR = placedCircles.maxOf { hypot(it.x, it.y) + it.r }
+    val s = minOf(1f, availR / clusterR)
     val cx = canvasWidth / 2f
     val cy = canvasHeight / 2f
-    // 圆环必须整体落进画布:外缘 = 半径 + 字高一半,不超出短边的一半(扣边距)
-    val maxR = minOf(cx, cy) - edgeMarginPx
-    if (maxR <= 0f) return emptyList()
-    val tau = (2.0 * Math.PI).toFloat()
-    val track = wordGapPx * 0.4f  // 弯排字距(小于词间隙,弧上观感更透气)
-    val ranked = words.sortedByDescending { it.total }
-    // 预量逐字布局:按 code point 拆字(防代理对截断),单字测量丢 kerning 可接受
-    val items = ranked.mapIndexed { rank, w ->
-        val tier = tierIndexFor(rank, ranked.size)
-        val style = tierStyles[tier]
-        val chars = mutableListOf<TextLayoutResult>()
-        var idx = 0
-        while (idx < w.display.length) {
-            val cp = w.display.codePointAt(idx)
-            chars += measurer.measure(String(Character.toChars(cp)), style)
-            idx += Character.charCount(cp)
+    return placedCircles.map { b ->
+        val layout = if (s >= 0.999f) {
+            b.layout
+        } else {
+            measurer.measure(b.display, tierStyles[b.tier].copy(fontSize = tierStyles[b.tier].fontSize * s))
         }
-        val arc = chars.sumOf { it.size.width.toDouble() }.toFloat() +
-            track * (chars.size - 1).coerceAtLeast(0)
-        RingWord(tier, chars, arc, chars.maxOf { it.size.height.toFloat() })
+        PlacedBubbleWord(
+            layout = layout,
+            center = Offset(cx + b.x * s, cy + b.y * s),
+            radius = b.r * s,
+            tier = b.tier,
+            shade = b.shade
+        )
     }
-    val result = mutableListOf<PlacedCloudWord>()
-    var ringR = maxR * 0.30f
-    var ringIndex = 0
-    var i = 0
-    while (i < items.size) {
-        // 收集本环词条:占角累计到 92% 圆周封环;弯排弧度超限时空环扩半径、
-        // 非空环封环(词留给更外环)
-        val ring = mutableListOf<RingWord>()
-        var usedAngle = 0f
-        var ringMaxH = 0f
-        while (i < items.size) {
-            val cand = items[i]
-            val padded = cand.arcPx + wordGapPx * 2f
-            if (padded / ringR > RING_ARC_CAP) {
-                if (ring.isEmpty()) {
-                    val needR = padded / RING_ARC_CAP
-                    if (needR + cand.maxCharH > maxR) {
-                        i++  // 扩到头仍放不下,丢弃(多为无实体信息量的超长词)
-                        continue
-                    }
-                    ringR = needR
-                } else break
-            }
-            val angW = padded / ringR
-            if (ring.isNotEmpty() && usedAngle + angW > tau * 0.92f) break
-            ring += cand
-            usedAngle += angW
-            ringMaxH = maxOf(ringMaxH, cand.maxCharH)
-            i++
-        }
-        if (ring.isEmpty()) break
-        // 环内均匀分布:剩余角均摊为额外间隙,词心落在自身占角中央;逐字沿弧
-        // 弯排 —— 上半环字心角递增(θ+90° 正立),下半环递减(θ-90° 翻转正立)
-        val extra = ((tau - usedAngle).coerceAtLeast(0f)) / ring.size
-        var theta = ringIndex * (tau / 6f)
-        ring.forEach { cand ->
-            val padded = cand.arcPx + wordGapPx * 2f
-            val angW = padded / ringR
-            val centerTheta = theta + angW / 2f
-            val topSide = sin(centerTheta) < 0f
-            val charsArcAng = cand.arcPx / ringR
-            var a = if (topSide) centerTheta - charsArcAng / 2f else centerTheta + charsArcAng / 2f
-            val glyphs = cand.chars.map { c ->
-                val halfAng = (c.size.width / 2f) / ringR
-                if (topSide) a += halfAng else a -= halfAng
-                val g = CloudGlyph(
-                    layout = c,
-                    center = Offset(cx + ringR * cos(a), cy + ringR * sin(a)),
-                    rotationDeg = (if (topSide) a + tau / 4f else a - tau / 4f) * RAD_TO_DEG
-                )
-                if (topSide) a += halfAng + track / ringR else a -= halfAng + track / ringR
-                g
-            }
-            result += PlacedCloudWord(glyphs = glyphs, tier = cand.tier)
-            theta += angW + extra
-        }
-        // 下一环:外移一整个本环最大字高 + 双倍间隙;外缘放不下则丢弃剩余词
-        ringR += ringMaxH + wordGapPx * 2f
-        val nextH = items.getOrNull(i)?.maxCharH?.div(2f) ?: 0f
-        if (i < items.size && ringR + nextH > maxR) break
-        ringIndex++
-    }
-    return result
 }
