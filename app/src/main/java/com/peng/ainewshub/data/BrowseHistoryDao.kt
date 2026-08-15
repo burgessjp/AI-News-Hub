@@ -46,4 +46,11 @@ interface BrowseHistoryDao {
     /** 历史总数(顶栏计数 / 空态判断备用)。 */
     @Query("SELECT COUNT(*) FROM browse_history")
     fun observeCount(): Flow<Int>
+
+    /**
+     * 全部已访问 URL(列表「已读」判定用)。整表只取 url 列,量级万级以内,
+     * 一次取回转 Set 供各列表 O(1) 查询;Flow 保证打开文章后返回列表即自动弱化。
+     */
+    @Query("SELECT url FROM browse_history")
+    fun observeAllUrls(): Flow<List<String>>
 }

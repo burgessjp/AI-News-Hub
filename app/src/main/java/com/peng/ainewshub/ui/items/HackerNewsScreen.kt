@@ -48,6 +48,8 @@ import com.peng.ainewshub.ui.components.RowDividerIfNeeded
 import com.peng.ainewshub.ui.components.SourceListScaffold
 import com.peng.ainewshub.ui.components.updateTimeHeader
 import com.peng.ainewshub.ui.components.formatRelativeTime
+import com.peng.ainewshub.ui.components.rememberReadUrls
+import com.peng.ainewshub.ui.theme.AppAlpha
 import com.peng.ainewshub.ui.theme.AppText
 import androidx.compose.material3.ExperimentalMaterial3Api
 
@@ -85,6 +87,9 @@ fun HackerNewsScreen(
     val config by vm.configFlow.collectAsStateWithLifecycle(initialValue = AiConfig())
     val snackbarHostState = remember { SnackbarHostState() }
 
+    // 已读判定(打开 URL 命中浏览历史):驱动行内标题弱化
+    val readUrls = rememberReadUrls()
+
     // 配置未就绪提示:点「译」后若 state 变成 CONFIG_MISSING,弹一次引导
     TranslateConfigMissingEffect(titleStates, snackbarHostState, onOpenSettings)
 
@@ -106,7 +111,9 @@ fun HackerNewsScreen(
                 translateEnabled = config.translateEnabled,
                 translationState = titleStates[story.id.toString()] ?: TranslationState.Idle,
                 onClick = { onOpenComments(story) },
-                onTranslate = { vm.translateTitle(story) }
+                onTranslate = { vm.translateTitle(story) },
+                // 已读 = 行点击打开的目标链接(url 空则站内讨论页)命中浏览历史
+                isRead = story.targetUrl in readUrls
             )
             RowDividerIfNeeded(index, stories.size)
         }
@@ -121,6 +128,7 @@ fun HackerNewsScreen(
  *  2. 作者 · 相对时间 · 得票 · 评论(单行,作者主色强调,其余弱色)
  *
  * @param rank 1 起的序号,徽章配色由 [RankBadge] 统一分档。
+ * @param isRead 已读(打开 URL 命中浏览历史)时标题降透明弱化
  */
 @Composable
 private fun HackerNewsRow(
@@ -129,7 +137,8 @@ private fun HackerNewsRow(
     translateEnabled: Boolean,
     translationState: TranslationState,
     onClick: () -> Unit,
-    onTranslate: () -> Unit
+    onTranslate: () -> Unit,
+    isRead: Boolean = false
 ) {
     val cs = MaterialTheme.colorScheme
     var titleCollapsed by remember { mutableStateOf(false) }
@@ -167,7 +176,7 @@ private fun HackerNewsRow(
                     text = titleAnnotated,
                     style = AppText.titleCompact,
                     fontWeight = FontWeight.SemiBold,
-                    color = cs.onSurface,
+                    color = if (isRead) cs.onSurface.copy(alpha = AppAlpha.readDim) else cs.onSurface,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)

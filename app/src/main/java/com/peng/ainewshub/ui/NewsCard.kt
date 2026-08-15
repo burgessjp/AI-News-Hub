@@ -54,14 +54,19 @@ import java.time.temporal.ChronoUnit
  *      底部行:精选标记 + 来源 · 分类(onSurfaceVariant 降层级)
  *
  *  - 左右 18dp / 上下 12dp 留白,行间无卡片描边,依靠列表分隔线区分
+ *  - [isRead] 已读过(该条目任一打开 URL 命中浏览历史):标题与时间栏降透明弱化,
+ *    由调用方以 rememberReadUrls() 判定后传入;默认 false 保持原样
  */
 @Composable
 fun NewsCard(
     item: NewsItem,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isRead: Boolean = false
 ) {
     val cs = MaterialTheme.colorScheme
+    // 已读弱化色:标题与时间栏共用(副行本就是 onSurfaceVariant,无需再弱化)
+    val titleColor = if (isRead) cs.onSurface.copy(alpha = AppAlpha.readDim) else cs.onSurface
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -82,7 +87,7 @@ fun NewsCard(
             Text(
                 text = time,
                 style = MaterialTheme.typography.labelMedium,
-                color = cs.onSurface.copy(alpha = AppAlpha.primaryEmphasis),
+                color = if (isRead) titleColor else cs.onSurface.copy(alpha = AppAlpha.primaryEmphasis),
                 fontWeight = FontWeight.Medium,
                 modifier = Modifier.alignByBaseline()
             )
@@ -101,7 +106,7 @@ fun NewsCard(
                         text = item.title,
                         // titleItem 档位本身即 SemiBold,不再显式覆盖字重
                         style = AppText.titleItem,
-                        color = cs.onSurface,
+                        color = titleColor,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f)

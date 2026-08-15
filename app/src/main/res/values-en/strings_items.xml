@@ -38,6 +38,10 @@
 
     <!-- ===== Items list ===== -->
     <string name="items_category_all">All</string>
+    <!-- Read/unread: trailing filter chip + filtered-empty state -->
+    <string name="items_unread_only">Unread only</string>
+    <string name="items_no_unread">You\'re all caught up</string>
+    <string name="items_no_unread_subtitle">Everything in this list has been read — try another category</string>
     <string name="items_refresh_hint_button">Tap the button below to refresh</string>
     <string name="items_try_other_keyword">Try a different keyword</string>
     <string name="items_open">Open</string>

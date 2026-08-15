@@ -42,6 +42,7 @@ import com.peng.ainewshub.ui.components.RankBadge
 import com.peng.ainewshub.ui.components.SourceListScaffold
 import com.peng.ainewshub.ui.components.RowDividerIfNeeded
 import com.peng.ainewshub.ui.components.updateTimeHeader
+import com.peng.ainewshub.ui.components.rememberReadUrls
 import com.peng.ainewshub.ui.theme.AppAlpha
 import com.peng.ainewshub.ui.theme.AppText
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -76,6 +77,9 @@ fun StormzhangAiNewsScreen(
     val isRefreshing by vm.isRefreshing.collectAsStateWithLifecycle()
     val pageDate by vm.pageDate.collectAsStateWithLifecycle()
 
+    // 已读判定(打开 URL 命中浏览历史):驱动行内主文本弱化
+    val readUrls = rememberReadUrls()
+
     SourceListScaffold(
         title = stringResource(R.string.source_title_stormzhang),
         onBack = onBack,
@@ -98,7 +102,12 @@ fun StormzhangAiNewsScreen(
         val news = (state as UiState.Success).data
         updateTimeHeader(sourceMode, lastRefreshAt)
         itemsIndexed(items = news, key = { _, item -> item.url }) { index, item ->
-            AiNewsRow(item = item, onClick = { onOpenUrl(item.url, item.summary) })
+            // 已读 = 打开过的原文 URL 命中浏览历史(该源无标题,弱化中文摘要主文本)
+            AiNewsRow(
+                item = item,
+                onClick = { onOpenUrl(item.url, item.summary) },
+                isRead = item.url in readUrls
+            )
             RowDividerIfNeeded(index, news.size)
         }
     }
@@ -113,11 +122,13 @@ fun StormzhangAiNewsScreen(
  *  3. meta:信源徽章(描边小标签,primary 色)+ 发布时间(弱色)
  *
  * @param item 资讯数据(rank 即为页面排名)
+ * @param isRead 已读(打开 URL 命中浏览历史)时主文本(中文摘要)降透明弱化
  */
 @Composable
 private fun AiNewsRow(
     item: StormzhangAiNews,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    isRead: Boolean = false
 ) {
     val cs = MaterialTheme.colorScheme
     Row(
@@ -141,7 +152,7 @@ private fun AiNewsRow(
                 text = item.summary,
                 style = AppText.titleCompact,
                 fontWeight = FontWeight.SemiBold,
-                color = cs.onSurface,
+                color = if (isRead) cs.onSurface.copy(alpha = AppAlpha.readDim) else cs.onSurface,
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis
             )

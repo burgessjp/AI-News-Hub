@@ -20,6 +20,7 @@ package com.peng.ainewshub.ui.theme
  *  - [chipOverlay]:      标签 chip 弱化底                    0.60f
  *  - [badgeOutline]:     徽章同色描边                        0.20f
  *  - [neutralOverlay]:   中性灰弱化底                        0.20f
+ *  - [readDim]:          已读条目标题弱化                    0.55f
  */
 object AppAlpha {
     /** primary 弱化 —— 用于 primary 色文字弱化、渐变终点。
@@ -64,4 +65,8 @@ object AppAlpha {
     /** 中性灰弱化底 —— 中性灰图标块底色;灰度饱和度低,需比彩色档([badgeOverlay])
      *  更高的 alpha 才不显寡淡。与 [badgeOutline] 同值不合档(底色 vs 描边)。 */
     const val neutralOverlay: Float = 0.20f
+
+    /** 已读弱化 —— 列表条目标题「已读过」的降透明:足以一眼区分已读/未读,
+     *  又保持可读(不与 onSurfaceVariant 副行文字混同)。 */
+    const val readDim: Float = 0.55f
 }

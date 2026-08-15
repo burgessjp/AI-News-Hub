@@ -47,6 +47,10 @@
     <!-- ===== 动态列表 ===== -->
     <!-- 分类 chip「全部」 -->
     <string name="items_category_all">全部</string>
+    <!-- 已读/未读:行尾过滤 chip 与过滤后空态 -->
+    <string name="items_unread_only">只看未读</string>
+    <string name="items_no_unread">没有未读内容了</string>
+    <string name="items_no_unread_subtitle">本列表的内容都已读过，换个分类看看</string>
     <!-- 非搜索空态副行(common_refresh_hint 的无「下拉」变体) -->
     <string name="items_refresh_hint_button">点下方按钮刷新看看</string>
     <!-- 搜索无结果的恢复提示(动态列表与搜索页共用) -->

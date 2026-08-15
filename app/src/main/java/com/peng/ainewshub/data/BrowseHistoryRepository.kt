@@ -2,6 +2,7 @@ package com.peng.ainewshub.data
 
 import android.net.Uri
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 
 /**
  * 浏览历史仓库 —— 对 [BrowseHistoryDao] 的薄封装,负责记录时机的领域逻辑:
@@ -72,6 +73,13 @@ class BrowseHistoryRepository(private val dao: BrowseHistoryDao) {
 
     /** 历史总数流(顶栏计数 / 空态判断备用)。 */
     fun observeCount(): Flow<Int> = dao.observeCount()
+
+    /**
+     * 已读 URL 集合(列表「已读/未读」判定):浏览历史在 openUrl 唯一入口记录,
+     * 「URL 在集合中」即天然已读状态,无需独立已读表。Room Flow 自动推送 ——
+     * 打开文章返回列表后弱化即时生效;删除单条历史 = 恢复未读。
+     */
+    fun observeReadUrls(): Flow<Set<String>> = dao.observeAllUrls().map { it.toSet() }
 
     private fun isRecordable(url: String): Boolean {
         if (url.isBlank()) return false

@@ -52,6 +52,7 @@ import com.peng.ainewshub.ui.components.SourceListScaffold
 import com.peng.ainewshub.ui.components.StatBadge
 import com.peng.ainewshub.ui.components.formatCount
 import com.peng.ainewshub.ui.components.updateTimeHeader
+import com.peng.ainewshub.ui.components.rememberReadUrls
 import com.peng.ainewshub.ui.theme.AppText
 import com.peng.ainewshub.ui.theme.AppAlpha
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -92,6 +93,9 @@ fun HuggingFacePapersScreen(
     val config by vm.configFlow.collectAsStateWithLifecycle(initialValue = AiConfig())
     val snackbarHostState = remember { SnackbarHostState() }
 
+    // 已读判定(打开 URL 命中浏览历史):驱动行内标题弱化
+    val readUrls = rememberReadUrls()
+
     // 配置未就绪提示:点「译」后若 state 变成 CONFIG_MISSING,弹一次引导
     TranslateConfigMissingEffect(translationStates, snackbarHostState, onOpenSettings)
 
@@ -113,7 +117,9 @@ fun HuggingFacePapersScreen(
                 translationState = translationStates[paper.id] ?: TranslationState.Idle,
                 onClick = { onOpenUrl(paper.url, paper.title) },
                 onOpenGithub = { onOpenUrl(paper.githubUrl, paper.title) },
-                onTranslate = { vm.translatePaper(paper) }
+                onTranslate = { vm.translatePaper(paper) },
+                // 已读 = 打开过的论文页 URL 命中浏览历史(GitHub 入口不参与判定)
+                isRead = paper.url in readUrls
             )
             RowDividerIfNeeded(index, papers.size)
         }
@@ -130,6 +136,7 @@ fun HuggingFacePapersScreen(
  *  3. meta:upvotes(primary 强调,热度主指标)+ 发布日期 + 作者
  *
  * @param item 论文数据(rank 即为页面排名)
+ * @param isRead 已读(打开 URL 命中浏览历史)时标题降透明弱化
  */
 @Composable
 private fun PaperRow(
@@ -138,7 +145,8 @@ private fun PaperRow(
     translationState: TranslationState,
     onClick: () -> Unit,
     onOpenGithub: () -> Unit,
-    onTranslate: () -> Unit
+    onTranslate: () -> Unit,
+    isRead: Boolean = false
 ) {
     val cs = MaterialTheme.colorScheme
     Row(
@@ -164,7 +172,7 @@ private fun PaperRow(
                     text = item.title,
                     style = AppText.titleCompact,
                     fontWeight = FontWeight.SemiBold,
-                    color = cs.onSurface,
+                    color = if (isRead) cs.onSurface.copy(alpha = AppAlpha.readDim) else cs.onSurface,
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)

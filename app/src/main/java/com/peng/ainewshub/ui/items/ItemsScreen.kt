@@ -49,6 +49,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -71,6 +72,7 @@ import com.peng.ainewshub.ui.dayKeyOf
 import com.peng.ainewshub.ui.components.BottomBarReservedHeight
 import com.peng.ainewshub.ui.components.HairlineDivider
 import com.peng.ainewshub.ui.components.NewsCardSkeletonList
+import com.peng.ainewshub.ui.components.rememberReadUrls
 import kotlinx.coroutines.launch
 
 /** 一天的分组(日期 key + 该天的条目)。空 key 表示不分天(搜索模式)。 */
@@ -110,6 +112,11 @@ fun ItemsScreen(
     val isLoadingMore by vm.isLoadingMore.collectAsStateWithLifecycle()
     val isRefreshing by vm.isRefreshing.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
+
+    // 已读判定与「只看未读」过滤(屏幕级状态,不持久化):过滤在展示层做,
+    // 不改 ViewModel 取数 —— 分页/刷新逻辑不受影响,翻到底仍会加载更多
+    val readUrls = rememberReadUrls()
+    var unreadOnly by rememberSaveable { mutableStateOf(false) }
 
     val showBackToTop by remember {
         derivedStateOf { listState.firstVisibleItemIndex >= 2 }
@@ -178,90 +185,107 @@ fun ItemsScreen(
                         // loadMore 后 _items 已更新但 state 不会重新 emit,若用 s.data
                         // 列表会永远停在第一页(即便后续页已加载)。
                         val data = items
-                        if (data.isEmpty()) {
-                            // 空态场景化:搜索无结果给「换关键词」恢复路径;非搜索空态给刷新动作
-                            EmptyState(
-                                title = stringResource(if (filter.isSearching) R.string.common_no_result else R.string.common_empty),
-                                subtitle = stringResource(if (filter.isSearching) R.string.items_try_other_keyword else R.string.items_refresh_hint_button),
-                                icon = if (filter.isSearching) Icons.Outlined.SearchOff else Icons.Outlined.Inbox,
-                                actionLabel = if (filter.isSearching) null else stringResource(R.string.common_refresh_once),
-                                onAction = if (filter.isSearching) null else ({ vm.refresh() })
+                        // 「只看未读」过滤(已读 = 详情页两个打开 URL 之一命中浏览历史)
+                        val shown = if (unreadOnly) {
+                            data.filter { it.permalink !in readUrls && it.url !in readUrls }
+                        } else data
+                        when {
+                            data.isEmpty() -> {
+                                // 空态场景化:搜索无结果给「换关键词」恢复路径;非搜索空态给刷新动作
+                                EmptyState(
+                                    title = stringResource(if (filter.isSearching) R.string.common_no_result else R.string.common_empty),
+                                    subtitle = stringResource(if (filter.isSearching) R.string.items_try_other_keyword else R.string.items_refresh_hint_button),
+                                    icon = if (filter.isSearching) Icons.Outlined.SearchOff else Icons.Outlined.Inbox,
+                                    actionLabel = if (filter.isSearching) null else stringResource(R.string.common_refresh_once),
+                                    onAction = if (filter.isSearching) null else ({ vm.refresh() })
+                                )
+                            }
+                            // 过滤后为空:全部已读(数据本身非空,不给刷新动作)
+                            shown.isEmpty() -> EmptyState(
+                                title = stringResource(R.string.items_no_unread),
+                                subtitle = stringResource(R.string.items_no_unread_subtitle),
+                                icon = Icons.Outlined.Inbox
                             )
-                        } else {
-                            // 按天分组(本地时区),保持原列表顺序。
-                            // 仅当未在搜索状态时分组 —— 搜索结果跨天聚合意义不大,且更紧凑。
-                            val grouped = remember(data, filter.isSearching) {
-                                if (filter.isSearching) {
-                                    listOf(GroupedDay("", data))
-                                } else {
-                                    data.groupBy { dayKeyOf(it.publishedAt) }
-                                        .map { (k, items) -> GroupedDay(k, items) }
-                                }
-                            }
-                            PullToRefreshBox(
-                                isRefreshing = isRefreshing,
-                                onRefresh = {
-                                    vm.refresh()
-                                    // 联动刷新页面自带的额外模块(如精选的「今日热点」)
-                                    onRefreshExtra?.invoke()
-                                }
-                            ) {
-                            LazyColumn(
-                                state = listState,
-                                // 根 tab 底部预留浮动药丸底栏的高度(reserveBottomBarSpace),
-                                // 避免末项被遮挡;二级页底栏已隐藏,只留常规间距。
-                                // 顶部留 4dp 与顶栏发丝线拉开间距。
-                                contentPadding = PaddingValues(
-                                    top = 4.dp,
-                                    bottom = if (reserveBottomBarSpace) BottomBarReservedHeight else 16.dp
-                                ),
-                                modifier = Modifier.fillMaxSize()
-                            ) {
-                                // 顶部装饰区(如「今日热点」卡片 + 区块标题)。仅非搜索时
-                                // 显示 —— 搜索态应聚焦结果,不宜插入热点等装饰模块。
-                                if (header != null && !filter.isSearching) {
-                                    item(key = "screen-header") { header() }
-                                }
-                                // 分类 chips(搜索态隐藏)。随列表滚动,不再钉在顶部。
-                                if (!filter.isSearching) {
-                                    item(key = "category-chips") {
-                                        CategoryChips(
-                                            selected = filter.category,
-                                            onSelect = { vm.setCategory(it) }
-                                        )
+                            else -> {
+                                // 按天分组(本地时区),保持原列表顺序。
+                                // 仅当未在搜索状态时分组 —— 搜索结果跨天聚合意义不大,且更紧凑。
+                                val grouped = remember(shown, filter.isSearching) {
+                                    if (filter.isSearching) {
+                                        listOf(GroupedDay("", shown))
+                                    } else {
+                                        shown.groupBy { dayKeyOf(it.publishedAt) }
+                                            .map { (k, items) -> GroupedDay(k, items) }
                                     }
                                 }
-                                grouped.forEach { group ->
-                                    // 日期分组条(搜索模式不显示)
-                                    if (!filter.isSearching && group.dayKey.isNotEmpty()) {
-                                        item(key = "header-${group.dayKey}") {
-                                            DateGroupHeader(dayKey = group.dayKey)
+                                PullToRefreshBox(
+                                    isRefreshing = isRefreshing,
+                                    onRefresh = {
+                                        vm.refresh()
+                                        // 联动刷新页面自带的额外模块(如精选的「今日热点」)
+                                        onRefreshExtra?.invoke()
+                                    }
+                                ) {
+                                    LazyColumn(
+                                        state = listState,
+                                        // 根 tab 底部预留浮动药丸底栏的高度(reserveBottomBarSpace),
+                                        // 避免末项被遮挡;二级页底栏已隐藏,只留常规间距。
+                                        // 顶部留 4dp 与顶栏发丝线拉开间距。
+                                        contentPadding = PaddingValues(
+                                            top = 4.dp,
+                                            bottom = if (reserveBottomBarSpace) BottomBarReservedHeight else 16.dp
+                                        ),
+                                        modifier = Modifier.fillMaxSize()
+                                    ) {
+                                        // 顶部装饰区(如「今日热点」卡片 + 区块标题)。仅非搜索时
+                                        // 显示 —— 搜索态应聚焦结果,不宜插入热点等装饰模块。
+                                        if (header != null && !filter.isSearching) {
+                                            item(key = "screen-header") { header() }
+                                        }
+                                        // 分类 chips(搜索态隐藏)。随列表滚动,不再钉在顶部。
+                                        if (!filter.isSearching) {
+                                            item(key = "category-chips") {
+                                                CategoryChips(
+                                                    selected = filter.category,
+                                                    onSelect = { vm.setCategory(it) },
+                                                    unreadOnly = unreadOnly,
+                                                    onToggleUnread = { unreadOnly = !unreadOnly }
+                                                )
+                                            }
+                                        }
+                                        grouped.forEach { group ->
+                                            // 日期分组条(搜索模式不显示)
+                                            if (!filter.isSearching && group.dayKey.isNotEmpty()) {
+                                                item(key = "header-${group.dayKey}") {
+                                                    DateGroupHeader(dayKey = group.dayKey)
+                                                }
+                                            }
+                                            // 组内条目(每条之间用 hairline 分隔,缩进对齐右栏)
+                                            // 注意:不使用 animateItem —— 分页加载会一次性追加数十条,
+                                            // 每条都纳入重排动画会让主线程测量/布局成本爆炸,在
+                                            // 列表累积到几百上千条时引发 ANR。静默追加更稳。
+                                            items(items = group.items, key = { it.id }) { item ->
+                                                NewsCard(
+                                                    item = item,
+                                                    onClick = { onItemClick(item) },
+                                                    // 已读 = 详情页两个打开 URL(permalink/原文)之一命中
+                                                    isRead = item.permalink in readUrls || item.url in readUrls
+                                                )
+                                                if (item.id != group.items.last().id) {
+                                                    HairlineDivider(startIndent = 72.dp)
+                                                }
+                                            }
+                                        }
+                                        // 底部加载状态 footer:
+                                        //  - 正在加载下一页:小转圈 + "加载中…"
+                                        //  - 没有更多了(后端返回 hasNext=false):"已加载全部"
+                                        item(key = "footer") {
+                                            ListFooter(
+                                                loading = isLoadingMore,
+                                                done = !hasMore
+                                            )
                                         }
                                     }
-                                    // 组内条目(每条之间用 hairline 分隔,缩进对齐右栏)
-                                    // 注意:不使用 animateItem —— 分页加载会一次性追加数十条,
-                                    // 每条都纳入重排动画会让主线程测量/布局成本爆炸,在
-                                    // 列表累积到几百上千条时引发 ANR。静默追加更稳。
-                                    items(items = group.items, key = { it.id }) { item ->
-                                        NewsCard(
-                                            item = item,
-                                            onClick = { onItemClick(item) }
-                                        )
-                                        if (item.id != group.items.last().id) {
-                                            HairlineDivider(startIndent = 72.dp)
-                                        }
-                                    }
                                 }
-                                // 底部加载状态 footer:
-                                //  - 正在加载下一页:小转圈 + "加载中…"
-                                //  - 没有更多了(后端返回 hasNext=false):"已加载全部"
-                                item(key = "footer") {
-                                    ListFooter(
-                                        loading = isLoadingMore,
-                                        done = !hasMore
-                                    )
-                                }
-                            }
                             }
                         }
                     }
@@ -344,7 +368,10 @@ private fun ListFooter(loading: Boolean, done: Boolean) {
 @Composable
 private fun CategoryChips(
     selected: NewsCategory?,
-    onSelect: (NewsCategory?) -> Unit
+    onSelect: (NewsCategory?) -> Unit,
+    // 「只看未读」过滤(展示层过滤,见 ItemsScreen);回调为 null 时不显示该 chip
+    unreadOnly: Boolean = false,
+    onToggleUnread: (() -> Unit)? = null
 ) {
     val scrollState = rememberScrollState()
     Surface(
@@ -389,6 +416,25 @@ private fun CategoryChips(
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = MaterialTheme.colorScheme.primary,
                         selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
+                )
+            }
+            // 行尾「只看未读」:与分类正交,选中态走 tertiary 区分于分类的 primary
+            if (onToggleUnread != null) {
+                FilterChip(
+                    selected = unreadOnly,
+                    onClick = onToggleUnread,
+                    label = { Text(stringResource(R.string.items_unread_only)) },
+                    shape = CircleShape,
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        if (unreadOnly) androidx.compose.ui.graphics.Color.Transparent
+                        else MaterialTheme.colorScheme.outlineVariant
+                    ),
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.tertiary,
+                        selectedLabelColor = MaterialTheme.colorScheme.onTertiary,
                         containerColor = MaterialTheme.colorScheme.surface
                     )
                 )

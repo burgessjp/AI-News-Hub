@@ -55,6 +55,8 @@ import com.peng.ainewshub.ui.components.InlineTranslateButton
 import com.peng.ainewshub.ui.components.TranslatedText
 import com.peng.ainewshub.ui.components.formatCount
 import com.peng.ainewshub.ui.components.updateTimeHeader
+import com.peng.ainewshub.ui.components.rememberReadUrls
+import com.peng.ainewshub.ui.theme.AppAlpha
 import com.peng.ainewshub.ui.theme.AppText
 
 /**
@@ -94,6 +96,9 @@ fun ProductHuntScreen(
     val config by vm.configFlow.collectAsStateWithLifecycle(initialValue = AiConfig())
     val snackbarHostState = remember { SnackbarHostState() }
 
+    // 已读判定(打开 URL 命中浏览历史):驱动行内标题弱化
+    val readUrls = rememberReadUrls()
+
     // 配置未就绪提示:点「译」后若 state 变成 CONFIG_MISSING,弹一次引导
     TranslateConfigMissingEffect(translationStates, snackbarHostState, onOpenSettings)
 
@@ -117,7 +122,9 @@ fun ProductHuntScreen(
                     val target = product.targetUrl
                     if (target.isNotBlank()) onOpenUrl(target, product.name)
                 },
-                onTranslate = { vm.translateProduct(product) }
+                onTranslate = { vm.translateProduct(product) },
+                // 已读 = 打开过的产品页链接(url 空则回退 website)命中浏览历史
+                isRead = product.targetUrl in readUrls
             )
             RowDividerIfNeeded(index, products.size)
         }
@@ -134,6 +141,7 @@ fun ProductHuntScreen(
  *  3. meta:upvotes(primary 强调,热度主指标)+ 评论数
  *
  * @param item 产品数据(rank 即为列表排名)
+ * @param isRead 已读(打开 URL 命中浏览历史)时标题降透明弱化
  */
 @Composable
 private fun ProductRow(
@@ -141,7 +149,8 @@ private fun ProductRow(
     translateEnabled: Boolean,
     translationState: TranslationState,
     onClick: () -> Unit,
-    onTranslate: () -> Unit
+    onTranslate: () -> Unit,
+    isRead: Boolean = false
 ) {
     val cs = MaterialTheme.colorScheme
     Row(
@@ -181,7 +190,7 @@ private fun ProductRow(
                     text = item.name,
                     style = AppText.titleCompact,
                     fontWeight = FontWeight.SemiBold,
-                    color = cs.onSurface,
+                    color = if (isRead) cs.onSurface.copy(alpha = AppAlpha.readDim) else cs.onSurface,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)

@@ -47,6 +47,8 @@ import com.peng.ainewshub.ui.components.TranslateConfigMissingEffect
 import com.peng.ainewshub.ui.components.InlineTranslateButton
 import com.peng.ainewshub.ui.components.TranslatedText
 import com.peng.ainewshub.ui.components.updateTimeHeader
+import com.peng.ainewshub.ui.components.rememberReadUrls
+import com.peng.ainewshub.ui.theme.AppAlpha
 import com.peng.ainewshub.ui.theme.AppText
 
 /**
@@ -87,6 +89,9 @@ fun OpenAiAnthropicNewsScreen(
     val config by vm.configFlow.collectAsStateWithLifecycle(initialValue = AiConfig())
     val snackbarHostState = remember { SnackbarHostState() }
 
+    // 已读判定(打开 URL 命中浏览历史):驱动行内标题弱化
+    val readUrls = rememberReadUrls()
+
     // 配置未就绪提示:点「译」后若 state 变成 CONFIG_MISSING,弹一次引导
     TranslateConfigMissingEffect(translationStates, snackbarHostState, onOpenSettings)
 
@@ -107,7 +112,9 @@ fun OpenAiAnthropicNewsScreen(
                 translateEnabled = config.translateEnabled,
                 translationState = translationStates[article.url] ?: TranslationState.Idle,
                 onClick = { onOpenUrl(article.url, article.title) },
-                onTranslate = { vm.translateArticle(article) }
+                onTranslate = { vm.translateArticle(article) },
+                // 已读 = 打开过的文章 URL 命中浏览历史
+                isRead = article.url in readUrls
             )
             RowDividerIfNeeded(index, articles.size)
         }
@@ -124,6 +131,7 @@ fun OpenAiAnthropicNewsScreen(
  *  3. meta:厂商徽章(OpenAI/Anthropic)+ 分类 + 发布时间
  *
  * @param item 动态数据(rank 即为列表排名)
+ * @param isRead 已读(打开 URL 命中浏览历史)时标题降透明弱化
  */
 @Composable
 private fun ArticleRow(
@@ -131,7 +139,8 @@ private fun ArticleRow(
     translateEnabled: Boolean,
     translationState: TranslationState,
     onClick: () -> Unit,
-    onTranslate: () -> Unit
+    onTranslate: () -> Unit,
+    isRead: Boolean = false
 ) {
     val cs = MaterialTheme.colorScheme
     Row(
@@ -157,7 +166,7 @@ private fun ArticleRow(
                     text = item.title,
                     style = AppText.titleCompact,
                     fontWeight = FontWeight.SemiBold,
-                    color = cs.onSurface,
+                    color = if (isRead) cs.onSurface.copy(alpha = AppAlpha.readDim) else cs.onSurface,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
