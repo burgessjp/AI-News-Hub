@@ -1,23 +1,24 @@
 #!/usr/bin/env python3
 """
-维护 index.json 的 history 历史索引(按日期寻址)。
+维护根级 history.json 历史索引(按日期寻址,已拆出 index.json 为独立文件)。
 
 两个用途:
-  1) 回填/重建(2026-07-19 已执行过一次):「历史摘要」功能上线前,数据仓库已按
+  1) 回填/重建(2026-07-19 已执行过一次,当时写入 index.json 内联字段;拆分后
+     改写根级 history.json):「历史摘要」功能上线前,数据仓库已按
      <source>/<YYYY-MM-DD>/<HH-MM>-data.json 落盘历史快照(push_data.py 只增不删),
-     但 index.json 没有 history 字段。扫描浅克隆里的全部日期目录,按 write_index
-     同款规则(每天取当日最后一次快照、不早于 HISTORY_START_DATE、每源保留最近
-     HISTORY_RETENTION_DAYS 天)生成 history 合入 index.json 并推送。
+     但索引未建。扫描浅克隆里的全部日期目录,按流水线同款规则(每天取当日最后一次
+     快照、不早于 HISTORY_START_DATE、每源保留最近 HISTORY_RETENTION_DAYS 天)
+     生成 history.json 并推送;index.json 残留的旧内联 history 字段一并移除。
   2) 清理起始日之前的目录(--prune,2026-07-19 已执行):删除仓库里早于
-     HISTORY_START_DATE 的日期目录,与重建后的 index 同一 commit 推送。
+     HISTORY_START_DATE 的日期目录,与重建后的索引同一 commit 推送。
      push_data.py 的 _overlay 只增不删,清理只能在本脚本里显式做。
 
-日常无需执行 —— 流水线每次运行的 write_index 会自动与旧 history 合并;
-仅当 history 索引因故整体丢失(重跑回填)或需要清理旧目录(--prune)时使用。
+日常无需执行 —— 流水线每次运行的 build_history 会自动与旧索引合并;
+仅当索引因故整体丢失(重跑回填)或需要清理旧目录(--prune)时使用。
 
 用法:
   export GITCODE_TOKEN=...
-  python3 scripts/backfill_history.py            # 克隆 → 重建 history → 提交推送
+  python3 scripts/backfill_history.py            # 克隆 → 重建 history.json → 提交推送
   python3 scripts/backfill_history.py --prune    # 同上,且先删除起始日之前的日期目录
   python3 scripts/backfill_history.py --dry-run [--prune]  # 只扫描打印,不写入不推送
 """
@@ -125,14 +126,18 @@ def main():
         print("[DRY] 不写入不推送")
         return 0
 
-    # 合入 index.json:latest 原样保留,只加/刷新 history;时间戳同步刷新
+    # 写独立 history.json(历史索引已拆出 index.json);index.json 里若残留
+    # 旧格式内联 history 字段,一并移除;时间戳同步刷新
+    history_path = os.path.join(repo_dir, "history.json")
+    with open(history_path, "w", encoding="utf-8") as f:
+        json.dump(history, f, ensure_ascii=False, indent=2)
     index_path = os.path.join(repo_dir, "index.json")
     with open(index_path, "r", encoding="utf-8") as f:
         index = json.load(f)
     now = datetime.now(CST)
+    index.pop("history", None)
     index["updated_at"] = now.strftime("%Y-%m-%dT%H:%M:%S%z")
     index["updated_at_ms"] = int(now.timestamp() * 1000)
-    index["history"] = history
     with open(index_path, "w", encoding="utf-8") as f:
         json.dump(index, f, ensure_ascii=False, indent=2)
 
@@ -140,8 +145,9 @@ def main():
     run(["git", "config", "user.name", "github-actions[bot]"], cwd=repo_dir)
     run(["git", "config", "user.email", "41898282+github-actions[bot]@users.noreply.github.com"],
         cwd=repo_dir)
-    # prune 过用 add -A 连目录删除一起暂存;否则只动 index.json
-    add_cmd = ["git", "add", "-A"] if pruned else ["git", "add", "index.json"]
+    # prune 过用 add -A 连目录删除一起暂存;否则只动 index.json / history.json
+    add_cmd = (["git", "add", "-A"] if pruned
+               else ["git", "add", "index.json", "history.json"])
     run(add_cmd, cwd=repo_dir)
     diff = subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=repo_dir)
     if diff.returncode == 0:

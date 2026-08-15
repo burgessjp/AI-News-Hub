@@ -16,8 +16,10 @@
 
 ```
 news-hub-data 分支/
-├── index.json                          ← 入口:各源最新快照路径(latest)+ 按日期历史索引(history)
-│                                         + 总览按日归档索引(overview_history)
+├── index.json                          ← 入口:即时字段(updated_at / latest /
+│                                         latest_overview / latest_trends)
+├── history.json                        ← 摘要历史索引:{源名: {日期: relpath}}(每源 31 天)
+├── overview_history.json               ← 总览归档索引:{日期: relpath}(保留 90 天)
 ├── manifest.json                       ← 最近一次运行总览(成功/失败状态)
 ├── overview/                           ← 今日总览按日归档(内容与 index 的 latest_overview 同构)
 │   └── 2026-08-15/
@@ -67,16 +69,6 @@ news-hub-data 分支/
     "aihot-featured": "2026-07-15/08-00-data.json",
     "openai-anthropic-news": "2026-07-15/08-00-data.json"
   },
-  "history": {
-    "hackernews": {
-      "2026-07-19": "2026-07-19/10-12-data.json",
-      "2026-07-18": "2026-07-18/15-00-data.json"
-    }
-  },
-  "overview_history": {
-    "2026-08-15": "2026-08-15/11-49-data.json",
-    "2026-08-14": "2026-08-14/18-00-data.json"
-  },
   "latest_overview": {
     "generatedAt": 1784073612000,
     "dataFetchedAt": 1784073600000,
@@ -108,15 +100,15 @@ news-hub-data 分支/
 }
 ```
 
+`index.json` 只含**即时字段**(每次批次整体刷新,体量有界不随保留期增长)。按日期寻址的两个历史索引在根级独立文件:`history.json`(摘要历史)与 `overview_history.json`(总览归档),按需拉取,详见下文对应章节。
+
 `latest` 里的路径是**相对于源目录**的。设计行为:某源当天抓取失败时,`index.json` 会保留它最后一次成功的指向(可能落在前一天),客户端永远能拿到有效数据。
-
-`history` 是按日期寻址的历史索引(`{源名: {日期: relpath}}`,上例仅示意一个源,实际每源都有;只收录 2026-07-18 起的日期),详见下文「按日期取历史快照」。
-
-`overview_history` 是**总览按日归档索引**(`{日期: relpath}`,relpath 相对 `overview/` 目录,保留最近 90 天),详见下文「历史总览归档」。
 
 `latest_overview` 是**今日总览**(流水线预生成的跨源综合分析,详见下文「今日总览 latest_overview」)。App 首页「总览」tab 直接读这个字段,不再端侧调 AI。
 
 `latest_trends` 是**热词趋势榜**(流水线对近 14 天快照的纯统计词频分析,不调 AI,详见下文「热词趋势 latest_trends」)。App「趋势」tab 直接读这个字段。
+
+按日期回看的数据走根级独立索引文件(不在 index.json 里,按需拉取):`history.json`(摘要历史,`{源名: {日期: relpath}}`,详见「按日期取历史快照」)与 `overview_history.json`(总览归档,`{日期: relpath}`,详见「历史总览归档」)。
 
 **第二步:拼完整路径拉数据。** `index.latest.<源>` 前面加上 `<源>/` 即得完整路径。
 
@@ -178,22 +170,20 @@ hn = get_latest('hackernews')
 print(hn['items'][0]['title'])
 ```
 
-## 按日期取历史快照(history 索引)
+## 按日期取历史快照(history.json 独立文件)
 
-`index.json` 顶层除 `latest` 外还有 `history` 字段,结构为 `{源名: {日期: relpath}}`:
+摘要历史索引在根级独立文件 `history.json`(已拆出 index.json,结构为 `{源名: {日期: relpath}}`,内容与原 index 内联 `history` 字段完全一致):
 
 ```json
 {
-  "history": {
-    "hackernews": {
-      "2026-07-19": "2026-07-19/10-12-data.json",
-      "2026-07-18": "2026-07-18/15-00-data.json"
-    }
+  "hackernews": {
+    "2026-07-19": "2026-07-19/10-12-data.json",
+    "2026-07-18": "2026-07-18/15-00-data.json"
   }
 }
 ```
 
-- **日期 → 当日最后一次快照**:键为北京时间日期(`YYYY-MM-DD`);一天抓两次时,当天较早的那份不进索引。
+- **日期 → 当日最后一次快照**:键为北京时间日期(`YYYY-MM-DD`);一天抓多次时,当天较早的那份不进索引。
 - **每源只保留最近 31 天,且不早于 2026-07-18**(历史摘要功能起始日;更早的快照源覆盖不全,日期目录已从仓库删除——`backfill_history.py --prune` 执行,推送的 `_overlay` 只增不删,删除只能显式做)。
 - `relpath` 与 `latest` 一样是**相对于源目录**的,消费方式相同:拼上 `<源>/` 前缀后走 gitcode raw API(见上「文件直链」),如 `hackernews/2026-07-19/10-12-data.json`。
 - **用途**:App「历史摘要」按日期查看当日快照与 `ai_summary_v2`;其它消费方亦可据此按日回溯。
@@ -236,16 +226,14 @@ print(hn['items'][0]['title'])
 
 **失败保留**:本次总览 AI 生成失败时,`latest_overview` 继承上一次的值(同 `latest` 指针的失败保留机制),避免一次失败导致 App 端总览空掉。字段完全缺失时,App 走「今日总览尚未生成」空态。
 
-## 历史总览归档(overview/ 目录 + overview_history 索引)
+## 历史总览归档(overview/ 目录 + overview_history.json 独立索引)
 
-`latest_overview` 只保留最新一份,历史版本以**按日归档文件**形式留痕:总览生成成功时,流水线把同一对象落盘到 `overview/<YYYY-MM-DD>/<HH-MM>-data.json`(路径规则与各源快照一致,北京时间),并在 `index.json` 顶层维护 `overview_history` 索引:
+`latest_overview` 只保留最新一份,历史版本以**按日归档文件**形式留痕:总览生成成功时,流水线把同一对象落盘到 `overview/<YYYY-MM-DD>/<HH-MM>-data.json`(路径规则与各源快照一致,北京时间),并在根级独立文件 `overview_history.json` 维护索引(已拆出 index.json):
 
 ```json
 {
-  "overview_history": {
-    "2026-08-15": "2026-08-15/11-49-data.json",
-    "2026-08-14": "2026-08-14/18-00-data.json"
-  }
+  "2026-08-15": "2026-08-15/11-49-data.json",
+  "2026-08-14": "2026-08-14/18-00-data.json"
 }
 ```
 

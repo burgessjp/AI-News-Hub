@@ -10,7 +10,8 @@ overview/<YYYY-MM-DD>/<HH-MM>-data.json,日期/时刻由 generatedAt 换算北�
 
 同时做的事(同一 commit 推送):
   1. 回填历史总览文件(早于 HISTORY_START_DATE 的丢弃,与 history 索引口径一致)
-  2. 重建 index.json 的 overview_history(复用 fetch_data._scan_history 同款规则)
+  2. 重建总览历史索引,写根级 overview_history.json 独立文件
+     (复用 fetch_data._scan_history 同款规则;index 残留的内联字段一并移除)
   3. 删除已下线源 linuxdo/ 的遗留目录(push_data._overlay 只增不删,需显式删)
 
 此后日常流水线(fetch_data.write_overview_snapshot / write_index)自动接力维护,
@@ -125,23 +126,26 @@ def remove_retired_dirs(repo_dir, dry_run):
 
 def rebuild_overview_history(repo_dir):
     """
-    扫描 repo/overview/ 重建 index.json 的 overview_history:
-    与 fetch_data.write_index 同款规则 —— 每天取当日最后一次、不早于
-    HISTORY_START_DATE、按日期倒序保留最近 OVERVIEW_RETENTION_DAYS 天。
-    读-改-写(其余字段原样保留),时间戳同步刷新。
+    扫描 repo/overview/ 重建总览历史索引,写根级 overview_history.json 独立文件
+    (已拆出 index.json):与流水线 build_overview_history 同款规则 —— 每天取当日
+    最后一次、不早于 HISTORY_START_DATE、按日期倒序保留最近 OVERVIEW_RETENTION_DAYS 天。
+    index.json 里残留的旧内联 overview_history 字段一并移除,时间戳同步刷新。
     """
     merged = _scan_history(repo_dir, "overview")
     keep = [d for d in sorted(merged, reverse=True)
             if d >= HISTORY_START_DATE][:OVERVIEW_RETENTION_DAYS]
     overview_history = {d: merged[d] for d in keep}
 
+    history_path = os.path.join(repo_dir, "overview_history.json")
+    with open(history_path, "w", encoding="utf-8") as f:
+        json.dump(overview_history, f, ensure_ascii=False, indent=2)
     index_path = os.path.join(repo_dir, "index.json")
     with open(index_path, "r", encoding="utf-8") as f:
         index = json.load(f)
     now = datetime.now(CST)
+    index.pop("overview_history", None)
     index["updated_at"] = now.strftime("%Y-%m-%dT%H:%M:%S%z")
     index["updated_at_ms"] = int(now.timestamp() * 1000)
-    index["overview_history"] = overview_history
     with open(index_path, "w", encoding="utf-8") as f:
         json.dump(index, f, ensure_ascii=False, indent=2)
     return overview_history

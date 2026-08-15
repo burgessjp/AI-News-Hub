@@ -1245,91 +1245,158 @@ DEFAULT_PREVIOUS_INDEX_URL = (
     "https://api.gitcode.com/api/v5/repos/peng1818/AI-News-Hub-Data"
     "/raw/index.json?ref=news-hub-data"
 )
+# 历史索引已拆出 index.json 为根级独立文件(防 index 随保留期/源数量无限增长;
+# App 端「历史摘要」「历史总览」按需拉取,不再拖累所有 tab 共享的 index)。
+DEFAULT_PREVIOUS_HISTORY_URL = (
+    "https://api.gitcode.com/api/v5/repos/peng1818/AI-News-Hub-Data"
+    "/raw/history.json?ref=news-hub-data"
+)
+DEFAULT_PREVIOUS_OVERVIEW_HISTORY_URL = (
+    "https://api.gitcode.com/api/v5/repos/peng1818/AI-News-Hub-Data"
+    "/raw/overview_history.json?ref=news-hub-data"
+)
 
 
-def load_previous_index(url):
+def fetch_optional_json(url):
     """
-    拉取上一次的 index.json,返回 (latest, history, previous_overview,
-    previous_overview_history) 四元组:
+    拉一个「可能尚不存在」的 JSON 文件:200 → 解析后的 dict;404 → None
+    (语义:文件未生成,调用方走过渡回退);其它错误抛异常(由 retry 兜底,
+    重试耗尽后 fail-closed)。"""
+    try:
+        text = fetch_text(url, extra_headers={"Accept": "application/json"}, expect_json=True)
+    except requests.HTTPError as e:
+        status = e.response.status_code if e.response is not None else None
+        if status == 404:
+            return None
+        raise
+    return json.loads(text)
+
+
+def _fetch_required_json(url, label):
+    """拉必须存在的 JSON 文件,失败包装统一异常(由 retry 重试)。"""
+    try:
+        text = fetch_text(url, extra_headers={"Accept": "application/json"}, expect_json=True)
+        return json.loads(text)
+    except Exception as e:
+        raise RuntimeError(f"拉取/解析{label}失败:{type(e).__name__}: {e}") from e
+
+
+def _valid_history_map(value):
+    """{source: {date: relpath}} 双层结构逐层过滤非法项(history.json 用)。"""
+    if not isinstance(value, dict):
+        return {}
+    return {
+        src: {d: p for d, p in dates.items()
+              if isinstance(d, str) and d and isinstance(p, str) and p}
+        for src, dates in value.items()
+        if isinstance(src, str) and isinstance(dates, dict)
+    }
+
+
+def _valid_date_map(value):
+    """{date: relpath} 单层结构逐项过滤非法项(overview_history.json 用)。"""
+    if not isinstance(value, dict):
+        return {}
+    return {d: p for d, p in value.items()
+            if isinstance(d, str) and d and isinstance(p, str) and p}
+
+
+def load_previous_index(index_url, history_url="", overview_history_url=""):
+    """
+    拉上一次的 index.json + history.json + overview_history.json,
+    返回 (latest, history, previous_overview, previous_overview_history) 四元组:
       latest                  : source → 相对路径,失败源继承旧 latest 指针用;
-      history                 : source → {date: 相对路径},历史索引的合并基线;
+      history                 : source → {date: 相对路径},独立 history.json 的合并基线;
       previous_overview       : 上次的 latest_overview dict(本次总览生成失败时继承用);
-      previous_overview_history: 上次的 overview_history(date → 相对路径),
-                                总览历史索引的合并基线(与 history 同语义)。
+      previous_overview_history: date → 相对路径,独立 overview_history.json 的合并基线。
     任一字段缺失或拉取失败时,对应项返回 {} / {} / None / {}。
 
     需求 a:CI 是干净跑(每次只有本次产物),某源本次抓取失败时本地目录不存在,
-    _scan_latest 会返回 None,导致 index.json 丢掉该源 —— 与 docs 承诺的
-    「保留旧指向」不符。这里从 gitcode 拉上一次 index.json,失败源继承其指针,
-    让客户端永远能拿到有效数据。history 同理:CI 本地只有当天快照,历史日期索引
-    必须从旧 index 继承合并,否则 history 里永远只剩当天一条。
-    previous_overview 同样:本次总览 AI 生成失败时,继承上次的 latest_overview,
-    避免一次失败导致 App 端总览空掉(对齐单源失败保留旧指向的兜底语义)。
-    拉取本身失败(HTTP/解析)时重试 3 次;仍失败则退出非 0(fail-closed):
-    拿不到旧 index 就意味着 history 会从 31 天塌缩成当天、失败源 latest 丢失,
-    且推送后被逐次继承永久损毁 —— 宁可本轮不更新,也不推降级 index。
-    (--no-previous-index 显式关闭时不在此列,走 url 为空的早退分支。)
+    _scan_latest 会返回 None,导致 latest 丢掉该源 —— 与 docs 承诺的「保留旧指向」
+    不符。这里从 gitcode 拉上一次数据,失败源继承其指针,让客户端永远能拿到有效
+    数据。history 同理:CI 本地只有当天快照,历史日期索引必须从旧文件继承合并,
+    否则永远只剩当天一条。previous_overview 同样:本次总览 AI 生成失败时继承。
 
-    与 App 的 ArchiveHttpClient.fetchIndex 同源(都是 gitcode API raw),匿名公开读。
+    history / overview_history 已拆出 index.json(独立文件优先):
+      - 独立文件 200 → 直接用(即使旧版 index 还带着内联字段,也以独立文件为准
+        —— 防旧代码批次写坏内联字段后污染新索引);
+      - 404 + index 有内联字段 → 过渡期回退内联(拆分上线后的首次运行即完成迁移,
+        写出独立文件且 index 不再内联);
+      - 404 + 无内联 + index 无历史数据信号(首跑)→ {};
+      - 404 + 无内联 + 有历史数据信号 → 独立文件意外丢失,fail-closed —— 宁可本轮
+        不更新,也不推塌缩的历史索引(会被逐次继承永久损毁)。
+    index.json 本身拉取失败同样 fail-closed(缺它 latest / 总览都会降级)。
+    (--no-previous-index / index_url 为空时三者全部跳过,走首跑语义。)
     """
-    if not url:
+    if not index_url:
         return {}, {}, None, {}
 
     # 重试骨架走 common.retry;全败时 fail-closed(sys.exit 1,不推降级 index)
     def on_exhausted(exc):
-        print(f"[INDEX] 拉上次 index.json {FETCH_MAX_ATTEMPTS} 次全败,中断本轮"
+        print(f"[INDEX] 拉上一次 index/历史索引 {FETCH_MAX_ATTEMPTS} 次全败,中断本轮"
               f"(不推降级 index):{type(exc).__name__}: {exc}", file=sys.stderr)
         sys.exit(1)
 
-    return retry(
-        lambda: _load_previous_index_once(url),
+    index = retry(
+        lambda: _fetch_required_json(index_url, "上次 index.json"),
         attempts=FETCH_MAX_ATTEMPTS,
-        log_tag="INDEX 拉上次 index.json",
+        log_tag="INDEX 拉上一次 index.json",
         on_exhausted=on_exhausted,
     )
+    latest = index.get("latest") or {}
+    if not isinstance(latest, dict):
+        latest = {}
+    latest = {k: v for k, v in latest.items() if isinstance(v, str) and v}
+    prev_overview = index.get("latest_overview")
+    if not isinstance(prev_overview, dict) or not isinstance(prev_overview.get("items"), list):
+        prev_overview = None
+
+    history = _load_split_index(
+        history_url, index.get("history"),
+        has_prior_data=bool(latest),
+        label="history.json",
+        on_exhausted=on_exhausted,
+        validator=_valid_history_map,
+    )
+    overview_history = _load_split_index(
+        overview_history_url, index.get("overview_history"),
+        has_prior_data=prev_overview is not None,
+        label="overview_history.json",
+        on_exhausted=on_exhausted,
+        validator=_valid_date_map,
+    )
+    print(f"[INDEX] 拉到上次 index.json,{len(latest)} 个源旧指向,"
+          f"latest_overview {'有' if prev_overview else '无'},"
+          f"history 共 {sum(len(v) for v in history.values())} 天,"
+          f"overview_history {len(overview_history)} 天")
+    return latest, history, prev_overview, overview_history
 
 
-def _load_previous_index_once(url):
-    """load_previous_index 的单次尝试(成功返回三元组,失败抛异常由调用方重试)。"""
-    try:
-        text = fetch_text(
-            url,
-            extra_headers={"Accept": "application/json"},
-            expect_json=True,
-        )
-        data = json.loads(text)
-        latest = data.get("latest") or {}
-        if not isinstance(latest, dict):
-            latest = {}
-        latest = {k: v for k, v in latest.items() if isinstance(v, str) and v}
-        # history 是双层结构(source → {date: relpath}),逐层过滤掉非法项
-        history = data.get("history") or {}
-        if not isinstance(history, dict):
-            history = {}
-        history = {
-            src: {d: p for d, p in dates.items()
-                  if isinstance(d, str) and d and isinstance(p, str) and p}
-            for src, dates in history.items()
-            if isinstance(src, str) and isinstance(dates, dict)
-        }
-        # previous_overview:顶层 latest_overview 字段,本次生成失败时原样继承
-        prev_overview = data.get("latest_overview")
-        if not isinstance(prev_overview, dict) or not isinstance(prev_overview.get("items"), list):
-            prev_overview = None
-        # overview_history:总览历史索引(date → relpath),同款逐项过滤非法项
-        prev_ov_history = data.get("overview_history") or {}
-        if not isinstance(prev_ov_history, dict):
-            prev_ov_history = {}
-        prev_ov_history = {
-            d: p for d, p in prev_ov_history.items()
-            if isinstance(d, str) and d and isinstance(p, str) and p
-        }
-        print(f"[INDEX] 拉到上次 index.json,{len(latest)} 个源旧指向,"
-              f"latest_overview {'有' if prev_overview else '无'},"
-              f"overview_history {len(prev_ov_history)} 天")
-        return latest, history, prev_overview, prev_ov_history
-    except Exception as e:
-        raise RuntimeError(f"拉取/解析上次 index.json 失败:{type(e).__name__}: {e}") from e
+def _load_split_index(url, inline_value, has_prior_data, label, on_exhausted, validator):
+    """
+    拉拆分出的独立索引文件(history.json / overview_history.json),迁移与兜底规则
+    见 load_previous_index 注释:独立文件优先 → 404 回退 index 内联字段 →
+    无内联且仓库已有历史数据则 fail-closed(文件意外丢失)→ 首跑返回 {}。
+    """
+    if not url:
+        return {}
+    result = retry(
+        lambda: fetch_optional_json(url),
+        attempts=FETCH_MAX_ATTEMPTS,
+        log_tag=f"INDEX 拉上一次 {label}",
+        on_exhausted=on_exhausted,
+    )
+    if result is not None:
+        return validator(result)
+    inline = validator(inline_value)
+    if inline:
+        print(f"[INDEX] {label} 尚不存在,过渡期回退 index.json 内联字段")
+        return inline
+    if has_prior_data:
+        print(f"[FATAL] {label} 不存在且 index 无内联字段,但仓库已有历史数据"
+              f"(疑似文件丢失),中断本轮不推降级索引", file=sys.stderr)
+        sys.exit(1)
+    return {}
 
 
 # App 端「历史摘要」只暴露最近 31 天,index.json 的 history 索引按此截断。
@@ -1348,22 +1415,20 @@ HISTORY_START_DATE = "2026-07-18"
 OVERVIEW_RETENTION_DAYS = 90
 
 
-def write_index(out_dir, now, results, previous_latest=None, previous_history=None,
-                previous_overview=None, overview=None,
-                previous_overview_history=None):
+def write_index(out_dir, now, results, previous_latest=None,
+                previous_overview=None, overview=None):
     """
-    写根目录 index.json:各源最新快照指针(latest)+ 按日期寻址的历史索引(history)
-    + 总览历史索引(overview_history)+ 今日总览(latest_overview)。
+    写根目录 index.json:updated_at + 各源最新快照指针(latest)+ 今日总览(latest_overview)。
+
+    index 只保留「即时字段」:history / overview_history 已拆出为根级独立文件
+    (见 [build_history] / [build_overview_history]),index 不再随保留期/源数量
+    增长 —— App 各 tab 共享拉取的入口文件保持小而有界。
 
     结构:
       {
         "updated_at": "2026-07-15T00:44:02+0800",
         "updated_at_ms": 1784047442756,
         "latest": { ... },
-        "history": { ... },
-        "overview_history": {                  # 总览按日归档索引(相对 overview/ 目录)
-          "2026-07-15": "2026-07-15/00-44-data.json", ...
-        },
         "latest_overview": {                  # 今日总览(跨源综合,流水线预生成)
           "generatedAt": ..., "dataFetchedAt": ...,
           "missingSources": [...],
@@ -1371,7 +1436,7 @@ def write_index(out_dir, now, results, previous_latest=None, previous_history=No
         }
       }
 
-    latest / history 的相对路径都是「相对于源目录」的(如 2026-07-15/00-44-data.json),
+    latest 的相对路径是「相对于源目录」的(如 2026-07-15/00-44-data.json),
     客户端拼上 <source>/ 前缀即得完整路径。
 
     latest 指针来源(需求 a 修复):
@@ -1380,28 +1445,13 @@ def write_index(out_dir, now, results, previous_latest=None, previous_history=No
          (上一次 index.json 的 latest)继承旧指针 —— 让客户端永远拿到有效数据。
          previous_latest 为空(未拉到 / --no-previous-index)时该源直接缺省。
 
-    history 索引(App「历史摘要」按日期查看当日快照/ai_summary):
-      每源 merge(previous_history, 本地 _scan_history)—— 同日以本地新扫描为准
-      (覆盖旧指向);再过滤掉早于 HISTORY_START_DATE 的日期,按日期字符串倒序
-      只保留前 HISTORY_RETENTION_DAYS 天(dict 保持插入序,json.dump 后按日期倒序可读)。
-      previous_history 为空(--no-previous-index)时只含本地扫描结果,与 latest 同语义。
-
     latest_overview(今日总览):
       本次 overview 非空 → 写入新的;本次为 None + previous_overview 非空 → 继承上次
       (避免一次 AI 生成失败导致 App 端总览空掉,对齐单源失败保留旧指向的兜底语义);
       都为空 → 不写该字段(客户端见缺省走 NoData 态)。
-
-    overview_history(总览按日归档索引,App「历史总览」按日期寻址):
-      与 history 同构 —— previous_overview_history 整体继承 + 本地
-      _scan_history(out_dir, "overview") 覆盖同日(本次生成成功才有当日归档文件;
-      当日生成失败时早批次的归档仍从旧索引继承保留);过滤早于 HISTORY_START_DATE
-      的日期,倒序截前 OVERVIEW_RETENTION_DAYS 天。恒写该字段(空 dict 表示
-      尚无任何总览归档,App 走空态)。
     """
     previous_latest = previous_latest or {}
-    previous_history = previous_history or {}
     latest = {}
-    history = {}
     for name in SOURCES:
         rel = _scan_latest(out_dir, name)
         if rel:
@@ -1410,17 +1460,10 @@ def write_index(out_dir, now, results, previous_latest=None, previous_history=No
             # 本次失败:继承上次成功指向(需求 a)
             latest[name] = previous_latest[name]
             print(f"[INDEX] {name:<20} 本次失败,保留旧指向 {previous_latest[name]}")
-        # history:旧索引整体继承,本地新扫描覆盖同日;再按起始日过滤、倒序截断
-        merged = dict(previous_history.get(name) or {})
-        merged.update(_scan_history(out_dir, name))
-        keep = [d for d in sorted(merged, reverse=True)
-                if d >= HISTORY_START_DATE][:HISTORY_RETENTION_DAYS]
-        history[name] = {d: merged[d] for d in keep}
     index = {
         "updated_at": now.strftime("%Y-%m-%dT%H:%M:%S%z"),
         "updated_at_ms": int(now.timestamp() * 1000),
         "latest": latest,
-        "history": history,
     }
     # latest_overview:本次新生成优先,失败时继承上次,都无则不写
     effective_overview = overview if overview else previous_overview
@@ -1428,16 +1471,54 @@ def write_index(out_dir, now, results, previous_latest=None, previous_history=No
         index["latest_overview"] = effective_overview
         if not overview and previous_overview:
             print("[INDEX] 本次总览生成失败,继承上次 latest_overview")
-    # overview_history:总览历史索引,与 history 同构的继承 + 合并 + 截断
-    merged_overview_history = dict(previous_overview_history or {})
-    merged_overview_history.update(_scan_history(out_dir, "overview"))
-    keep_overview = [d for d in sorted(merged_overview_history, reverse=True)
-                     if d >= HISTORY_START_DATE][:OVERVIEW_RETENTION_DAYS]
-    index["overview_history"] = {d: merged_overview_history[d] for d in keep_overview}
     index_path = os.path.join(out_dir, "index.json")
-    with open(index_path, "w", encoding="utf-8") as f:
-        json.dump(index, f, ensure_ascii=False, indent=2)
+    write_json_file(index_path, index)
     return index_path
+
+
+def _retain_recent(previous, local, retention_days):
+    """
+    历史索引共用合并规则:旧索引整体继承 + 本地新扫描覆盖同日 → 过滤早于
+    HISTORY_START_DATE 的日期 → 按日期倒序截前 retention_days 天
+    (dict 保持插入序,写出的 JSON 按日期倒序可读)。
+    """
+    merged = dict(previous or {})
+    merged.update(local or {})
+    keep = [d for d in sorted(merged, reverse=True)
+            if d >= HISTORY_START_DATE][:retention_days]
+    return {d: merged[d] for d in keep}
+
+
+def build_history(out_dir, previous_history=None):
+    """
+    构造独立 history.json 内容:{source: {date: relpath}}(App「历史摘要」按日期
+    寻址当日快照)。每源按 _retain_recent 规则合并截断(31 天);仅收录 SOURCES
+    现存源(下线源的旧键不继承,自然淘汰)。
+    """
+    previous_history = previous_history or {}
+    return {
+        name: _retain_recent(previous_history.get(name),
+                             _scan_history(out_dir, name),
+                             HISTORY_RETENTION_DAYS)
+        for name in SOURCES
+    }
+
+
+def build_overview_history(out_dir, previous_overview_history=None):
+    """
+    构造独立 overview_history.json 内容:{date: relpath}(总览按日归档索引,
+    相对 overview/ 目录)。合并规则与 history 同构,保留 90 天;本次生成失败时
+    当日无本地文件,早批次的归档从旧索引继承保留。
+    """
+    return _retain_recent(previous_overview_history,
+                          _scan_history(out_dir, "overview"),
+                          OVERVIEW_RETENTION_DAYS)
+
+
+def write_json_file(path, payload):
+    """统一 JSON 落盘格式(UTF-8 中文原样、2 空格缩进,与快照/index 一致)。"""
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
 
 
 def main():
@@ -1452,6 +1533,14 @@ def main():
     parser.add_argument(
         "--previous-index-url", default=DEFAULT_PREVIOUS_INDEX_URL,
         help="上一次 index.json 的 URL(失败源继承其 latest 指针);空串关闭",
+    )
+    parser.add_argument(
+        "--previous-history-url", default=DEFAULT_PREVIOUS_HISTORY_URL,
+        help="上一次 history.json 的 URL(历史索引合并基线);随 --previous-index-url 一同关闭",
+    )
+    parser.add_argument(
+        "--previous-overview-history-url", default=DEFAULT_PREVIOUS_OVERVIEW_HISTORY_URL,
+        help="上一次 overview_history.json 的 URL(总览历史索引合并基线);随 --previous-index-url 一同关闭",
     )
     parser.add_argument(
         "--no-previous-index", action="store_true",
@@ -1472,16 +1561,19 @@ def main():
     else:
         targets = list(SOURCES.items())
 
-    # 需求 a:拉上一次 index.json,失败源继承其 latest 指针、history 索引整体合并
-    # (见 write_index)。previous_overview 在本次总览生成失败时继承;
-    # previous_overview_history 是总览历史索引的合并基线(与 history 同语义)。
+    # 需求 a:拉上一次 index.json + history.json + overview_history.json,失败源
+    # 继承其 latest 指针、两个历史索引整体合并(见 load_previous_index;拆分过渡期
+    # 独立文件 404 时自动回退 index 内联字段)。previous_overview 在本次总览生成
+    # 失败时继承(同兜底语义)。
     previous_latest = {}
     previous_history = {}
     previous_overview = None
     previous_overview_history = {}
     if args.previous_index_url and not args.no_previous_index:
         (previous_latest, previous_history, previous_overview,
-         previous_overview_history) = load_previous_index(args.previous_index_url)
+         previous_overview_history) = load_previous_index(
+            args.previous_index_url, args.previous_history_url,
+            args.previous_overview_history_url)
 
     do_summary = not args.no_summary
     if do_summary and not ai_summary.config_ready():
@@ -1575,17 +1667,21 @@ def main():
     if overview:
         print(f"[OVERVIEW] 总览已归档 → {write_overview_snapshot(args.out_dir, overview, now)}")
 
-    # index.json:每源最新快照指针(本地扫最新;失败源继承 previous_latest)
-    # + 按日期寻址的历史索引(与 previous_history 合并后按保留期截断)
-    # + 总览历史索引 overview_history(与 previous_overview_history 同款合并)
-    # + 今日总览 latest_overview(本次生成优先,失败继承 previous_overview)
+    # index.json(即时字段:updated_at / latest / latest_overview)
+    # + 根级独立历史索引文件(拆出 index,不随保留期增长):
+    #   history.json(摘要历史,31 天)/ overview_history.json(总览归档,90 天)
     index_path = write_index(args.out_dir, now, results, previous_latest=previous_latest,
-                             previous_history=previous_history,
-                             previous_overview=previous_overview, overview=overview,
-                             previous_overview_history=previous_overview_history)
+                             previous_overview=previous_overview, overview=overview)
+    history_path = os.path.join(args.out_dir, "history.json")
+    write_json_file(history_path, build_history(args.out_dir, previous_history))
+    overview_history_path = os.path.join(args.out_dir, "overview_history.json")
+    write_json_file(overview_history_path,
+                    build_overview_history(args.out_dir, previous_overview_history))
 
     ok_count = sum(1 for r in results.values() if r["status"] == "ok")
-    print(f"\n汇总: {ok_count}/{len(results)} 源成功;manifest → {manifest_path};index → {index_path}")
+    print(f"\n汇总: {ok_count}/{len(results)} 源成功;manifest → {manifest_path};"
+          f"index → {index_path};history → {history_path};"
+          f"overview_history → {overview_history_path}")
     return 0 if ok_count > 0 else 1
 
 
