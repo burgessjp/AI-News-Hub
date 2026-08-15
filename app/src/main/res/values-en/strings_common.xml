@@ -21,6 +21,8 @@
     <string name="common_back_to_top">Back to top</string>
     <string name="common_all_loaded">Everything loaded</string>
     <string name="common_translate_config_missing">Set up the translation service in Settings → Translate first</string>
+    <!-- Offline fallback: shown once when archive fetches fall back to disk data -->
+    <string name="offline_banner">You\'re offline — showing cached data</string>
 
     <!-- ===== Error messages (UiState.toUiError by ErrorKind) ===== -->
     <string name="error_no_data">Today\'s content isn\'t available yet, please try again later</string>

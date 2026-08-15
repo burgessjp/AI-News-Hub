@@ -21,6 +21,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -30,6 +33,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -44,6 +48,7 @@ import com.peng.ainewshub.data.AppDatabase
 import com.peng.ainewshub.data.BrowseHistoryRepository
 import com.peng.ainewshub.data.FavoritesRepository
 import com.peng.ainewshub.data.SummaryRepository
+import com.peng.ainewshub.data.source.ArchiveHttpClient
 import com.peng.ainewshub.notify.DailyNotifyScheduler
 import com.peng.ainewshub.ui.anim.pageTransition
 import com.peng.ainewshub.ui.anim.predictivePopTransition
@@ -217,6 +222,20 @@ internal fun AiNewsHubApp(
         }
     }
 
+    // 离线兜底提示:归档取数落到盘上旧数据时弹一次性 Snackbar(每次离线事件只提示一次,
+    // 任一请求网络成功后状态复位,下次再离线会重新提示)。不做常驻横幅 —— 会盖住各页
+    // 顶栏的返回导航;数据新旧由列表页自带的「数据更新时间」头体现。
+    val offlineMode by ArchiveHttpClient.offlineMode.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val offlineBannerText = stringResource(R.string.offline_banner)
+    LaunchedEffect(Unit) {
+        snapshotFlow { offlineMode }.collect { offline ->
+            if (offline) {
+                snackbarHostState.showSnackbar(offlineBannerText, duration = SnackbarDuration.Long)
+            }
+        }
+    }
+
     // 当前屏幕:根(tab) 或 二级页。用作转场的 currentState/targetState。
     val screen: Screen = nav.screen
 
@@ -385,6 +404,15 @@ internal fun AiNewsHubApp(
                 ) {
                     AppBottomBar(current = nav.currentTab, onSelect = { nav.selectTab(it) })
                 }
+
+                // 离线兜底提示的宿主:悬浮在浮动药丸底栏上方,不遮挡内容交互。
+                SnackbarHost(
+                    hostState = snackbarHostState,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
+                        .padding(bottom = 92.dp)
+                )
             }
         }
     }

@@ -39,7 +39,9 @@
     </queries>
     <!-- 预测返回手势:Android 13/14 开启「退回桌面」预览动画;Android 15+ 默认 true。
          App 全程 OnBackPressedDispatcher(BackHandler/PredictiveBackHandler),与该模式兼容。 -->
+    <!-- Application 入口:初始化归档磁盘缓存等无 Activity 依赖的全局组件 -->
     <application
+        android:name=".App"
         android:allowBackup="false"
         android:enableOnBackInvokedCallback="true"
         android:icon="@mipmap/ic_launcher"

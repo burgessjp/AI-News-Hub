@@ -16,6 +16,7 @@ import java.io.File
  *  - WebView Cookie / Web Storage(随浏览不断累积的持久化数据)
  *  - Coil 图片缓存(磁盘 + 内存)
  *  - 5 个榜单源列表缓存文件(HackerNews/GitHub/HuggingFace/stormzhang/Rundown)
+ *  - 归档数据磁盘缓存 cacheDir/archives/(断网兜底的旧数据,清后下次联网重建)
  *  - 搜索历史([SettingsStore.clearSearchHistory])
  *
  * 需调用方显式选择才清(有用户价值,误删代价高):
