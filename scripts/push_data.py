@@ -133,7 +133,7 @@ def _clone_overlay_commit_push(data_dir, repo_dir, authed_url, branch, repo_url,
     _overlay(data_dir, repo_dir)
 
     # 热词趋势:overlay 后仓库 checkout 含全部历史快照,是唯一能免费拿到全部
-    # 历史的环节;纯统计不调 AI,失败只告警不阻断推送(字段暂缺,App 走空态)
+    # 历史的环节;纯统计不调 AI,失败只告警不阻断推送(文件暂缺,App 走空态)
     trend_keywords.write_trends(repo_dir)
 
     # bot 身份(对齐原 workflow:github-actions[bot])

@@ -126,7 +126,11 @@ object ArchiveHttpClient {
 
     private val historyFileFetcher = CachedFileJson(HISTORY_URL, "读取历史索引失败")
     private val overviewHistoryFileFetcher = CachedFileJson(OVERVIEW_HISTORY_URL, "读取总览历史索引失败")
-    private val trendsFileFetcher = CachedFileJson(TRENDS_URL, "读取趋势数据失败")
+
+    // trends.json 由 write_trends「成功才写」,生成失败的批次会暂缺文件(下次自愈),
+    // 404 是正常暂态 → absentAsNull 返回 null(UI 走 NoData 空态);history 两索引
+    // 由流水线无条件恒写,404 属异常,应抛错走错误态。
+    private val trendsFileFetcher = CachedFileJson(TRENDS_URL, "读取趋势数据失败", absentAsNull = true)
 
     /**
      * 根级独立文件的单实例缓存拉取器(history / overview_history / trends 用)。
@@ -135,20 +139,28 @@ object ArchiveHttpClient {
      * index 同批次更新,节奏一致);[force] 语义也与 fetchIndex 一致 —— 绕过 TTL
      * 强制打网络,但保留 [FORCE_FETCH_DEDUP_MS] 锁内去重窗口(趋势 Tab 下拉刷新用;
      * 历史页无下拉刷新,恒走默认 false)。
+     *
+     * [absentAsNull]:true 时文件 404(尚未生成)返回 null 而非抛错(NoData 语义);
+     * false 时 404 与其它失败一样抛 [AppException.Network](错误态语义)。
      */
-    private class CachedFileJson(private val url: String, private val hint: String) {
+    private class CachedFileJson(
+        private val url: String,
+        private val hint: String,
+        private val absentAsNull: Boolean = false
+    ) {
 
         private val mutex = Mutex()
         private var cached: JSONObject? = null
         private var cachedAt = 0L
 
-        suspend fun fetch(force: Boolean = false): JSONObject = mutex.withLock {
+        suspend fun fetch(force: Boolean = false): JSONObject? = mutex.withLock {
             val c = cached
             val freshWithin = if (force) FORCE_FETCH_DEDUP_MS else INDEX_TTL_MS
             if (c != null && System.currentTimeMillis() - cachedAt < freshWithin) {
                 return@withLock c
             }
-            val text = getRaw(url, hint)
+            val text = getRaw(url, hint, tolerateMissing = absentAsNull)
+                ?: return@withLock null
             val parsed = runCatching { JSONObject(text) }
                 .getOrElse { throw AppException.ServerError() }
             cached = parsed
@@ -174,7 +186,8 @@ object ArchiveHttpClient {
             return@withLock cached
         }
         // 2) 走网络刷新(仅一次,并发其余调用在此等待后复用结果)
-        val text = getRaw(INDEX_URL, "读取归档索引失败")
+        //    tolerateMissing=false 时 getRaw 不会返回 null,elvis 仅为类型兜底
+        val text = getRaw(INDEX_URL, "读取归档索引失败") ?: throw AppException.ServerError()
         val parsed = runCatching { JSONObject(text) }
             .getOrElse { throw AppException.ServerError() }
         indexCache = parsed
@@ -261,12 +274,14 @@ object ArchiveHttpClient {
      * push 阶段纯统计预生成;内容与原 index 内联 `latest_trends` 字段同构)。
      * 独立 2 分钟缓存 + 并发去重,与 index 互不影响。
      *
+     * 文件「成功才写」:生成失败的批次暂缺(下次批次自愈),404 视为正常暂态 →
+     * 返回 null;文件存在但无 keywords 同样返回 null(语义均为「趋势尚未生成」,
+     * UI 走 NoData 空态)。其余网络/解析失败照常抛错(UI 错误态)。
+     *
      * @param force true 绕过缓存(趋势 Tab 下拉刷新;锁内秒级去重窗口与 fetchIndex 同款)
-     * @return 趋势 JSON;无 keywords 时返回 null(语义:趋势尚未生成,UI 走 NoData 态)。
-     * TrendsRepository 据此反序列化为 TrendsDigest。
      */
     suspend fun fetchLatestTrends(force: Boolean = false): JSONObject? = withContext(Dispatchers.IO) {
-        trendsFileFetcher.fetch(force).takeIf { it.has("keywords") }
+        trendsFileFetcher.fetch(force)?.takeIf { it.has("keywords") }
     }
 
     /**
@@ -274,10 +289,11 @@ object ArchiveHttpClient {
      * 自带 2 分钟缓存 + 并发去重,与 index 互不影响(未进历史页的 tab 不下载本文件)。
      *
      * @return source → (date → 相对源目录的快照路径);由流水线每次运行时合并写入,
-     * 每源仅保留最近 31 天且自 2026-07-18 起;文件缺失/字段为空时返回空 map(功能上线初期即如此)
+     * 每源仅保留最近 31 天且自 2026-07-18 起;文件存在但为空对象时返回空 map(UI 空态)。
+     * 本文件由流水线无条件恒写,404/拉取失败属异常 → 抛错(UI 错误态)
      */
     suspend fun fetchHistory(): Map<String, Map<String, String>> = withContext(Dispatchers.IO) {
-        val history = historyFileFetcher.fetch()
+        val history = historyFileFetcher.fetch() ?: throw AppException.Network()
         val result = mutableMapOf<String, Map<String, String>>()
         history.keys().forEach { source ->
             val dates = history.optJSONObject(source) ?: return@forEach
@@ -297,10 +313,11 @@ object ArchiveHttpClient {
      *
      * @return date → 相对 overview/ 目录的归档文件路径(形如 `2026-08-15/11-49-data.json`,
      *         取当日最后一次批次)。由流水线每次运行时合并写入,仅保留最近 90 天;
-     *         文件缺失/为空时返回空 map(功能上线初期即如此)
+     *         文件存在但为空对象时返回空 map(UI 空态)。本文件由流水线无条件恒写,
+     *         404/拉取失败属异常 → 抛错(UI 错误态)
      */
     suspend fun fetchOverviewHistory(): Map<String, String> = withContext(Dispatchers.IO) {
-        val history = overviewHistoryFileFetcher.fetch()
+        val history = overviewHistoryFileFetcher.fetch() ?: throw AppException.Network()
         val result = mutableMapOf<String, String>()
         history.keys().forEach { date ->
             val rel = history.optString(date)
@@ -355,24 +372,31 @@ object ArchiveHttpClient {
      * GET 一个 URL,返回响应正文;非 2xx 或空响应抛 [AppException.Network]。
      * [hint] 仅用于日志诊断(toUiError 会把原始异常记入 logcat)。
      *
+     * [tolerateMissing] 为 true 时 404 → null(语义:文件尚未生成,调用方走 NoData;
+     * 仅 trends.json 的「成功才写」暂态语义用),其余非 2xx 照常抛错。
+     *
      * suspend 自管 [Dispatchers.IO]:所有调用方(含 [fetchIndex] 的 Mutex 锁内)
      * 均无需再外层切 IO,与 [HttpClients.get] 行为一致。
      */
-    private suspend fun getRaw(url: String, @Suppress("UNUSED_PARAMETER") hint: String): String =
-        withContext(Dispatchers.IO) {
-            val req = Request.Builder()
-                .url(url)
-                .header("User-Agent", HttpClients.DEFAULT_BROWSER_UA)
-                .header("Accept", "application/json,text/plain,*/*")
-                .build()
-            client.newCall(req).execute().use { resp ->
-                if (!resp.isSuccessful) {
-                    throw AppException.Network()
-                }
-                resp.body?.string()?.takeIf { it.isNotBlank() }
+    private suspend fun getRaw(
+        url: String,
+        @Suppress("UNUSED_PARAMETER") hint: String,
+        tolerateMissing: Boolean = false
+    ): String? = withContext(Dispatchers.IO) {
+        val req = Request.Builder()
+            .url(url)
+            .header("User-Agent", HttpClients.DEFAULT_BROWSER_UA)
+            .header("Accept", "application/json,text/plain,*/*")
+            .build()
+        client.newCall(req).execute().use { resp ->
+            when {
+                resp.code == 404 && tolerateMissing -> null
+                !resp.isSuccessful -> throw AppException.Network()
+                else -> resp.body?.string()?.takeIf { it.isNotBlank() }
                     ?: throw AppException.Network()
             }
         }
+    }
 }
 
 /**

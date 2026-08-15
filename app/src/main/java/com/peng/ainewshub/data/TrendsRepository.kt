@@ -70,8 +70,8 @@ data class TrendsDigest(
  * 设计要点:
  *  - 输入 [ArchiveHttpClient.fetchLatestTrends] 走 trends.json 的独立 2 分钟
  *    缓存(与 index 互不影响);
- *  - 文件缺失(null)或 keywords 为空 → 抛 [AppException.NoData](UI 走空态,
- *    语义是「趋势尚未生成」——拆分迁移前/功能上线初期即如此);
+ *  - 文件缺失(404)或 keywords 为空 → 抛 [AppException.NoData](UI 走空态,
+ *    语义是「趋势尚未生成」——write_trends 失败的批次会暂缺文件,下次批次自愈);
  *  - 网络/解析失败 → 抛 [AppException.Network]/[AppException.ServerError](UI 走错误态)。
  */
 class TrendsRepository {

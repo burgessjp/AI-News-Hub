@@ -20,8 +20,8 @@ import kotlinx.coroutines.launch
 /**
  * 热词趋势 UI 状态。
  *
- * [NoData]:趋势尚未生成(归档 trends.json 缺失),语义是空态而非出错
- * —— 功能上线初期旧 index.json 即如此。
+ * [NoData]:趋势尚未生成(归档 trends.json 缺失或无热词),语义是空态而非出错
+ * —— write_trends 失败的批次会暂缺文件,下次批次自愈。
  * [Error]:网络/解析失败。
  */
 sealed interface TrendsState {
