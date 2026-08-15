@@ -34,10 +34,10 @@ sealed interface TrendsState {
 /**
  * 热词趋势 ViewModel —— 根 tab「趋势」。
  *
- * 趋势由流水线预生成(scripts/trend_keywords.py,纯统计不调 AI),本 VM 只读归档
- * (对齐 OverviewViewModel 范式):
- *  - init 自动 [load](命中 index.json 2 分钟缓存即秒回);
- *  - [refresh]:下拉刷新,绕过 index 缓存强制重读(流水线刚推送立即可见);
+ * 趋势由流水线预生成(scripts/trend_keywords.py,统计为主 + 可选 AI 精修),
+ * 本 VM 只读归档(对齐 OverviewViewModel 范式):
+ *  - init 自动 [load](命中 trends.json 2 分钟缓存即秒回);
+ *  - [refresh]:下拉刷新,绕过缓存强制重读(流水线刚推送立即可见);
  *  - 重击 tab 走 [load] 即可。
  *
  * 加载中保留旧内容(Success 不回落 Loading),只亮下拉刷新指示。
@@ -60,7 +60,7 @@ class TrendsViewModel(application: Application) : AndroidViewModel(application) 
     /** 自动加载:读归档 trends.json(命中 2 分钟缓存秒回)。 */
     fun load() = run(false)
 
-    /** 下拉刷新:绕过 index.json 2 分钟缓存强制重读。 */
+    /** 下拉刷新:绕过 trends.json 2 分钟缓存强制重读。 */
     fun refresh() = run(true)
 
     private fun run(force: Boolean) {

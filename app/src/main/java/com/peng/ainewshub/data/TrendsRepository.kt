@@ -25,7 +25,7 @@ data class TrendItem(
  * 单个热词的趋势数据。
  *
  * @param term 归一化 canonical key(如 "gpt-5")
- * @param display 展示形(映射表指定形,或语料中最常见的原始大小写写法)
+ * @param display 展示形(映射表指定形、语料最常见写法,或 AI 精修命名,可为中文)
  * @param total 窗口期总命中次数(按「条目命中」计)
  * @param daysActive 窗口期活跃天数(当日命中 ≥1 即活跃)
  * @param daily 与 [TrendsDigest.days] 对齐的每日命中序列(sparkline 数据源)
@@ -51,7 +51,7 @@ data class TrendKeyword(
 /**
  * 热词趋势榜结果。
  *
- * @param keywords 热词榜(按 total 降序,≤10 个)
+ * @param keywords 热词榜(流水线按动量加权分排序,≤10 个)
  * @param generatedAt 流水线生成时刻(毫秒)
  * @param windowDays 统计窗口天数(当前 14)
  * @param days 窗口内日历日期序列(yyyy-MM-dd,与各 keyword.daily 对齐;
@@ -68,10 +68,10 @@ data class TrendsDigest(
  * 热词趋势 Repository —— 根 tab「趋势」的数据源。
  *
  * 与 [OverviewRepository] 同范式:**流水线预生成、App 只读归档**。流水线
- * (`scripts/trend_keywords.py`,纯统计不调 AI)在 push 阶段扫近 14 天快照做
- * 词频统计,把结果写进数据仓库根级独立文件 `trends.json`(内容与原 index
- * 内联 `latest_trends` 字段同构),本 Repository 只负责拉取并反序列化为
- * [TrendsDigest]。
+ * (`scripts/trend_keywords.py`,统计为主 + 每批至多一次 AI 精修,失败回退纯
+ * 统计)在 push 阶段扫近 14 天快照做词频统计,把结果写进数据仓库根级独立
+ * 文件 `trends.json`(内容与原 index.json 内联 `latest_trends` 字段同构),
+ * 本 Repository 只负责拉取并反序列化为 [TrendsDigest]。
  *
  * 设计要点:
  *  - 输入 [ArchiveHttpClient.fetchLatestTrends] 走 trends.json 的独立 2 分钟
@@ -98,7 +98,7 @@ class TrendsRepository {
     /** 反序列化 trends JSON 为 [TrendsDigest]。keywords 为空视为数据无效抛 [AppException.NoData]。 */
     private suspend fun parseTrends(json: JSONObject): TrendsDigest = withContext(Dispatchers.IO) {
         val days = readStringList(json.optJSONArray("days"))
-        val keywords = parseKeywords(json.optJSONArray("keywords"))
+        val keywords = parseKeywords(json.optJSONArray("keywords"), days)
         if (keywords.isEmpty()) throw AppException.NoData()
         TrendsDigest(
             keywords = keywords,
@@ -108,8 +108,12 @@ class TrendsRepository {
         )
     }
 
-    /** 解析 keywords 数组,过滤掉 display 为空或 daily 序列无效的项。 */
-    private fun parseKeywords(arr: JSONArray?): List<TrendKeyword> {
+    /**
+     * 解析 keywords 数组,过滤掉 display 为空或 daily 序列无效的项。
+     * daily 长度须与窗口 days 对齐(sparkline 按下标画,错位的词条直接过滤,
+     * 防流水线口径变化时折线与窗口悄然错位)。
+     */
+    private fun parseKeywords(arr: JSONArray?, days: List<String>): List<TrendKeyword> {
         if (arr == null) return emptyList()
         return (0 until arr.length()).mapNotNull { i ->
             val o = arr.optJSONObject(i) ?: return@mapNotNull null
@@ -127,7 +131,7 @@ class TrendsRepository {
                 rankChange = if (o.has("rankChange")) o.optInt("rankChange") else null,
                 isNewEntry = o.optBoolean("isNewEntry", false),
                 items = parseItems(o.optJSONArray("items"))
-            ).takeIf { it.display.isNotBlank() && it.daily.isNotEmpty() }
+            ).takeIf { it.display.isNotBlank() && it.daily.isNotEmpty() && it.daily.size == days.size }
         }
     }
 

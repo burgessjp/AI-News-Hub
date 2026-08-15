@@ -67,8 +67,8 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * 热词趋势 Tab 根屏 —— 流水线预生成的跨源热词词频统计(读归档 trends.json,
- * 纯统计无 AI 参与;与「总览」tab 同范式:流水线预生成、App 只读归档)。
+ * 热词趋势 Tab 根屏 —— 流水线预生成的跨源热词榜(读归档 trends.json,统计
+ * 为主 + 可选 AI 精修;与「总览」tab 同范式:流水线预生成、App 只读归档)。
  *
  * 结构(编辑风,去卡片化,与总览 Top10 平铺同语言):
  *  - 顶部时效 caption:「近 N 天热词 · 数据截至 M月d日」(归档每日跑批,先交代新鲜度)
@@ -89,7 +89,7 @@ fun TrendsScreen(
     val state by vm.state.collectAsStateWithLifecycle()
     val isRefreshing by vm.isRefreshing.collectAsStateWithLifecycle()
 
-    // 重击当前 tab:滚回顶部 + 重读归档(命中 index.json 2 分钟缓存零开销)。
+    // 重击当前 tab:滚回顶部 + 重读归档(命中 trends.json 2 分钟缓存零开销)。
     // lastHandled 防「重新进入组合就自动刷新」(同总览 tab 套路)。
     var lastHandledReselect by remember { mutableIntStateOf(reselectSignal) }
     LaunchedEffect(reselectSignal) {
@@ -235,15 +235,18 @@ private fun TrendsContent(
             }
         }
 
-        item(key = "footer", contentType = "footer") {
-            Text(
-                text = stringResource(R.string.trends_generated_at, formatClock(digest.generatedAt)),
-                style = AppText.caption,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 18.dp, vertical = 12.dp)
-            )
+        // generatedAt 缺省 0(异常数据)时不渲染页脚,避免显示成 1970 年的时刻
+        if (digest.generatedAt > 0) {
+            item(key = "footer", contentType = "footer") {
+                Text(
+                    text = stringResource(R.string.trends_generated_at, formatClock(digest.generatedAt)),
+                    style = AppText.caption,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 18.dp, vertical = 12.dp)
+                )
+            }
         }
     }
 }
@@ -265,7 +268,8 @@ private fun KeywordRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable(onClick = onToggle)
+                // 代表条目为空时禁点(展开无内容,不给无反馈的点击)
+                .clickable(enabled = keyword.items.isNotEmpty(), onClick = onToggle)
                 .padding(horizontal = 18.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -329,7 +333,8 @@ private fun TrendArrow(trend: String) {
 }
 
 /**
- * 排名变化小字(排名徽章下方,较昨日最后一期榜单):新上榜=error 红「新」/
+ * 排名变化小字(排名徽章下方,较昨日最后一期榜单):新上榜=primary「新」
+ * (与上升同色——都是偏正面的信号,error 红只留给错误与下降语义)/
  * 上升=primary +N / 下降=tertiary -N / 持平=弱色。rankChange 为 null 且非
  * 新上榜时是流水线无历史基准(首期),不显示。
  */
@@ -338,7 +343,7 @@ private fun RankChangeLabel(keyword: TrendKeyword) {
     val cs = MaterialTheme.colorScheme
     val rc = keyword.rankChange
     if (keyword.isNewEntry) {
-        RankChangeText(stringResource(R.string.trends_rank_new), cs.error)
+        RankChangeText(stringResource(R.string.trends_rank_new), cs.primary)
     } else if (rc != null) {
         when {
             rc > 0 -> RankChangeText(stringResource(R.string.trends_rank_up, rc), cs.primary)
