@@ -17,4 +17,9 @@
     <string name="trends_hits_meta">%1$d 次 · %2$d 天活跃</string>
     <!-- 页脚生成时间:%1$s=HH:mm -->
     <string name="trends_generated_at">生成于 %1$s</string>
+    <!-- 排名变化小字(排名徽章下方,较昨日最后一期):%1$d=变化名次数 -->
+    <string name="trends_rank_up">+%1$d</string>
+    <string name="trends_rank_down">-%1$d</string>
+    <string name="trends_rank_flat">持平</string>
+    <string name="trends_rank_new">新</string>
 </resources>

@@ -72,8 +72,8 @@ import java.util.Locale
  *
  * 结构(编辑风,去卡片化,与总览 Top10 平铺同语言):
  *  - 顶部时效 caption:「近 N 天热词 · 数据截至 M月d日」(归档每日跑批,先交代新鲜度)
- *  - 热词榜平铺:[RankBadge] + 热词 + 命中统计 + 14 日 sparkline(Canvas 手绘,
- *    不引图表库)+ 涨跌箭头;行间 0.5dp 发丝线(缩进对齐文字列)
+ *  - 热词榜平铺:[RankBadge] + 排名变化小字(较昨日:+N/-N/持平/新上榜)+ 热词 +
+ *    命中统计 + 14 日 sparkline(Canvas 手绘,不引图表库)+ 涨跌箭头;行间 0.5dp 发丝线(缩进对齐文字列)
  *  - 点击词条整行展开 ≤3 条代表条目(浅底通栏带,标题点击经 openUrl 进内置 WebView)
  *  - 页脚:生成时间
  */
@@ -249,7 +249,7 @@ private fun TrendsContent(
 }
 
 /**
- * 热词行:[RankBadge] + 热词/命中统计 + sparkline + 涨跌箭头。
+ * 热词行:[RankBadge] + 排名变化小字 + 热词/命中统计 + sparkline + 涨跌箭头。
  * 展开时下方带出代表条目浅底通栏带(对齐总览 breaking 色带语言:无卡片、色带边缘分隔)。
  */
 @Composable
@@ -269,7 +269,15 @@ private fun KeywordRow(
                 .padding(horizontal = 18.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            RankBadge(rank = rank)
+            // 排名徽章 + 其下排名变化小字,固定 24dp 宽(与徽章同宽,行间文字列对齐)
+            Column(
+                modifier = Modifier.width(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                RankBadge(rank = rank)
+                Spacer(Modifier.height(2.dp))
+                RankChangeLabel(keyword = keyword)
+            }
             Spacer(Modifier.size(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -317,6 +325,37 @@ private fun TrendArrow(trend: String) {
         contentDescription = null,
         tint = tint,
         modifier = Modifier.size(16.dp)
+    )
+}
+
+/**
+ * 排名变化小字(排名徽章下方,较昨日最后一期榜单):新上榜=error 红「新」/
+ * 上升=primary +N / 下降=tertiary -N / 持平=弱色。rankChange 为 null 且非
+ * 新上榜时是流水线无历史基准(首期),不显示。
+ */
+@Composable
+private fun RankChangeLabel(keyword: TrendKeyword) {
+    val cs = MaterialTheme.colorScheme
+    val rc = keyword.rankChange
+    if (keyword.isNewEntry) {
+        RankChangeText(stringResource(R.string.trends_rank_new), cs.error)
+    } else if (rc != null) {
+        when {
+            rc > 0 -> RankChangeText(stringResource(R.string.trends_rank_up, rc), cs.primary)
+            rc < 0 -> RankChangeText(stringResource(R.string.trends_rank_down, -rc), cs.tertiary)
+            else -> RankChangeText(stringResource(R.string.trends_rank_flat), cs.onSurfaceVariant)
+        }
+    }
+}
+
+/** 排名变化小字本体:caption 单行,由外层 24dp Column 负责居中。 */
+@Composable
+private fun RankChangeText(text: String, color: Color) {
+    Text(
+        text = text,
+        style = AppText.caption,
+        color = color,
+        maxLines = 1
     )
 }
 

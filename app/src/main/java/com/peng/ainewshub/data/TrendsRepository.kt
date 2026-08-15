@@ -30,6 +30,10 @@ data class TrendItem(
  * @param daysActive 窗口期活跃天数(当日命中 ≥1 即活跃)
  * @param daily 与 [TrendsDigest.days] 对齐的每日命中序列(sparkline 数据源)
  * @param trend 涨跌标记:"up" / "down" / "flat"(近 3 日命中和 vs 前 3 日)
+ * @param rankChange 排名变化(较昨日最后一期榜单):正 = 上升 N 名、0 = 持平、
+ *   负 = 下降;流水线无历史基准(首期运行 / 基准归档缺失)时不输出该字段,
+ *   此处为 null(UI 不显示标记)
+ * @param isNewEntry 新上榜标记(昨日最后一期不在榜);与 rankChange 互斥
  * @param items ≤3 条代表条目(日期新的优先,源尽量多样)
  */
 data class TrendKeyword(
@@ -39,6 +43,8 @@ data class TrendKeyword(
     val daysActive: Int,
     val daily: List<Int>,
     val trend: String,
+    val rankChange: Int?,
+    val isNewEntry: Boolean,
     val items: List<TrendItem>
 )
 
@@ -117,6 +123,9 @@ class TrendsRepository {
                 daysActive = o.optInt("daysActive"),
                 daily = daily,
                 trend = o.optString("trend", "flat"),
+                // rankChange 仅在流水线有历史基准时输出(has 判空,旧格式天然兼容)
+                rankChange = if (o.has("rankChange")) o.optInt("rankChange") else null,
+                isNewEntry = o.optBoolean("isNewEntry", false),
                 items = parseItems(o.optJSONArray("items"))
             ).takeIf { it.display.isNotBlank() && it.daily.isNotEmpty() }
         }

@@ -17,4 +17,9 @@
     <string name="trends_hits_meta">%1$d hits · %2$d days active</string>
     <!-- Footer generated time: %1$s=HH:mm -->
     <string name="trends_generated_at">Generated %1$s</string>
+    <!-- Rank change under rank badge (vs yesterday's final board): %1$d=rank delta -->
+    <string name="trends_rank_up">+%1$d</string>
+    <string name="trends_rank_down">-%1$d</string>
+    <string name="trends_rank_flat">Flat</string>
+    <string name="trends_rank_new">New</string>
 </resources>
