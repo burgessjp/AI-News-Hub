@@ -18,12 +18,12 @@
 versionCode / versionName 的注入见 `app/build.gradle.kts` 的 `defaultConfig`:
 
 ```kotlin
-// 版本号默认 1.0(1),release.yml 发版时从 tag 经 -PversionName/-PversionCode 注入
-versionCode = (findProperty("versionCode") as? String)?.toIntOrNull() ?: 1
-versionName = findProperty("versionName") as? String ?: "1.0"
+// 版本号默认 1.2.1(10201),发版时同步此兜底值;release.yml 从 tag 经 -PversionName/-PversionCode 注入
+versionCode = (findProperty("versionCode") as? String)?.toIntOrNull() ?: 10201
+versionName = findProperty("versionName") as? String ?: "1.2.1"
 ```
 
-本地 debug 构建走默认值 `1.0(1)`,**只有 tag 触发的 CI 才会注入真实版本号**;`build.yml` 的 PR 构建不注入。
+本地 debug 构建与 `build.yml` 的 PR 构建走上述兜底值(每次发版时同步),**tag 触发的 CI 注入 tag 计算的真实版本号,覆盖兜底**。
 
 ## 前置条件
 
@@ -83,10 +83,14 @@ git pull origin main
 - 顺手核对上一版本条目状态(如 `[1.0.0] - 未发布` 实际已发版,应改为真实日期)
 - 若改动涉及数据源模式 / 流水线行为 / 导航机制,按 `AGENTS.md`「维护」小节约定同步更新 `AGENTS.md`
 
+**2.1 同步 build.gradle.kts 兜底版本号**
+
+把 `app/build.gradle.kts` defaultConfig 中的兜底 `versionCode`/`versionName` 更新为本次发版值(如 `10201`/`"1.2.1"`),让本地 debug 构建与 PR 构建也显示当前版本。
+
 **3. 提交**
 
 ```bash
-git add CHANGELOG.md   # 若有 AGENTS.md 同步改动一并 add
+git add CHANGELOG.md app/build.gradle.kts   # 若有 AGENTS.md / docs 同步改动一并 add
 git commit -m "docs(release): prepare v1.0.1"
 ```
 
