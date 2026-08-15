@@ -7,7 +7,8 @@
 - **取数模式恒定归档**（设置页「数据源」入口已移除）：5 个稳定源（HackerNews / GitHub Trending / stormzhang AI / HuggingFace Papers / The Rundown AI）固定走 ARCHIVE；底层 `SourceMode` 枚举与 LIVE 分支保留待恢复（`SettingsStore` 强制返回 `ARCHIVE`）。
 - **Product Hunt 只归档**（Developer Token 是服务端 secret 不进 APK，两种模式都走归档）。
 - 归档走 `ArchiveHttpClient`（gitcode **REST API raw 端点**，**不要**用 raw 直链——背后是 WAF 会 403）。
-- **归档失败直接显示 Error 态，不回退实时**。
+- **归档断网兜底**：index / 快照 / 根级文件网络成功后 write-through 落盘（`ArchiveDiskCache`，`cacheDir/archives/`，64MB 上限最旧淘汰，`App.onCreate` init 保证小组件等无 Activity 入口也能落盘）；网络失败先读盘，命中则置 `ArchiveHttpClient.offlineMode` 并返回旧数据（Repository/VM 签名零改动），UI 层每次离线事件弹一次性 Snackbar；未命中才走错误态。
+- **归档失败（盘上也无兜底）直接显示 Error 态，不回退实时**。
 
 ## 三个内容 Tab 的数据语义
 
@@ -46,4 +47,6 @@
 ## 其他
 
 - 端侧 AI（翻译 / 系统选中译）统一经 `AiChatClient` 访问「设置 → AI 服务」里的用户配置。
+- **本地搜索索引**：`SearchIndexRepository`（单例 object，`App.onCreate` init）在 7 个归档 Repository 与 `NewsRepository.fetchItems` 成功取数后回填 Room `search_items` 表（url 主键 = 行点击时传给 `openUrl` 的同一 URL；source 存 `SourceKeys` key 或 aihot 条目媒体名，UI 经 `sourceMeta` 转本地化标题），只覆盖用户浏览过的批次、90 天抽样清理；搜索页「本地」模式消费（详见 persistence.md）。
+- **更新检查**：`UpdateChecker`（关于页手动触发）查 GitHub `releases/latest` 的 `tag_name` 与本地 versionName 逐段比较；任何失败静默视为已是最新（匿名限频 60/h，仅手动无压力）。
 - 数据模型：`NewsItem` / `HackerNewsStory` 用 `@Parcelize`。

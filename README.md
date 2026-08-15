@@ -97,9 +97,12 @@ Every link in the app opens in-app, never in an external browser:
 ### More
 
 - **AI Daily** and **historical archive** (browse back by date)
-- **Search**: local search history + trending-word hints from Today's Hot
+- **Search**: online mode (AIHot API) or on-device mode (Room index of the feeds you've browsed), with local search history + trending-word hints
+- **Read state**: opened items dim across every feed, with an "Unread only" filter on the items list (delete a history entry to un-read)
+- **Offline fallback**: archive data is written through to a disk cache, so a cold start without network still shows the last fetched content
 - **Browsing history & Favorites** (stored locally in Room; star any page from the built-in WebView to read it later)
 - **Daily update notification** (optional, off by default): a local notification when the pipeline publishes new content, at most one per day; with it on, a cold start on new data also shows a quick "view" dialog
+- **In-app update check** (About page) against GitHub Releases, plus `ainewshub://` deep links (`web?url=…`, `tab/<overview|summary|trends|more>`, `settings`) for browsers, QR codes and automation tools
 - **Theme**: Material You dynamic color (Android 12+), font family toggle (default / serif / monospace), size presets, dark mode
 - **Languages**: switch between Simplified Chinese and English
 
