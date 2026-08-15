@@ -22,9 +22,12 @@ import java.util.concurrent.ConcurrentHashMap
  *
  * 取数流程(对齐 docs/news-hub-data-usage.md):
  *  1. GET `index.json?ref=news-hub-data` → 读 `latest.<source>` 拿最新快照路径
- *     (或读 `history.<source>.<date>` 拿指定日期的快照路径 —— 「历史摘要」用)
+ *     (index 只含即时字段:updated_at / latest / latest_overview / latest_trends)
  *  2. 拼 `<API_BASE>/<source>/<相对路径>?ref=news-hub-data` GET 该快照 JSON
  *  3. 解析顶层 `fetched_at_ms` 与 `items[]`,交由各 Repository 做字段映射
+ *  4. 历史类页面按需另拉根级独立索引文件 `history.json`(「历史摘要」日期寻址)
+ *     与 `overview_history.json`(「历史总览」日期寻址)——已拆出 index.json,
+ *     不随保留期增长,且未进历史页的 tab 不必下载
  *
  * 缓存与刷新:index.json 有 2 分钟内存缓存(多源并发去重,见 fetchIndex);快照本体
  * 按路径缓存(内容不可变,见 fetchSnapshot)+ 同 URL in-flight 去重,重进 tab 不重复下载。
@@ -56,6 +59,10 @@ object ArchiveHttpClient {
     private const val REF = "news-hub-data"
 
     private const val INDEX_URL = "$API_BASE/index.json?ref=$REF"
+
+    /** 根级独立历史索引(拆出 index.json,内容与原内联字段同构)。 */
+    private const val HISTORY_URL = "$API_BASE/history.json?ref=$REF"
+    private const val OVERVIEW_HISTORY_URL = "$API_BASE/overview_history.json?ref=$REF"
 
     /** index.json 内存缓存有效期:2 分钟(index 实际几小时才更新一次,短 TTL 足够)。 */
     private const val INDEX_TTL_MS = 2L * 60 * 1000
@@ -109,6 +116,40 @@ object ArchiveHttpClient {
 
     /** in-flight 去重锁:同 URL 并发只打 1 次网络,其余等锁后复用缓存。 */
     private val snapshotLocks = ConcurrentHashMap<String, Mutex>()
+
+    // ===== 根级独立索引文件(history.json / overview_history.json)=====
+    // 拆出 index.json 的历史索引:更新节奏与 index 相同(每批次),复用同款
+    // 2 分钟 TTL + Mutex 并发去重;仅历史类页面按需拉取,单文件持有单实例。
+
+    private val historyFileFetcher = CachedFileJson(HISTORY_URL, "读取历史索引失败")
+    private val overviewHistoryFileFetcher = CachedFileJson(OVERVIEW_HISTORY_URL, "读取总览历史索引失败")
+
+    /**
+     * 根级独立索引文件的单实例缓存拉取器(history.json / overview_history.json 用)。
+     *
+     * 机制与 fetchIndex 同款:Mutex 串行化 + [INDEX_TTL_MS] 短 TTL 缓存(两文件与
+     * index 同批次更新,节奏一致);区别是无需 force 路径(历史页无下拉刷新,
+     * 仅错误态重试,重试直接走网络)。
+     */
+    private class CachedFileJson(private val url: String, private val hint: String) {
+
+        private val mutex = Mutex()
+        private var cached: JSONObject? = null
+        private var cachedAt = 0L
+
+        suspend fun fetch(): JSONObject = mutex.withLock {
+            val c = cached
+            if (c != null && System.currentTimeMillis() - cachedAt < INDEX_TTL_MS) {
+                return@withLock c
+            }
+            val text = getRaw(url, hint)
+            val parsed = runCatching { JSONObject(text) }
+                .getOrElse { throw AppException.ServerError() }
+            cached = parsed
+            cachedAt = System.currentTimeMillis()
+            parsed
+        }
+    }
 
     /**
      * 拉 index.json(带 2 分钟缓存 + 并发去重)。
@@ -220,14 +261,14 @@ object ArchiveHttpClient {
     }
 
     /**
-     * 读 index.json 的 `history` 索引(与 latest 共享 2 分钟缓存),供「历史摘要」按日期寻址。
+     * 读根级独立索引文件 `history.json`(拆出 index.json,历史摘要按日期寻址用)。
+     * 自带 2 分钟缓存 + 并发去重,与 index 互不影响(未进历史页的 tab 不下载本文件)。
      *
-     * @return source → (date → 相对源目录的快照路径);history 由流水线每次运行时合并写入,
-     * 每源仅保留最近 31 天且自 2026-07-18 起;旧版 index 无该字段时返回空 map(功能上线初期即如此)
+     * @return source → (date → 相对源目录的快照路径);由流水线每次运行时合并写入,
+     * 每源仅保留最近 31 天且自 2026-07-18 起;文件缺失/字段为空时返回空 map(功能上线初期即如此)
      */
     suspend fun fetchHistory(): Map<String, Map<String, String>> = withContext(Dispatchers.IO) {
-        val index = fetchIndex()
-        val history = index.optJSONObject("history") ?: return@withContext emptyMap()
+        val history = historyFileFetcher.fetch()
         val result = mutableMapOf<String, Map<String, String>>()
         history.keys().forEach { source ->
             val dates = history.optJSONObject(source) ?: return@forEach
@@ -242,16 +283,15 @@ object ArchiveHttpClient {
     }
 
     /**
-     * 读 index.json 的 `overview_history` 索引(与 latest 共享 2 分钟缓存),供
-     * 「历史总览」按日期寻址。
+     * 读根级独立索引文件 `overview_history.json`(拆出 index.json,历史总览按日期寻址)。
+     * 自带 2 分钟缓存 + 并发去重。
      *
      * @return date → 相对 overview/ 目录的归档文件路径(形如 `2026-08-15/11-49-data.json`,
      *         取当日最后一次批次)。由流水线每次运行时合并写入,仅保留最近 90 天;
-     *         旧版 index 无该字段时返回空 map(功能上线初期即如此)
+     *         文件缺失/为空时返回空 map(功能上线初期即如此)
      */
     suspend fun fetchOverviewHistory(): Map<String, String> = withContext(Dispatchers.IO) {
-        val index = fetchIndex()
-        val history = index.optJSONObject("overview_history") ?: return@withContext emptyMap()
+        val history = overviewHistoryFileFetcher.fetch()
         val result = mutableMapOf<String, String>()
         history.keys().forEach { date ->
             val rel = history.optString(date)
