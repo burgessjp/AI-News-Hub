@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.TrendingDown
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.Remove
@@ -40,6 +41,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -81,6 +83,8 @@ import java.util.Locale
 @Composable
 fun TrendsScreen(
     onOpenUrl: (url: String, title: String, source: String) -> Unit,
+    // 词云二级页入口(TabRoot 分支内经 nav.push 构造;根 tab 顶栏无 actions,入口在 caption 行)
+    onOpenCloud: () -> Unit,
     // 列表状态由 MainActivity 上提持有:切 tab / 进二级页返回后保持滚动位置
     listState: LazyListState,
     reselectSignal: Int = 0,
@@ -143,7 +147,8 @@ fun TrendsScreen(
                     TrendsContent(
                         digest = s.digest,
                         listState = listState,
-                        onOpenUrl = onOpenUrl
+                        onOpenUrl = onOpenUrl,
+                        onOpenCloud = onOpenCloud
                     )
                 }
             }
@@ -189,12 +194,15 @@ private fun TrendsLoading() {
  *
  * [bottomReserve]:根 tab 为 true(末项可停到浮动药丸之上:药丸高 + 16dp 呼吸
  * 空间);二级页为 false(无浮动底栏,不留底部预留)。
+ * [onOpenCloud]:词云页入口,仅趋势根 tab 传入(caption 行右侧出现「词云 ›」
+ * 链接);历史日期页保持 null 不显示入口。
  */
 @Composable
 internal fun TrendsContent(
     digest: TrendsDigest,
     listState: LazyListState,
     onOpenUrl: (url: String, title: String, source: String) -> Unit,
+    onOpenCloud: (() -> Unit)? = null,
     bottomReserve: Boolean = true
 ) {
     val context = LocalContext.current
@@ -205,18 +213,47 @@ internal fun TrendsContent(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = if (bottomReserve) BottomBarPillHeight + 16.dp else 0.dp)
     ) {
-        // 顶部时效 caption:窗口 + 数据截至(归档每日跑批,先交代新鲜度)
+        // 顶部时效 caption:窗口 + 数据截至(归档每日跑批,先交代新鲜度);
+        // 根 tab 在行尾带「词云 ›」入口链接(顶栏无 actions,入口收进内容区)
         item(key = "caption", contentType = "caption") {
-            Text(
-                text = stringResource(
-                    R.string.trends_window_caption,
-                    digest.windowDays,
-                    formatDay(context, digest.days.lastOrNull().orEmpty())
-                ),
-                style = AppText.caption,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stringResource(
+                        R.string.trends_window_caption,
+                        digest.windowDays,
+                        formatDay(context, digest.days.lastOrNull().orEmpty())
+                    ),
+                    style = AppText.caption,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f)
+                )
+                if (onOpenCloud != null) {
+                    Row(
+                        modifier = Modifier
+                            .clip(MaterialTheme.shapes.small)
+                            .clickable(onClick = onOpenCloud)
+                            .padding(start = 12.dp, top = 4.dp, bottom = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = stringResource(R.string.trends_cloud_entry),
+                            style = AppText.caption,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                }
+            }
         }
 
         val keywords = digest.keywords
@@ -450,8 +487,8 @@ private fun KeywordItems(
     }
 }
 
-/** 窗口日期(yyyy-MM-dd)格式化为「M月d日」;解析失败原样返回。 */
-private fun formatDay(context: Context, day: String): String =
+/** 窗口日期(yyyy-MM-dd)格式化为「M月d日」;解析失败原样返回。趋势 Tab 与词云页共用。 */
+internal fun formatDay(context: Context, day: String): String =
     runCatching {
         val parsed = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).parse(day)
         if (parsed != null) {
@@ -459,6 +496,6 @@ private fun formatDay(context: Context, day: String): String =
         } else day
     }.getOrDefault(day)
 
-/** 生成时刻格式化为「HH:mm」。 */
-private fun formatClock(ms: Long): String =
+/** 生成时刻格式化为「HH:mm」。趋势 Tab 与词云页共用。 */
+internal fun formatClock(ms: Long): String =
     runCatching { SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(ms)) }.getOrDefault("")

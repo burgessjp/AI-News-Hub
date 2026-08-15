@@ -73,6 +73,8 @@ internal sealed interface Page {
     data object TrendsArchive : Page
     /** 历史热词 —— 指定日期的热词榜页(复用趋势 Tab 内容实现)。 */
     data class TrendsDate(val date: String) : Page
+    /** 趋势词云 —— 近窗口期热词的词云全景页(趋势 Tab caption 行进入,纯 Canvas 无列表)。 */
+    data object TrendsCloud : Page
 }
 
 /**
@@ -109,6 +111,7 @@ internal fun Page.toBundle(): Bundle = Bundle().apply {
         is Page.OverviewDate -> { putString("t", "OverviewDate"); putString("date", date) }
         is Page.TrendsArchive -> putString("t", "TrendsArchive")
         is Page.TrendsDate -> { putString("t", "TrendsDate"); putString("date", date) }
+        is Page.TrendsCloud -> putString("t", "TrendsCloud")
     }
 }
 
@@ -143,6 +146,7 @@ internal fun pageFromBundle(b: Bundle, webFallbackTitle: String): Page? {
         "OverviewDate" -> b.getString("date")?.let { Page.OverviewDate(it) }
         "TrendsArchive" -> Page.TrendsArchive
         "TrendsDate" -> b.getString("date")?.let { Page.TrendsDate(it) }
+        "TrendsCloud" -> Page.TrendsCloud
         else -> null
     }
 }

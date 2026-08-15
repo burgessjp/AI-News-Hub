@@ -30,4 +30,15 @@
     <string name="trends_archive_empty_subtitle">每日热词榜生成后按日归档\n可回看最近 90 天</string>
     <!-- 日期详情页顶栏标题:%1$s=YYYY-MM-DD -->
     <string name="trends_date_title">%1$s 热词榜</string>
+
+    <!-- 趋势词云(趋势 Tab caption 行进入的二级页) -->
+    <!-- 页面顶栏标题 -->
+    <string name="trends_cloud_title">趋势词云</string>
+    <!-- 趋势 Tab caption 行的入口链接文字 -->
+    <string name="trends_cloud_entry">词云</string>
+    <!-- 空态:归档 trends_cloud.json 缺失 -->
+    <string name="trends_cloud_no_data_title">趋势词云尚未生成</string>
+    <string name="trends_cloud_no_data_subtitle">词云由每日流水线统计生成,请稍后再来</string>
+    <!-- 错误态标题 -->
+    <string name="trends_cloud_load_failed">词云加载失败</string>
 </resources>

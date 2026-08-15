@@ -4,8 +4,12 @@
 
 「趋势」Tab 的数据生产者:扫描数据仓库 checkout 里近 WINDOW_DAYS 天的 8 源快照,
 按「条目命中」做词频统计(一个词在一条条目中出现算 1 次,同日同条不重复计),
-产出一个热词榜(每日命中序列 + 涨跌 + 代表条目),写进根级独立文件
-`trends.json`(内容与原 index.json 内联 `latest_trends` 字段同构,整文件覆盖)。
+产出两份数据:
+  - 热词榜 trends.json(每日命中序列 + 涨跌 + 代表条目,榜单恒 10 词);
+  - 趋势词云 trends_cloud.json(纯统计 top CLOUD_WORDS 个轻量词条,专用数据
+    文件,不占 trends.json 体积、不带代表条目,供 App「趋势词云」全景页)。
+两份均为根级独立文件、整文件覆盖(trends.json 内容与原 index.json 内联
+`latest_trends` 字段同构;trends_cloud.json 为新增文件,互不依赖)。
 同时每批落一份按日归档 `trends/<date>/<HH-MM>-data.json`(根级索引
 `trends_history.json` 维护 {date: relpath},保留 90 天指针,旧归档目录只增不删),
 并基于「昨日最后一期」归档为每个热词附上排名变化字段 rankChange / isNewEntry
@@ -65,6 +69,7 @@ from ai_summary import ENV_API_KEY, ENV_BASE_URL, ENV_MODEL, config_ready
 
 WINDOW_DAYS = 14            # 统计窗口(天)
 TOP_KEYWORDS = 10           # 入榜热词数
+CLOUD_WORDS = 60            # 词云候选词数(独立文件 trends_cloud.json,纯统计)
 MIN_TOTAL = 3               # 窗口期总命中下限
 MIN_DAYS_ACTIVE = 2         # 窗口期活跃天数下限(有命中即算活跃)
 MAX_ITEMS_PER_KEYWORD = 3   # 每词代表条目上限
@@ -371,12 +376,15 @@ def _finalize_entry(entry):
 
 def generate_trends(repo_dir, now=None):
     """
-    扫描 repo_dir 近 WINDOW_DAYS 天快照,生成 (趋势榜 dict, AI 精修候选池);
-    可用快照不足时返回 None。
+    扫描 repo_dir 近 WINDOW_DAYS 天快照,生成 (趋势榜 dict, 词云 dict, AI 精修
+    候选池);可用快照不足时返回 None。
 
     趋势榜 keywords 先装「统计回退榜」(动量加权排序 + 自由 unigram 护栏后的
     top TOP_KEYWORDS);调用方可把候选池交给 refine_keywords_with_ai 精修替换。
     候选池按分值序取 REFINE_POOL_SIZE 个、宽口径不过护栏。
+    词云 dict 为独立文件 trends_cloud.json 的内容(top CLOUD_WORDS 纯统计,
+    组装见代码注释;AI 精修只替换 keywords,词云不受影响;generatedAt 由
+    write_trends 填充)。
 
     now: datetime(北京时间),默认取当前;generatedAt 用它,日期窗口以快照实际
     最大日期为锚(而不是 now——本地验证 / 补跑时窗口对准数据而非运行时刻)。
@@ -472,13 +480,30 @@ def generate_trends(repo_dir, now=None):
     guarded += [k for k in pool if _is_free_unigram(k["term"])]
     keywords = [_finalize_entry(k) for k in guarded[:TOP_KEYWORDS]]
 
+    # 词云候选(独立文件 trends_cloud.json 的 words):从 qualified 全集按分值
+    # 序取护栏词 top CLOUD_WORDS(护栏词不足才用自由 unigram 补位,语料充足时
+    # 词云全为有实体/主题信息量的词,无 work/any 之类拆词残留)——榜单看头部,
+    # 词云看全景,量级比 REFINE_POOL_SIZE 大,不受 AI 候选池约束。恒为纯统计
+    # 产出,AI 精修只作用于 keywords,不触碰词云
+    cloud_guarded = [c for c in qualified if not _is_free_unigram(c[2])]
+    cloud_free = [c for c in qualified if _is_free_unigram(c[2])]
+    cloud_words = (cloud_guarded + cloud_free)[:CLOUD_WORDS]
+    cloud = {
+        "generatedAt": None,  # 由 write_trends 统一填生成时刻
+        "windowDays": WINDOW_DAYS,
+        "days": days,
+        "words": [{"term": canon, "display": _display_of(canon, surface_forms[canon]),
+                   "total": total}
+                  for _, total, canon in cloud_words],
+    }
+
     now = now or now_cst()
     return {
         "generatedAt": int(now.timestamp() * 1000),
         "windowDays": WINDOW_DAYS,
         "days": days,
         "keywords": keywords,
-    }, pool
+    }, cloud, pool
 
 
 # ===== AI 精修(可选增强,失败零降级回退纯统计) =====
@@ -702,21 +727,24 @@ def _write_trends_archive(repo_dir, trends, now):
 
 def write_trends(repo_dir):
     """
-    生成趋势并写根级独立文件 <repo_dir>/trends.json(整文件覆盖,内容与原
-    index.json 内联 `latest_trends` 字段同构),同时落一份按日归档并维护
-    trends_history.json 索引。
+    生成趋势并写两个根级独立文件:
+      - <repo_dir>/trends.json(热词榜,整文件覆盖,内容与原 index.json 内联
+        `latest_trends` 字段同构),同时落一份按日归档并维护 trends_history.json
+        索引;
+      - <repo_dir>/trends_cloud.json(趋势词云,纯统计 top CLOUD_WORDS 轻量
+        词条,专用数据文件,不进归档/索引——词云是即时全景可视化,无历史回看)。
 
     任何失败只告警、返回 False,不抛异常——趋势是锦上添花,不得阻断 push 主
     流程(对齐单源失败的降级哲学;文件暂缺时 App 走空态,下次运行自愈。统计
     部分可从快照全量重算,AI 精修失败的批次退回统计回退榜,均无继承语义)。
     归档/索引失败时根级 trends.json 已写入,仍视为成功;基准读取失败只是少
-    rankChange 字段。
+    rankChange 字段;词云文件写入失败仅告警(热词榜不受影响)。
     """
     try:
         generated = generate_trends(repo_dir)
         if generated is None:
             return False
-        trends, pool = generated
+        trends, cloud, pool = generated
         # AI 精修(可选增强):成功则替换为精修榜,失败保留统计回退榜
         refine_keywords_with_ai(trends, pool)
         now = now_cst()
@@ -731,6 +759,17 @@ def write_trends(repo_dir):
             f.write("\n")
         print(f"[TRENDS] 已写入 trends.json:{len(trends['keywords'])} 个热词,"
               f"窗口 {trends['days'][0]} ~ {trends['days'][-1]}")
+        # 词云独立文件:与热词榜同批生成时刻;写入失败只告警不阻断
+        try:
+            cloud["generatedAt"] = int(now.timestamp() * 1000)
+            cloud_path = os.path.join(repo_dir, "trends_cloud.json")
+            with open(cloud_path, "w", encoding="utf-8") as f:
+                json.dump(cloud, f, ensure_ascii=False, indent=2)
+                f.write("\n")
+            print(f"[TRENDS] 已写入 trends_cloud.json:{len(cloud['words'])} 个词云词条")
+        except Exception as e:
+            print(f"[TRENDS] 词云文件写入失败(不阻断):{type(e).__name__}: {e}",
+                  file=sys.stderr)
         try:
             _write_trends_archive(repo_dir, trends, now)
         except Exception as e:
@@ -758,7 +797,7 @@ def main():
     generated = generate_trends(args.repo_dir)
     if generated is None:
         return 1
-    trends, pool = generated
+    trends, cloud, pool = generated
     refined = refine_keywords_with_ai(trends, pool)
     # dry-run 也附上排名变化字段(纯读旧索引/归档,不写任何文件)
     baseline = attach_rank_changes(trends, args.repo_dir, now_cst().strftime("%Y-%m-%d"))
@@ -777,7 +816,10 @@ def main():
               f"{kw['daysActive']:>2} 天 {arrow} {delta:<4} daily={kw['daily']}")
         for it in kw["items"]:
             print(f"      - [{it['source']}] {it['date']} {it['title'][:50]}")
-    print("(dry-run,未写 trends.json)")
+    words = cloud["words"]
+    print(f"词云候选(trends_cloud.json):{len(words)} 个")
+    print("  " + " / ".join(f"{w['display']}({w['total']})" for w in words))
+    print("(dry-run,未写 trends.json / trends_cloud.json)")
     return 0
 
 

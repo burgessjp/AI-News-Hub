@@ -67,6 +67,9 @@ object ArchiveHttpClient {
     /** 根级独立趋势文件(拆出 index.json,内容与原内联 latest_trends 字段同构)。 */
     private const val TRENDS_URL = "$API_BASE/trends.json?ref=$REF"
 
+    /** 根级独立趋势词云文件(专用数据文件,「趋势词云」页按需拉取)。 */
+    private const val TRENDS_CLOUD_URL = "$API_BASE/trends_cloud.json?ref=$REF"
+
     /** 根级独立趋势历史索引(拆出 index.json,历史热词按日期寻址)。 */
     private const val TRENDS_HISTORY_URL = "$API_BASE/trends_history.json?ref=$REF"
 
@@ -133,8 +136,10 @@ object ArchiveHttpClient {
 
     // trends.json 由 write_trends「成功才写」,生成失败的批次会暂缺文件(下次自愈),
     // 404 是正常暂态 → absentAsNull 返回 null(UI 走 NoData 空态);history 两索引
-    // 由流水线无条件恒写,404 属异常,应抛错走错误态。
+    // 由流水线无条件恒写,404 属异常,应抛错走错误态。trends_cloud.json 与 trends.json
+    // 同批生成、同为「成功才写」语义(词云文件写入失败仅告警,热词榜不受影响)。
     private val trendsFileFetcher = CachedFileJson(TRENDS_URL, "读取趋势数据失败", absentAsNull = true)
+    private val trendsCloudFileFetcher = CachedFileJson(TRENDS_CLOUD_URL, "读取趋势词云失败", absentAsNull = true)
 
     /**
      * 根级独立文件的单实例缓存拉取器(history / overview_history / trends 用)。
@@ -286,6 +291,18 @@ object ArchiveHttpClient {
      */
     suspend fun fetchLatestTrends(force: Boolean = false): JSONObject? = withContext(Dispatchers.IO) {
         trendsFileFetcher.fetch(force)?.takeIf { it.has("keywords") }
+    }
+
+    /**
+     * 拉根级独立文件 `trends_cloud.json`(趋势词云,流水线 trend_keywords.py 与
+     * trends.json 同批生成的纯统计词云候选;专用数据文件,不进按日归档)。
+     * 独立 2 分钟缓存 + 并发去重,与 index / trends 互不影响——未进词云页不下载。
+     *
+     * 与 [fetchLatestTrends] 同款「成功才写」语义:404(尚未生成)或无 words 数组
+     * 返回 null(UI 走 NoData 空态);其余网络/解析失败照常抛错(UI 错误态)。
+     */
+    suspend fun fetchTrendsCloud(): JSONObject? = withContext(Dispatchers.IO) {
+        trendsCloudFileFetcher.fetch()?.takeIf { it.has("words") }
     }
 
     /**

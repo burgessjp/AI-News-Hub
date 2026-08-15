@@ -45,6 +45,7 @@ internal fun TabRoot(
         )
         AppTab.Trends -> TrendsScreen(
             onOpenUrl = onOpenUrl,
+            onOpenCloud = { nav.push(Page.TrendsCloud) },
             listState = trendsListState,
             reselectSignal = reselectTick
         )

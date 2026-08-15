@@ -49,6 +49,36 @@ data class TrendKeyword(
 )
 
 /**
+ * 词云候选词 —— `trends_cloud.json` 的轻量词条(趋势词云页数据源)。
+ *
+ * @param term 归一化 canonical key(如 "gpt-5")
+ * @param display 展示形(映射表指定形或语料最常见写法;词云恒为纯统计产出,
+ *   display 不会是 AI 精修命名)
+ * @param total 窗口期总命中次数(词云字号权重)
+ */
+data class TrendCloudWord(
+    val term: String,
+    val display: String,
+    val total: Int
+)
+
+/**
+ * 趋势词云结果 —— 根级独立文件 `trends_cloud.json`(专用数据文件,与热词榜
+ * `trends.json` 同批生成、互不依赖;不进按日归档,无历史回看)。
+ *
+ * @param words 词云候选词(纯统计 top ~60,按流水线动量分值序)
+ * @param generatedAt 流水线生成时刻(毫秒)
+ * @param windowDays 统计窗口天数(与热词榜一致,当前 14)
+ * @param days 窗口内日历日期序列(caption 取末位作「数据截至」)
+ */
+data class TrendsCloudDigest(
+    val words: List<TrendCloudWord>,
+    val generatedAt: Long,
+    val windowDays: Int,
+    val days: List<String>
+)
+
+/**
  * 热词趋势榜结果。
  *
  * @param keywords 热词榜(流水线按动量加权分排序,≤10 个)
@@ -136,6 +166,44 @@ class TrendsRepository {
             windowDays = json.optInt("windowDays", days.size),
             days = days
         )
+    }
+
+    /**
+     * 加载趋势词云(「趋势词云」二级页)。
+     *
+     * 读根级独立文件 `trends_cloud.json`(独立 2 分钟缓存,未进词云页不下载)。
+     * 文件缺失(404,尚未生成)或 words 全部无效 → [AppException.NoData]
+     * (空态语义,下次批次自愈);网络/解析失败为对应异常。
+     */
+    suspend fun loadCloud(): Result<TrendsCloudDigest> = runCatching {
+        val json = ArchiveHttpClient.fetchTrendsCloud()
+            ?: throw AppException.NoData()
+        parseCloudDigest(json)
+    }
+
+    /** 反序列化 trends_cloud JSON 为 [TrendsCloudDigest]。words 为空视为数据无效抛 [AppException.NoData]。 */
+    private suspend fun parseCloudDigest(json: JSONObject): TrendsCloudDigest = withContext(Dispatchers.IO) {
+        val words = parseCloudWords(json.optJSONArray("words"))
+        if (words.isEmpty()) throw AppException.NoData()
+        TrendsCloudDigest(
+            words = words,
+            generatedAt = json.optLong("generatedAt", 0L),
+            windowDays = json.optInt("windowDays", 1),
+            days = readStringList(json.optJSONArray("days"))
+        )
+    }
+
+    /** 解析 words 数组,过滤掉 display 为空的项。 */
+    private fun parseCloudWords(arr: JSONArray?): List<TrendCloudWord> {
+        if (arr == null) return emptyList()
+        return (0 until arr.length()).mapNotNull { i ->
+            val o = arr.optJSONObject(i) ?: return@mapNotNull null
+            TrendCloudWord(
+                term = o.optString("term"),
+                display = o.optString("display"),
+                total = o.optInt("total")
+            ).takeIf { it.display.isNotBlank() }
+        }
     }
 
     /**

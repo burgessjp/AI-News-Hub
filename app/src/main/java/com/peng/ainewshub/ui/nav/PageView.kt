@@ -41,6 +41,7 @@ import com.peng.ainewshub.ui.overview.OverviewDateScreen
 import com.peng.ainewshub.ui.summary.SummaryArchiveScreen
 import com.peng.ainewshub.ui.summary.SummaryDateScreen
 import com.peng.ainewshub.ui.trends.TrendsArchiveScreen
+import com.peng.ainewshub.ui.trends.TrendsCloudScreen
 import com.peng.ainewshub.ui.trends.TrendsDateScreen
 import com.peng.ainewshub.ui.tabs.AllTab
 import com.peng.ainewshub.ui.tabs.FeaturedTab
@@ -311,5 +312,8 @@ internal fun PageView(
             onOpenUrl = { url, title, source -> onOpenUrl(url, title, source) },
             listState = listStates.forPage(page)
         )
+        // 趋势词云:读根级独立文件 trends_cloud.json(专用 VM),纯 Canvas 可视化页,
+        // 无列表滚动状态(不上提 listState)。
+        Page.TrendsCloud -> TrendsCloudScreen(onBack = onBack)
     }
 }

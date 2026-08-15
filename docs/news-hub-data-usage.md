@@ -21,6 +21,7 @@ news-hub-data 分支/
 ├── history.json                        ← 摘要历史索引:{源名: {日期: relpath}}(每源 31 天)
 ├── overview_history.json               ← 总览归档索引:{日期: relpath}(保留 90 天)
 ├── trends.json                         ← 热词趋势榜(纯统计,每次批次整文件覆盖)
+├── trends_cloud.json                   ← 趋势词云(纯统计 top ~60 词云候选,专用文件,不归档)
 ├── trends_history.json                 ← 趋势归档索引:{日期: relpath}(保留 90 天,App 暂不读取)
 ├── manifest.json                       ← 最近一次运行总览(成功/失败状态)
 ├── overview/                           ← 今日总览按日归档(内容与 index 的 latest_overview 同构)
@@ -284,6 +285,31 @@ print(hn['items'][0]['title'])
 **AI 精修**:统计产出候选池(按动量分值序 top 25,宽口径含被自由 unigram 护栏拦下的词)后,流水线调一次 LLM 从中选 10 个、合并同话题候选(被吸收词条的 `daily`/`items` 并入主词后重算统计)、剔除泛词、给出规范 display(可为中文);AI 未选满时按分值序用统计候选补齐,榜单长度恒定。term/absorb 必须来自候选池且不重复、数量与 display 长度校验不过 → 整体回退统计回退榜;AI 配置缺失时跳过。排序语义(动量加权)切换后的首批 `rankChange` 会有一次性全榜跳变,属预期过渡。
 
 **失败语义**:趋势生成失败不阻断推送,当次 `trends.json` 暂缺(clone 自带上一版时实际继承上一期;下次运行自愈。统计部分可从快照全量重算,AI 精修失败退回统计回退榜,均无继承语义);文件完全缺失时 App 走「热词趋势尚未生成」空态。
+
+## 趋势词云(trends_cloud.json 独立文件)
+
+根级独立文件 `trends_cloud.json` ——**趋势词云候选词表**,App「趋势词云」页(趋势 Tab caption 行进入)的数据源。流水线(`trend_keywords.py` 的 `write_trends`)与 `trends.json` **同批生成**:词频统计口径、入榜门槛(total ≥ 3 且 daysActive ≥ 2)、动量分值排序完全一致,取护栏词 top **60** 个(护栏词不足才用自由 unigram 补位)——榜单看头部,词云看全景。**恒为纯统计产出,AI 精修只作用于 `keywords`,不触碰词云**;不进按日归档(词云是即时全景可视化,无历史回看),每次批次整文件覆盖。
+
+```json
+{
+  "generatedAt": 1786277998615,
+  "windowDays": 14,
+  "days": ["2026-07-27", "2026-07-28", "...", "2026-08-09"],
+  "words": [
+    {"term": "agent", "display": "Agent", "total": 489},
+    {"term": "claude", "display": "Claude", "total": 145}
+  ]
+}
+```
+
+| 字段 | 说明 |
+|------|------|
+| `generatedAt` | 流水线生成时刻,Unix 毫秒时间戳(与同批 `trends.json` 一致) |
+| `windowDays` | 统计窗口天数(与 `trends.json` 一致,当前 14) |
+| `days` | 窗口内日历日期序列(App caption 取末位作「数据截至」) |
+| `words` | 词云候选词,按动量加权分降序,轻量词条只有 `term`/`display`/`total` 三个字段(不带 `daily`/`items`,控制体积)。App 按词频映射字号与放置顺序,不依赖数组顺序 |
+
+**失败语义**:与 `trends.json` 同批生成但独立落盘——词云文件写入失败仅告警,不影响热词榜推送;文件缺失(404)或 `words` 为空时 App「趋势词云」页走空态,下次批次自愈。
 
 ## 趋势历史归档(trends/ 目录 + trends_history.json 独立索引)
 
