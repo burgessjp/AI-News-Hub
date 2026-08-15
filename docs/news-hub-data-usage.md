@@ -17,9 +17,10 @@
 ```
 news-hub-data 分支/
 ├── index.json                          ← 入口:即时字段(updated_at / latest /
-│                                         latest_overview / latest_trends)
+│                                         latest_overview)
 ├── history.json                        ← 摘要历史索引:{源名: {日期: relpath}}(每源 31 天)
 ├── overview_history.json               ← 总览归档索引:{日期: relpath}(保留 90 天)
+├── trends.json                         ← 热词趋势榜(纯统计,每次批次整文件覆盖)
 ├── manifest.json                       ← 最近一次运行总览(成功/失败状态)
 ├── overview/                           ← 今日总览按日归档(内容与 index 的 latest_overview 同构)
 │   └── 2026-08-15/
@@ -82,31 +83,15 @@ news-hub-data 分支/
         "breaking": false, "breakingReason": ""
       }
     ]
-  },
-  "latest_trends": {
-    "generatedAt": 1786277998615,
-    "windowDays": 14,
-    "days": ["2026-07-27", "...", "2026-08-09"],
-    "keywords": [
-      {
-        "term": "agent", "display": "Agent",
-        "total": 365, "daysActive": 14,
-        "daily": [25, 29, "...", 24],
-        "trend": "up",
-        "items": [{"title": "...", "url": "...", "source": "hackernews", "date": "2026-08-09"}]
-      }
-    ]
   }
 }
 ```
 
-`index.json` 只含**即时字段**(每次批次整体刷新,体量有界不随保留期增长)。按日期寻址的两个历史索引在根级独立文件:`history.json`(摘要历史)与 `overview_history.json`(总览归档),按需拉取,详见下文对应章节。
+`index.json` 只含**即时字段**(每次批次整体刷新,体量有界不随保留期增长)。其余内容在根级独立文件按需拉取:`trends.json`(热词趋势)、`history.json`(摘要历史索引)与 `overview_history.json`(总览归档索引),详见下文对应章节。
 
 `latest` 里的路径是**相对于源目录**的。设计行为:某源当天抓取失败时,`index.json` 会保留它最后一次成功的指向(可能落在前一天),客户端永远能拿到有效数据。
 
 `latest_overview` 是**今日总览**(流水线预生成的跨源综合分析,详见下文「今日总览 latest_overview」)。App 首页「总览」tab 直接读这个字段,不再端侧调 AI。
-
-`latest_trends` 是**热词趋势榜**(流水线对近 14 天快照的纯统计词频分析,不调 AI,详见下文「热词趋势 latest_trends」)。App「趋势」tab 直接读这个字段。
 
 按日期回看的数据走根级独立索引文件(不在 index.json 里,按需拉取):`history.json`(摘要历史,`{源名: {日期: relpath}}`,详见「按日期取历史快照」)与 `overview_history.json`(总览归档,`{日期: relpath}`,详见「历史总览归档」)。
 
@@ -243,30 +228,28 @@ print(hn['items'][0]['title'])
 - **归档文件内容与当日 `latest_overview` 完全同构**(同一对象两处落盘):`generatedAt` / `dataFetchedAt` / `missingSources` / `digest`(2026-08-10 前生成的旧总览可能无此字段,空串不渲染)/ `items`。
 - **用途**:App「更多 → 历史总览」按日期回看;总览是流水线唯一花钱调 AI 且覆盖即失的产物(AI 摘要随快照留痕、趋势可从快照重算),归档即它的历史。
 
-## 热词趋势(latest_trends 字段)
+## 热词趋势(trends.json 独立文件)
 
-`index.json` 顶层还有 `latest_trends` 字段——**跨源热词趋势榜**,流水线(`scripts/trend_keywords.py`)在 push 阶段扫近 14 天各源快照做**纯统计词频分析**(不调 AI、确定性结果),App「趋势」tab 直接读这个字段。
+根级独立文件 `trends.json` ——**跨源热词趋势榜**,流水线(`scripts/trend_keywords.py`)在 push 阶段扫近 14 天各源快照做**纯统计词频分析**(不调 AI、确定性结果),每次批次整文件覆盖,App「趋势」tab 直接读这个文件(内容与原 index 内联 `latest_trends` 字段同构)。
 
 ```json
 {
-  "latest_trends": {
-    "generatedAt": 1786277998615,
-    "windowDays": 14,
-    "days": ["2026-07-27", "2026-07-28", "...", "2026-08-09"],
-    "keywords": [
-      {
-        "term": "gpt-5",
-        "display": "GPT-5",
-        "total": 87,
-        "daysActive": 9,
-        "daily": [0, 3, 5, "...", 12],
-        "trend": "up",
-        "items": [
-          {"title": "...", "url": "...", "source": "hackernews", "date": "2026-08-09"}
-        ]
-      }
-    ]
-  }
+  "generatedAt": 1786277998615,
+  "windowDays": 14,
+  "days": ["2026-07-27", "2026-07-28", "...", "2026-08-09"],
+  "keywords": [
+    {
+      "term": "gpt-5",
+      "display": "GPT-5",
+      "total": 87,
+      "daysActive": 9,
+      "daily": [0, 3, 5, "...", 12],
+      "trend": "up",
+      "items": [
+        {"title": "...", "url": "...", "source": "hackernews", "date": "2026-08-09"}
+      ]
+    }
+  ]
 }
 ```
 
@@ -291,7 +274,7 @@ print(hn['items'][0]['title'])
 
 **统计口径**:文本取自各源条目标题/简介(aihot-featured 优先 `titleEn`,stormzhang-ai 优先 `english` 并截掉 "PLUS:" 赞助尾巴);英文按 `[a-z0-9]+` 分词去停用词后取 unigram + 相邻 bigram,内置 AI 实体别名表做归一(GPT-5/OpenAI/Claude/千问 等);中文不分词,只对别名表内含 CJK 的词做子串匹配。
 
-**失败语义**:趋势生成失败不阻断推送,当次 `index.json` 暂缺该字段(下次运行自愈);字段完全缺失时 App 走「热词趋势尚未生成」空态。
+**失败语义**:趋势生成失败不阻断推送,当次 `trends.json` 暂缺(下次运行自愈;趋势可从快照全量重算,无继承语义);文件完全缺失时 App 走「热词趋势尚未生成」空态。
 
 ## 单个数据文件的通用结构
 

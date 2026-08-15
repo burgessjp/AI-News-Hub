@@ -4,8 +4,8 @@
 
 「趋势」Tab 的数据生产者:扫描数据仓库 checkout 里近 WINDOW_DAYS 天的 8 源快照,
 按「条目命中」做词频统计(一个词在一条条目中出现算 1 次,同日同条不重复计),
-产出一个热词榜(每日命中序列 + 涨跌 + 代表条目),作为 `latest_trends` 字段
-写进 index.json 顶层(与 `latest_overview` 平级)。
+产出一个热词榜(每日命中序列 + 涨跌 + 代表条目),写进根级独立文件
+`trends.json`(内容与原 index.json 内联 `latest_trends` 字段同构,整文件覆盖)。
 
 挂载点:push_data.py 在 overlay 之后、git add 之前调用 write_trends(repo_dir)。
 选 push 阶段而非 fetch 阶段的原因:fetch 的 out/ 只有当天快照,而 push 阶段
@@ -28,7 +28,7 @@ clone 下来的数据仓库含全部历史日期目录(快照是文件,git --dep
   - 每词保留 <= MAX_ITEMS_PER_KEYWORD 条代表条目(日期新的优先,按 URL 去重)。
 
 用法:
-  # 对本地数据仓库 checkout 生成并写回其 index.json
+  # 对本地数据仓库 checkout 生成并写回其 trends.json
   python3 scripts/trend_keywords.py --repo-dir repo
 
   # 只打印不写文件(本地验证)
@@ -392,24 +392,22 @@ def generate_trends(repo_dir, now=None):
 
 def write_trends(repo_dir):
     """
-    生成趋势并写进 <repo_dir>/index.json 顶层 `latest_trends` 字段。
+    生成趋势并写根级独立文件 <repo_dir>/trends.json(整文件覆盖,内容与原
+    index.json 内联 `latest_trends` 字段同构)。
 
     任何失败只告警、返回 False,不抛异常——趋势是纯统计的锦上添花,
-    不得阻断 push 主流程(对齐单源失败的降级哲学;字段暂缺时 App 走空态,
-    下次运行自愈)。
+    不得阻断 push 主流程(对齐单源失败的降级哲学;文件暂缺时 App 走空态,
+    下次运行自愈。趋势可从快照全量重算,无继承语义)。
     """
     try:
         trends = generate_trends(repo_dir)
         if trends is None:
             return False
-        index_path = os.path.join(repo_dir, "index.json")
-        with open(index_path, "r", encoding="utf-8") as f:
-            index = json.load(f)
-        index["latest_trends"] = trends
-        with open(index_path, "w", encoding="utf-8") as f:
-            json.dump(index, f, ensure_ascii=False, indent=2)
+        trends_path = os.path.join(repo_dir, "trends.json")
+        with open(trends_path, "w", encoding="utf-8") as f:
+            json.dump(trends, f, ensure_ascii=False, indent=2)
             f.write("\n")
-        print(f"[TRENDS] 已写入 index.json:{len(trends['keywords'])} 个热词,"
+        print(f"[TRENDS] 已写入 trends.json:{len(trends['keywords'])} 个热词,"
               f"窗口 {trends['days'][0]} ~ {trends['days'][-1]}")
         return True
     except Exception as e:
@@ -422,7 +420,7 @@ def main():
     parser.add_argument("--repo-dir", default="repo",
                         help="数据仓库 checkout 根目录(默认 ./repo)")
     parser.add_argument("--dry-run", action="store_true",
-                        help="只打印结果摘要,不写 index.json(本地验证用)")
+                        help="只打印结果摘要,不写 trends.json(本地验证用)")
     args = parser.parse_args()
 
     trends = generate_trends(args.repo_dir)
@@ -436,7 +434,7 @@ def main():
         for it in kw["items"]:
             print(f"      - [{it['source']}] {it['date']} {it['title'][:50]}")
     if args.dry_run:
-        print("(dry-run,未写 index.json)")
+        print("(dry-run,未写 trends.json)")
         return 0
     return 0 if write_trends(args.repo_dir) else 1
 
