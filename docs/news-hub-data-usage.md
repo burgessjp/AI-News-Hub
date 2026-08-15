@@ -234,7 +234,7 @@ print(hn['items'][0]['title'])
 
 ## 热词趋势(trends.json 独立文件)
 
-根级独立文件 `trends.json` ——**跨源热词趋势榜**,流水线(`scripts/trend_keywords.py`)在 push 阶段扫近 14 天各源快照做**纯统计词频分析**(不调 AI、确定性结果),每次批次整文件覆盖,App「趋势」tab 直接读这个文件(内容与原 index 内联 `latest_trends` 字段同构)。
+根级独立文件 `trends.json` ——**跨源热词趋势榜**,流水线(`scripts/trend_keywords.py`)在 push 阶段扫近 14 天各源快照做**词频统计 + 每批至多一次 AI 精修**(统计部分确定性可全量重算;AI 精修只做合并同话题/剔除泛词/规范 display,失败零降级回退统计榜),每次批次整文件覆盖,App「趋势」tab 直接读这个文件(内容与原 index 内联 `latest_trends` 字段同构)。
 
 ```json
 {
@@ -263,25 +263,27 @@ print(hn['items'][0]['title'])
 | `generatedAt` | 流水线生成时刻,Unix 毫秒时间戳 |
 | `windowDays` | 统计窗口天数(当前 14) |
 | `days` | 窗口内日历日期序列(yyyy-MM-dd,北京时间,连续 WINDOW_DAYS 天;缺数据的日期命中计 0),与各 keyword 的 `daily` 按下标对齐 |
-| `keywords` | 热词榜,按 `total` 降序 ≤10 个。入榜门槛:窗口期 `total ≥ 3` 且 `daysActive ≥ 2` |
+| `keywords` | 热词榜,按**动量加权分**降序(近 7 日命中和 × min(动量比, 2.5),动量比 = (近3日+1)/(前3日+1)),恒 10 个(数据稀薄期候选耗尽时允许更少)。入榜门槛:窗口期 `total ≥ 3` 且 `daysActive ≥ 2`;非别名归一的自由 unigram 不直接入榜,按分值序补位 |
 
 `keywords[]` 单项:
 
 | 字段 | 说明 |
 |------|------|
 | `term` | 归一化 canonical key(小写,如 `gpt-5`) |
-| `display` | 展示形(内置 AI 实体映射表指定形,如 `GPT-5`;或语料中最常见的原始大小写写法) |
+| `display` | 展示形(内置 AI 实体映射表指定形,如 `GPT-5`;语料中最常见的原始大小写写法;或 AI 精修命名,可为中文) |
 | `total` | 窗口期总命中次数(按「条目命中」计:一个词在一条条目中出现算 1 次) |
 | `daysActive` | 窗口期活跃天数(当日命中 ≥1 即活跃) |
 | `daily` | 每日命中序列,与 `days` 对齐(sparkline 数据源) |
-| `trend` | 涨跌标记:`up` / `down` / `flat`(近 3 日命中和 vs 前 3 日) |
+| `trend` | 涨跌标记:`up` / `down` / `flat`(近 3 日命中和 vs 前 3 日,±max(1, 前3日×15%) 容差带内算 `flat`) |
 | `rankChange` | 排名变化(较昨日最后一期榜单):正 = 上升 N 名、0 = 持平、负 = 下降。仅流水线有历史基准时输出(首期运行 / 基准归档缺失时整个字段不输出,App 不显示标记) |
 | `isNewEntry` | 新上榜标记(昨日最后一期不在榜),与 `rankChange` 互斥;同样仅在存在历史基准时输出 |
 | `items` | ≤3 条代表条目(日期新的优先,按 URL 去重,源尽量多样),每项含 `title`/`url`/`source`/`date` |
 
 **统计口径**:文本取自各源条目标题/简介(aihot-featured 优先 `titleEn`,stormzhang-ai 优先 `english` 并截掉 "PLUS:" 赞助尾巴);英文按 `[a-z0-9]+` 分词去停用词后取 unigram + 相邻 bigram,内置 AI 实体别名表做归一(GPT-5/OpenAI/Claude/千问 等);中文不分词,只对别名表内含 CJK 的词做子串匹配。
 
-**失败语义**:趋势生成失败不阻断推送,当次 `trends.json` 暂缺(下次运行自愈;趋势可从快照全量重算,无继承语义);文件完全缺失时 App 走「热词趋势尚未生成」空态。
+**AI 精修**:统计产出候选池(按动量分值序 top 25,宽口径含被自由 unigram 护栏拦下的词)后,流水线调一次 LLM 从中选 10 个、合并同话题候选(被吸收词条的 `daily`/`items` 并入主词后重算统计)、剔除泛词、给出规范 display(可为中文);AI 未选满时按分值序用统计候选补齐,榜单长度恒定。term/absorb 必须来自候选池且不重复、数量与 display 长度校验不过 → 整体回退统计回退榜;AI 配置缺失时跳过。排序语义(动量加权)切换后的首批 `rankChange` 会有一次性全榜跳变,属预期过渡。
+
+**失败语义**:趋势生成失败不阻断推送,当次 `trends.json` 暂缺(clone 自带上一版时实际继承上一期;下次运行自愈。统计部分可从快照全量重算,AI 精修失败退回统计回退榜,均无继承语义);文件完全缺失时 App 走「热词趋势尚未生成」空态。
 
 ## 趋势历史归档(trends/ 目录 + trends_history.json 独立索引)
 

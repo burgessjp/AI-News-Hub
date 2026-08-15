@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-跨源热词趋势统计(纯统计,不调 AI,零 token 成本)。
+跨源热词趋势统计(统计为主 + 每批至多一次 AI 精修,失败回退纯统计)。
 
 「趋势」Tab 的数据生产者:扫描数据仓库 checkout 里近 WINDOW_DAYS 天的 8 源快照,
 按「条目命中」做词频统计(一个词在一条条目中出现算 1 次,同日同条不重复计),
@@ -27,8 +27,14 @@ clone 下来的数据仓库含全部历史日期目录(快照是文件,git --dep
     最常见的原始大小写写法;
   - 中文:不做分词,只对映射表内含 CJK 的变体做子串匹配(千问/豆包/智谱…);
   - 入榜门槛:total >= MIN_TOTAL 且 daysActive >= MIN_DAYS_ACTIVE(滤掉单日闪现);
-    按 (total, daysActive) 降序取 TOP_KEYWORDS;
-  - trend:近 3 日命中和 vs 前 3 日命中和 → up / down / flat;
+    排序按动量加权分(近 7 日命中和 × 动量比封顶,见 _momentum_score),自由
+    unigram 不直接入榜(护栏见 _is_free_unigram)但按分值序补位,榜单恒取
+    TOP_KEYWORDS 个(不足时允许浮动,数据稀薄期不强凑);
+  - AI 精修:每批把候选池(REFINE_POOL_SIZE 个,宽口径含被护栏拦下的词)交给
+    LLM 合并同义/剔除泛词/规范 display(可为中文);配置缺失或调用/校验失败
+    原样保留统计回退榜,不告警不阻断;
+  - trend:近 3 日命中和 vs 前 3 日命中和,±max(1, 前 3 日 × 15%) 容差带内算
+    flat(无容差时 101 vs 100 也标 up,箭头近似噪声);
   - 每词保留 <= MAX_ITEMS_PER_KEYWORD 条代表条目(日期新的优先,按 URL 去重)。
 
 用法:
@@ -44,6 +50,7 @@ import json
 import os
 import re
 import sys
+import time
 from collections import Counter
 from datetime import datetime, timedelta
 
@@ -51,11 +58,20 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from common import SOURCE_KEYS, BEIJING_TZ, now_cst
 
+# AI 精修复用 ai_summary 的配置单点(环境变量名 + config_ready),调用统一走
+# ai_client.call_llm(围栏剥离 / 429 快速重试 / thinking 开关都已收口在内)
+import ai_client
+from ai_summary import ENV_API_KEY, ENV_BASE_URL, ENV_MODEL, config_ready
+
 WINDOW_DAYS = 14            # 统计窗口(天)
 TOP_KEYWORDS = 10           # 入榜热词数
 MIN_TOTAL = 3               # 窗口期总命中下限
 MIN_DAYS_ACTIVE = 2         # 窗口期活跃天数下限(有命中即算活跃)
 MAX_ITEMS_PER_KEYWORD = 3   # 每词代表条目上限
+REFINE_POOL_SIZE = 25       # AI 精修候选池大小(按分值序,宽口径不过护栏)
+POOL_ITEM_SAMPLES = 6       # 候选池每词代表条目数(给合并重选留原料,比终榜宽裕)
+MOMENTUM_CAP = 2.5          # 动量比封顶(防前 3 日基数小时单日尖峰爆表)
+TREND_FLAT_RATIO = 0.15     # trend 容差带比例:|近3日-前3日| <= max(1, 前3日×此值) 算 flat
 
 # 趋势历史索引(trends_history.json)的指针保留天数。对齐总览归档
 # (fetch_data.OVERVIEW_RETENTION_DAYS)的 90 天档位:趋势归档每份仅十几 KB,
@@ -133,7 +149,7 @@ ALIASES = {
     "vscode": ("VS Code", {"vscode", "vs code"}),
     "rag": ("RAG", {"rag"}),
     "mcp": ("MCP", {"mcp"}),
-    "agent": ("Agent", {"agent", "agents", "智能体"}),
+    "agent": ("Agent", {"agent", "agents", "agentic", "智能体"}),
     "robot": ("机器人", {"robot", "robots", "robotics", "机器人"}),
     "open-source": ("开源 Open Source", {"open source", "开源"}),
     "video-generation": ("视频生成", {"video generation", "video generative", "视频生成"}),
@@ -290,9 +306,77 @@ def _display_of(canon, surface_counter):
 
 # ===== 主流程 =====
 
+def _momentum_score(hits):
+    """动量加权分:近 7 日命中和 × 动量比(封顶)。
+
+    动量比 = (近3日+1)/(前3日+1),+1 平滑防除零。纯 total 排序是热度榜,
+    Agent/OpenAI 这类常青词常年霸榜、头部固化;加权后上升中的词能顶到前面,
+    稳定泛词自然沉底。门槛(total/daysActive)仍按全窗口算,只改排序键。
+    """
+    recent7 = sum(hits[-7:])
+    momentum = (sum(hits[-3:]) + 1) / (sum(hits[-6:-3]) + 1)
+    return recent7 * min(momentum, MOMENTUM_CAP)
+
+
+def _trend_of(hits):
+    """涨跌标记:近 3 日 vs 前 3 日命中和,容差带内算 flat。
+
+    无容差时 101 vs 100 也会标 up,箭头近似随机噪声;带宽取
+    max(1, 前 3 日 × TREND_FLAT_RATIO)。
+    """
+    recent, previous = sum(hits[-3:]), sum(hits[-6:-3])
+    band = max(1, round(previous * TREND_FLAT_RATIO))
+    if recent > previous + band:
+        return "up"
+    if recent < previous - band:
+        return "down"
+    return "flat"
+
+
+def _is_free_unigram(canon):
+    """是否为「非别名归一的自由 unigram」——统计回退榜的护栏拦截对象。
+
+    这类词多为拆词残留(work/long 来自 "future of work"/"long-horizon" 的
+    碎片),无实体/主题信息量;别名表词与自由 bigram(自带上下文)不受限。
+    被拦下的词仍在 AI 精修候选池里,可由 AI 捞回。
+    """
+    return " " not in canon and canon not in ALIASES
+
+
+def _select_items(cands, limit):
+    """从(已按日期降序的)代表条目候选里选 ≤limit 条:URL 去重 + 两轮制。
+
+    第一轮每源至多 1 条(避免榜单出口被聚合源屠榜),凑不满再放开补齐。
+    """
+    seen_urls, out = set(), []
+    for diverse_only in (True, False):
+        for it in cands:
+            if len(out) >= limit:
+                break
+            if it["url"] in seen_urls:
+                continue
+            if diverse_only and any(o["source"] == it["source"] for o in out):
+                continue
+            seen_urls.add(it["url"])
+            out.append(it)
+    return out
+
+
+def _finalize_entry(entry):
+    """把候选池词条收口成终榜词条:代表条目截到 MAX_ITEMS_PER_KEYWORD。"""
+    out = dict(entry)
+    out["items"] = _select_items(entry["items"], MAX_ITEMS_PER_KEYWORD)
+    return out
+
+
 def generate_trends(repo_dir, now=None):
     """
-    扫描 repo_dir 近 WINDOW_DAYS 天快照,生成趋势榜 dict;可用快照不足时返回 None。
+    扫描 repo_dir 近 WINDOW_DAYS 天快照,生成 (趋势榜 dict, AI 精修候选池);
+    可用快照不足时返回 None。
+
+    趋势榜 keywords 先装「统计回退榜」(动量加权排序 + 自由 unigram 护栏后的
+    top TOP_KEYWORDS);调用方可把候选池交给 refine_keywords_with_ai 精修替换。
+    候选池按分值序取 REFINE_POOL_SIZE 个、宽口径不过护栏。
 
     now: datetime(北京时间),默认取当前;generatedAt 用它,日期窗口以快照实际
     最大日期为锚(而不是 now——本地验证 / 补跑时窗口对准数据而非运行时刻)。
@@ -347,48 +431,46 @@ def generate_trends(repo_dir, now=None):
                     surface_forms[canon][surface] += 1
                     hit_items[canon].append((date, source, title, url))
 
-    # 入榜过滤 + 排序:total 降序、daysActive 降序(同票时活跃天数多者靠前)
-    ranked = []
+    # 入榜门槛:total / daysActive(滤掉单日闪现);排序按动量加权分
+    # (见 _momentum_score)——纯 total 排序是热度榜,常青词常年霸榜头部固化
+    qualified = []
     for canon, hits in daily_hits.items():
         total = sum(hits)
         days_active = sum(1 for h in hits if h > 0)
         if total >= MIN_TOTAL and days_active >= MIN_DAYS_ACTIVE:
-            ranked.append((canon, total, days_active))
-    ranked.sort(key=lambda x: (-x[1], -x[2], x[0]))
-    ranked = ranked[:TOP_KEYWORDS]
-    if not ranked:
+            qualified.append((_momentum_score(hits), total, canon))
+    qualified.sort(key=lambda x: (-x[0], -x[1], x[2]))
+    if not qualified:
         print("[TRENDS] 无热词达到入榜门槛,跳过", file=sys.stderr)
         return None
 
-    keywords = []
-    for canon, total, days_active in ranked:
+    def _entry(canon, item_cap):
+        """把一个 canonical key 的统计结果组装成榜单词条 dict。"""
         hits = daily_hits[canon]
-        # trend:近 3 日命中和 vs 前 3 日命中和
-        recent, previous = sum(hits[-3:]), sum(hits[-6:-3])
-        trend = "up" if recent > previous else ("down" if recent < previous else "flat")
         # 代表条目:日期新的优先 + 按 URL 去重;第一轮优先源多样性(每源至多 1 条,
-        # 避免榜单出口被聚合源屠榜),凑不满 MAX_ITEMS_PER_KEYWORD 再放开补齐
-        seen_urls, top_items = set(), []
-        cands = sorted(hit_items[canon], reverse=True)
-        for diverse_only in (True, False):
-            for date, source, title, url in cands:
-                if len(top_items) >= MAX_ITEMS_PER_KEYWORD:
-                    break
-                if url in seen_urls:
-                    continue
-                if diverse_only and any(it["source"] == source for it in top_items):
-                    continue
-                seen_urls.add(url)
-                top_items.append({"title": title, "url": url, "source": source, "date": date})
-        keywords.append({
+        # 避免榜单出口被聚合源屠榜),凑不满上限再放开补齐
+        cands = [{"title": t, "url": u, "source": s, "date": d}
+                 for d, s, t, u in sorted(hit_items[canon], reverse=True)]
+        return {
             "term": canon,
             "display": _display_of(canon, surface_forms[canon]),
-            "total": total,
-            "daysActive": days_active,
+            "total": sum(hits),
+            "daysActive": sum(1 for h in hits if h > 0),
             "daily": hits,
-            "trend": trend,
-            "items": top_items,
-        })
+            "trend": _trend_of(hits),
+            "items": _select_items(cands, item_cap),
+        }
+
+    # 候选池:按分值序取宽口径 top,不过自由 unigram 护栏(让 AI 看得到
+    # memory/codex 这类可能值得捞回的词)
+    pool = [_entry(canon, POOL_ITEM_SAMPLES)
+            for _, _, canon in qualified[:REFINE_POOL_SIZE]]
+
+    # 统计回退榜:自由 unigram 不直接入榜,但按分值序补位到满 TOP_KEYWORDS
+    # (榜单长度恒定,避免 AI/统计产出 6-10 个浮动让用户以为缺数据)
+    guarded = [k for k in pool if not _is_free_unigram(k["term"])]
+    guarded += [k for k in pool if _is_free_unigram(k["term"])]
+    keywords = [_finalize_entry(k) for k in guarded[:TOP_KEYWORDS]]
 
     now = now or now_cst()
     return {
@@ -396,7 +478,145 @@ def generate_trends(repo_dir, now=None):
         "windowDays": WINDOW_DAYS,
         "days": days,
         "keywords": keywords,
+    }, pool
+
+
+# ===== AI 精修(可选增强,失败零降级回退纯统计) =====
+
+_REFINE_SYSTEM_PROMPT = (
+    "你是 AI 资讯热词榜的编辑。给你一份按近期热度排序的候选热词列表"
+    "(含命中统计与示例标题),请产出最终榜单:合并语义相同或同属一个话题的词、"
+    "剔除没有实体或主题信息量的泛词(形容词/常用动词/拆词残留)、给每个入选词"
+    "一个规范的展示名。只做筛选与命名,不发明候选之外的新词。"
+)
+
+
+def _refine_user_prompt(pool):
+    """把候选池序列化成 AI 输入(带示例标题,帮模型判断词条的话题归属)。"""
+    cands = [{
+        "term": k["term"],
+        "display": k["display"],
+        "total": k["total"],
+        "daysActive": k["daysActive"],
+        "trend": k["trend"],
+        "samples": [it["title"] for it in k["items"][:2]],
+    } for k in pool]
+    return (
+        "候选热词列表(JSON):\n"
+        + json.dumps(cands, ensure_ascii=False)
+        + "\n\n要求:\n"
+          "1. 从候选中选出 10 个最终热词(候选确实不足时可少选),按近期热度与上升势头综合排序;\n"
+          "2. 语义相同或同属一个话题的候选合并:主词放 term,被合并词列进 absorb;\n"
+          "3. 剔除泛词:形容词/动词/无区分度的常用词不要入选;\n"
+          "4. 每个入选词给 display:行业惯用名,不超过 16 个字符,可用中文;\n"
+          '5. 只输出 JSON 对象:{"selected": [{"term": "...", "display": "...", '
+          '"absorb": ["..."]}]},absorb 可为空数组;不要输出任何解释。\n'
+    )
+
+
+def _merge_pool_entries(main, absorbed, display):
+    """把 absorbed 词条的统计合并进 main,产出终榜词条。
+
+    daily 按下标累加,total/daysActive/trend(含容差带)随之重算;代表条目
+    取并集后重跑两轮制选择(原料是各词条已截到 POOL_ITEM_SAMPLES 的列表,
+    对合并场景足够)。
+    """
+    daily = list(main["daily"])
+    items = list(main["items"])
+    for other in absorbed:
+        daily = [a + b for a, b in zip(daily, other["daily"])]
+        items = items + other["items"]
+    items.sort(key=lambda it: it["date"], reverse=True)
+    return {
+        "term": main["term"],
+        "display": display,
+        "total": sum(daily),
+        "daysActive": sum(1 for h in daily if h > 0),
+        "daily": daily,
+        "trend": _trend_of(daily),
+        "items": _select_items(items, MAX_ITEMS_PER_KEYWORD),
     }
+
+
+def refine_keywords_with_ai(trends, pool):
+    """
+    用 AI 对候选池做一次精修,成功时就地替换 trends["keywords"] 并返回 True。
+
+    每批至多一次调用,对齐 ai_summary 的配置入口;任何失败(配置缺失/调用
+    异常/结果校验不过)只告警并保留统计回退榜,返回 False——精修是锦上添花,
+    绝不阻断主流程。
+    """
+    if not config_ready():
+        print("[TRENDS] AI 精修跳过(未配置 AI 环境变量,使用统计回退榜)",
+              file=sys.stderr)
+        return False
+    base_url = os.getenv(ENV_BASE_URL)
+    model = os.getenv(ENV_MODEL)
+    api_key = os.getenv(ENV_API_KEY)
+    parsed = None
+    for attempt in range(2):  # 业务层重试 1 次(传输层 429/503 重试在 ai_client 内)
+        try:
+            parsed = ai_client.call_llm(
+                _REFINE_SYSTEM_PROMPT, _refine_user_prompt(pool),
+                base_url, model, api_key,
+                timeout=60, temperature=0.2, expect="object",
+            )
+            break
+        except Exception as e:
+            if attempt == 0:
+                print(f"[TRENDS] AI 精修调用失败,10s 后重试一次:"
+                      f"{type(e).__name__}: {e}", file=sys.stderr)
+                time.sleep(10)
+                continue
+            print(f"[TRENDS] AI 精修失败(回退统计回退榜):{type(e).__name__}: {e}",
+                  file=sys.stderr)
+            return False
+    try:
+        selected = parsed.get("selected")
+        if not isinstance(selected, list):
+            raise RuntimeError(f"selected 非数组:{type(selected)}")
+        if not 5 <= len(selected) <= TOP_KEYWORDS:
+            raise RuntimeError(f"selected 数量异常:{len(selected)}")
+        pool_by_term = {k["term"]: k for k in pool}
+        used = set()
+        entries = []
+        for item in selected:
+            if not isinstance(item, dict):
+                raise RuntimeError("selected 元素非对象")
+            term = item.get("term")
+            display = str(item.get("display") or "").strip()
+            absorb = item.get("absorb") or []
+            if term not in pool_by_term or term in used:
+                raise RuntimeError(f"term 不在候选池或重复:{term!r}")
+            if not display or len(display) > 24:
+                raise RuntimeError(f"display 非法:{display!r}")
+            if not isinstance(absorb, list):
+                raise RuntimeError("absorb 非数组")
+            absorbed = []
+            for a in absorb:
+                if a not in pool_by_term or a in used:
+                    raise RuntimeError(f"absorb 词条不在候选池或重复:{a!r}")
+                absorbed.append(pool_by_term[a])
+                used.add(a)
+            used.add(term)
+            entries.append(_merge_pool_entries(pool_by_term[term], absorbed, display))
+        absorbed_count = len(used) - len(entries)
+        # AI 未选满 TOP_KEYWORDS 时按分值序用统计候选补齐(榜单长度恒定,
+        # 避免用户以为缺数据);候选池耗尽时才允许少于 10 个
+        shortage = TOP_KEYWORDS - len(entries)
+        if shortage > 0:
+            fill = [_finalize_entry(k) for k in pool if k["term"] not in used][:shortage]
+            entries += fill
+            if fill:
+                print(f"[TRENDS] AI 精修未选满,按分值序补齐 {len(fill)} 个统计候选")
+        trends["keywords"] = entries
+        print(f"[TRENDS] AI 精修完成:{len(entries)} 个热词"
+              f"(合并吸收 {absorbed_count} 个候选)")
+        return True
+    except Exception as e:
+        print(f"[TRENDS] AI 精修结果校验失败(回退统计回退榜):"
+              f"{type(e).__name__}: {e}", file=sys.stderr)
+        return False
 
 
 def _load_trends_history(repo_dir):
@@ -486,15 +706,19 @@ def write_trends(repo_dir):
     index.json 内联 `latest_trends` 字段同构),同时落一份按日归档并维护
     trends_history.json 索引。
 
-    任何失败只告警、返回 False,不抛异常——趋势是纯统计的锦上添花,
-    不得阻断 push 主流程(对齐单源失败的降级哲学;文件暂缺时 App 走空态,
-    下次运行自愈。趋势可从快照全量重算,无继承语义)。归档/索引失败时根级
-    trends.json 已写入,仍视为成功;基准读取失败只是少 rankChange 字段。
+    任何失败只告警、返回 False,不抛异常——趋势是锦上添花,不得阻断 push 主
+    流程(对齐单源失败的降级哲学;文件暂缺时 App 走空态,下次运行自愈。统计
+    部分可从快照全量重算,AI 精修失败的批次退回统计回退榜,均无继承语义)。
+    归档/索引失败时根级 trends.json 已写入,仍视为成功;基准读取失败只是少
+    rankChange 字段。
     """
     try:
-        trends = generate_trends(repo_dir)
-        if trends is None:
+        generated = generate_trends(repo_dir)
+        if generated is None:
             return False
+        trends, pool = generated
+        # AI 精修(可选增强):成功则替换为精修榜,失败保留统计回退榜
+        refine_keywords_with_ai(trends, pool)
         now = now_cst()
         today = now.strftime("%Y-%m-%d")
         # 排名变化:先算基准,再写今日归档(否则会把今日早批当成基准)
@@ -519,19 +743,27 @@ def write_trends(repo_dir):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="跨源热词趋势统计(纯统计,不调 AI)")
+    parser = argparse.ArgumentParser(
+        description="跨源热词趋势统计(统计为主 + 每批至多一次 AI 精修,失败回退纯统计)")
     parser.add_argument("--repo-dir", default="repo",
                         help="数据仓库 checkout 根目录(默认 ./repo)")
     parser.add_argument("--dry-run", action="store_true",
                         help="只打印结果摘要,不写 trends.json(本地验证用)")
     args = parser.parse_args()
 
-    trends = generate_trends(args.repo_dir)
-    if trends is None:
+    # 正式路径全权交给 write_trends(其自身日志足够),避免预览 + 写入各算一遍
+    if not args.dry_run:
+        return 0 if write_trends(args.repo_dir) else 1
+
+    generated = generate_trends(args.repo_dir)
+    if generated is None:
         return 1
+    trends, pool = generated
+    refined = refine_keywords_with_ai(trends, pool)
     # dry-run 也附上排名变化字段(纯读旧索引/归档,不写任何文件)
     baseline = attach_rank_changes(trends, args.repo_dir, now_cst().strftime("%Y-%m-%d"))
     print(f"窗口:{trends['days'][0]} ~ {trends['days'][-1]}({trends['windowDays']} 天)")
+    print(f"榜单来源:{'AI 精修' if refined else '统计回退'}")
     print(f"排名变化基准:{baseline + ' 最后一期' if baseline else '无(不附加变化字段)'}")
     for i, kw in enumerate(trends["keywords"], 1):
         arrow = {"up": "↑", "down": "↓", "flat": "→"}[kw["trend"]]
@@ -545,10 +777,8 @@ def main():
               f"{kw['daysActive']:>2} 天 {arrow} {delta:<4} daily={kw['daily']}")
         for it in kw["items"]:
             print(f"      - [{it['source']}] {it['date']} {it['title'][:50]}")
-    if args.dry_run:
-        print("(dry-run,未写 trends.json)")
-        return 0
-    return 0 if write_trends(args.repo_dir) else 1
+    print("(dry-run,未写 trends.json)")
+    return 0
 
 
 if __name__ == "__main__":
