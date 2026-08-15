@@ -17,7 +17,11 @@
 ```
 news-hub-data 分支/
 ├── index.json                          ← 入口:各源最新快照路径(latest)+ 按日期历史索引(history)
+│                                         + 总览按日归档索引(overview_history)
 ├── manifest.json                       ← 最近一次运行总览(成功/失败状态)
+├── overview/                           ← 今日总览按日归档(内容与 index 的 latest_overview 同构)
+│   └── 2026-08-15/
+│       └── 11-49-data.json
 ├── hackernews/
 │   ├── 2026-07-14/
 │   │   └── 08-00-data.json
@@ -69,6 +73,10 @@ news-hub-data 分支/
       "2026-07-18": "2026-07-18/15-00-data.json"
     }
   },
+  "overview_history": {
+    "2026-08-15": "2026-08-15/11-49-data.json",
+    "2026-08-14": "2026-08-14/18-00-data.json"
+  },
   "latest_overview": {
     "generatedAt": 1784073612000,
     "dataFetchedAt": 1784073600000,
@@ -103,6 +111,8 @@ news-hub-data 分支/
 `latest` 里的路径是**相对于源目录**的。设计行为:某源当天抓取失败时,`index.json` 会保留它最后一次成功的指向(可能落在前一天),客户端永远能拿到有效数据。
 
 `history` 是按日期寻址的历史索引(`{源名: {日期: relpath}}`,上例仅示意一个源,实际每源都有;只收录 2026-07-18 起的日期),详见下文「按日期取历史快照」。
+
+`overview_history` 是**总览按日归档索引**(`{日期: relpath}`,relpath 相对 `overview/` 目录,保留最近 90 天),详见下文「历史总览归档」。
 
 `latest_overview` 是**今日总览**(流水线预生成的跨源综合分析,详见下文「今日总览 latest_overview」)。App 首页「总览」tab 直接读这个字段,不再端侧调 AI。
 
@@ -225,6 +235,25 @@ print(hn['items'][0]['title'])
 **与单源 `ai_summary_v2` 的区别**:`ai_summary_v2` 是各源快照内的分源要点(8 个独立摘要);`latest_overview` 是跨 8 源的综合研判(1 个总榜),AI 会按跨源归一化热度档位排序、合并同事件、标 breaking。
 
 **失败保留**:本次总览 AI 生成失败时,`latest_overview` 继承上一次的值(同 `latest` 指针的失败保留机制),避免一次失败导致 App 端总览空掉。字段完全缺失时,App 走「今日总览尚未生成」空态。
+
+## 历史总览归档(overview/ 目录 + overview_history 索引)
+
+`latest_overview` 只保留最新一份,历史版本以**按日归档文件**形式留痕:总览生成成功时,流水线把同一对象落盘到 `overview/<YYYY-MM-DD>/<HH-MM>-data.json`(路径规则与各源快照一致,北京时间),并在 `index.json` 顶层维护 `overview_history` 索引:
+
+```json
+{
+  "overview_history": {
+    "2026-08-15": "2026-08-15/11-49-data.json",
+    "2026-08-14": "2026-08-14/18-00-data.json"
+  }
+}
+```
+
+- **日期 → 当日最后一次总览**:一天多批次(08:00 / 15:30 / 18:00)时索引取最后一次;当日全部批次都失败时该日不在索引中(当天早批次的归档仍保留)。
+- **保留最近 90 天,且不早于 2026-07-18**。归档文件每份数 KB,历史日期可追至 2026-07-28(总览功能上线日,更早的总览未留痕;2026-08 之前的归档由 `backfill_overview.py` 从 git 历史一次性回填)。
+- **relpath 相对 `overview/` 目录**,拼前缀后走 gitcode raw API(同 history 消费方式),如 `overview/2026-08-15/11-49-data.json`。
+- **归档文件内容与当日 `latest_overview` 完全同构**(同一对象两处落盘):`generatedAt` / `dataFetchedAt` / `missingSources` / `digest`(2026-08-10 前生成的旧总览可能无此字段,空串不渲染)/ `items`。
+- **用途**:App「更多 → 历史总览」按日期回看;总览是流水线唯一花钱调 AI 且覆盖即失的产物(AI 摘要随快照留痕、趋势可从快照重算),归档即它的历史。
 
 ## 热词趋势(latest_trends 字段)
 
@@ -446,7 +475,7 @@ The Rundown AI(beehiiv 托管的头部英文 AI 日更 newsletter)首页文章�
 }
 ```
 
-`status` 取值:`ok`(成功,带 count/file)/ `fail`(失败,带 error,此时该源 3 次重试已全败)。每天会被覆盖,只保留最近一次。
+`status` 取值:`ok`(成功,带 count/file)/ `fail`(失败,带 error,此时该源 3 次重试已全败)。每天会被覆盖,只保留最近一次。`file` 为相对仓库根的路径(如 `hackernews/2026-07-15/08-00-data.json`)。
 
 ## 失败保留机制
 
@@ -458,6 +487,8 @@ The Rundown AI(beehiiv 托管的头部英文 AI 日更 newsletter)首页文章�
 > 例如:producthunt 在 07-15 当天因 token 失效被 401 拦截,`index.latest.producthunt` 仍指向 `2026-07-14/...`,客户端照常能拉到 07-14 的数据。这是设计行为,对应用户「某源偶尔失败不能让 App 空白」的预期。
 
 该机制依赖 gitcode 上一次 `index.json` 可匿名拉取(公开仓库)。首跑(仓库还没有 `index.json`)时无旧指向可继承,失败源在首跑的 `index.json` 中会缺省。
+
+总览同理:本次 AI 生成失败时 `latest_overview` 继承上一次,当日归档文件不落盘(`overview_history` 从上一次索引继承,当天早批次的归档仍可寻址)。
 
 ## 限制与注意事项
 
