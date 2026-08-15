@@ -40,6 +40,8 @@ import com.peng.ainewshub.ui.overview.OverviewArchiveScreen
 import com.peng.ainewshub.ui.overview.OverviewDateScreen
 import com.peng.ainewshub.ui.summary.SummaryArchiveScreen
 import com.peng.ainewshub.ui.summary.SummaryDateScreen
+import com.peng.ainewshub.ui.trends.TrendsArchiveScreen
+import com.peng.ainewshub.ui.trends.TrendsDateScreen
 import com.peng.ainewshub.ui.tabs.AllTab
 import com.peng.ainewshub.ui.tabs.FeaturedTab
 import com.peng.ainewshub.ui.webview.WebViewScreen
@@ -291,6 +293,19 @@ internal fun PageView(
             listState = listStates.forPage(page)
         )
         is Page.OverviewDate -> OverviewDateScreen(
+            date = page.date,
+            onBack = onBack,
+            onOpenUrl = { url, title, source -> onOpenUrl(url, title, source) },
+            listState = listStates.forPage(page)
+        )
+        // 历史热词:日期列表(trends_history 索引)→ 当日热词榜页(复用趋势内容)。
+        // 纯归档语义;二级页无下拉刷新。
+        Page.TrendsArchive -> TrendsArchiveScreen(
+            onSelectDate = { nav.push(Page.TrendsDate(it)) },
+            onBack = onBack,
+            listState = listStates.forPage(page)
+        )
+        is Page.TrendsDate -> TrendsDateScreen(
             date = page.date,
             onBack = onBack,
             onOpenUrl = { url, title, source -> onOpenUrl(url, title, source) },

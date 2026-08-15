@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.SmartToy
+import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -69,6 +70,7 @@ fun MoreScreen(
     onOpenFavorites: () -> Unit,
     onOpenSummaryArchive: () -> Unit,
     onOpenOverviewArchive: () -> Unit,
+    onOpenTrendsArchive: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenAiService: () -> Unit,
     onOpenAbout: () -> Unit
@@ -110,7 +112,8 @@ fun MoreScreen(
             }
 
             // 历史组(tertiary 强调)—— 历史总览(按日期回看每日 AI 总览)/
-            // 历史摘要(按日期看各源归档摘要)/ 浏览历史 / 收藏
+            // 历史热词(按日期回看每日热词榜)/ 历史摘要(按日期看各源归档摘要)/
+            // 浏览历史 / 收藏
             item { SectionHeader(stringResource(R.string.more_section_history), accent = MaterialTheme.colorScheme.tertiary) }
             item {
                 IconTileRow(
@@ -119,6 +122,15 @@ fun MoreScreen(
                     title = stringResource(R.string.more_overview_archive_title),
                     subtitle = stringResource(R.string.more_overview_archive_subtitle),
                     onClick = onOpenOverviewArchive
+                )
+            }
+            item {
+                IconTileRow(
+                    icon = Icons.Filled.TrendingUp,
+                    iconColor = IconAccent.Primary,
+                    title = stringResource(R.string.more_trends_archive_title),
+                    subtitle = stringResource(R.string.more_trends_archive_subtitle),
+                    onClick = onOpenTrendsArchive
                 )
             }
             item {

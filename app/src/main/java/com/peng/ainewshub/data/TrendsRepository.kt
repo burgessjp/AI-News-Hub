@@ -78,9 +78,16 @@ data class TrendsDigest(
  *    缓存(与 index 互不影响);
  *  - 文件缺失(404)或 keywords 为空 → 抛 [AppException.NoData](UI 走空态,
  *    语义是「趋势尚未生成」——write_trends 失败的批次会暂缺文件,下次批次自愈);
- *  - 网络/解析失败 → 抛 [AppException.Network]/[AppException.ServerError](UI 走错误态)。
+ *  - 网络/解析失败 → 抛 [AppException.Network]/[AppException.ServerError](UI 走错误态);
+ *  - 历史热词:「更多 → 历史热词」经 [availableDates] / [loadDigestOn] 按
+ *    `trends_history.json` 索引寻址逐日归档(同 [OverviewRepository.loadDigestOn] 范式)。
  */
 class TrendsRepository {
+
+    companion object {
+        /** 趋势归档目录名(索引 trends_history 指针相对该目录寻址,数据仓库同名目录)。 */
+        const val ARCHIVE_DIR = "trends"
+    }
 
     /**
      * 加载热词趋势榜。
@@ -93,6 +100,29 @@ class TrendsRepository {
         val json = ArchiveHttpClient.fetchLatestTrends(force)
             ?: throw AppException.NoData()
         parseTrends(json)
+    }
+
+    /**
+     * 可选日期列表(「历史热词」日期列表页):trends_history 索引键,倒序。
+     * 索引缺失/为空返回空列表(UI 走空态)。
+     */
+    suspend fun availableDates(): List<String> =
+        ArchiveHttpClient.fetchTrendsHistory().keys.sortedDescending()
+
+    /**
+     * 加载指定日期的历史热词榜。
+     *
+     * 经根级独立索引 `trends_history.json` 按日期寻址,归档文件内容与当期
+     * `trends.json` 完全同构(同一对象两处落盘),复用 [parseTrends] 反序列化
+     * (含 rankChange / isNewEntry,历史榜单同样带排名变化标记)。
+     *
+     * @param date YYYY-MM-DD(北京时间)
+     * @return 成功为 [TrendsDigest];日期不在索引/归档缺失 → [AppException.NoData]
+     */
+    suspend fun loadDigestOn(date: String): Result<TrendsDigest> = runCatching {
+        val relPath = ArchiveHttpClient.fetchTrendsHistory()[date]
+            ?: throw AppException.NoData()
+        parseTrends(ArchiveHttpClient.fetchSnapshot(ARCHIVE_DIR, relPath, "keywords"))
     }
 
     /** 反序列化 trends JSON 为 [TrendsDigest]。keywords 为空视为数据无效抛 [AppException.NoData]。 */

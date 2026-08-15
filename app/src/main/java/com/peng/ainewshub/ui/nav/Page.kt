@@ -69,6 +69,10 @@ internal sealed interface Page {
     data object OverviewArchive : Page
     /** 历史总览 —— 指定日期的总览页(复用总览 Tab 内容实现)。 */
     data class OverviewDate(val date: String) : Page
+    /** 历史热词 —— 可选日期列表(归档 trends_history 索引),从「更多」页进入。 */
+    data object TrendsArchive : Page
+    /** 历史热词 —— 指定日期的热词榜页(复用趋势 Tab 内容实现)。 */
+    data class TrendsDate(val date: String) : Page
 }
 
 /**
@@ -103,6 +107,8 @@ internal fun Page.toBundle(): Bundle = Bundle().apply {
         is Page.SummaryDate -> { putString("t", "SummaryDate"); putString("date", date) }
         is Page.OverviewArchive -> putString("t", "OverviewArchive")
         is Page.OverviewDate -> { putString("t", "OverviewDate"); putString("date", date) }
+        is Page.TrendsArchive -> putString("t", "TrendsArchive")
+        is Page.TrendsDate -> { putString("t", "TrendsDate"); putString("date", date) }
     }
 }
 
@@ -135,6 +141,8 @@ internal fun pageFromBundle(b: Bundle, webFallbackTitle: String): Page? {
         "SummaryDate" -> b.getString("date")?.let { Page.SummaryDate(it) }
         "OverviewArchive" -> Page.OverviewArchive
         "OverviewDate" -> b.getString("date")?.let { Page.OverviewDate(it) }
+        "TrendsArchive" -> Page.TrendsArchive
+        "TrendsDate" -> b.getString("date")?.let { Page.TrendsDate(it) }
         else -> null
     }
 }

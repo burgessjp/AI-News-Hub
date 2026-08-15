@@ -184,11 +184,18 @@ private fun TrendsLoading() {
     }
 }
 
+/**
+ * 热词榜内容渲染 —— 趋势 Tab 与「历史热词」日期页共用。
+ *
+ * [bottomReserve]:根 tab 为 true(末项可停到浮动药丸之上:药丸高 + 16dp 呼吸
+ * 空间);二级页为 false(无浮动底栏,不留底部预留)。
+ */
 @Composable
-private fun TrendsContent(
+internal fun TrendsContent(
     digest: TrendsDigest,
     listState: LazyListState,
-    onOpenUrl: (url: String, title: String, source: String) -> Unit
+    onOpenUrl: (url: String, title: String, source: String) -> Unit,
+    bottomReserve: Boolean = true
 ) {
     val context = LocalContext.current
     // 当前展开的词条(单展开,再点收起);瞬态 UI 状态,切 tab 丢失可接受
@@ -196,8 +203,7 @@ private fun TrendsContent(
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
-        // 末项可停到药丸之上:药丸高 + 16dp 呼吸空间(与总览同)
-        contentPadding = PaddingValues(bottom = BottomBarPillHeight + 16.dp)
+        contentPadding = PaddingValues(bottom = if (bottomReserve) BottomBarPillHeight + 16.dp else 0.dp)
     ) {
         // 顶部时效 caption:窗口 + 数据截至(归档每日跑批,先交代新鲜度)
         item(key = "caption", contentType = "caption") {

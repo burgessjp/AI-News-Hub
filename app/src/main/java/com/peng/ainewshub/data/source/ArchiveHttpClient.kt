@@ -67,6 +67,9 @@ object ArchiveHttpClient {
     /** 根级独立趋势文件(拆出 index.json,内容与原内联 latest_trends 字段同构)。 */
     private const val TRENDS_URL = "$API_BASE/trends.json?ref=$REF"
 
+    /** 根级独立趋势历史索引(拆出 index.json,历史热词按日期寻址)。 */
+    private const val TRENDS_HISTORY_URL = "$API_BASE/trends_history.json?ref=$REF"
+
     /** index.json 内存缓存有效期:2 分钟(index 实际几小时才更新一次,短 TTL 足够)。 */
     private const val INDEX_TTL_MS = 2L * 60 * 1000
 
@@ -120,12 +123,13 @@ object ArchiveHttpClient {
     /** in-flight 去重锁:同 URL 并发只打 1 次网络,其余等锁后复用缓存。 */
     private val snapshotLocks = ConcurrentHashMap<String, Mutex>()
 
-    // ===== 根级独立索引/内容文件(history.json / overview_history.json / trends.json)=====
+    // ===== 根级独立索引/内容文件(history.json / overview_history.json / trends.json / trends_history.json)=====
     // 拆出 index.json 的历史索引与趋势:更新节奏与 index 相同(每批次),复用同款
     // 2 分钟 TTL + Mutex 并发去重;仅对应页面按需拉取,单文件持有单实例。
 
     private val historyFileFetcher = CachedFileJson(HISTORY_URL, "读取历史索引失败")
     private val overviewHistoryFileFetcher = CachedFileJson(OVERVIEW_HISTORY_URL, "读取总览历史索引失败")
+    private val trendsHistoryFileFetcher = CachedFileJson(TRENDS_HISTORY_URL, "读取热词历史索引失败")
 
     // trends.json 由 write_trends「成功才写」,生成失败的批次会暂缺文件(下次自愈),
     // 404 是正常暂态 → absentAsNull 返回 null(UI 走 NoData 空态);history 两索引
@@ -327,16 +331,37 @@ object ArchiveHttpClient {
     }
 
     /**
-     * 按相对路径拉某源的归档快照,返回解析后的顶层 JSON(历史日期寻址入口)。
-     * 带 source/relPath 路径缓存(内容不可变)与同 URL in-flight 去重:2 分钟内重进
-     * tab / 历史日期页来回翻不再重复下载同一快照。
+     * 读根级独立索引文件 `trends_history.json`(拆出 index.json,历史热词按日期寻址)。
+     * 自带 2 分钟缓存 + 并发去重。
      *
-     * @param source 源标识(目录名)
-     * @param relPath 相对源目录的快照路径(形如 `2026-07-19/10-12-data.json`,
-     *                取自 latest / history 索引)
-     * @return 该快照的 JSON 对象;缺失或 items 为空抛 RuntimeException
+     * @return date → 相对 trends/ 目录的归档文件路径(形如 `2026-08-15/18-00-data.json`,
+     *         取当日最后一次批次)。由流水线逐批次合并写入,仅保留最近 90 天;
+     *         文件存在但为空对象时返回空 map(UI 空态)。索引自回填起持续存在,
+     *         404/拉取失败属异常 → 抛错(UI 错误态)
      */
-    suspend fun fetchSnapshot(source: String, relPath: String): JSONObject {
+    suspend fun fetchTrendsHistory(): Map<String, String> = withContext(Dispatchers.IO) {
+        val history = trendsHistoryFileFetcher.fetch() ?: throw AppException.Network()
+        val result = mutableMapOf<String, String>()
+        history.keys().forEach { date ->
+            val rel = history.optString(date)
+            if (rel.isNotBlank()) result[date] = rel
+        }
+        result
+    }
+
+    /**
+     * 按相对路径拉归档文件,返回解析后的顶层 JSON(历史日期寻址入口)。
+     * 带 source/relPath 路径缓存(内容不可变)与同 URL in-flight 去重:2 分钟内重进
+     * tab / 历史日期页来回翻不再重复下载同一归档。
+     *
+     * @param source 目录标识(源目录 / `overview` / `trends`)
+     * @param relPath 相对该目录的归档文件路径(形如 `2026-07-19/10-12-data.json`,
+     *                取自 latest / history 索引)
+     * @param arrayField 顶级内容数组字段名:源快照与总览归档为 `items`,趋势归档为
+     *                `keywords`(字段缺失或为空视为无数据,抛 [AppException.NoData])
+     * @return 该归档文件的 JSON 对象
+     */
+    suspend fun fetchSnapshot(source: String, relPath: String, arrayField: String = "items"): JSONObject {
         val cacheKey = "$source/$relPath"
         snapshotCache[cacheKey]?.let { return it }
         val lock = snapshotLocks.computeIfAbsent(cacheKey) { Mutex() }
@@ -349,9 +374,9 @@ object ArchiveHttpClient {
                     val snapshot = runCatching { JSONObject(snapshotText) }
                         .getOrElse { throw AppException.ServerError() }
 
-                    // items 为空视为无数据(失败不缓存,下次重试)
-                    val items = snapshot.optJSONArray("items")
-                    if (items == null || items.length() == 0) {
+                    // 顶级内容数组为空视为无数据(失败不缓存,下次重试)
+                    val arr = snapshot.optJSONArray(arrayField)
+                    if (arr == null || arr.length() == 0) {
                         throw AppException.NoData()
                     }
                     snapshot

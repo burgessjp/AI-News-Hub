@@ -22,4 +22,12 @@
     <string name="trends_rank_down">-%1$d</string>
     <string name="trends_rank_flat">Flat</string>
     <string name="trends_rank_new">New</string>
+
+    <!-- Trends history (More → Trends History secondary pages) -->
+    <string name="trends_archive_title">Trends History</string>
+    <string name="trends_archive_load_failed">Failed to load trends history</string>
+    <string name="trends_archive_empty_title">No trends history yet</string>
+    <string name="trends_archive_empty_subtitle">Daily keyword boards are archived as they are generated\nwith the last 90 days available</string>
+    <!-- Date detail page top bar title: %1$s=YYYY-MM-DD -->
+    <string name="trends_date_title">Trends for %1$s</string>
 </resources>

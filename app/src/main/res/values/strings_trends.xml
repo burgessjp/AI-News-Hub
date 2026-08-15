@@ -22,4 +22,12 @@
     <string name="trends_rank_down">-%1$d</string>
     <string name="trends_rank_flat">持平</string>
     <string name="trends_rank_new">新</string>
+
+    <!-- 历史热词(「更多 → 历史热词」两级页) -->
+    <string name="trends_archive_title">历史热词</string>
+    <string name="trends_archive_load_failed">历史热词加载失败</string>
+    <string name="trends_archive_empty_title">暂无历史热词</string>
+    <string name="trends_archive_empty_subtitle">每日热词榜生成后按日归档\n可回看最近 90 天</string>
+    <!-- 日期详情页顶栏标题:%1$s=YYYY-MM-DD -->
+    <string name="trends_date_title">%1$s 热词榜</string>
 </resources>

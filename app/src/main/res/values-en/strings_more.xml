@@ -10,6 +10,8 @@
     <string name="more_section_history">History</string>
     <string name="more_overview_archive_title">Overview History</string>
     <string name="more_overview_archive_subtitle">Browse the daily AI overview by date</string>
+    <string name="more_trends_archive_title">Trends History</string>
+    <string name="more_trends_archive_subtitle">Browse the daily keyword board by date</string>
     <string name="more_summary_archive_title">Digest Archive</string>
     <string name="more_summary_archive_subtitle">Browse each source\'s daily AI digest by date</string>
     <string name="more_browse_history_title">Browsing History</string>

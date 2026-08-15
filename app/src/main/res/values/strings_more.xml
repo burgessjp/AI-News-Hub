@@ -12,6 +12,8 @@
     <string name="more_section_history">历史</string>
     <string name="more_overview_archive_title">历史总览</string>
     <string name="more_overview_archive_subtitle">按日期回看每日 AI 总览</string>
+    <string name="more_trends_archive_title">历史热词</string>
+    <string name="more_trends_archive_subtitle">按日期回看每日热词榜</string>
     <string name="more_summary_archive_title">历史摘要</string>
     <string name="more_summary_archive_subtitle">按日期查看各源当日 AI 摘要</string>
     <string name="more_browse_history_title">浏览历史</string>

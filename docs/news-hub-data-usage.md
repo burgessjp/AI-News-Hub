@@ -301,7 +301,7 @@ print(hn['items'][0]['title'])
 - **历史日期可追至 2026-08-10**(趋势功能上线日,更早无数据)。存量历史由 `backfill_trends.py` 从数据仓库 git 历史一次性回填(遍历每次提交的 `trends.json`,拆分前回退读 index.json 内联 `latest_trends`,按 `generatedAt` 去重)。
 - **relpath 相对 `trends/` 目录**,拼前缀后走 gitcode raw API(同 history / overview_history 消费方式)。
 - **归档文件内容与当期 `trends.json` 完全同构**(同一对象两处落盘)。
-- **用途**:① 每期 `rankChange` / `isNewEntry` 以「昨日最后一期」归档为基准计算(基准读取失败只是少这两个字段,不影响榜单本身);② 为后续热词历史浏览 / 长期演变分析预留(App 暂未读取该索引)。
+- **用途**:① 每期 `rankChange` / `isNewEntry` 以「昨日最后一期」归档为基准计算(基准读取失败只是少这两个字段,不影响榜单本身);② App「更多 → 历史热词」按日期回看(经 `trends_history.json` 寻址,复用 `fetchSnapshot` 路径缓存,归档内容与当期榜单同构渲染)。
 
 ## 单个数据文件的通用结构
 
