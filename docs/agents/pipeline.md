@@ -12,6 +12,7 @@ AI_NEWS_HUB_AI_BASE_URL / AI_NEWS_HUB_AI_MODEL / AI_NEWS_HUB_AI_API_KEY / GITCOD
 
 - 抓 8 源（7 个第三方站点 + `aihot.virxact.com` 精选 `/items?mode=selected&take=20`）→ 各源 AI 摘要（`ai_summary.py`，写入快照顶层 `ai_summary_v2`，每项含 `title`+`desc`+`url`，url 由 AI 返回的条目编号回填）+ 跨源总览（`overview_summary.py`，写入 `index.json` 顶层 `latest_overview`，含 `digest` 综述 + items）→ 推送到 gitcode 数据仓库 `peng1818/AI-News-Hub-Data` 的 `news-hub-data` 分支；push 阶段 overlay 后由 `trend_keywords.py` 扫近 14 天历史快照做纯统计词频分析（不调 AI），写入 `index.json` 顶层 `latest_trends`（热词榜，失败只告警不阻断推送）。
 - 单源失败跳过且 `index.json` latest 指针从上一次继承（客户端永远拿到有效数据）；总览 AI 生成失败时 `latest_overview` 同样继承上一次。≥1 源成功退出码即为 0。日期统一北京时间。
+- **Product Hunt `postedAfter` 恒用 PT（太平洋时间）当日 0 点（带时区偏移，`fetch_data.py` 的 `_ph_today_pt_start()`），勿改回 UTC 边界**：PH 把每个帖子的 `createdAt` 规范化到上线日 PT 00:01（夏令时 = UTC 07:01、冬令时 = UTC 08:01）且「Product of the Day」按 PT 自然日排榜；用 UTC 当日 0 点过滤，北京 08:00 批（= UTC 00:00 整）会把当前榜单整体过滤成空、误报「源站改版」，冬令时下 15:30 批（UTC 07:30）同样会拿空。
 - 数据格式详见 `docs/news-hub-data-usage.md`；各脚本行为见脚本头注释。
 
 ## CI/CD

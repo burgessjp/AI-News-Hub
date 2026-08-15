@@ -8,9 +8,11 @@ name: Fetch Hub Data
 # GitHub cron 不保证准点,脚本内部按 TZ=Asia/Shanghai 取「真正执行时」的北京时间
 # 生成文件名日期/时间,因此即便延迟到 15:45 才跑,目录名仍是当天的 15-45,不会错位。
 #
-# 选 15:30 而非 12:00:Product Hunt 的「Product of the Day」每天 UTC 07:01
-# (北京 15:01)上线,北京 15:30(UTC 07:30)跑时 PH API 日级聚合已能返回当日批次
-# (见 scripts/fetch_data.py 的 _ph_posted_after);定在 12:00(UTC 04:00)会拿空。
+# 选 15:30 而非 12:00:Product Hunt 的「Product of the Day」每天 PT 00:01(夏令时
+# UTC 07:01/北京 15:01,冬令时 UTC 08:01/北京 16:01)上线,北京 15:30(UTC 07:30)
+# 跑时 PH API 日级聚合已能返回当日批次(见 scripts/fetch_data.py 的
+# _ph_today_pt_start);定在 12:00(UTC 04:00)会拿空。postedAfter 恒用 PT 当日
+# 0 点——冬令时下 UTC 边界连本批也会拿空(当前 PT 日批次 08:01 才上线)。
 #
 # 失败策略(对齐 scripts/fetch_data.py):单源失败 3 次重试后被跳过,成功源照常提交;
 # 失败源的 index.json latest 指针从上一次 index.json 继承,客户端永远拿到有效数据。

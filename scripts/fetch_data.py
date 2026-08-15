@@ -50,6 +50,7 @@ import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
 
 import requests
 from bs4 import BeautifulSoup
@@ -480,7 +481,7 @@ def fetch_huggingface_papers():
 # 缺失或失效时本源抛错被单源失败跳过,不影响其余源。
 PH_GQL_URL = "https://api.producthunt.com/v2/api/graphql"
 PH_TOKEN_ENV = "PRODUCT_HUNT_KEY"
-# 当日榜单:取当日 UTC 0 点后上线的、按 votes 排序的前 20(贴合 PH「Product of the Day」语义)。
+# 当日榜单:取当日 PT 0 点后上线的、按 votes 排序的前 20(贴合 PH「Product of the Day」语义)。
 PH_QUERY = """
 query($first: Int!, $after: DateTime) {
   posts(first: $first, order: VOTES, postedAfter: $after) {
@@ -505,11 +506,20 @@ query($first: Int!, $after: DateTime) {
 """
 
 
-def _ph_today_utc_start():
-    """当日 UTC 0 点的 ISO 字符串(如 '2026-07-18T00:00:00Z')。
-    PH 按太平洋时间排「Product of the Day」,但 API 的 postedAfter 用 UTC 最直观,
-    且北京 15:30 抓取时 UTC 当天已覆盖 PH 当日榜单。"""
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT00:00:00Z")
+def _ph_today_pt_start():
+    """当日太平洋时间(PT)0 点的 ISO 字符串(如 '2026-08-15T00:00:00-07:00')。
+
+    PH 把每个帖子的 createdAt 规范化到上线日 PT 00:01(夏令时=UTC 07:01,
+    冬令时=UTC 08:01),「Product of the Day」也按 PT 自然日排榜,所以
+    postedAfter 用 PT 当日 0 点才能在任意批次时刻拿到当前榜单。
+
+    不要改回 UTC 当日 0 点:北京 08:00(=UTC 00:00 整)抓取时,UTC 边界晚于
+    当前榜单全部帖子的规范化时间,会把结果过滤成空列表、误报「源站改版」;
+    冬令时下连北京 15:30 批(UTC 07:30,新批次 08:01 才上线)同样会拿空。"""
+    pt = ZoneInfo("America/Los_Angeles")
+    return datetime.now(pt).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    ).isoformat()
 
 
 def fetch_producthunt():
@@ -517,7 +527,7 @@ def fetch_producthunt():
     Product Hunt 当日热门(对齐 App 端归档模式:数据结构供 ProductHuntArchiveRepository 消费)。
 
     GraphQL V2 + Bearer Developer Token(api.producthunt.com/v2/api/graphql):
-      - 查询 posts(first:20, order:VOTES, postedAfter: 今日UTC0点)
+      - 查询 posts(first:20, order:VOTES, postedAfter: 当日PT 0点,带时区偏移)
       - 字段:id/slug/name/tagline/votesCount/commentsCount/website/url/createdAt/
         dailyRank/topics[]/thumbnail{url}
     - PRODUCT_HUNT_KEY 缺失 → RuntimeError(被单源失败跳过,index 继承旧 latest)
@@ -532,7 +542,7 @@ def fetch_producthunt():
             "(去 https://api.producthunt.com/v2/dashboard 的 API Dashboard 拿)"
         )
 
-    variables = {"first": 20, "after": _ph_today_utc_start()}
+    variables = {"first": 20, "after": _ph_today_pt_start()}
     resp = SESSION.post(
         PH_GQL_URL,
         json={"query": PH_QUERY, "variables": variables},
@@ -1066,6 +1076,13 @@ FETCH_MAX_ATTEMPTS = 3
 EMPTY_OK_SOURCES = frozenset({"openai-anthropic-news"})
 
 
+class EmptyResultError(RuntimeError):
+    """抓取本身成功(HTTP 200 且解析正常)但结果为空,按失败处理。
+
+    与网络/接口错误区分:这条路径不经过 fetch_with_retry 的 3 次重试,
+    main 的失败日志单独报「未重试」,避免误导排查方向。"""
+
+
 def fetch_with_retry(name, fn, limit_hn=None):
     """
     包装单源抓取,失败重试最多 FETCH_MAX_ATTEMPTS 次(需求 a)。
@@ -1434,13 +1451,18 @@ def main():
             # 子源)在时间窗口无新文时正常返回空,落盘 0 条快照、不调 AI;其余源空结果
             # = 选择器失效/接口异常,按失败处理(不落盘,由 previous_latest 兜底)。
             if not items and name not in EMPTY_OK_SOURCES:
-                raise RuntimeError("抓取结果为空(疑似源站改版/接口异常),按失败处理")
+                raise EmptyResultError("抓取结果为空(疑似源站改版/接口异常),按失败处理")
 
             file_path = write_snapshot(args.out_dir, name, items, meta, now)
             print(f"[OK]   {name:<20} {len(items):>4} 条 → {file_path}")
             results[name] = {"status": "ok", "count": len(items), "file": file_path}
             if items:  # 空结果的源没有东西可总结,不进待总结队列
                 pending_summary.append((name, items, file_path))
+        except EmptyResultError as e:
+            # 空结果路径:抓取本身成功、未经过重试,单独报避免「重试 3 次仍失败」误导排查
+            print(f"[FAIL] {name:<20} 抓取成功但结果为空(未重试):"
+                  f"{type(e).__name__}: {e}", file=sys.stderr)
+            results[name] = {"status": "fail", "error": f"{type(e).__name__}: {e}"}
         except Exception as e:
             # 单源 3 次重试全败:记错误、跳过、继续(需求 a:由 previous_latest 兜底 index)
             print(f"[FAIL] {name:<20} 重试 {FETCH_MAX_ATTEMPTS} 次仍失败:"
