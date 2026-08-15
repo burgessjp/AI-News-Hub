@@ -36,6 +36,8 @@ import com.peng.ainewshub.ui.more.SettingsScreen
 import com.peng.ainewshub.ui.more.SettingsStore
 import com.peng.ainewshub.ui.more.SourcesScreen
 import com.peng.ainewshub.ui.more.ThemeMode
+import com.peng.ainewshub.ui.overview.OverviewArchiveScreen
+import com.peng.ainewshub.ui.overview.OverviewDateScreen
 import com.peng.ainewshub.ui.summary.SummaryArchiveScreen
 import com.peng.ainewshub.ui.summary.SummaryDateScreen
 import com.peng.ainewshub.ui.tabs.AllTab
@@ -280,6 +282,19 @@ internal fun PageView(
             onBack = onBack,
             onOpenUrl = { url, title, source -> onOpenUrl(url, title, source) },
             pagerState = pagerStates.forPagePager(page)
+        )
+        // 历史总览:日期列表(overview_history 索引)→ 当日总览页(复用总览内容)。
+        // 纯归档语义;二级页无下拉刷新。
+        Page.OverviewArchive -> OverviewArchiveScreen(
+            onSelectDate = { nav.push(Page.OverviewDate(it)) },
+            onBack = onBack,
+            listState = listStates.forPage(page)
+        )
+        is Page.OverviewDate -> OverviewDateScreen(
+            date = page.date,
+            onBack = onBack,
+            onOpenUrl = { url, title, source -> onOpenUrl(url, title, source) },
+            listState = listStates.forPage(page)
         )
     }
 }

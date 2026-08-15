@@ -257,11 +257,20 @@ private fun HeroShimmerBox(
     )
 }
 
+/**
+ * 总览内容列表(digest Hero + Top10 平铺 + 页脚)。
+ *
+ * 总览 Tab 与「历史总览」日期页共用(后者复用同一渲染,仅差底部预留):
+ *
+ * @param bottomReserve true 预留浮动药丸底栏高度(根 tab);false 为二级页
+ *        (无悬浮底栏),只留呼吸空间
+ */
 @Composable
-private fun OverviewContent(
+internal fun OverviewContent(
     digest: OverviewDigest,
     listState: LazyListState,
-    onOpenUrl: (url: String, title: String, source: String) -> Unit
+    onOpenUrl: (url: String, title: String, source: String) -> Unit,
+    bottomReserve: Boolean = true
 ) {
     // LocalContext.current 只能在 @Composable 上下文取,提前取出供回调内复用
     val context = LocalContext.current
@@ -279,9 +288,11 @@ private fun OverviewContent(
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
-        // 末项可停到药丸之上:药丸高 + 16dp 呼吸空间
-        // (列表本身可滚入药丸之下,容器已按药丸底缘裁剪)
-        contentPadding = PaddingValues(bottom = BottomBarPillHeight + 16.dp)
+        // 根 tab 末项可停到药丸之上(药丸高 + 16dp 呼吸空间,列表本身可滚入药丸之下,
+        // 容器已按药丸底缘裁剪);二级页无悬浮底栏,只留呼吸空间
+        contentPadding = PaddingValues(
+            bottom = if (bottomReserve) BottomBarPillHeight + 16.dp else 24.dp
+        )
     ) {
         // 首屏 digest Hero:今日综述 + 时效 caption(两者都缺失时不占位)
         if (digest.dataFetchedAt > 0 || digest.digest.isNotBlank()) {

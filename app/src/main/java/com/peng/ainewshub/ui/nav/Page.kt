@@ -65,6 +65,10 @@ internal sealed interface Page {
     data object SummaryArchive : Page
     /** 历史摘要 —— 指定日期的全源摘要卡页(复用摘要卡片实现)。 */
     data class SummaryDate(val date: String) : Page
+    /** 历史总览 —— 可选日期列表(归档 overview_history 索引),从「更多」页进入。 */
+    data object OverviewArchive : Page
+    /** 历史总览 —— 指定日期的总览页(复用总览 Tab 内容实现)。 */
+    data class OverviewDate(val date: String) : Page
 }
 
 /**
@@ -97,6 +101,8 @@ internal fun Page.toBundle(): Bundle = Bundle().apply {
         is Page.Favorites -> putString("t", "Favorites")
         is Page.SummaryArchive -> putString("t", "SummaryArchive")
         is Page.SummaryDate -> { putString("t", "SummaryDate"); putString("date", date) }
+        is Page.OverviewArchive -> putString("t", "OverviewArchive")
+        is Page.OverviewDate -> { putString("t", "OverviewDate"); putString("date", date) }
     }
 }
 
@@ -127,6 +133,8 @@ internal fun pageFromBundle(b: Bundle, webFallbackTitle: String): Page? {
         "Favorites" -> Page.Favorites
         "SummaryArchive" -> Page.SummaryArchive
         "SummaryDate" -> b.getString("date")?.let { Page.SummaryDate(it) }
+        "OverviewArchive" -> Page.OverviewArchive
+        "OverviewDate" -> b.getString("date")?.let { Page.OverviewDate(it) }
         else -> null
     }
 }

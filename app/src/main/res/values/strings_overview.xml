@@ -30,4 +30,11 @@
     <!-- ViewModel 错误文案(网络/受限复用 common error_*) -->
     <string name="overview_error_parse">数据解析失败,请稍后重试</string>
     <string name="overview_error_load_failed">总览加载失败,请稍后重试</string>
+
+    <!-- 历史总览(「更多 → 历史总览」两级页) -->
+    <string name="overview_archive_title">历史总览</string>
+    <string name="overview_archive_load_failed">历史总览加载失败</string>
+    <string name="overview_archive_empty_title">暂无历史总览</string>
+    <string name="overview_archive_empty_subtitle">每日总览生成后按日归档\n可回看最近 90 天</string>
+    <string name="overview_date_title">%1$s 总览</string>
 </resources>

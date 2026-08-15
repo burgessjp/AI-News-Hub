@@ -242,6 +242,25 @@ object ArchiveHttpClient {
     }
 
     /**
+     * 读 index.json 的 `overview_history` 索引(与 latest 共享 2 分钟缓存),供
+     * 「历史总览」按日期寻址。
+     *
+     * @return date → 相对 overview/ 目录的归档文件路径(形如 `2026-08-15/11-49-data.json`,
+     *         取当日最后一次批次)。由流水线每次运行时合并写入,仅保留最近 90 天;
+     *         旧版 index 无该字段时返回空 map(功能上线初期即如此)
+     */
+    suspend fun fetchOverviewHistory(): Map<String, String> = withContext(Dispatchers.IO) {
+        val index = fetchIndex()
+        val history = index.optJSONObject("overview_history") ?: return@withContext emptyMap()
+        val result = mutableMapOf<String, String>()
+        history.keys().forEach { date ->
+            val rel = history.optString(date)
+            if (rel.isNotBlank()) result[date] = rel
+        }
+        result
+    }
+
+    /**
      * 按相对路径拉某源的归档快照,返回解析后的顶层 JSON(历史日期寻址入口)。
      * 带 source/relPath 路径缓存(内容不可变)与同 URL in-flight 去重:2 分钟内重进
      * tab / 历史日期页来回翻不再重复下载同一快照。

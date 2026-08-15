@@ -21,4 +21,11 @@
 
     <string name="overview_error_parse">Failed to parse data, please try again later</string>
     <string name="overview_error_load_failed">Failed to load the overview, please try again later</string>
+
+    <!-- Overview history (More → Overview History pages) -->
+    <string name="overview_archive_title">Overview History</string>
+    <string name="overview_archive_load_failed">Failed to load overview history</string>
+    <string name="overview_archive_empty_title">No overview history yet</string>
+    <string name="overview_archive_empty_subtitle">Daily overviews are archived by date\nLooking back up to 90 days</string>
+    <string name="overview_date_title">Overview for %1$s</string>
 </resources>

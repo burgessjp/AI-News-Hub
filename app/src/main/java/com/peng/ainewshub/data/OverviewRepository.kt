@@ -64,6 +64,11 @@ data class OverviewDigest(
  */
 class OverviewRepository {
 
+    companion object {
+        /** 总览归档目录名(index `overview_history` 指针相对该目录寻址,数据仓库同名目录)。 */
+        const val ARCHIVE_DIR = "overview"
+    }
+
     /**
      * 加载今日总览。
      *
@@ -78,6 +83,28 @@ class OverviewRepository {
         val json = ArchiveHttpClient.fetchLatestOverview(force)
             ?: throw AppException.NoData()
         parseDigest(json)
+    }
+
+    /**
+     * 可选日期列表(「历史总览」日期列表页):index `overview_history` 索引键,倒序。
+     * 索引缺失/为空返回空列表(UI 走空态)。
+     */
+    suspend fun availableDates(): List<String> =
+        ArchiveHttpClient.fetchOverviewHistory().keys.sortedDescending()
+
+    /**
+     * 加载指定日期的历史总览。
+     *
+     * 经 index `overview_history` 索引按日期寻址,归档文件内容与当日 latest_overview
+     * 同构(流水线逐批次落盘 + 一次性回填),复用 [parseDigest] 反序列化。
+     *
+     * @param date YYYY-MM-DD(北京时间)
+     * @return 成功为 [OverviewDigest];日期不在索引/归档缺失 → [AppException.NoData]
+     */
+    suspend fun loadDigestOn(date: String): Result<OverviewDigest> = runCatching {
+        val relPath = ArchiveHttpClient.fetchOverviewHistory()[date]
+            ?: throw AppException.NoData()
+        parseDigest(ArchiveHttpClient.fetchSnapshot(ARCHIVE_DIR, relPath))
     }
 
     /** 反序列化 latest_overview JSON 为 [OverviewDigest]。items 为空视为数据无效抛 [AppException.NoData]。 */

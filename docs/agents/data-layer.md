@@ -15,6 +15,7 @@
 
 - **摘要 Tab** 直接读归档快照顶层 `ai_summary_v2` 字段（JSON 数组，每项含 `title`+`desc`+`url`，流水线预生成；`url` 由流水线按 AI 返回的条目编号回填，空串 = 该条只读不可点），兼容回退旧纯文本 `ai_summary`（历史快照），两者都缺失即失败态。v2 条目 `url` 非空时整行可点，经 `openUrl` 直达内置 WebView。
 - **总览 Tab** 直接读 `index.json` 顶层 `latest_overview` 字段（流水线 `scripts/overview_summary.py` 预生成的跨源综合分析，含 `digest` 今日综述 + Top10 items + breaking 标记；`digest` 可能为空串，空串不渲染）。App 端 `OverviewRepository` 只做反序列化，不再有端侧 AI 调用 / 缓存 / ConfigMissing 引导态。首屏 digest Hero = BrandGradient 通栏（「今日综述」label + digest 正文 + 数据截至 caption；digest 空串退化为纯文本时效行），Top10 无头条特殊位统一平铺。
+- **历史总览**（「更多 → 历史总览」两级页）：`OverviewRepository.loadDigestOn(date)` 经 `index.json` 顶层 `overview_history` 索引按日期寻址，拉 `overview/<date>/<HH-MM>-data.json` 归档文件（复用 `fetchSnapshot("overview", relPath)` 路径缓存）反序列化为 `OverviewDigest`——与总览 Tab 同构渲染（共享 `OverviewContent`，仅差二级页顶栏返回/无下拉刷新/底部不预留底栏）。索引仅保留最近 90 天；旧 index 无该字段时日期列表走空态。VM 按日期隔离实例（`OverviewArchiveViewModel`，key = `overview-date-$date`）。
 - **趋势 Tab** 直接读 `index.json` 顶层 `latest_trends` 字段（流水线 `scripts/trend_keywords.py` 在 push 阶段对近 14 天快照做的**纯统计**热词词频分析，**不调 AI**、确定性结果：窗口期命中数 + 每日序列 + 涨跌 + ≤3 条代表条目）。App 端 `TrendsRepository` 只做反序列化。UI 为热词榜平铺（RankBadge + 命中统计 + Canvas 手绘 sparkline + 涨跌箭头），点击词条展开代表条目经 `openUrl` 进内置 WebView。
 
 ## 桌面小组件「今日热点」（widget/ 包，Glance）

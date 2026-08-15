@@ -3,6 +3,9 @@ package com.peng.ainewshub.ui.components
 import android.content.Context
 import com.peng.ainewshub.R
 import java.text.SimpleDateFormat
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import java.util.Date
 import java.util.Locale
 
@@ -69,3 +72,28 @@ fun formatRelative(context: Context, tsMillis: Long): String {
  */
 fun weekdayLabel(context: Context, dayOfWeek: Int): String =
     context.resources.getStringArray(R.array.weekdays)[(dayOfWeek - 1).coerceIn(0, 6)]
+
+/**
+ * 归档日期(YYYY-MM-DD)→ 列表行日期标签:「今天/昨天/前天/M月d日 · 周X」。
+ * 历史摘要与历史总览的日期列表行同规格(原 SummaryArchiveScreen 私有实现收口至此)。
+ * 解析失败原样返回日期串。
+ */
+fun archiveDateLabel(context: Context, date: String): String {
+    return runCatching {
+        val d = LocalDate.parse(date)
+        val today = LocalDate.now()
+        val days = ChronoUnit.DAYS.between(d, today)
+        val base = when {
+            days == 0L -> context.getString(R.string.time_today)
+            days == 1L -> context.getString(R.string.time_yesterday)
+            days == 2L -> context.getString(R.string.time_day_before_yesterday)
+            else -> d.format(
+                DateTimeFormatter.ofPattern(
+                    context.getString(R.string.date_fmt_month_day),
+                    Locale.getDefault()
+                )
+            )
+        }
+        "$base · ${weekdayLabel(context, d.dayOfWeek.value)}"
+    }.getOrDefault(date)
+}

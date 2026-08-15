@@ -53,6 +53,7 @@ internal fun TabRoot(
             onOpenBrowseHistory = { nav.push(Page.BrowseHistory) },
             onOpenFavorites = { nav.push(Page.Favorites) },
             onOpenSummaryArchive = { nav.push(Page.SummaryArchive) },
+            onOpenOverviewArchive = { nav.push(Page.OverviewArchive) },
             onOpenSettings = { nav.push(Page.Settings) },
             onOpenAiService = { nav.push(Page.AiService) },
             onOpenAbout = { nav.push(Page.About) }
