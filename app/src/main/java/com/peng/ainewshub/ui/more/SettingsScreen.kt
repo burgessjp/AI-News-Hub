@@ -58,7 +58,7 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * 主题模式 —— 由 [com.peng.ainewshub.AiNewsHubApp] 持有,设置页通过回调修改。
+ * 主题模式 —— 由 [com.peng.ainewshub.ui.nav.AiNewsHubApp] 持有,设置页通过回调修改。
  */
 enum class ThemeMode(@StringRes val labelRes: Int) {
     System(R.string.settings_theme_system),
@@ -67,7 +67,7 @@ enum class ThemeMode(@StringRes val labelRes: Int) {
 }
 
 /**
- * 字体族 —— 同样提升到 [com.peng.ainewshub.AiNewsHubApp]。
+ * 字体族 —— 同样提升到 [com.peng.ainewshub.ui.nav.AiNewsHubApp]。
  *
  * 仅用 Compose 内置 FontFamily,无需引入外部字体资源:
  *  - System: 系统默认字体
