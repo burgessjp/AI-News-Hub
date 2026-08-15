@@ -48,7 +48,7 @@ import com.peng.ainewshub.ui.theme.AppText
  *  - 未选中:[icon] 描边(Outlined)变体
  *
  * 「总览」是默认首页:端侧 AI 对全部归档源榜单的当日综合分析(OverviewScreen)。
- * 「趋势」是流水线纯统计的跨源热词榜(TrendsScreen,读归档 latest_trends)。
+ * 「趋势」是流水线纯统计的跨源热词榜(TrendsScreen,读归档 trends.json)。
  * 「AIHot 精选」原为独立根 tab,现改为从「更多」页进入的二级页(Page.FeaturedHub),
  * 精选 tab 的 Whatshot 图标语义迁移到 MoreScreen 浏览组入口。
  *

@@ -3,7 +3,7 @@
 <resources>
     <!-- 加载中说明 -->
     <string name="trends_loading">正在加载热词趋势…</string>
-    <!-- 空态:归档 latest_trends 字段缺失 -->
+    <!-- 空态:归档 trends.json 缺失 -->
     <string name="trends_no_data_title">热词趋势尚未生成</string>
     <string name="trends_no_data_subtitle">趋势由每日流水线统计生成,请稍后再来</string>
     <!-- 错误态标题 -->

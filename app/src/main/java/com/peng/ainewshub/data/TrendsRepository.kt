@@ -63,14 +63,15 @@ data class TrendsDigest(
  *
  * 与 [OverviewRepository] 同范式:**流水线预生成、App 只读归档**。流水线
  * (`scripts/trend_keywords.py`,纯统计不调 AI)在 push 阶段扫近 14 天快照做
- * 词频统计,把结果写进 index.json 顶层 `latest_trends` 字段,本 Repository
- * 只负责拉取该字段并反序列化为 [TrendsDigest]。
+ * 词频统计,把结果写进数据仓库根级独立文件 `trends.json`(内容与原 index
+ * 内联 `latest_trends` 字段同构),本 Repository 只负责拉取并反序列化为
+ * [TrendsDigest]。
  *
  * 设计要点:
- *  - 输入 [ArchiveHttpClient.fetchLatestTrends] 复用 index.json 的 2 分钟缓存,
- *    与 latest/history/latest_overview 共享一次网络请求;
- *  - 字段缺失(null)或 keywords 为空 → 抛 [AppException.NoData](UI 走空态,
- *    语义是「趋势尚未生成」——功能上线初期旧 index.json 即如此);
+ *  - 输入 [ArchiveHttpClient.fetchLatestTrends] 走 trends.json 的独立 2 分钟
+ *    缓存(与 index 互不影响);
+ *  - 文件缺失(null)或 keywords 为空 → 抛 [AppException.NoData](UI 走空态,
+ *    语义是「趋势尚未生成」——拆分迁移前/功能上线初期即如此);
  *  - 网络/解析失败 → 抛 [AppException.Network]/[AppException.ServerError](UI 走错误态)。
  */
 class TrendsRepository {
@@ -78,8 +79,8 @@ class TrendsRepository {
     /**
      * 加载热词趋势榜。
      *
-     * @param force true 绕过 index.json 2 分钟缓存(趋势 Tab 下拉刷新)
-     * @return 成功为 [TrendsDigest];字段缺失/无热词为 [AppException.NoData];
+     * @param force true 绕过 trends.json 2 分钟缓存(趋势 Tab 下拉刷新)
+     * @return 成功为 [TrendsDigest];文件缺失/无热词为 [AppException.NoData];
      * 网络/解析失败为对应异常
      */
     suspend fun loadTrends(force: Boolean = false): Result<TrendsDigest> = runCatching {
@@ -88,7 +89,7 @@ class TrendsRepository {
         parseTrends(json)
     }
 
-    /** 反序列化 latest_trends JSON 为 [TrendsDigest]。keywords 为空视为数据无效抛 [AppException.NoData]。 */
+    /** 反序列化 trends JSON 为 [TrendsDigest]。keywords 为空视为数据无效抛 [AppException.NoData]。 */
     private suspend fun parseTrends(json: JSONObject): TrendsDigest = withContext(Dispatchers.IO) {
         val days = readStringList(json.optJSONArray("days"))
         val keywords = parseKeywords(json.optJSONArray("keywords"))

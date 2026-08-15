@@ -20,7 +20,7 @@ import kotlinx.coroutines.launch
 /**
  * 热词趋势 UI 状态。
  *
- * [NoData]:趋势尚未生成(归档 latest_trends 字段缺失),语义是空态而非出错
+ * [NoData]:趋势尚未生成(归档 trends.json 缺失),语义是空态而非出错
  * —— 功能上线初期旧 index.json 即如此。
  * [Error]:网络/解析失败。
  */
@@ -57,7 +57,7 @@ class TrendsViewModel(application: Application) : AndroidViewModel(application) 
         load()
     }
 
-    /** 自动加载:读归档 latest_trends 字段(命中 2 分钟缓存秒回)。 */
+    /** 自动加载:读归档 trends.json(命中 2 分钟缓存秒回)。 */
     fun load() = run(false)
 
     /** 下拉刷新:绕过 index.json 2 分钟缓存强制重读。 */

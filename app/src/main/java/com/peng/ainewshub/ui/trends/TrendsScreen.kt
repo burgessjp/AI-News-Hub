@@ -67,7 +67,7 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * 热词趋势 Tab 根屏 —— 流水线预生成的跨源热词词频统计(读归档 latest_trends 字段,
+ * 热词趋势 Tab 根屏 —— 流水线预生成的跨源热词词频统计(读归档 trends.json,
  * 纯统计无 AI 参与;与「总览」tab 同范式:流水线预生成、App 只读归档)。
  *
  * 结构(编辑风,去卡片化,与总览 Top10 平铺同语言):

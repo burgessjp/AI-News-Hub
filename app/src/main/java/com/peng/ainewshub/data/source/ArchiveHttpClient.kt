@@ -22,12 +22,12 @@ import java.util.concurrent.ConcurrentHashMap
  *
  * 取数流程(对齐 docs/news-hub-data-usage.md):
  *  1. GET `index.json?ref=news-hub-data` → 读 `latest.<source>` 拿最新快照路径
- *     (index 只含即时字段:updated_at / latest / latest_overview / latest_trends)
+ *     (index 只含即时字段:updated_at / latest / latest_overview)
  *  2. 拼 `<API_BASE>/<source>/<相对路径>?ref=news-hub-data` GET 该快照 JSON
  *  3. 解析顶层 `fetched_at_ms` 与 `items[]`,交由各 Repository 做字段映射
- *  4. 历史类页面按需另拉根级独立索引文件 `history.json`(「历史摘要」日期寻址)
- *     与 `overview_history.json`(「历史总览」日期寻址)——已拆出 index.json,
- *     不随保留期增长,且未进历史页的 tab 不必下载
+ *  4. 按需另拉根级独立文件:趋势 `trends.json`(趋势 Tab)与历史索引
+ *     `history.json`(历史摘要)/ `overview_history.json`(历史总览)——均已拆出
+ *     index.json,不随保留期增长,未用到对应页面的 tab 不必下载
  *
  * 缓存与刷新:index.json 有 2 分钟内存缓存(多源并发去重,见 fetchIndex);快照本体
  * 按路径缓存(内容不可变,见 fetchSnapshot)+ 同 URL in-flight 去重,重进 tab 不重复下载。
@@ -63,6 +63,9 @@ object ArchiveHttpClient {
     /** 根级独立历史索引(拆出 index.json,内容与原内联字段同构)。 */
     private const val HISTORY_URL = "$API_BASE/history.json?ref=$REF"
     private const val OVERVIEW_HISTORY_URL = "$API_BASE/overview_history.json?ref=$REF"
+
+    /** 根级独立趋势文件(拆出 index.json,内容与原内联 latest_trends 字段同构)。 */
+    private const val TRENDS_URL = "$API_BASE/trends.json?ref=$REF"
 
     /** index.json 内存缓存有效期:2 分钟(index 实际几小时才更新一次,短 TTL 足够)。 */
     private const val INDEX_TTL_MS = 2L * 60 * 1000
@@ -117,19 +120,21 @@ object ArchiveHttpClient {
     /** in-flight 去重锁:同 URL 并发只打 1 次网络,其余等锁后复用缓存。 */
     private val snapshotLocks = ConcurrentHashMap<String, Mutex>()
 
-    // ===== 根级独立索引文件(history.json / overview_history.json)=====
-    // 拆出 index.json 的历史索引:更新节奏与 index 相同(每批次),复用同款
-    // 2 分钟 TTL + Mutex 并发去重;仅历史类页面按需拉取,单文件持有单实例。
+    // ===== 根级独立索引/内容文件(history.json / overview_history.json / trends.json)=====
+    // 拆出 index.json 的历史索引与趋势:更新节奏与 index 相同(每批次),复用同款
+    // 2 分钟 TTL + Mutex 并发去重;仅对应页面按需拉取,单文件持有单实例。
 
     private val historyFileFetcher = CachedFileJson(HISTORY_URL, "读取历史索引失败")
     private val overviewHistoryFileFetcher = CachedFileJson(OVERVIEW_HISTORY_URL, "读取总览历史索引失败")
+    private val trendsFileFetcher = CachedFileJson(TRENDS_URL, "读取趋势数据失败")
 
     /**
-     * 根级独立索引文件的单实例缓存拉取器(history.json / overview_history.json 用)。
+     * 根级独立文件的单实例缓存拉取器(history / overview_history / trends 用)。
      *
-     * 机制与 fetchIndex 同款:Mutex 串行化 + [INDEX_TTL_MS] 短 TTL 缓存(两文件与
-     * index 同批次更新,节奏一致);区别是无需 force 路径(历史页无下拉刷新,
-     * 仅错误态重试,重试直接走网络)。
+     * 机制与 fetchIndex 同款:Mutex 串行化 + [INDEX_TTL_MS] 短 TTL 缓存(各文件与
+     * index 同批次更新,节奏一致);[force] 语义也与 fetchIndex 一致 —— 绕过 TTL
+     * 强制打网络,但保留 [FORCE_FETCH_DEDUP_MS] 锁内去重窗口(趋势 Tab 下拉刷新用;
+     * 历史页无下拉刷新,恒走默认 false)。
      */
     private class CachedFileJson(private val url: String, private val hint: String) {
 
@@ -137,9 +142,10 @@ object ArchiveHttpClient {
         private var cached: JSONObject? = null
         private var cachedAt = 0L
 
-        suspend fun fetch(): JSONObject = mutex.withLock {
+        suspend fun fetch(force: Boolean = false): JSONObject = mutex.withLock {
             val c = cached
-            if (c != null && System.currentTimeMillis() - cachedAt < INDEX_TTL_MS) {
+            val freshWithin = if (force) FORCE_FETCH_DEDUP_MS else INDEX_TTL_MS
+            if (c != null && System.currentTimeMillis() - cachedAt < freshWithin) {
                 return@withLock c
             }
             val text = getRaw(url, hint)
@@ -251,13 +257,16 @@ object ArchiveHttpClient {
     }
 
     /**
-     * 读 index.json 顶层的 `latest_trends` 字段(跨源热词趋势榜,流水线 trend_keywords.py
-     * 纯统计预生成)。与 latest/history/latest_overview 共享 2 分钟缓存,零额外请求。
-     * 字段缺失或无 keywords 时返回 null(语义:趋势尚未生成,UI 走 NoData 态)。
+     * 拉根级独立文件 `trends.json`(跨源热词趋势榜,流水线 trend_keywords.py 在
+     * push 阶段纯统计预生成;内容与原 index 内联 `latest_trends` 字段同构)。
+     * 独立 2 分钟缓存 + 并发去重,与 index 互不影响。
+     *
+     * @param force true 绕过缓存(趋势 Tab 下拉刷新;锁内秒级去重窗口与 fetchIndex 同款)
+     * @return 趋势 JSON;无 keywords 时返回 null(语义:趋势尚未生成,UI 走 NoData 态)。
      * TrendsRepository 据此反序列化为 TrendsDigest。
      */
     suspend fun fetchLatestTrends(force: Boolean = false): JSONObject? = withContext(Dispatchers.IO) {
-        fetchIndex(force).optJSONObject("latest_trends")?.takeIf { it.has("keywords") }
+        trendsFileFetcher.fetch(force).takeIf { it.has("keywords") }
     }
 
     /**
