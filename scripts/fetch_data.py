@@ -506,17 +506,10 @@ query($first: Int!, $after: DateTime) {
 
 
 def _ph_today_utc_start():
-    """PH「当前 PT 自然日」0 点的 ISO 字符串(带时区偏移,如 '2026-08-14T00:00:00-07:00')。
-    PH 的 posts.createdAt 已被规范化到太平洋时间 00:01(即 UTC 07:01 左右),
-    若用 UTC 当日 0 点做 postedAfter,PT 语义下的"当日"帖子会全部被过滤掉
-    (例如北京 08:00 抓取时 PT 还在前一天,UTC 当日 0 点会排除 PT 当日全部帖子,
-    导致返回空列表 → "疑似源站改版"失败)。用 PT 日边界才与
-    Product of the Day 排名语义一致。"""
-    from zoneinfo import ZoneInfo
-    pt = ZoneInfo("America/Los_Angeles")
-    pt_now = datetime.now(pt)
-    pt_day_start = pt_now.replace(hour=0, minute=0, second=0, microsecond=0)
-    return pt_day_start.isoformat()
+    """当日 UTC 0 点的 ISO 字符串(如 '2026-07-18T00:00:00Z')。
+    PH 按太平洋时间排「Product of the Day」,但 API 的 postedAfter 用 UTC 最直观,
+    且北京 15:30 抓取时 UTC 当天已覆盖 PH 当日榜单。"""
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT00:00:00Z")
 
 
 def fetch_producthunt():
