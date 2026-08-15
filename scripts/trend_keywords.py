@@ -87,23 +87,32 @@ TRENDS_RETENTION_DAYS = 90
 # 语境里无区分度,入榜只会霸榜)。
 STOPWORDS = {
     # 标准功能词
-    "a", "an", "and", "are", "as", "at", "be", "been", "but", "by", "can",
-    "could", "did", "do", "does", "for", "from", "had", "has", "have", "he",
-    "her", "here", "him", "his", "how", "i", "if", "in", "into", "is", "it",
-    "its", "just", "me", "my", "no", "not", "now", "of", "on", "or", "our",
-    "out", "over", "own", "per", "she", "so", "than", "that", "the", "their",
+    "a", "about", "after", "amid", "an", "and", "are", "as", "at", "back",
+    "be", "been", "before", "between", "but", "by", "can", "could", "did",
+    "do", "does", "during", "for", "from", "had", "has", "have", "he", "her",
+    "here", "him", "his", "how", "i", "if", "in", "into", "is", "it", "its",
+    "just", "may", "me", "might", "more", "most", "must", "my", "no", "not",
+    "now", "of", "on", "or", "other", "our", "out", "over", "own", "per",
+    "she", "should", "so", "some", "still", "than", "that", "the", "their",
     "them", "then", "there", "these", "they", "this", "to", "too", "under",
-    "up", "us", "via", "was", "we", "were", "what", "when", "where", "which",
-    "while", "who", "why", "will", "with", "you", "your",
+    "up", "us", "via", "was", "we", "were", "what", "when", "where", "whether",
+    "which", "while", "who", "why", "will", "with", "would", "you", "your",
     # 标题填充词
     "new", "best", "top", "first", "way", "ways", "thing", "things", "say",
     "says", "said", "see", "look", "want", "need", "know", "think", "take",
     "get", "got", "make", "made", "use", "used", "using", "let", "like",
     "one", "two", "day", "days", "week", "weeks", "year", "years", "time",
     "people", "good", "big", "going", "go", "come", "comes", "show", "ask",
-    "hn", "vs", "launch", "launches", "launched", "release", "releases",
+    "asks", "hn", "vs", "launch", "launches", "launched", "release", "releases",
     "released", "announce", "announces", "announced", "introducing", "unveils",
     "update", "updates", "review", "guide", "tutorials", "tutorial",
+    # 标题填充词二期:词云实锤上榜的垃圾词根(questions about / raising
+    # questions / next gen / long term / generated text / production ready /
+    # v4 pro / deploys claude 等)。故意不加:long(会误杀 "long horizon",
+    # "long term" 靠 term 拦截即可)、report/research(会连带杀掉
+    # "technical report" 这类尚可词条,边界模糊)
+    "question", "questions", "raising", "raises", "raised", "next", "gen",
+    "term", "terms", "generated", "ready", "pro", "deploy", "deploys",
     # 领域泛词(AI 资讯里处处出现,无趋势意义)
     "ai", "model", "models", "app", "apps", "tool", "tools", "tech",
     "software", "data", "code", "coding", "open", "source",
@@ -117,19 +126,26 @@ STOPWORDS = {
 
 # AI 领域实体别名表:canonical key → (display, 变体集合)。
 # 变体一律小写;bigram 变体含空格(如 "gpt 5");含 CJK 的变体走子串匹配。
-# 新增实体只改本表一处。
+# 新增实体只改本表一处。带版本号的模型名(GPT-5/DeepSeek V4/Grok 4 等)必须
+# 在本表登记——数字侧 token(5/4/3.7)过不了自由 bigram 的字母约束,只有别名
+# 变体能让版本词组入榜。
 ALIASES = {
     "openai": ("OpenAI", {"openai", "open ai"}),
     "chatgpt": ("ChatGPT", {"chatgpt", "chat gpt"}),
     "gpt-5": ("GPT-5", {"gpt5", "gpt-5", "gpt 5"}),
     "gpt-4": ("GPT-4", {"gpt4", "gpt-4", "gpt 4"}),
+    "gpt-5.6": ("GPT-5.6 Sol", {"gpt 5.6", "5.6 sol"}),
+    "gpt-5.5": ("GPT-5.5", {"gpt 5.5"}),
     "anthropic": ("Anthropic", {"anthropic"}),
     "claude": ("Claude", {"claude"}),
     "claude-code": ("Claude Code", {"claude code"}),
+    "fable-5": ("Fable 5", {"fable 5", "claude fable"}),
     "google": ("Google", {"google"}),
     "gemini": ("Gemini", {"gemini"}),
+    "gemini-3": ("Gemini 3", {"gemini 3", "gemini 3.7"}),
     "deepmind": ("DeepMind", {"deepmind", "deep mind"}),
     "deepseek": ("DeepSeek", {"deepseek", "deep seek", "深度求索"}),
+    "deepseek-v4": ("DeepSeek V4", {"deepseek v4"}),
     "meta": ("Meta", {"meta"}),
     "llama": ("Llama", {"llama"}),
     "microsoft": ("Microsoft", {"microsoft"}),
@@ -138,16 +154,21 @@ ALIASES = {
     "nvidia": ("NVIDIA", {"nvidia"}),
     "xai": ("xAI", {"xai", "x ai"}),
     "grok": ("Grok", {"grok"}),
+    "grok-4.6": ("Grok 4.6", {"grok 4.6"}),
+    "grok-4.5": ("Grok 4.5", {"grok 4.5"}),
     "mistral": ("Mistral", {"mistral"}),
     "qwen": ("Qwen 千问", {"qwen", "千问", "通义千问"}),
+    "qwen3.8": ("Qwen3.8", {"qwen3.8"}),
     "kimi": ("Kimi", {"kimi", "月之暗面"}),
     "doubao": ("豆包", {"doubao", "豆包"}),
     "zhipu": ("智谱", {"zhipu", "智谱"}),
+    "glm-5.2": ("GLM-5.2", {"glm 5.2"}),
     "alibaba": ("Alibaba", {"alibaba", "阿里"}),
     "bytedance": ("字节跳动", {"bytedance", "字节跳动", "字节"}),
     "sora": ("Sora", {"sora"}),
     "midjourney": ("Midjourney", {"midjourney"}),
     "stable-diffusion": ("Stable Diffusion", {"stable diffusion"}),
+    "ltx-2": ("LTX-2", {"ltx 2"}),
     "huggingface": ("Hugging Face", {"huggingface", "hugging face"}),
     "github": ("GitHub", {"github"}),
     "cursor": ("Cursor", {"cursor"}),
@@ -171,7 +192,10 @@ for _canon, (_display, _variants) in ALIASES.items():
 _CJK_VARIANTS = {v: c for v, c in _VARIANT_TO_CANONICAL.items()
                  if re.search(r"[一-鿿]", v)}
 
-_TOKEN_RE = re.compile(r"[A-Za-z0-9]+")
+_TOKEN_RE = re.compile(r"[A-Za-z0-9]+(?:\.[0-9]+)*")  # 小数版本号(3.7/2.4)不拆碎片
+
+# 所有格后缀(X's → X):分词前剥掉,避免 "builder's" 切出 "s" 残片混进 bigram
+_POSSESSIVE_RE = re.compile(r"(?<=[A-Za-z0-9])'s\b", re.IGNORECASE)
 
 
 # ===== 快照扫描 =====
@@ -223,20 +247,23 @@ def _item_fields(source, o):
         url = _s(o, "target_url") or _s(o, "url")
     elif source == "github-trending":
         name = f"{_s(o, 'owner')}/{_s(o, 'name')}".strip("/")
-        text = f"{name} {_s(o, 'description')}"
+        # 多字段拼接一律用换行而非空格:拼接边界是假相邻,若用空格会把
+        # "…Flash" + "Google DeepMind…" 拼成 "flash google" 这类跨界词组
+        # (自由 bigram 的间隔校验不认换行,见 _extract_terms)
+        text = f"{name}\n{_s(o, 'description')}"
         title, url = name, _s(o, "url")
     elif source == "huggingface-papers":
         text, title = _s(o, "title"), _s(o, "title")
         url = _s(o, "url")
     elif source == "producthunt":
-        text = f"{_s(o, 'name')} {_s(o, 'tagline')}"
+        text = f"{_s(o, 'name')}\n{_s(o, 'tagline')}"
         title, url = _s(o, "name"), _s(o, "url")
     elif source == "rundown-ai":
         text, title = _s(o, "title"), _s(o, "title")
         url = _s(o, "url")
     elif source == "aihot-featured":
         # titleEn 英文原文优先;中文 title 一并带上(供 CJK 变体子串匹配)
-        text = f"{_s(o, 'titleEn')} {_s(o, 'title')}"
+        text = f"{_s(o, 'titleEn')}\n{_s(o, 'title')}"
         title = _s(o, "title")
         url = _s(o, "permalink") or _s(o, "url")
     elif source == "openai-anthropic-news":
@@ -247,7 +274,7 @@ def _item_fields(source, o):
         # english 尾部常带 TLDR 赞助行("PLUS: <软广> <作者>, +N"),且赞助条目整条
         # english 就是 "PLUS: ...";partition 两种都覆盖,避免作者名/赞助商混进词频
         english = _s(o, "english").partition("PLUS:")[0]
-        text = f"{english} {_s(o, 'summary')}"
+        text = f"{english}\n{_s(o, 'summary')}"
         title, url = _s(o, "summary"), _s(o, "url")
     else:
         return None
@@ -266,31 +293,57 @@ def _extract_terms(text):
     按频次票选)。英文走 unigram + 相邻 bigram;CJK 变体走子串匹配。
     """
     found = {}
-    # (lower, original) 成对 token 流:在原文上做大小写不敏感匹配再小写化,
-    # 避免 lower() 改变个别 Unicode 字符长度导致的位置错位
-    tokens = [(m.group(0).lower(), m.group(0)) for m in _TOKEN_RE.finditer(text)]
+    # 所有格后缀先剥掉(在原文本上,后续 CJK 子串匹配也用剥完的文本——
+    # 剥 ASCII 的 's 不会影响 CJK 子串)
+    text = _POSSESSIVE_RE.sub("", text)
+    # (start, end, lower, original) 成对 token 流:在原文上做大小写不敏感
+    # 匹配再小写化,避免 lower() 改变个别 Unicode 字符长度导致的位置错位;
+    # start/end 供 bigram 判断两 token 之间是否只有空白(不跨标点配对)
+    tokens = [(m.start(), m.end(), m.group(0).lower(), m.group(0))
+              for m in _TOKEN_RE.finditer(text)]
 
     def _record(raw, display_hint):
         canon = _VARIANT_TO_CANONICAL.get(raw, raw)
         if canon not in found:
             found[canon] = display_hint
 
-    for i, (low, orig) in enumerate(tokens):
-        # unigram:别名变体直接命中(不受停用词约束,如 "rag");否则必须含字母、
-        # 非停用词(纯数字只活在 bigram 里,如 "gpt 5" 的 "5")
+    def _free_token_ok(low):
+        """自由 token 约束:≥2 字符且含字母。
+
+        拦两类碎片:单字母残片('s 剥漏的 s 之类,配出 "builder s");纯数字/
+        小数 token(3、3.7——版本号数字只允许活在别名变体里,如 "gpt 5",
+        自由组合会配出 "7 flash"、"2 4t" 这类破碎词)。
+        """
+        return len(low) >= 2 and re.search(r"[a-z]", low)
+
+    def _free_gap_ok(gap):
+        """自由 bigram 的间隔约束:只允许空白(空格/Tab)或恰好一个连字符。
+
+        换行不算空白——多字段拼接处与多行简介的行界都是假相邻,会拼出
+        "flash google" 这类跨界噪声;连字符要保(long-horizon 式复合词)。
+        逗号/句号/CJK 字符等一概不配对("…Flash, Google…" 拼不出词组)。
+        """
+        return gap.strip(" \t") == "" or gap == "-"
+
+    for i, (start, end, low, orig) in enumerate(tokens):
+        # unigram:别名变体直接命中(不受停用词约束,如 "rag");否则须过
+        # 自由 token 约束且非停用词
         if low in _VARIANT_TO_CANONICAL:
             _record(low, orig)
-        elif len(low) >= 2 and re.search(r"[a-z]", low) and low not in STOPWORDS:
+        elif _free_token_ok(low) and low not in STOPWORDS:
             _record(low, orig)
-        # bigram:别名变体直接命中(如 "open source" 两侧都是停用词仍收录);
-        # 否则任一侧为停用词即丢弃,且至少一侧含字母
+        # bigram:别名变体对直接命中且不受任何约束(允许跨连字符等标点——
+        # "open-source"/"GPT-5" 的连写形式靠这个命中,停用词也不拦,如
+        # "open source" 两侧本身都是停用词)
         if i + 1 < len(tokens):
-            nxt_low, nxt_orig = tokens[i + 1]
+            nxt_start, _, nxt_low, nxt_orig = tokens[i + 1]
             pair = f"{low} {nxt_low}"
             if pair in _VARIANT_TO_CANONICAL:
                 _record(pair, f"{orig} {nxt_orig}")
-            elif (low not in STOPWORDS and nxt_low not in STOPWORDS
-                    and re.search(r"[a-z]", pair)):
+            elif (_free_token_ok(low) and _free_token_ok(nxt_low)
+                    and low not in STOPWORDS and nxt_low not in STOPWORDS
+                    and _free_gap_ok(text[end:nxt_start])):
+                # 自由 bigram:两侧均过自由 token 约束 + 非停用词 + 间隔合法
                 _record(pair, f"{orig} {nxt_orig}")
     # CJK 变体子串匹配(不分词)
     for variant, canon in _CJK_VARIANTS.items():
