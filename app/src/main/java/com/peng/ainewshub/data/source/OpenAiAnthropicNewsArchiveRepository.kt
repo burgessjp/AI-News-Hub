@@ -1,6 +1,7 @@
 package com.peng.ainewshub.data.source
 
 import com.peng.ainewshub.data.OpenAiAnthropicNews
+import com.peng.ainewshub.data.SearchIndexRepository
 import com.peng.ainewshub.data.SourceKeys
 
 /**
@@ -23,6 +24,12 @@ class OpenAiAnthropicNewsArchiveRepository : OpenAiAnthropicNewsSource {
         val (fetchedAt, articles) = ArchiveHttpClient.fetchItemsList(SourceKeys.OPENAI_ANTHROPIC_NEWS) { obj, i ->
             OpenAiAnthropicNews.fromJson(obj, fallbackRank = i + 1)
         }
+        // 本地搜索索引回填
+        SearchIndexRepository.index(
+            articles.map {
+                SearchIndexRepository.SearchDoc(it.url, it.title, it.summary, SourceKeys.OPENAI_ANTHROPIC_NEWS)
+            }
+        )
         return OpenAiAnthropicNewsResult(fetchedAt, articles)
     }
 }

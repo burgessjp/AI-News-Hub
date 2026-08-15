@@ -2,6 +2,7 @@ package com.peng.ainewshub.data.source
 
 import com.peng.ainewshub.data.HackerNewsStory
 import com.peng.ainewshub.data.HackerNewsTopStories
+import com.peng.ainewshub.data.SearchIndexRepository
 import com.peng.ainewshub.data.SourceKeys
 
 /**
@@ -38,6 +39,17 @@ class HackerNewsArchiveRepository : HackerNewsSource {
                 kids = emptyList()
             )
         }
+        // 本地搜索索引回填:尽力而为,失败静默(见 SearchIndexRepository)
+        SearchIndexRepository.index(
+            stories.map {
+                SearchIndexRepository.SearchDoc(
+                    url = it.targetUrl,
+                    title = it.title,
+                    summary = "",
+                    source = SourceKeys.HACKERNEWS
+                )
+            }
+        )
         return HackerNewsTopStories(fetchedAt, stories)
     }
 }

@@ -68,6 +68,11 @@
     <string name="search_no_result_title">没有找到相关内容</string>
     <string name="search_history_title">搜索历史</string>
     <string name="search_hot_title">热门</string>
+    <!-- 本地搜索(设备内索引) -->
+    <string name="search_scope_online">联网</string>
+    <string name="search_scope_local">本地</string>
+    <string name="search_local_empty_title">本地暂无匹配内容</string>
+    <string name="search_local_empty_subtitle">本地索引只收录你浏览过的资讯，试试联网搜索或换个关键词</string>
 
     <!-- ===== 浏览历史 ===== -->
     <string name="history_title">浏览历史</string>

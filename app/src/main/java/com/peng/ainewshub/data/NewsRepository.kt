@@ -51,6 +51,18 @@ class NewsRepository {
         val root = getJson("$base/items", params) ?: throw AppException.ServerError()
         val arr = root.optJSONArray("items") ?: JSONArray()
         val items = (0 until arr.length()).map { NewsItem.fromJson(arr.getJSONObject(it)) }
+        // 本地搜索索引回填:URL 用 permalink 优先(与详情页「阅读页」打开的一致),
+        // 来源展示用条目自带媒体名,空则回退源 key(UI 经 sourceMeta 转本地化标题)
+        SearchIndexRepository.index(
+            items.map {
+                SearchIndexRepository.SearchDoc(
+                    url = it.permalink.ifBlank { it.url },
+                    title = it.title,
+                    summary = it.summary.orEmpty(),
+                    source = it.source.ifBlank { SourceKeys.AIHOT_FEATURED }
+                )
+            }
+        )
         NewsPage(
             items = items,
             hasNext = root.optBoolean("hasNext", false),

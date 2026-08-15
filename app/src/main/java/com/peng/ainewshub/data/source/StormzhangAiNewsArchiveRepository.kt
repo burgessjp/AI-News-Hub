@@ -1,6 +1,7 @@
 package com.peng.ainewshub.data.source
 
 import com.peng.ainewshub.data.AppException
+import com.peng.ainewshub.data.SearchIndexRepository
 import com.peng.ainewshub.data.SourceKeys
 import com.peng.ainewshub.data.StormzhangAiNews
 import com.peng.ainewshub.data.StormzhangAiNewsResult
@@ -44,6 +45,13 @@ class StormzhangAiNewsArchiveRepository : StormzhangAiNewsSource {
             )
         }
         if (news.isEmpty()) throw AppException.NoData()
+        // 本地搜索索引回填:该源无标题字段,summary 即主文本(列表页也拿它当标题传
+        // openUrl),english 副文本作可搜索摘要
+        SearchIndexRepository.index(
+            news.map {
+                SearchIndexRepository.SearchDoc(it.url, it.summary, it.english, SourceKeys.STORMZHANG_AI)
+            }
+        )
         return StormzhangAiNewsResult(fetchedAt, news, pageDate)
     }
 }

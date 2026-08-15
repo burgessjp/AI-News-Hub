@@ -1,6 +1,7 @@
 package com.peng.ainewshub.data.source
 
 import com.peng.ainewshub.data.RundownAiArticle
+import com.peng.ainewshub.data.SearchIndexRepository
 import com.peng.ainewshub.data.SourceKeys
 
 /**
@@ -23,6 +24,12 @@ class RundownAiArchiveRepository : RundownAiSource {
         val (fetchedAt, articles) = ArchiveHttpClient.fetchItemsList(SourceKeys.RUNDOWN_AI) { obj, i ->
             RundownAiArticle.fromJson(obj, fallbackRank = i + 1)
         }
+        // 本地搜索索引回填:摘要用副标题(正文是 newsletter 卡片,无独立摘要)
+        SearchIndexRepository.index(
+            articles.map {
+                SearchIndexRepository.SearchDoc(it.url, it.title, it.subtitle, SourceKeys.RUNDOWN_AI)
+            }
+        )
         return RundownAiResult(fetchedAt, articles)
     }
 }

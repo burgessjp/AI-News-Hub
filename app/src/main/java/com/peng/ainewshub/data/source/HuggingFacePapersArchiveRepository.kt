@@ -2,6 +2,7 @@ package com.peng.ainewshub.data.source
 
 import com.peng.ainewshub.data.HuggingFacePaper
 import com.peng.ainewshub.data.HuggingFacePapersResult
+import com.peng.ainewshub.data.SearchIndexRepository
 import com.peng.ainewshub.data.SourceKeys
 import org.json.JSONObject
 
@@ -38,6 +39,12 @@ class HuggingFacePapersArchiveRepository : HuggingFacePapersSource {
                 githubUrl = obj.optString("githubUrl")
             )
         }
+        // 本地搜索索引回填
+        SearchIndexRepository.index(
+            papers.map {
+                SearchIndexRepository.SearchDoc(it.url, it.title, it.summary, SourceKeys.HUGGINGFACE_PAPERS)
+            }
+        )
         return HuggingFacePapersResult(fetchedAt, papers)
     }
 }

@@ -155,6 +155,8 @@ internal fun PageView(
         Page.Search -> SearchScreen(
             onBack = onBack,
             onItemClick = onItemClick,
+            // 本地搜索结果直达 WebView;source 标签传条目自身来源(见 SearchScreen)
+            onOpenUrl = { url, title, source -> onOpenUrl(url, title, source) },
             listState = listStates.forPage(page)
         )
         Page.Settings -> SettingsScreen(

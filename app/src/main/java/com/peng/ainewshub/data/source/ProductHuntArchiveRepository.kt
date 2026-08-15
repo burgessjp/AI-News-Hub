@@ -1,6 +1,7 @@
 package com.peng.ainewshub.data.source
 
 import com.peng.ainewshub.data.ProductHunt
+import com.peng.ainewshub.data.SearchIndexRepository
 import com.peng.ainewshub.data.SourceKeys
 import org.json.JSONObject
 
@@ -25,6 +26,12 @@ class ProductHuntArchiveRepository : ProductHuntSource {
         val (fetchedAt, products) = ArchiveHttpClient.fetchItemsList(SourceKeys.PRODUCTHUNT) { obj, i ->
             ProductHunt.fromJson(obj, fallbackRank = i + 1)
         }
+        // 本地搜索索引回填:URL 与列表页打开的 targetUrl 一致(url 空时回退 website)
+        SearchIndexRepository.index(
+            products.map {
+                SearchIndexRepository.SearchDoc(it.targetUrl, it.name, it.tagline, SourceKeys.PRODUCTHUNT)
+            }
+        )
         return ProductHuntResult(fetchedAt, products)
     }
 }
