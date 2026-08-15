@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -26,22 +27,30 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.peng.ainewshub.R
+import com.peng.ainewshub.data.UpdateChecker
 import com.peng.ainewshub.ui.components.AppCard
 import com.peng.ainewshub.ui.components.AppTopBar
 import com.peng.ainewshub.ui.components.AppTopBarDefaults
 import com.peng.ainewshub.ui.components.SectionHeader
 import com.peng.ainewshub.ui.theme.AppText
+import kotlinx.coroutines.launch
 
 /**
  * 关于页 —— App 名/版本/数据源说明/项目链接/开源依赖清单。
@@ -72,6 +81,25 @@ fun AboutScreen(onBack: () -> Unit, onOpenUrl: (String, String) -> Unit) {
     }
     // 「项目源码」行标题在非 Composable 的 onClick 回调里也要用(onOpenUrl 记录标题),提前取出
     val projectSourceTitle = stringResource(R.string.about_project_source_title)
+
+    // 检查更新:手动查 GitHub Releases 最新 tag 与本地 versionName 比较(见 UpdateChecker)。
+    // 失败静默视为「已是最新」;命中新版本弹窗展示说明,「去下载」经内置 WebView 打开
+    // Release 页(点 APK 资产链接走 DownloadManager 下载,与网页下载体验一致)。
+    val scope = rememberCoroutineScope()
+    var updateChecking by remember { mutableStateOf(false) }
+    var updateUpToDate by remember { mutableStateOf(false) }
+    var updateInfo by remember { mutableStateOf<UpdateChecker.UpdateInfo?>(null) }
+    val updatePageTitle = stringResource(R.string.about_update_check)
+    fun checkUpdate() {
+        if (updateChecking) return
+        updateChecking = true
+        updateUpToDate = false
+        scope.launch {
+            val info = UpdateChecker.check(versionName ?: "1.0")
+            updateChecking = false
+            if (info != null) updateInfo = info else updateUpToDate = true
+        }
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
@@ -113,6 +141,26 @@ fun AboutScreen(onBack: () -> Unit, onOpenUrl: (String, String) -> Unit) {
             item { SectionHeader(stringResource(R.string.about_section_project)) }
             item {
                 InfoRow(
+                    title = stringResource(R.string.about_update_check),
+                    // 检查中/已是最新在行尾给状态字;空闲时显示默认 chevron
+                    trailing = if (updateChecking || updateUpToDate) {
+                        {
+                            Text(
+                                text = stringResource(
+                                    if (updateChecking) R.string.about_update_checking
+                                    else R.string.about_update_up_to_date
+                                ),
+                                style = AppText.caption,
+                                color = MaterialTheme.colorScheme.outline
+                            )
+                        }
+                    } else null,
+                    onClick = { checkUpdate() },
+                    showDivider = true
+                )
+            }
+            item {
+                InfoRow(
                     title = projectSourceTitle,
                     subtitle = "GitHub · burgessjp/AI-News-Hub",
                     onClick = { onOpenUrl("https://github.com/burgessjp/AI-News-Hub", projectSourceTitle) },
@@ -132,6 +180,45 @@ fun AboutScreen(onBack: () -> Unit, onOpenUrl: (String, String) -> Unit) {
                 }
             }
         }
+    }
+
+    // 发现新版本:版本号 + 更新说明(截断防超长 body 撑爆弹窗)。「去下载」经内置
+    // WebView 打开 Release 页;「忽略」仅关弹窗,下次手动检查仍会提示
+    updateInfo?.let { info ->
+        AlertDialog(
+            onDismissRequest = { updateInfo = null },
+            title = {
+                Text(
+                    text = stringResource(R.string.about_update_available_title, info.version),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                if (info.notes.isNotBlank()) {
+                    Text(
+                        text = info.notes,
+                        style = AppText.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 12,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    updateInfo = null
+                    onOpenUrl(info.releaseUrl, updatePageTitle)
+                }) {
+                    Text(stringResource(R.string.about_update_download))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { updateInfo = null }) {
+                    Text(stringResource(R.string.common_ignore))
+                }
+            }
+        )
     }
 }
 

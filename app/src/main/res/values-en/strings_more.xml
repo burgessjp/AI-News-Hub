@@ -60,6 +60,12 @@
     <string name="about_section_project">Project</string>
     <string name="about_project_source_title">Source Code</string>
     <string name="about_section_oss">Open-Source Dependencies</string>
+    <!-- Check for updates (manual, GitHub Releases; failures silently treated as up-to-date) -->
+    <string name="about_update_check">Check for updates</string>
+    <string name="about_update_checking">Checking…</string>
+    <string name="about_update_up_to_date">Up to date</string>
+    <string name="about_update_available_title">New version v%1$s available</string>
+    <string name="about_update_download">Download</string>
 
     <!-- ===== Sources screen (row title shared with the More screen entry) ===== -->
     <string name="sources_title">Sources</string>

@@ -61,6 +61,15 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- 外部深链:自定义 scheme(浏览器/二维码/自动化工具经此直达 App 内页面)。
+                 路由见 MainActivity 的 ainewshub:// 解析:web / tab / settings。
+                 不做 https App Links(需 assetlinks 验证,当前分发不上商店无收益)。 -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="ainewshub" />
+            </intent-filter>
         </activity>
 
         <!-- 「今日热点」桌面小组件(Glance):只处理系统 APPWIDGET_UPDATE 广播 -->

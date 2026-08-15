@@ -88,9 +88,14 @@ private val DARK_SCRIM = 0x801B1B1B.toInt()
 @Composable
 internal fun AiNewsHubApp(
     openSettingsOnLaunch: Boolean = false,
+    /** 「直达设置」消费回调(冷启动 extras 与 ainewshub://settings 深链共用;消费后复位,支持热启动重复触发)。 */
+    onSettingsConsumed: () -> Unit = {},
     /** 桌面小组件深链(待消费):非 null 时经 openUrl 统一入口打开,随后回调清空。 */
     pendingOpenUrl: Triple<String, String, String?>? = null,
-    onPendingUrlConsumed: () -> Unit = {}
+    onPendingUrlConsumed: () -> Unit = {},
+    /** ainewshub://tab/<name> 深链(待消费):非 null 时切到该根 tab(清空其二级栈),随后回调清空。 */
+    pendingTab: AppTab? = null,
+    onPendingTabConsumed: () -> Unit = {}
 ) {
     val appContext = LocalContext.current.applicationContext
     val scope = rememberCoroutineScope()
@@ -208,9 +213,12 @@ internal fun AiNewsHubApp(
         }
     }
 
-    // 外部入口要求直达设置页(如系统选中翻译的「去设置」)
+    // 外部入口要求直达设置页(系统选中翻译的「去设置」/ ainewshub://settings 深链)
     LaunchedEffect(openSettingsOnLaunch) {
-        if (openSettingsOnLaunch) nav.push(Page.Settings)
+        if (openSettingsOnLaunch) {
+            nav.push(Page.Settings)
+            onSettingsConsumed()
+        }
     }
 
     // 桌面小组件深链:经 openUrl 统一入口(记浏览历史 + push Page.Web),消费后清空。
@@ -219,6 +227,15 @@ internal fun AiNewsHubApp(
         pendingOpenUrl?.let { (url, title, source) ->
             openUrl(url, title, source)
             onPendingUrlConsumed()
+        }
+    }
+
+    // 外部深链切 tab:goToRoot(切 tab + 清空该 tab 二级栈),消费后清空。
+    // 热启动(singleTask onNewIntent)可重复触发 —— 每次深链都是新的非 null 值写入。
+    LaunchedEffect(pendingTab) {
+        pendingTab?.let { tab ->
+            nav.goToRoot(tab)
+            onPendingTabConsumed()
         }
     }
 
