@@ -47,6 +47,6 @@
 ## 其他
 
 - 端侧 AI（翻译 / 系统选中译）统一经 `AiChatClient` 访问「设置 → AI 服务」里的用户配置。
-- **本地搜索索引**：`SearchIndexRepository`（单例 object，`App.onCreate` init）在 7 个归档 Repository 与 `NewsRepository.fetchItems` 成功取数后回填 Room `search_items` 表（url 主键 = 行点击时传给 `openUrl` 的同一 URL；source 存 `SourceKeys` key 或 aihot 条目媒体名，UI 经 `sourceMeta` 转本地化标题），只覆盖用户浏览过的批次、90 天抽样清理；由独立的「本地搜索」页消费（`Page.LocalSearch`，总览顶栏入口，详见 persistence.md），与联网搜索页互不相干。
+- **本地搜索索引**：`SearchIndexRepository`（单例 object，`App.onCreate` init）在成功取数后回填 Room `search_items` 表（url 主键 = 行点击时传给 `openUrl` 的同一 URL；source 存 `SourceKeys` key 或条目自带源名，UI 经 `sourceMeta` 转本地化标题），90 天抽样清理。回填点三类：① 7 个归档源列表 Repository；② `SummaryRepository.summarize/summarizeOn`（摘要 Tab 与历史摘要——日常阅读主路径，v2 条目带原文 URL，是索引覆盖 8 源的主入口）；③ `OverviewRepository.parseDigest`（总览 Top10/breaking，冷启动即拉取）。**刻意不回填** `NewsRepository.fetchItems`（aihot 实时 API 精选流——第三方数据、permalink 指向其站内阅读页，与「本地搜索 = 本 App 归档数据」定位不符；开发期曾回填过，已由 Room v4 迁移清理）。由独立的「本地搜索」页消费（`Page.LocalSearch`，总览顶栏入口，详见 persistence.md），与联网搜索页互不相干。
 - **更新检查**：`UpdateChecker`（关于页手动触发）查 GitHub `releases/latest` 的 `tag_name` 与本地 versionName 逐段比较；任何失败静默视为已是最新（匿名限频 60/h，仅手动无压力）。
 - 数据模型：`NewsItem` / `HackerNewsStory` 用 `@Parcelize`。

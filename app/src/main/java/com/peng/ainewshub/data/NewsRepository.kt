@@ -51,18 +51,9 @@ class NewsRepository {
         val root = getJson("$base/items", params) ?: throw AppException.ServerError()
         val arr = root.optJSONArray("items") ?: JSONArray()
         val items = (0 until arr.length()).map { NewsItem.fromJson(arr.getJSONObject(it)) }
-        // 本地搜索索引回填:URL 用 permalink 优先(与详情页「阅读页」打开的一致),
-        // 来源展示用条目自带媒体名,空则回退源 key(UI 经 sourceMeta 转本地化标题)
-        SearchIndexRepository.index(
-            items.map {
-                SearchIndexRepository.SearchDoc(
-                    url = it.permalink.ifBlank { it.url },
-                    title = it.title,
-                    summary = it.summary.orEmpty(),
-                    source = it.source.ifBlank { SourceKeys.AIHOT_FEATURED }
-                )
-            }
-        )
+        // 注意:这里刻意不做本地搜索索引回填 —— 本流是 aihot 第三方 API 的实时精选流,
+        // permalink 指向其站内阅读页,与「本地搜索 = 本 App 归档数据」的定位不符;
+        // aihot 内容经流水线归档后由 SummaryRepository 按原文 URL 回填
         NewsPage(
             items = items,
             hasNext = root.optBoolean("hasNext", false),

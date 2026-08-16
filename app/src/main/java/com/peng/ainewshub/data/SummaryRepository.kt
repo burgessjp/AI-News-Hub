@@ -101,6 +101,9 @@ class SummaryRepository {
             .getOrElse { return Result.failure(it) }
 
         return parseSummary(snapshot).map { content ->
+            // 本地搜索索引回填:v2 结构化条目(带原文 URL;url 为空的只读条目由 index 内部过滤)。
+            // 摘要 Tab 是日常阅读主路径,这是索引覆盖 8 源的主入口
+            indexStructured(src.key, content)
             SourceSummary(content = content, fetchedAtMs = snapshot.optLong("fetched_at_ms", 0L))
         }
     }
@@ -125,8 +128,20 @@ class SummaryRepository {
             .getOrElse { return Result.failure(it) }
 
         return parseSummary(snapshot).map { content ->
+            // 历史摘要同样回填:浏览历史日期也能把过往条目纳入本地搜索
+            indexStructured(src.key, content)
             SourceSummary(content = content, fetchedAtMs = snapshot.optLong("fetched_at_ms", 0L))
         }
+    }
+
+    /** 把 v2 结构化摘要条目回填进本地搜索索引(尽力而为,纯文本旧格式无条目可回填)。 */
+    private suspend fun indexStructured(sourceKey: String, content: SummaryContent) {
+        val structured = content as? SummaryContent.Structured ?: return
+        SearchIndexRepository.index(
+            structured.items.map {
+                SearchIndexRepository.SearchDoc(it.url, it.title, it.desc, sourceKey)
+            }
+        )
     }
 
     /**

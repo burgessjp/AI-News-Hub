@@ -111,6 +111,11 @@ class OverviewRepository {
     private suspend fun parseDigest(json: JSONObject): OverviewDigest = withContext(Dispatchers.IO) {
         val items = parseEntries(json.optJSONArray("items"))
         if (items.isEmpty()) throw AppException.NoData()
+        // 本地搜索索引回填:Top10/breaking 条目(原文 URL;comment 为 AI 一句话点评作可搜索摘要)。
+        // 总览是默认首页,冷启动即拉取 —— 这是跨源条目进入索引的日常入口
+        SearchIndexRepository.index(
+            items.map { SearchIndexRepository.SearchDoc(it.url, it.title, it.comment, it.source) }
+        )
         OverviewDigest(
             items = items,
             generatedAt = json.optLong("generatedAt", 0L),
