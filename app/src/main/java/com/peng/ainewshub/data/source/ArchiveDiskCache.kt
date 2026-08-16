@@ -13,6 +13,9 @@ import java.io.File
  *    键形如 "index.json" / "<source>/<日期>/<时间>-data.json",均为固定字符集,无穿越风险。
  *  - 总量护栏 [MAX_BYTES]:写入后超限按 lastModified 从最旧开始淘汰。单条快照数百 KB,
  *    64MB 足以容纳 8 源近期快照 + 全部根级索引文件;淘汰最旧即等价于淘汰过时日期。
+ *  - 时效护栏 [MAX_AGE_MS]:读取时超过 7 天未更新的条目视为过期、不兜底(走错误态)
+ *    —— 断网多日后旧数据不再冒充可用;代价是离线能力(含离线翻历史摘要/总览)
+ *    一并失效。文件本体保留,仍受 [MAX_BYTES] 淘汰与「清理缓存」管辖。
  *  - 线程模型:读写为普通阻塞 IO,调用方([ArchiveHttpClient])已在 Dispatchers.IO 上;
  *    init 仅建目录引用(懒建目录本身),主线程调用也轻量。
  *  - 所有失败静默:落盘是尽力而为,盘上数据缺失只是少了兜底,不影响主流程。
@@ -24,6 +27,9 @@ object ArchiveDiskCache {
 
     /** 总量护栏:超出后从最旧开始淘汰。 */
     private const val MAX_BYTES = 64L * 1024 * 1024
+
+    /** 时效护栏:读取时超过此年龄的条目视为过期(数据 3 批/天,7 天已足够离线出行用)。 */
+    private const val MAX_AGE_MS = 7L * 24 * 60 * 60 * 1000
 
     @Volatile
     private var dir: File? = null
@@ -38,9 +44,13 @@ object ArchiveDiskCache {
         }
     }
 
-    /** 读缓存;未初始化/文件不存在/读取失败一律返回 null(调用方按无兜底处理)。 */
+    /**
+     * 读缓存;未初始化/文件不存在/读取失败/超过 [MAX_AGE_MS] 一律返回 null
+     * (调用方按无兜底处理)。时钟被回拨导致 lastModified 落在未来时视为未过期(安全默认)。
+     */
     fun read(key: String): String? = runCatching {
-        fileOf(key).takeIf { it.isFile }?.readText()
+        fileOf(key).takeIf { it.isFile && System.currentTimeMillis() - it.lastModified() <= MAX_AGE_MS }
+            ?.readText()
     }.getOrNull()?.takeIf { it.isNotBlank() }
 
     /** 写缓存(write-through);失败静默。 */

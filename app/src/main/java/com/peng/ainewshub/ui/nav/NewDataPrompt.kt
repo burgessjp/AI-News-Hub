@@ -68,8 +68,11 @@ internal fun NewDataPromptHost(
         NewDataPromptGate.shouldCheck = false
         // 开关关闭不支持弹窗;首帧默认值不可信,须读 DataStore 真值
         if (!settingsStore.prefsFlow.first().dailyNotify) return@LaunchedEffect
+        // networkOnly 探测:必须真实打网络(绕过内存缓存与磁盘兜底),断网/服务端
+        // 故障一律失败 → 不弹窗 —— 不能拿盘上旧数据当「新数据」提示;联网冷启动
+        // 相比共享缓存至多多一次 index 请求,可接受
         val json = try {
-            ArchiveHttpClient.fetchLatestOverview()
+            ArchiveHttpClient.fetchLatestOverview(networkOnly = true)
         } catch (e: CancellationException) {
             // 组合销毁的取消要放行重抛,不能当失败吞掉(否则继续走完剩余判断,
             // 破坏结构化取消语义)

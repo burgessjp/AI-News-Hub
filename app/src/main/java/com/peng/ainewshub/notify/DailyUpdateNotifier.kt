@@ -202,8 +202,10 @@ class DailyUpdateWorker(
         store.setLastNotifyCheckAt(System.currentTimeMillis())
 
         val attempt = inputData.getInt(DailyNotifyScheduler.KEY_ATTEMPT, 0)
-        // 拉最新总览:网络/解析失败与「当日尚未生成」(null)都走档内补查,不区分
-        val json = runCatching { ArchiveHttpClient.fetchLatestOverview() }.getOrNull()
+        // 拉最新总览:networkOnly 探测 —— 必须真实打网络(绕过内存缓存与磁盘兜底),
+        // 断网/服务端故障一律失败,与「当日尚未生成」(null)同样走档内补查,不区分;
+        // 绝不能把盘上旧数据当新批次发通知
+        val json = runCatching { ArchiveHttpClient.fetchLatestOverview(networkOnly = true) }.getOrNull()
         if (json == null) {
             DailyNotifyScheduler.enqueueRetry(applicationContext, attempt + 1)
             return Result.success()

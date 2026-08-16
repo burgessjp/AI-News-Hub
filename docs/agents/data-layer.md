@@ -7,7 +7,7 @@
 - **取数模式恒定归档**（设置页「数据源」入口已移除）：5 个稳定源（HackerNews / GitHub Trending / stormzhang AI / HuggingFace Papers / The Rundown AI）固定走 ARCHIVE；底层 `SourceMode` 枚举与 LIVE 分支保留待恢复（`SettingsStore` 强制返回 `ARCHIVE`）。
 - **Product Hunt 只归档**（Developer Token 是服务端 secret 不进 APK，两种模式都走归档）。
 - 归档走 `ArchiveHttpClient`（gitcode **REST API raw 端点**，**不要**用 raw 直链——背后是 WAF 会 403）。
-- **归档断网兜底**：index / 快照 / 根级文件网络成功后 write-through 落盘（`ArchiveDiskCache`，`cacheDir/archives/`，64MB 上限最旧淘汰，`App.onCreate` init 保证小组件等无 Activity 入口也能落盘）；网络失败先读盘，命中则置 `ArchiveHttpClient.offlineMode` 并返回旧数据（Repository/VM 签名零改动），UI 层每次离线事件弹一次性 Snackbar；未命中才走错误态。
+- **归档断网兜底**：index / 快照 / 根级文件网络成功后 write-through 落盘（`ArchiveDiskCache`，`cacheDir/archives/`，64MB 上限最旧淘汰 + 读取 7 天时效，`App.onCreate` init 保证小组件等无 Activity 入口也能落盘）；**仅传输层失败（IOException：连不上/DNS/读超时）读盘兜底**，命中且未过期则置 `ArchiveHttpClient.offlineMode` 并返回旧数据（Repository/VM 签名零改动），UI 层每次离线事件弹一次性 Snackbar；**HTTP 层错误（4xx/5xx/空响应）不兜底**，直接走 Error 态——服务端故障不得伪装成「离线」拿旧数据顶上。`fetchLatestOverview(networkOnly = true)` 为网络探测语义（跳过内存缓存与盘兜底、失败即抛），仅供每日通知 Worker 与冷启动弹窗用；未命中才走错误态。
 - **归档失败（盘上也无兜底）直接显示 Error 态，不回退实时**。
 
 ## 三个内容 Tab 的数据语义
@@ -36,7 +36,7 @@
 - WorkManager one-shot 自查链轮询归档 `latest_overview.generatedAt` 指纹（不用 `updated_at_ms`，总览失败继承旧值时不误报），检查时刻表对齐流水线批次（北京时间 08:40 / 16:10 / 18:40 = 各批次 +40min 余量，**改流水线批次时间必须同步改 `CHECK_SLOTS`**；批次 08:00 / 18:00 由仓库外机器调度，仓库 workflow 仅承载 15:30 批——勿因 workflow 只有一个 cron 误判 CHECK_SLOTS 为 bug）；档内未就绪 40min 补查最多 2 次。
 - 每天（北京时间）至多 1 条（当天首批时发，之后批次静默），正文 digest 始终中文。设置页开关默认关，存 `display_prefs` 的 `daily_notify` 键；API 33+ 打开时经设置页请求 `POST_NOTIFICATIONS` 运行时权限。
 - Worker 除「开关已关」外所有路径先续链再干活（失败不断链），刻意不用 `Result.retry()`；任务持久化跨重启，无 boot receiver。
-- **冷启动新数据弹窗随同一开关**（`MainActivity`）：开关开启时每次冷启动比对指纹（`last_notified_overview_at`），落后于最新 `generatedAt` 即弹全局 AlertDialog（「查看」直达总览根页 /「忽略」），确认与忽略都写回指纹——与通知互补：每天至多 1 条提醒，通知或弹窗任一形式先触达即静默。取数与总览 Tab 共享 `ArchiveHttpClient` 2 分钟缓存，冷启动零额外请求。
+- **冷启动新数据弹窗随同一开关**（`MainActivity`）：开关开启时每次冷启动比对指纹（`last_notified_overview_at`），落后于最新 `generatedAt` 即弹全局 AlertDialog（「查看」直达总览根页 /「忽略」），确认与忽略都写回指纹——与通知互补：每天至多 1 条提醒，通知或弹窗任一形式先触达即静默。取数走 `ArchiveHttpClient.fetchLatestOverview(networkOnly = true)`（必须真实打网络：断网/服务端故障不弹窗、不读盘兜底；联网冷启动相比共享 2 分钟缓存至多多一次 index 请求）。
 
 ## 源标识 / 元数据单点定义
 

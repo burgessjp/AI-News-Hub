@@ -15,6 +15,7 @@ import okhttp3.CookieJar
 import okhttp3.HttpUrl
 import okhttp3.Request
 import org.json.JSONObject
+import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -42,9 +43,11 @@ import java.util.concurrent.ConcurrentHashMap
  * 交由 ViewModel 显示 Error 态(归档模式明确提示,不回退实时)。
  *
  * 断网兜底:index / 快照 / 根级文件网络成功后均 write-through 落盘
- * ([ArchiveDiskCache],cacheDir/archives/);网络失败时先读盘,命中则置
- * [offlineMode] 为 true 并返回盘上旧数据(各 Repository 签名零改动),
- * 未命中才照常抛错。列表页自带的「数据更新时间」头可让用户感知数据新旧。
+ * ([ArchiveDiskCache],cacheDir/archives/);传输层失败(IOException:连不上/DNS/
+ * 读超时)时先读盘,命中且未超 7 天时效则置 [offlineMode] 为 true 并返回盘上
+ * 旧数据(各 Repository 签名零改动),未命中才照常抛错。HTTP 层错误(4xx/5xx/
+ * 空响应)是服务端已应答,不兜底、直接走 Error 态 —— 盘上旧数据不能冒充最新
+ * 数据。列表页自带的「数据更新时间」头可让用户感知数据新旧。
  *
  * 走 gitcode 官方 REST API(api.gitcode.com/api/v5/.../raw/)而非 raw 直链:
  * raw.gitcode.com 背后是华为云 WAF,部分网络环境(数据中心/特定地区 IP)被拦 403;
@@ -206,19 +209,27 @@ object ArchiveHttpClient {
      * @param force true 时绕过 TTL 强制打网络(手动刷新路径);并发去重的 Mutex 仍生效,
      *              且锁内做短窗口二次校验 —— 排队等锁期间 index 已被首个 force 刷新过
      *              则直接复用,同一波并发 force 收敛为 1 次网络请求
+     * @param allowDiskFallback false(networkOnly 探测,见 [fetchLatestOverview])时:
+     *              跳过内存缓存早退(缓存里可能混有断网时读盘写入的旧 index),传输层
+     *              失败也不读盘兜底,保证「要么真实网络数据、要么失败」
      * @return 解析后的 index JSON;读取或解析失败抛 RuntimeException
      */
-    private suspend fun fetchIndex(force: Boolean = false): JSONObject = indexMutex.withLock {
+    private suspend fun fetchIndex(force: Boolean = false, allowDiskFallback: Boolean = true): JSONObject = indexMutex.withLock {
         // 1) 命中缓存:非 force 看 2 分钟 TTL;force 只看秒级去重窗口
-        //    (等待锁期间已被刷新 → 复用,不重复打网络)。
-        val cached = indexCache
-        val freshWithin = if (force) FORCE_FETCH_DEDUP_MS else INDEX_TTL_MS
-        if (cached != null && System.currentTimeMillis() - indexCacheAt < freshWithin) {
-            return@withLock cached
+        //    (等待锁期间已被刷新 → 复用,不重复打网络)。networkOnly 探测完全跳过。
+        if (allowDiskFallback) {
+            val cached = indexCache
+            val freshWithin = if (force) FORCE_FETCH_DEDUP_MS else INDEX_TTL_MS
+            if (cached != null && System.currentTimeMillis() - indexCacheAt < freshWithin) {
+                return@withLock cached
+            }
         }
-        // 2) 走网络刷新(仅一次,并发其余调用在此等待后复用结果;网络失败读盘兜底)
+        // 2) 走网络刷新(仅一次,并发其余调用在此等待后复用结果;传输层失败读盘兜底)
         //    tolerateMissing=false 时不会返回 null,elvis 仅为类型兜底
-        val parsed = fetchJsonWithDiskFallback("index.json", INDEX_URL, "读取归档索引失败")
+        val parsed = fetchJsonWithDiskFallback(
+            "index.json", INDEX_URL, "读取归档索引失败",
+            allowDiskFallback = allowDiskFallback
+        )
             ?: throw AppException.ServerError()
         indexCache = parsed
         indexCacheAt = System.currentTimeMillis()
@@ -294,9 +305,15 @@ object ArchiveHttpClient {
      * 读 index.json 顶层的 `latest_overview` 字段(今日总览,流水线预生成的跨源综合分析)。
      * 与 latest/history 共享 2 分钟缓存。字段缺失或无 items 时返回 null
      * (语义:今日总览尚未生成,UI 走 NoData 态)。OverviewRepository 据此反序列化为 OverviewDigest。
+     *
+     * @param force true 绕过 2 分钟缓存(手动刷新路径)
+     * @param networkOnly true 时为「网络探测」语义(每日更新 Worker / 冷启动新数据弹窗):
+     *        跳过内存缓存与磁盘兜底,必须真实打网络,传输层/HTTP/解析失败一律抛 ——
+     *        调用方拿失败当信号(档内补查/放弃弹窗),绝不能把盘上旧数据当成新批次。
+     *        总览 Tab / 小组件等展示路径不要传(需要断网兜底)。
      */
-    suspend fun fetchLatestOverview(force: Boolean = false): JSONObject? = withContext(Dispatchers.IO) {
-        fetchIndex(force).optJSONObject("latest_overview")?.takeIf { it.has("items") }
+    suspend fun fetchLatestOverview(force: Boolean = false, networkOnly: Boolean = false): JSONObject? = withContext(Dispatchers.IO) {
+        fetchIndex(force, allowDiskFallback = !networkOnly).optJSONObject("latest_overview")?.takeIf { it.has("items") }
     }
 
     /**
@@ -433,13 +450,19 @@ object ArchiveHttpClient {
     /**
      * 网络取 JSON + 磁盘兜底的统一骨架(fetchIndex / fetchSnapshot / 根级独立文件共用):
      *  1. 网络成功 → 解析 → write-through 落盘(静默失败)→ 复位 [offlineMode]
-     *  2. 网络失败(任意非取消异常)→ 读盘兜底:命中且可解析则置 [offlineMode] 为 true
-     *     并返回盘上旧数据;未命中或盘上数据损坏则抛回原异常(走原错误态)
+     *  2. 传输层失败([IOException]:连不上/DNS/读超时)→ 读盘兜底:命中且未过期
+     *     ([ArchiveDiskCache] 7 天 TTL)则置 [offlineMode] 为 true 并返回盘上旧数据;
+     *     未命中或盘上数据损坏则抛回原异常(走原错误态)
      *  3. [tolerateMissing] 语义不变:404 返回 null,不落盘也不兜底(「成功才写」的
      *     文件尚未生成时盘上本就不会有)
      *
-     * 网络成功但解析失败(HTML 乱码等)照旧抛 [AppException.ServerError],不读盘 ——
-     * 与原行为一致,兜底只针对「连不上」的场景。
+     * 不兜底的失败:HTTP 层错误(非 2xx、空响应,服务端已应答)抛 [AppException.Network]、
+     * 解析失败抛 [AppException.ServerError] —— 服务端故障不能伪装成「离线」拿旧数据
+     * 顶上,须如实走 Error 态。
+     *
+     * [allowDiskFallback] 为 false(通知自查/冷启动弹窗的 networkOnly 探测)时:
+     * 传输层失败也不读盘,直接抛 —— 调用方拿「失败」当信号走补查/放弃,绝不把盘上
+     * 旧数据当成新批次。
      *
      * @param cacheKey 磁盘缓存键(与内存缓存同键:index.json / source/relPath / 根级文件名)
      */
@@ -447,20 +470,24 @@ object ArchiveHttpClient {
         cacheKey: String,
         url: String,
         hint: String,
-        tolerateMissing: Boolean = false
+        tolerateMissing: Boolean = false,
+        allowDiskFallback: Boolean = true
     ): JSONObject? {
         val text = try {
             getRaw(url, hint, tolerateMissing) ?: return null
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Exception) {
-            // 连不上:读盘兜底(盘上是上次网络成功时落下的旧数据)
+        } catch (e: IOException) {
+            // 传输层失败(连不上):读盘兜底(盘上是上次网络成功时落下的旧数据);
+            // networkOnly 探测不兜底,失败即抛
+            if (!allowDiskFallback) throw e
             val disk = withContext(Dispatchers.IO) { ArchiveDiskCache.read(cacheKey) }
                 ?: throw e
             return runCatching { JSONObject(disk) }
                 .map { parsed -> parsed.also { _offlineMode.value = true } }
                 .getOrElse { throw e }
         }
+        // AppException(HTTP 错误/空响应)与其他非预期异常不捕获,直接向上抛
         val parsed = runCatching { JSONObject(text) }
             .getOrElse { throw AppException.ServerError() }
         withContext(Dispatchers.IO) { ArchiveDiskCache.write(cacheKey, text) }
