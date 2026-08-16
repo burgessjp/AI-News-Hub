@@ -68,6 +68,7 @@ import com.peng.ainewshub.ui.components.BrandWordmark
 import com.peng.ainewshub.ui.components.HairlineDivider
 import com.peng.ainewshub.ui.components.RankBadge
 import com.peng.ainewshub.ui.components.RankRowSkeletonList
+import com.peng.ainewshub.ui.components.rememberReadUrls
 import com.peng.ainewshub.ui.theme.AppAlpha
 import com.peng.ainewshub.ui.theme.AppText
 import com.peng.ainewshub.ui.theme.BrandGradient
@@ -286,6 +287,8 @@ internal fun OverviewContent(
 ) {
     // LocalContext.current 只能在 @Composable 上下文取,提前取出供回调内复用
     val context = LocalContext.current
+    // 已读判定:打开过的条目(entry.url 命中浏览历史)标题弱化
+    val readUrls = rememberReadUrls()
     // Top10 稳定 key:url 优先(breaking 前移等排序变化时走 move 复用而非销毁重建),
     // 重复/空 url 以出现序号消歧保证唯一(重复 key 会直接崩溃)
     val topKeys = remember(digest.items) {
@@ -326,6 +329,7 @@ internal fun OverviewContent(
                 TopEntryRow(
                     rank = index + 1,
                     entry = entry,
+                    isRead = entry.url in readUrls,
                     onClick = { onOpenUrl(entry.url, entry.title, SummaryRepository.titleOf(context, entry.source)) }
                 )
                 val next = items.getOrNull(index + 1)
@@ -442,7 +446,9 @@ private fun TopEntryRow(
     rank: Int,
     entry: OverviewEntry,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    // 已读(打开过原文)时标题降透明弱化;breaking 浅底带/推荐理由等强调不受影响
+    isRead: Boolean = false
 ) {
     val cs = MaterialTheme.colorScheme
     Row(
@@ -469,7 +475,7 @@ private fun TopEntryRow(
                 text = entry.title,
                 style = AppText.body,
                 fontWeight = FontWeight.SemiBold,
-                color = cs.onSurface,
+                color = if (isRead) cs.onSurface.copy(alpha = AppAlpha.readDim) else cs.onSurface,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )

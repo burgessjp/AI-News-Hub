@@ -56,7 +56,9 @@ import com.peng.ainewshub.ui.anim.Motion
 import com.peng.ainewshub.ui.components.BottomBarPillHeight
 import com.peng.ainewshub.ui.components.ShimmerBox
 import com.peng.ainewshub.ui.components.ShimmerHost
+import com.peng.ainewshub.ui.components.rememberReadUrls
 import com.peng.ainewshub.ui.more.sourceMeta
+import com.peng.ainewshub.ui.theme.AppAlpha
 import com.peng.ainewshub.ui.theme.AppText
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -344,6 +346,10 @@ private fun SummaryItems(
     reserveBottomBarSpace: Boolean,
     onOpenItem: (SummaryItem) -> Unit
 ) {
+    val cs = MaterialTheme.colorScheme
+    // 已读判定:打开过的条目(url 命中浏览历史)正文降透明弱化;行内仅设字重的
+    // AnnotatedString 不覆盖颜色,Text 基础色即整行生效
+    val readUrls = rememberReadUrls()
     // 稳定 key:url 优先,重复/空以出现序号消歧保证唯一(重复 key 会直接崩溃)
     val itemKeys = remember(items) {
         val seen = mutableMapOf<String, Int>()
@@ -385,7 +391,11 @@ private fun SummaryItems(
                 Text(
                     text = line,
                     style = AppText.body,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = if (item.url.isNotBlank() && item.url in readUrls) {
+                        cs.onSurface.copy(alpha = AppAlpha.readDim)
+                    } else {
+                        cs.onSurface
+                    },
                     modifier = Modifier.alignByBaseline()
                 )
             }

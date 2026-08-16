@@ -112,8 +112,8 @@ fun HackerNewsScreen(
                 translationState = titleStates[story.id.toString()] ?: TranslationState.Idle,
                 onClick = { onOpenComments(story) },
                 onTranslate = { vm.translateTitle(story) },
-                // 已读 = 行点击打开的目标链接(url 空则站内讨论页)命中浏览历史
-                isRead = story.targetUrl in readUrls
+                // 已读 = 点开过评论页(discussionUrl,进评论页时记录)或打开过原文
+                isRead = story.discussionUrl in readUrls || story.targetUrl in readUrls
             )
             RowDividerIfNeeded(index, stories.size)
         }

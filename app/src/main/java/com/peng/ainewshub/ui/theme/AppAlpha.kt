@@ -66,7 +66,7 @@ object AppAlpha {
      *  更高的 alpha 才不显寡淡。与 [badgeOutline] 同值不合档(底色 vs 描边)。 */
     const val neutralOverlay: Float = 0.20f
 
-    /** 已读弱化 —— 列表条目标题「已读过」的降透明:足以一眼区分已读/未读,
-     *  又保持可读(不与 onSurfaceVariant 副行文字混同)。 */
-    const val readDim: Float = 0.55f
+    /** 已读弱化 —— 列表条目标题「已读过」的降透明:一眼区分已读/未读(0.55 偏淡
+     *  实测不够醒目,压到 0.45),仍保持可读(深于 onSurfaceVariant 副行文字)。 */
+    const val readDim: Float = 0.45f
 }

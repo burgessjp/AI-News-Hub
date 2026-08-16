@@ -3,6 +3,7 @@ package com.peng.ainewshub.ui.nav
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.res.stringResource
 import com.peng.ainewshub.R
 import com.peng.ainewshub.data.AiConfig
@@ -47,6 +48,7 @@ import com.peng.ainewshub.ui.trends.TrendsDateScreen
 import com.peng.ainewshub.ui.tabs.AllTab
 import com.peng.ainewshub.ui.tabs.FeaturedTab
 import com.peng.ainewshub.ui.webview.WebViewScreen
+import kotlinx.coroutines.launch
 
 /**
  * 二级页共用环境:stores/repos 与全局 AI 配置,由 AiNewsHubApp 构造一次下传,
@@ -95,7 +97,8 @@ internal fun PageView(
     darkTheme: Boolean
 ) {
     val onBack = { nav.pop() }
-    val onItemClick: (NewsItem) -> Unit = { nav.push(Page.Detail(it)) }
+    // 已读记录用:点进详情/评论页即视为「看过」(详见各记录点注释)
+    val readScope = rememberCoroutineScope()
     val onOpenSettings = { nav.push(Page.Settings) }
     // 浏览历史来源标签:下方非 Composable 回调(onOpenUrl lambda)里捕获,提前取词
     val dailyLabel = stringResource(R.string.history_source_daily)
@@ -109,6 +112,15 @@ internal fun PageView(
     val productHuntLabel = stringResource(R.string.source_title_producthunt)
     val rundownLabel = stringResource(R.string.source_title_rundown)
     val openAiAnthropicLabel = stringResource(R.string.source_title_openai_anthropic)
+    // 点进详情即视为已读:记录 permalink 优先的 URL(详情「阅读页」打开的即它;
+    // 记录同时进浏览历史,语义 = 我点开过的文章,列表弱化即时生效)
+    val onItemClick: (NewsItem) -> Unit = { item ->
+        val readUrl = item.permalink.ifBlank { item.url }
+        if (readUrl.isNotBlank()) {
+            readScope.launch { env.browseHistoryRepo.record(readUrl, item.title, aihotLabel) }
+        }
+        nav.push(Page.Detail(item))
+    }
     when (page) {
         is Page.Detail -> NewsDetailScreen(
             item = page.item,
@@ -193,7 +205,12 @@ internal fun PageView(
         )
         Page.HackerNews -> HackerNewsScreen(
             onBack = onBack,
-            onOpenComments = { nav.push(Page.HackerNewsComments(it)) },
+            onOpenComments = { story ->
+                // 进评论页即视为已读:HN 行点击不开 WebView,记录 discussion 页 URL
+                // 驱动列表弱化(条目也会出现在浏览历史,点开即 HN 讨论页,语义自洽)
+                readScope.launch { env.browseHistoryRepo.record(story.discussionUrl, story.title, hackerNewsLabel) }
+                nav.push(Page.HackerNewsComments(story))
+            },
             onOpenSettings = onOpenSettings,
             listState = listStates.forPage(page)
         )
