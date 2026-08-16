@@ -56,11 +56,13 @@
     <string name="search_no_result_title">No results found</string>
     <string name="search_history_title">Search history</string>
     <string name="search_hot_title">Trending</string>
-    <!-- On-device search (local index) -->
-    <string name="search_scope_online">Online</string>
-    <string name="search_scope_local">On device</string>
+    <!-- Dedicated on-device search page (local index, entered from the Overview top bar) -->
+    <string name="local_search_cd">Search</string>
+    <string name="local_search_hint">Search browsed feeds…</string>
+    <string name="local_search_intro_title">On-device search</string>
+    <string name="local_search_intro_subtitle">An index is built automatically as you browse feeds online — search titles and summaries you\'ve seen</string>
     <string name="search_local_empty_title">Nothing found on this device</string>
-    <string name="search_local_empty_subtitle">The on-device index only covers feeds you\'ve browsed — try online search or another keyword</string>
+    <string name="search_local_empty_subtitle">The on-device index only covers feeds you\'ve browsed — try another keyword</string>
 
     <!-- ===== Browsing history ===== -->
     <string name="history_title">History</string>

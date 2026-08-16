@@ -26,11 +26,13 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.HourglassEmpty
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -91,6 +93,8 @@ import java.util.Locale
 @Composable
 fun OverviewScreen(
     onOpenUrl: (url: String, title: String, source: String) -> Unit,
+    // 顶栏搜索图标 → 本地搜索独立页(TabRoot 注入 nav.push(Page.LocalSearch))
+    onOpenSearch: () -> Unit = {},
     // 列表状态由 MainActivity 上提持有:切 tab / 进二级页返回后保持滚动位置
     listState: LazyListState,
     reselectSignal: Int = 0,
@@ -125,6 +129,14 @@ fun OverviewScreen(
                 },
                 horizontalPadding = 18.dp,
                 actions = {
+                    // 本地搜索入口:查设备内索引(浏览过的 8 源数据),一步直达
+                    IconButton(onClick = onOpenSearch) {
+                        Icon(
+                            imageVector = Icons.Filled.Search,
+                            contentDescription = stringResource(R.string.local_search_cd),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                     Text(
                         text = dateText,
                         style = MaterialTheme.typography.bodyMedium,

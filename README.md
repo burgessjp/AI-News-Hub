@@ -97,7 +97,8 @@ Every link in the app opens in-app, never in an external browser:
 ### More
 
 - **AI Daily** and **historical archive** (browse back by date)
-- **Search**: online mode (AIHot API) or on-device mode (Room index of the feeds you've browsed), with local search history + trending-word hints
+- **On-device search**: a dedicated page (🔍 in the Overview top bar) querying a local index built automatically as you browse the 8 sources — search titles and summaries, read items dim, results open the original page
+- **Online search**: from the All-feeds page top bar (third-party AIHot API), with local search history + trending-word hints
 - **Read state**: opened items dim across every feed, with an "Unread only" filter on the items list (delete a history entry to un-read)
 - **Offline fallback**: archive data is written through to a disk cache, so a cold start without network still shows the last fetched content
 - **Browsing history & Favorites** (stored locally in Room; star any page from the built-in WebView to read it later)

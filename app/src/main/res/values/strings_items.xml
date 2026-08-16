@@ -72,11 +72,13 @@
     <string name="search_no_result_title">没有找到相关内容</string>
     <string name="search_history_title">搜索历史</string>
     <string name="search_hot_title">热门</string>
-    <!-- 本地搜索(设备内索引) -->
-    <string name="search_scope_online">联网</string>
-    <string name="search_scope_local">本地</string>
+    <!-- 本地搜索独立页(设备内索引,总览顶栏进入;与联网搜索页互不相干) -->
+    <string name="local_search_cd">搜索</string>
+    <string name="local_search_hint">搜索已浏览的资讯…</string>
+    <string name="local_search_intro_title">本地搜索</string>
+    <string name="local_search_intro_subtitle">联网浏览各源时自动建立索引，可搜标题与摘要</string>
     <string name="search_local_empty_title">本地暂无匹配内容</string>
-    <string name="search_local_empty_subtitle">本地索引只收录你浏览过的资讯，试试联网搜索或换个关键词</string>
+    <string name="search_local_empty_subtitle">本地索引只收录你浏览过的资讯，换个关键词试试</string>
 
     <!-- ===== 浏览历史 ===== -->
     <string name="history_title">浏览历史</string>

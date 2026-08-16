@@ -23,6 +23,7 @@ import com.peng.ainewshub.ui.items.GitHubTrendingScreen
 import com.peng.ainewshub.ui.items.HackerNewsCommentsScreen
 import com.peng.ainewshub.ui.items.HackerNewsScreen
 import com.peng.ainewshub.ui.items.HuggingFacePapersScreen
+import com.peng.ainewshub.ui.items.LocalSearchScreen
 import com.peng.ainewshub.ui.items.OpenAiAnthropicNewsScreen
 import com.peng.ainewshub.ui.items.ProductHuntScreen
 import com.peng.ainewshub.ui.items.RundownAiScreen
@@ -155,7 +156,11 @@ internal fun PageView(
         Page.Search -> SearchScreen(
             onBack = onBack,
             onItemClick = onItemClick,
-            // 本地搜索结果直达 WebView;source 标签传条目自身来源(见 SearchScreen)
+            listState = listStates.forPage(page)
+        )
+        Page.LocalSearch -> LocalSearchScreen(
+            onBack = onBack,
+            // 结果直达 WebView;source 标签传条目自身来源(见 LocalSearchScreen)
             onOpenUrl = { url, title, source -> onOpenUrl(url, title, source) },
             listState = listStates.forPage(page)
         )

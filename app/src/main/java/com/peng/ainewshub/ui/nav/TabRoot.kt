@@ -26,6 +26,8 @@ internal fun TabRoot(
     when (tab) {
         AppTab.Overview -> OverviewScreen(
             onOpenUrl = onOpenUrl,
+            // 顶栏搜索图标 → 本地搜索独立页(查设备内索引,覆盖本 App 浏览过的 8 源数据)
+            onOpenSearch = { nav.push(Page.LocalSearch) },
             listState = overviewListState,
             reselectSignal = reselectTick
         )
