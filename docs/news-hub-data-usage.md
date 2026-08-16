@@ -22,7 +22,7 @@ news-hub-data 分支/
 ├── overview_history.json               ← 总览归档索引:{日期: relpath}(保留 90 天)
 ├── trends.json                         ← 热词趋势榜(纯统计,每次批次整文件覆盖)
 ├── trends_cloud.json                   ← 趋势词云(纯统计 top ~60 词云候选,专用文件,不归档)
-├── trends_history.json                 ← 趋势归档索引:{日期: relpath}(保留 90 天,App 暂不读取)
+├── trends_history.json                 ← 趋势归档索引:{日期: relpath}(保留 90 天;App「历史热词」页按日期寻址,流水线亦用作排名变化基准)
 ├── manifest.json                       ← 最近一次运行总览(成功/失败状态)
 ├── overview/                           ← 今日总览按日归档(内容与 index 的 latest_overview 同构)
 │   └── 2026-08-15/
@@ -92,7 +92,7 @@ news-hub-data 分支/
 }
 ```
 
-`index.json` 只含**即时字段**(每次批次整体刷新,体量有界不随保留期增长)。其余内容在根级独立文件按需拉取:`trends.json`(热词趋势)、`history.json`(摘要历史索引)与 `overview_history.json`(总览归档索引),详见下文对应章节。另有 `trends_history.json`(趋势归档索引,App 暂不拉取,供流水线计算排名变化基准)。
+`index.json` 只含**即时字段**(每次批次整体刷新,体量有界不随保留期增长)。其余内容在根级独立文件按需拉取:`trends.json`(热词趋势)、`history.json`(摘要历史索引)与 `overview_history.json`(总览归档索引),详见下文对应章节。另有 `trends_history.json`(趋势归档索引,App「更多 → 历史热词」页经其按日期寻址,流水线以「昨日最后一期」归档为排名变化基准,详见「趋势历史归档」)。
 
 `latest` 里的路径是**相对于源目录**的。设计行为:某源当天抓取失败时,`index.json` 会保留它最后一次成功的指向(可能落在前一天),客户端永远能拿到有效数据。
 
