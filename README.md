@@ -183,12 +183,15 @@ The data-repo format is documented in [`docs/news-hub-data-usage.md`](docs/news-
 ```
 app/                       the single Android module
   src/main/java/com/peng/ainewshub/
-    MainActivity.kt        custom multi-stack navigation + page routing (no Navigation Compose)
+    MainActivity.kt        Activity shell only (deep-link extras); custom multi-stack navigation in ui/nav/ (no Navigation Compose)
     data/                  Repository, data models, Room, DataStore, source modes
+    notify/                daily-update local notification (WorkManager)
     ui/                    ViewModel + Compose Screen, split by feature
+      nav/                 custom multi-stack navigation (pages, nav state, app scaffold)
       tabs/                AIHot "All activity" and "Picks" secondary screens
       overview/            today's overview (reads pipeline-pre-generated cross-source analysis)
       summary/             Summary tab + archive history
+      trends/              Trends tab + word cloud + trends history
       items/               per-source detail screens (HackerNews, GitHub Trending, ...) + search + browsing history
       daily/               AI Daily and archive
       more/                More page / Sources / About

@@ -183,12 +183,15 @@ AI News Hub 的整页翻译等运行时 AI 能力**不内置任何 key**，由�
 ```
 app/                       唯一 Android 模块
   src/main/java/com/peng/ainewshub/
-    MainActivity.kt        自定义多栈导航 + 页面路由（不用 Navigation Compose）
+    MainActivity.kt        Activity 壳（深链解析）；自实现多栈导航在 ui/nav/（不用 Navigation Compose）
     data/                  Repository、数据模型、Room、DataStore、数据源模式
+    notify/                每日更新本地通知（WorkManager）
     ui/                    ViewModel + Compose Screen，按功能分包
+      nav/                 自实现多栈导航（页面路由 / 状态机 / 应用壳）
       tabs/                AIHot「全部动态 / 精选」二级页
       overview/            今日总览（读流水线预生成的跨源分析）
       summary/             摘要 Tab + 历史摘要
+      trends/              趋势 Tab + 词云 + 历史热词
       items/               各信息源详情页（HackerNews、GitHub Trending……）+ 搜索 + 浏览历史
       daily/               AI 日报与归档
       more/                更多页 / 信息源 / 关于
