@@ -50,9 +50,11 @@ import com.peng.ainewshub.ui.components.TranslateConfigMissingEffect
 import com.peng.ainewshub.ui.components.RankBadge
 import com.peng.ainewshub.ui.components.RowDividerIfNeeded
 import com.peng.ainewshub.ui.components.SourceListScaffold
+import com.peng.ainewshub.ui.components.rememberReadUrls
 import com.peng.ainewshub.ui.components.updateTimeHeader
 import com.peng.ainewshub.ui.components.StatBadge
 import com.peng.ainewshub.ui.components.formatCount
+import com.peng.ainewshub.ui.theme.AppAlpha
 import com.peng.ainewshub.ui.theme.AppText
 import androidx.compose.material3.ExperimentalMaterial3Api
 
@@ -89,6 +91,8 @@ fun GitHubTrendingScreen(
     val descStates by vm.descStates.collectAsStateWithLifecycle()
     val config by vm.configFlow.collectAsStateWithLifecycle(initialValue = AiConfig())
     val snackbarHostState = remember { SnackbarHostState() }
+    // 已读判定:打开过的仓库(repo.url 命中浏览历史)标题弱化
+    val readUrls = rememberReadUrls()
 
     // 配置未就绪提示:点「译」后若 state 变成 CONFIG_MISSING,弹一次引导
     TranslateConfigMissingEffect(descStates, snackbarHostState, onOpenSettings)
@@ -110,7 +114,8 @@ fun GitHubTrendingScreen(
                 translateEnabled = config.translateEnabled,
                 translationState = descStates[repo.url] ?: TranslationState.Idle,
                 onClick = { onOpenUrl(repo.url, "${repo.owner}/${repo.name}") },
-                onTranslate = { vm.translateDesc(repo) }
+                onTranslate = { vm.translateDesc(repo) },
+                isRead = repo.url in readUrls
             )
             RowDividerIfNeeded(index, repos.size)
         }
@@ -126,6 +131,7 @@ fun GitHubTrendingScreen(
  *  3. meta:语言(带色点)+ stars + forks + 今日新增(火焰图标,强调色)
  *
  * @param repo 仓库数据(rank 即为页面排名)
+ * @param isRead 已读(打开过仓库页)时 name 标题降透明弱化(owner 本就是弱色不动)
  */
 @Composable
 private fun TrendingRow(
@@ -133,7 +139,8 @@ private fun TrendingRow(
     translateEnabled: Boolean,
     translationState: TranslationState,
     onClick: () -> Unit,
-    onTranslate: () -> Unit
+    onTranslate: () -> Unit,
+    isRead: Boolean = false
 ) {
     val cs = MaterialTheme.colorScheme
     var descCollapsed by remember { mutableStateOf(false) }
@@ -171,7 +178,7 @@ private fun TrendingRow(
                     text = repo.name,
                     style = AppText.titleCompact,
                     fontWeight = FontWeight.Bold,
-                    color = cs.onSurface,
+                    color = if (isRead) cs.onSurface.copy(alpha = AppAlpha.readDim) else cs.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
