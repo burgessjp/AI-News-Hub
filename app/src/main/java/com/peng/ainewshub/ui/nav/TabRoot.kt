@@ -60,7 +60,6 @@ internal fun TabRoot(
             onOpenTrendsArchive = { nav.push(Page.TrendsArchive) },
             onOpenSettings = { nav.push(Page.Settings) },
             onOpenAiService = { nav.push(Page.AiService) },
-            onOpenChangelog = { nav.push(Page.Changelog) },
             onOpenAbout = { nav.push(Page.About) }
         )
     }

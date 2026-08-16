@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material.icons.filled.Hub
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Settings
@@ -74,7 +73,6 @@ fun MoreScreen(
     onOpenTrendsArchive: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenAiService: () -> Unit,
-    onOpenChangelog: () -> Unit,
     onOpenAbout: () -> Unit
 ) {
     Scaffold(
@@ -184,16 +182,6 @@ fun MoreScreen(
                     title = stringResource(R.string.settings_title),
                     subtitle = stringResource(R.string.more_settings_subtitle),
                     onClick = onOpenSettings
-                )
-            }
-            // 更新日志:各版本新增/修复(读构建时打包的 CHANGELOG.md)
-            item {
-                IconTileRow(
-                    icon = Icons.AutoMirrored.Filled.Notes,
-                    iconColor = IconAccent.Neutral,
-                    title = stringResource(R.string.changelog_title),
-                    subtitle = stringResource(R.string.more_changelog_subtitle),
-                    onClick = onOpenChangelog
                 )
             }
             item {

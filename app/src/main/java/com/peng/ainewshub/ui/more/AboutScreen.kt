@@ -1,26 +1,24 @@
 package com.peng.ainewshub.ui.more
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.Notes
+import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.Extension
+import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material.icons.filled.TravelExplore
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -28,7 +26,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -37,10 +34,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.peng.ainewshub.R
@@ -49,31 +47,34 @@ import com.peng.ainewshub.ui.components.AppCard
 import com.peng.ainewshub.ui.components.AppTopBar
 import com.peng.ainewshub.ui.components.AppTopBarDefaults
 import com.peng.ainewshub.ui.components.SectionHeader
+import com.peng.ainewshub.ui.components.SettingsRow
 import com.peng.ainewshub.ui.theme.AppText
 import kotlinx.coroutines.launch
 
 /**
- * 关于页 —— App 名/版本/数据源说明/项目链接/开源依赖清单。
+ * 关于页 —— 居中品牌头 + 两组入口。
  *
- * 数据来源 8 源(与信息源页 / 摘要 Tab 一致,元数据来自 [sourceMeta],顺序固定用
- * [DEFAULT_SOURCE_ORDER] 不跟随用户自定义):HackerNews、GitHub Trending、
- * OpenAI×Anthropic、HuggingFace Papers、Product Hunt、The Rundown AI、AIHot 精选、
- * stormzhang AI。
+ * 重构后的信息架构(长清单下沉到二级页,主页只留入口):
+ *  - 品牌头([BrandHeader]):居中 logo / 名称 / 版本胶囊 / slogan / 版权
+ *  - 「资源」组:数据来源 → [AboutSourcesScreen](8 源官网)、
+ *    开源依赖 → [AboutOssScreen](清单 + license)
+ *  - 「项目」组:检查更新 / 更新日志 / 项目源码
+ *
+ * 入口行复用 [SettingsRow](36dp 强调色图标块),与设置页同语言;数据源顺序与开源
+ * 清单均不在本页展开(细节见两个二级页)。
  *
  * 链接统一走内置 WebView([onOpenUrl],计入浏览历史),不跳外部浏览器 ——
  * 与全 App openUrl 策略一致。
  *
  * 版本号取自 build.gradle.kts 的 versionName(运行时 PackageManager 读取,避免硬编码漂移)。
- *
- * 视觉:品牌头走 AppCard 灰白描边卡 + primaryContainer 圆形「AI」logo;内容行统一
- * 走 [InfoRow] 轻量行(标题/副标题弱化字号与颜色,与章节标题 [SectionHeader] 的
- * labelLarge 同档但靠字重 + 颜色建立层级,避免头重脚轻)。
  */
 @Composable
 fun AboutScreen(
     onBack: () -> Unit,
     onOpenUrl: (String, String) -> Unit,
-    onOpenChangelog: () -> Unit
+    onOpenChangelog: () -> Unit,
+    onOpenSources: () -> Unit,
+    onOpenOss: () -> Unit
 ) {
     val context = LocalContext.current
     // 版本号取自包信息(对齐 build.gradle.kts versionName),不再硬编码
@@ -123,28 +124,45 @@ fun AboutScreen(
             modifier = Modifier.fillMaxWidth().padding(padding),
             contentPadding = PaddingValues(bottom = 24.dp)
         ) {
-            // 品牌头(全页唯一卡片,品牌渐变)
+            // 居中品牌头(全页唯一卡片)
             item { BrandHeader(versionName = versionName) }
 
-            // 数据来源 —— 轻量行(无图标,文字弱化)。顺序固定用 DEFAULT_SOURCE_ORDER,
-            // 不跟随用户在「信息源」页的自定义顺序(关于页是 App 静态说明)。
-            item { SectionHeader(stringResource(R.string.about_section_data_sources)) }
-            DEFAULT_SOURCE_ORDER.forEachIndexed { idx, key ->
-                item {
-                    val src = sourceMeta(key)
-                    InfoRow(
-                        title = src.title,
-                        subtitle = src.subtitle,
-                        onClick = { onOpenUrl(src.url, src.title) },
-                        showDivider = idx != DEFAULT_SOURCE_ORDER.lastIndex
-                    )
-                }
+            // 资源 —— 长清单入口下沉二级页,数量跟随数据自动同步
+            item { SectionHeader(stringResource(R.string.about_section_resources)) }
+            item {
+                SettingsRow(
+                    icon = Icons.Filled.TravelExplore,
+                    iconAccent = MaterialTheme.colorScheme.primary,
+                    title = stringResource(R.string.about_section_data_sources),
+                    subtitle = pluralStringResource(
+                        R.plurals.more_sources_subtitle,
+                        DEFAULT_SOURCE_ORDER.size,
+                        DEFAULT_SOURCE_ORDER.size
+                    ),
+                    onClick = onOpenSources
+                )
+            }
+            item {
+                SettingsRow(
+                    icon = Icons.Filled.Extension,
+                    iconAccent = MaterialTheme.colorScheme.primary,
+                    title = stringResource(R.string.about_section_oss),
+                    subtitle = pluralStringResource(
+                        R.plurals.about_oss_entry_subtitle,
+                        ossDeps.size,
+                        ossDeps.size
+                    ),
+                    showDivider = false,
+                    onClick = onOpenOss
+                )
             }
 
-            // 项目
+            // 项目 —— 检查更新(行尾状态字)/ 更新日志 / 项目源码
             item { SectionHeader(stringResource(R.string.about_section_project)) }
             item {
-                InfoRow(
+                SettingsRow(
+                    icon = Icons.Filled.SystemUpdate,
+                    iconAccent = MaterialTheme.colorScheme.secondary,
                     title = stringResource(R.string.about_update_check),
                     // 检查中/已是最新在行尾给状态字;空闲时显示默认 chevron
                     trailing = if (updateChecking || updateUpToDate) {
@@ -159,37 +177,26 @@ fun AboutScreen(
                             )
                         }
                     } else null,
-                    onClick = { checkUpdate() },
-                    showDivider = true
+                    onClick = { checkUpdate() }
                 )
             }
-            // 更新日志 —— 各版本新增/修复(与「更多」页入口同一目标页)
             item {
-                InfoRow(
+                SettingsRow(
+                    icon = Icons.AutoMirrored.Filled.Notes,
+                    iconAccent = MaterialTheme.colorScheme.secondary,
                     title = stringResource(R.string.changelog_title),
-                    onClick = onOpenChangelog,
-                    showDivider = true
+                    onClick = onOpenChangelog
                 )
             }
             item {
-                InfoRow(
+                SettingsRow(
+                    icon = Icons.Filled.Code,
+                    iconAccent = MaterialTheme.colorScheme.secondary,
                     title = projectSourceTitle,
                     subtitle = "GitHub · burgessjp/AI-News-Hub",
-                    onClick = { onOpenUrl("https://github.com/burgessjp/AI-News-Hub", projectSourceTitle) },
-                    showDivider = false
+                    showDivider = false,
+                    onClick = { onOpenUrl("https://github.com/burgessjp/AI-News-Hub", projectSourceTitle) }
                 )
-            }
-
-            // 开源依赖 —— license 用圆角描边 Badge
-            item { SectionHeader(stringResource(R.string.about_section_oss)) }
-            deps.forEachIndexed { idx, (name, license) ->
-                item {
-                    InfoRow(
-                        title = name,
-                        trailing = { LicenseBadge(license) },
-                        showDivider = idx != deps.lastIndex
-                    )
-                }
             }
         }
     }
@@ -244,168 +251,72 @@ fun AboutScreen(
 }
 
 /**
- * 品牌头卡片 —— primaryContainer 圆形 logo + 名称 + 版本号 + slogan。
+ * 居中品牌头卡片 —— logo / 名称 / 版本胶囊 / slogan / 版权,纵向居中排布。
+ *
+ * 版本胶囊:secondaryContainer 实底小胶囊,让版本号从纯文本升级为可扫读的标签。
  */
 @Composable
 private fun BrandHeader(versionName: String) {
     val cs = MaterialTheme.colorScheme
-    AppCard(modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 14.dp)) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+    AppCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 18.dp, vertical = 14.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Surface(
                 color = cs.primaryContainer,
                 shape = CircleShape,
-                modifier = Modifier.size(48.dp)
+                modifier = Modifier.size(64.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Text(
                         text = "AI",
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = cs.onPrimaryContainer
                     )
                 }
             }
-            Spacer(Modifier.width(16.dp))
-            Column {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "AI News Hub",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = cs.onSurface
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = "v$versionName",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = cs.onSurfaceVariant
-                    )
-                }
-                Spacer(Modifier.height(2.dp))
+            Spacer(Modifier.height(14.dp))
+            Text(
+                text = "AI News Hub",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = cs.onSurface,
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(8.dp))
+            Surface(
+                shape = CircleShape,
+                color = cs.secondaryContainer
+            ) {
                 Text(
-                    text = stringResource(R.string.about_slogan),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = cs.onSurfaceVariant
-                )
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text = stringResource(R.string.about_license),
+                    text = "v$versionName",
                     style = AppText.caption,
-                    color = cs.outline
+                    color = cs.onSecondaryContainer,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp)
                 )
             }
-        }
-    }
-}
-
-/**
- * 轻量信息行 —— 关于页内容主体,弱化字号与颜色以平衡章节标题(labelLarge)。
- *
- * 视觉对齐全 App 「扁平行 + hairline 分隔线」语言,但不走 [com.peng.ainewshub.ui.components.SettingsRow]
- * 的 titleMedium/onSurface(16sp SemiBold + 满色)—— 那会让内容行重于章节标题(labelLarge
- * 14sp Bold),形成「头重脚轻」。这里:
- *  - 标题 [AppText.body] 14sp + onSurfaceVariant(弱色,与章节标题同档但靠字重建立层级)
- *  - 副标题 [AppText.caption] 11sp + outline(更弱,纯辅助)
- *  - 可选 [trailing](与默认 chevron 二选一,license Badge 用)
- *  - hairline 分隔线左缩进 18dp 起平
- *  - [onClick] 为空时不挂 clickable(纯展示行,如开源依赖清单)
- *
- * @param showDivider 行底是否绘 hairline 分隔线(组内除末行外都传 true)
- * @param trailing 行尾自定义内容(有则不显示默认 chevron)
- */
-@Composable
-private fun InfoRow(
-    title: String,
-    modifier: Modifier = Modifier,
-    subtitle: String? = null,
-    trailing: @Composable (RowScope.() -> Unit)? = null,
-    showDivider: Boolean = true,
-    onClick: (() -> Unit)? = null
-) {
-    val cs = MaterialTheme.colorScheme
-    Column(modifier = modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .let { base -> if (onClick != null) base.clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = ripple(),
-                    onClick = onClick
-                ) else base }
-                .padding(horizontal = 18.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = AppText.body,
-                    color = cs.onSurfaceVariant
-                )
-                if (subtitle != null) {
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        text = subtitle,
-                        style = AppText.caption,
-                        color = cs.outline
-                    )
-                }
-            }
-            if (trailing != null) {
-                Spacer(Modifier.width(12.dp))
-                trailing()
-            } else {
-                Spacer(Modifier.width(8.dp))
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = null,
-                    tint = cs.outlineVariant
-                )
-            }
-        }
-        if (showDivider) {
-            HorizontalDivider(
-                thickness = 0.5.dp,
-                color = cs.outlineVariant,
-                modifier = Modifier.padding(start = 18.dp, end = 18.dp)
+            Spacer(Modifier.height(10.dp))
+            Text(
+                text = stringResource(R.string.about_slogan),
+                style = MaterialTheme.typography.bodySmall,
+                color = cs.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = stringResource(R.string.about_license),
+                style = AppText.caption,
+                color = cs.outline,
+                textAlign = TextAlign.Center
             )
         }
     }
 }
-
-/**
- * 开源依赖 license Badge —— 圆角描边胶囊,统一 license 呈现。
- *
- * 不引品牌色:outlineVariant 描边 + onSurfaceVariant 文字,与卡片描边同一语言。
- */
-@Composable
-private fun LicenseBadge(license: String) {
-    val cs = MaterialTheme.colorScheme
-    Surface(
-        shape = MaterialTheme.shapes.small,
-        color = Color.Transparent,
-        border = BorderStroke(0.5.dp, cs.outlineVariant)
-    ) {
-        Text(
-            text = license,
-            style = AppText.caption,
-            color = cs.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-        )
-    }
-}
-
-private val deps = listOf(
-    "Jetpack Compose & Material 3" to "Apache-2.0",
-    "Kotlin Coroutines" to "Apache-2.0",
-    "OkHttp" to "Apache-2.0",
-    "jsoup" to "MIT",
-    "Coil" to "Apache-2.0",
-    "Room" to "Apache-2.0",
-    "Reorderable" to "Apache-2.0",
-    "Jetpack Glance" to "Apache-2.0",
-    "AndroidX WebKit" to "Apache-2.0",
-    "AndroidX DataStore" to "Apache-2.0"
-)

@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   「更多」域文案(中文全集,默认 locale;英文在 values-en/strings_more.xml)。
-  覆盖:更多页(MoreScreen)/ 设置页(SettingsScreen)/ 关于页(AboutScreen)/ 更新日志页(ChangelogScreen)/ 信息源页(SourcesScreen)。
+  覆盖:更多页(MoreScreen)/ 设置页(SettingsScreen)/ 关于页(AboutScreen)/
+  关于 · 数据来源(AboutSourcesScreen)/ 关于 · 开源依赖(AboutOssScreen)/
+  更新日志页(ChangelogScreen)/ 信息源页(SourcesScreen)。
   术语遵守 values/strings_common.xml 头注释术语表;通用条(common_*/error_* 等)复用不重复造。
 -->
 <resources>
@@ -24,7 +26,6 @@
     <string name="more_ai_service_title">AI 服务</string>
     <string name="more_ai_service_subtitle">服务商、模型、翻译、用量</string>
     <string name="more_settings_subtitle">主题、显示偏好</string>
-    <string name="more_changelog_subtitle">每版本的新增与修复</string>
     <string name="more_about_subtitle">版本、数据源、开源依赖</string>
 
     <!-- ===== 设置页(SettingsScreen) ===== -->
@@ -55,14 +56,20 @@
     <string name="settings_clear_data_include_history">同时清空浏览历史</string>
     <string name="settings_clear_action">清理</string>
 
-    <!-- ===== 关于页(AboutScreen) ===== -->
+    <!-- ===== 关于页(AboutScreen + AboutSourcesScreen + AboutOssScreen) ===== -->
     <string name="about_title">关于</string>
     <string name="about_slogan">精选每日 AI 资讯聚合客户端</string>
     <string name="about_license">© 2026 peng · 基于 MIT 协议开源</string>
+    <string name="about_section_resources">资源</string>
     <string name="about_section_data_sources">数据来源</string>
     <string name="about_section_project">项目</string>
     <string name="about_project_source_title">项目源码</string>
     <string name="about_section_oss">开源依赖</string>
+    <plurals name="about_oss_entry_subtitle">
+        <item quantity="other">%1$d 项开源组件及许可证</item>
+    </plurals>
+    <string name="about_sources_page_hint">点击行访问各源官网</string>
+    <string name="about_oss_page_hint">许可证与项目主页</string>
     <!-- 检查更新(手动触发,查 GitHub Releases;失败静默视为已是最新) -->
     <string name="about_update_check">检查更新</string>
     <string name="about_update_checking">检查中…</string>

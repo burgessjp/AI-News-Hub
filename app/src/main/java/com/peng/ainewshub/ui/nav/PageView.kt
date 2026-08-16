@@ -30,7 +30,9 @@ import com.peng.ainewshub.ui.items.ProductHuntScreen
 import com.peng.ainewshub.ui.items.RundownAiScreen
 import com.peng.ainewshub.ui.items.SearchScreen
 import com.peng.ainewshub.ui.items.StormzhangAiNewsScreen
+import com.peng.ainewshub.ui.more.AboutOssScreen
 import com.peng.ainewshub.ui.more.AboutScreen
+import com.peng.ainewshub.ui.more.AboutSourcesScreen
 import com.peng.ainewshub.ui.more.AiServiceScreen
 import com.peng.ainewshub.ui.more.ChangelogScreen
 import com.peng.ainewshub.ui.more.FontChoice
@@ -203,7 +205,21 @@ internal fun PageView(
         Page.About -> AboutScreen(
             onBack = onBack,
             onOpenUrl = { url, title -> onOpenUrl(url, title, aboutLabel) },
-            onOpenChangelog = { nav.push(Page.Changelog) }
+            onOpenChangelog = { nav.push(Page.Changelog) },
+            onOpenSources = { nav.push(Page.AboutSources) },
+            onOpenOss = { nav.push(Page.AboutOss) }
+        )
+        // 关于 · 数据来源:8 源品牌色列表,点击行经内置 WebView 访问各源官网
+        Page.AboutSources -> AboutSourcesScreen(
+            onBack = onBack,
+            onOpenUrl = { url, title -> onOpenUrl(url, title, aboutLabel) },
+            listState = listStates.forPage(page)
+        )
+        // 关于 · 开源依赖:清单 + license 徽章,点击行打开项目主页
+        Page.AboutOss -> AboutOssScreen(
+            onBack = onBack,
+            onOpenUrl = { url, title -> onOpenUrl(url, title, aboutLabel) },
+            listState = listStates.forPage(page)
         )
         // 更新日志:读构建时打包的 CHANGELOG.md(纯静态页),列表状态照约定上提
         Page.Changelog -> ChangelogScreen(

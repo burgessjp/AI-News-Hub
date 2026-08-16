@@ -22,7 +22,6 @@
     <string name="more_ai_service_title">AI Service</string>
     <string name="more_ai_service_subtitle">Providers, models, translation, usage</string>
     <string name="more_settings_subtitle">Theme and display preferences</string>
-    <string name="more_changelog_subtitle">New features and fixes by version</string>
     <string name="more_about_subtitle">Version, data sources, open-source dependencies</string>
 
     <!-- ===== Settings screen ===== -->
@@ -53,14 +52,21 @@
     <string name="settings_clear_data_include_history">Also clear browsing history</string>
     <string name="settings_clear_action">Clear</string>
 
-    <!-- ===== About screen ===== -->
+    <!-- ===== About screen (AboutScreen + AboutSourcesScreen + AboutOssScreen) ===== -->
     <string name="about_title">About</string>
     <string name="about_slogan">A curated daily AI news aggregator</string>
     <string name="about_license">© 2026 peng · Licensed under the MIT License</string>
+    <string name="about_section_resources">Resources</string>
     <string name="about_section_data_sources">Data Sources</string>
     <string name="about_section_project">Project</string>
     <string name="about_project_source_title">Source Code</string>
     <string name="about_section_oss">Open-Source Dependencies</string>
+    <plurals name="about_oss_entry_subtitle">
+        <item quantity="one">%1$d open-source component and license</item>
+        <item quantity="other">%1$d open-source components and licenses</item>
+    </plurals>
+    <string name="about_sources_page_hint">Tap a row to visit the source\'s website</string>
+    <string name="about_oss_page_hint">Licenses and project homepages</string>
     <!-- Check for updates (manual, GitHub Releases; failures silently treated as up-to-date) -->
     <string name="about_update_check">Check for updates</string>
     <string name="about_update_checking">Checking…</string>
