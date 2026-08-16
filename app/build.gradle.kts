@@ -15,6 +15,18 @@ val keystoreProperties = Properties().apply {
     if (f.exists()) load(FileInputStream(f))
 }
 
+// 根 CHANGELOG.md 是唯一真相源：构建时自动拷入 generated assets 目录（不落 src 树、无需
+// gitignore），App 内「更新日志」页（ui/more/ChangelogScreen.kt）读取渲染。发版流程不变，
+// 改完 CHANGELOG.md 重新打包即带上最新内容。
+// 注：srcDir 挂 Provider 不携带 task 依赖（实测 mergeAssets 不会触发拷贝），故显式挂 preBuild。
+val changelogAssetsDir = layout.buildDirectory.dir("generated/changelog")
+val syncChangelogAssets = tasks.register<Copy>("syncChangelogAssets") {
+    from(rootProject.layout.projectDirectory.file("CHANGELOG.md"))
+    into(changelogAssetsDir)
+}
+// preBuild 早于所有 variant 的 mergeAssets，保证拷贝先于打包发生
+tasks.named("preBuild") { dependsOn(syncChangelogAssets) }
+
 android {
     namespace = "com.peng.ainewshub"
     compileSdk = 35
@@ -57,6 +69,11 @@ android {
 
     buildFeatures {
         compose = true
+    }
+
+    // CHANGELOG.md 经 syncChangelogAssets 拷入 generated 目录后并入主 assets
+    sourceSets.getByName("main") {
+        assets.srcDir(changelogAssetsDir)
     }
 
     compileOptions {

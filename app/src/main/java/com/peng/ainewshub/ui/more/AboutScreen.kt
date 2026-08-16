@@ -70,7 +70,11 @@ import kotlinx.coroutines.launch
  * labelLarge 同档但靠字重 + 颜色建立层级,避免头重脚轻)。
  */
 @Composable
-fun AboutScreen(onBack: () -> Unit, onOpenUrl: (String, String) -> Unit) {
+fun AboutScreen(
+    onBack: () -> Unit,
+    onOpenUrl: (String, String) -> Unit,
+    onOpenChangelog: () -> Unit
+) {
     val context = LocalContext.current
     // 版本号取自包信息(对齐 build.gradle.kts versionName),不再硬编码
     val versionName = remember {
@@ -159,6 +163,14 @@ fun AboutScreen(onBack: () -> Unit, onOpenUrl: (String, String) -> Unit) {
                     showDivider = true
                 )
             }
+            // 更新日志 —— 各版本新增/修复(与「更多」页入口同一目标页)
+            item {
+                InfoRow(
+                    title = stringResource(R.string.changelog_title),
+                    onClick = onOpenChangelog,
+                    showDivider = true
+                )
+            }
             item {
                 InfoRow(
                     title = projectSourceTitle,
@@ -183,7 +195,8 @@ fun AboutScreen(onBack: () -> Unit, onOpenUrl: (String, String) -> Unit) {
     }
 
     // 发现新版本:版本号 + 更新说明(截断防超长 body 撑爆弹窗)。「去下载」经内置
-    // WebView 打开 Release 页;「忽略」仅关弹窗,下次手动检查仍会提示
+    // WebView 打开 Release 页;「查看更新日志」跳应用内更新日志页;「忽略」仅关弹窗,
+    // 下次手动检查仍会提示
     updateInfo?.let { info ->
         AlertDialog(
             onDismissRequest = { updateInfo = null },
@@ -214,8 +227,16 @@ fun AboutScreen(onBack: () -> Unit, onOpenUrl: (String, String) -> Unit) {
                 }
             },
             dismissButton = {
-                TextButton(onClick = { updateInfo = null }) {
-                    Text(stringResource(R.string.common_ignore))
+                Row {
+                    TextButton(onClick = {
+                        updateInfo = null
+                        onOpenChangelog()
+                    }) {
+                        Text(stringResource(R.string.changelog_view))
+                    }
+                    TextButton(onClick = { updateInfo = null }) {
+                        Text(stringResource(R.string.common_ignore))
+                    }
                 }
             }
         )

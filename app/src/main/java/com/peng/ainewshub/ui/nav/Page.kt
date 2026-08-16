@@ -48,6 +48,8 @@ internal sealed interface Page {
     /** AI 服务 —— 服务商/模型/翻译开关 + 用量统计,从「更多」页进入。 */
     data object AiService : Page
     data object About : Page
+    /** 更新日志 —— 各版本新增/修复/改进(读构建时打包的 CHANGELOG.md),从「更多」/「关于」页进入。 */
+    data object Changelog : Page
     data object HackerNews : Page
     data class HackerNewsComments(val story: HackerNewsStory) : Page
     data object GitHubTrending : Page
@@ -97,6 +99,7 @@ internal fun Page.toBundle(): Bundle = Bundle().apply {
         is Page.Settings -> putString("t", "Settings")
         is Page.AiService -> putString("t", "AiService")
         is Page.About -> putString("t", "About")
+        is Page.Changelog -> putString("t", "Changelog")
         is Page.HackerNews -> putString("t", "HackerNews")
         is Page.GitHubTrending -> putString("t", "GitHubTrending")
         is Page.StormzhangAiNews -> putString("t", "StormzhangAiNews")
@@ -133,6 +136,7 @@ internal fun pageFromBundle(b: Bundle, webFallbackTitle: String): Page? {
         "Settings" -> Page.Settings
         "AiService" -> Page.AiService
         "About" -> Page.About
+        "Changelog" -> Page.Changelog
         "HackerNews" -> Page.HackerNews
         "GitHubTrending" -> Page.GitHubTrending
         "StormzhangAiNews" -> Page.StormzhangAiNews

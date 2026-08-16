@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- English translations for the More area (More / Settings / About / Sources screens).
+<!-- English translations for the More area (More / Settings / About / Changelog / Sources screens).
      Terminology: see values/strings_common.xml header. -->
 <resources>
     <!-- ===== More screen ===== -->
@@ -22,6 +22,7 @@
     <string name="more_ai_service_title">AI Service</string>
     <string name="more_ai_service_subtitle">Providers, models, translation, usage</string>
     <string name="more_settings_subtitle">Theme and display preferences</string>
+    <string name="more_changelog_subtitle">New features and fixes by version</string>
     <string name="more_about_subtitle">Version, data sources, open-source dependencies</string>
 
     <!-- ===== Settings screen ===== -->
@@ -66,6 +67,20 @@
     <string name="about_update_up_to_date">Up to date</string>
     <string name="about_update_available_title">New version v%1$s available</string>
     <string name="about_update_download">Download</string>
+    <!-- "View changelog" entry in the new-version dialog (opens the changelog screen) -->
+    <string name="changelog_view">View changelog</string>
+
+    <!-- ===== Changelog screen (release notes body follows CHANGELOG.md and stays Chinese; only UI labels are localized) ===== -->
+    <string name="changelog_title">Changelog</string>
+    <string name="changelog_empty">No release notes yet</string>
+    <string name="changelog_current_badge">Current</string>
+    <!-- CHANGELOG.md section names mapped to localized labels (ChangelogScreen.categoryRes); unmapped names shown as-is -->
+    <string name="changelog_category_added">New</string>
+    <string name="changelog_category_fixed">Fixes</string>
+    <string name="changelog_category_improved">Improvements</string>
+    <string name="changelog_category_core">Core Features</string>
+    <string name="changelog_category_pipeline">Data Pipeline</string>
+    <string name="changelog_category_engineering">Engineering</string>
 
     <!-- ===== Sources screen (row title shared with the More screen entry) ===== -->
     <string name="sources_title">Sources</string>

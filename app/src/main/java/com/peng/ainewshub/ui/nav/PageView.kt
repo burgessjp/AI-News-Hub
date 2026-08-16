@@ -32,6 +32,7 @@ import com.peng.ainewshub.ui.items.SearchScreen
 import com.peng.ainewshub.ui.items.StormzhangAiNewsScreen
 import com.peng.ainewshub.ui.more.AboutScreen
 import com.peng.ainewshub.ui.more.AiServiceScreen
+import com.peng.ainewshub.ui.more.ChangelogScreen
 import com.peng.ainewshub.ui.more.FontChoice
 import com.peng.ainewshub.ui.more.FontScale
 import com.peng.ainewshub.ui.more.SettingsScreen
@@ -201,7 +202,13 @@ internal fun PageView(
         )
         Page.About -> AboutScreen(
             onBack = onBack,
-            onOpenUrl = { url, title -> onOpenUrl(url, title, aboutLabel) }
+            onOpenUrl = { url, title -> onOpenUrl(url, title, aboutLabel) },
+            onOpenChangelog = { nav.push(Page.Changelog) }
+        )
+        // 更新日志:读构建时打包的 CHANGELOG.md(纯静态页),列表状态照约定上提
+        Page.Changelog -> ChangelogScreen(
+            onBack = onBack,
+            listState = listStates.forPage(page)
         )
         Page.HackerNews -> HackerNewsScreen(
             onBack = onBack,
