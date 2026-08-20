@@ -18,6 +18,7 @@ import com.peng.ainewshub.ui.daily.DailyArchiveScreen
 import com.peng.ainewshub.ui.daily.DailyDateScreen
 import com.peng.ainewshub.ui.daily.DailyScreen
 import com.peng.ainewshub.ui.i18n.AppLanguage
+import com.peng.ainewshub.ui.follows.FollowsScreen
 import com.peng.ainewshub.ui.items.BrowseHistoryScreen
 import com.peng.ainewshub.ui.items.FavoritesScreen
 import com.peng.ainewshub.ui.items.GitHubTrendingScreen
@@ -176,6 +177,12 @@ internal fun PageView(
         Page.LocalSearch -> LocalSearchScreen(
             onBack = onBack,
             // 结果直达 WebView;source 标签传条目自身来源(见 LocalSearchScreen)
+            onOpenUrl = { url, title, source -> onOpenUrl(url, title, source) },
+            listState = listStates.forPage(page)
+        )
+        Page.Follows -> FollowsScreen(
+            onBack = onBack,
+            // 命中条目直达 WebView;source 标签传条目自身来源(见 FollowsScreen)
             onOpenUrl = { url, title, source -> onOpenUrl(url, title, source) },
             listState = listStates.forPage(page)
         )

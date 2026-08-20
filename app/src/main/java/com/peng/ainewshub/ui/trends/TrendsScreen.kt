@@ -25,9 +25,11 @@ import androidx.compose.material.icons.automirrored.filled.TrendingDown
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.outlined.HourglassEmpty
+import androidx.compose.material.icons.outlined.PersonAddAlt
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -83,8 +85,11 @@ import java.util.Locale
 @Composable
 fun TrendsScreen(
     onOpenUrl: (url: String, title: String, source: String) -> Unit,
-    // 词云二级页入口(TabRoot 分支内经 nav.push 构造;根 tab 顶栏无 actions,入口在 caption 行)
+    // 词云二级页入口(TabRoot 分支内经 nav.push 构造;入口在 caption 行)
     onOpenCloud: () -> Unit,
+    // 顶栏关注图标 → 我的关注独立页(TabRoot 注入 nav.push(Page.Follows);趋势页是
+    // 关键词场景,关注词与热词同源,入口放这里语义最顺)
+    onOpenFollows: () -> Unit = {},
     // 列表状态由 MainActivity 上提持有:切 tab / 进二级页返回后保持滚动位置
     listState: LazyListState,
     reselectSignal: Int = 0,
@@ -107,14 +112,24 @@ fun TrendsScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
-            // 一级根 tab 规格:品牌 wordmark;刷新收口到下拉手势,日期仅总览 tab 保留,
-            // 顶栏不再有 actions
+            // 一级根 tab 规格:品牌 wordmark;刷新收口到下拉手势,日期仅总览 tab 保留。
+            // 唯一 action 是右上角「我的关注」入口(关键词场景同源)
             AppTopBar(
                 title = "AI NEWS HUB",
                 titleContent = {
                     BrandWordmark(modifier = Modifier.height(44.dp))
                 },
-                horizontalPadding = 18.dp
+                horizontalPadding = 18.dp,
+                actions = {
+                    // 我的关注入口:关键词订阅的当日命中流(人形+加号,通用「关注」符号)
+                    IconButton(onClick = onOpenFollows) {
+                        Icon(
+                            imageVector = Icons.Outlined.PersonAddAlt,
+                            contentDescription = stringResource(R.string.follows_entry_cd),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
             )
         }
     ) { padding ->

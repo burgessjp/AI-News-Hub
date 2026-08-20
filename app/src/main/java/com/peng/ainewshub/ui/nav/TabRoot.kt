@@ -48,6 +48,8 @@ internal fun TabRoot(
         AppTab.Trends -> TrendsScreen(
             onOpenUrl = onOpenUrl,
             onOpenCloud = { nav.push(Page.TrendsCloud) },
+            // 顶栏关注图标 → 我的关注独立页(关键词订阅的当日命中流;趋势页同是关键词场景)
+            onOpenFollows = { nav.push(Page.Follows) },
             listState = trendsListState,
             reselectSignal = reselectTick
         )

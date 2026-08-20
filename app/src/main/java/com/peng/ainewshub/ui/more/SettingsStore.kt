@@ -16,7 +16,8 @@ import kotlinx.coroutines.flow.map
 
 /**
  * 显示偏好(主题模式 + 动态取色 + 字体族 + 字号档位 + 数据源模式 + 应用内语言)持久化;
- * 搜索历史([searchHistoryFlow],最近 10 条)同存于此文件,与显示偏好语义轻绑定。
+ * 搜索历史([searchHistoryFlow],最近 10 条)与关注关键词([followedKeywordsFlow],
+ * 最多 20 个)同存于此文件,与显示偏好语义轻绑定。
  *
  * 此前 [themeMode] / [fontChoice] 仅靠 rememberSaveable 存内存,App 冷启动
  * 即丢失回到默认。这里用独立 DataStore 文件 `display_prefs`(与 AI 服务配置
@@ -35,6 +36,9 @@ import kotlinx.coroutines.flow.map
  * 「上次检查」,用于区分「链被系统后台限制拦住没跑」和「跑了但档内没新数据」)。
  */
 private val Context.displayDataStore: DataStore<Preferences> by preferencesDataStore("display_prefs")
+
+/** 关注关键词上限(「我的关注」域多处引用:存储写入兜底 + 管理弹层按钮态与提示文案)。 */
+const val MAX_FOLLOWED_KEYWORDS = 20
 
 class SettingsStore(context: Context) {
 
@@ -192,6 +196,58 @@ class SettingsStore(context: Context) {
         }
     }
 
+    // ===== 我的关注关键词 =====
+
+    /**
+     * 关注关键词流 —— 「我的关注」页的订阅词,最新在前,最多 [MAX_FOLLOWED_KEYWORDS] 个。
+     *
+     * 存储格式:换行分隔的纯字符串(与搜索历史同模式,规避 stringListPreferencesKey),
+     * 读取时 trim + 过滤空串,对历史脏数据容错。匹配在端上完成(见 data 层 FollowMatcher),
+     * 关键词增删只重算过滤、不触发网络请求。
+     */
+    val followedKeywordsFlow: Flow<List<String>> = dataStore.data.map { p ->
+        p[KEY_FOLLOWED_KEYWORDS].orEmpty()
+            .split('\n')
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .take(MAX_FOLLOWED_KEYWORDS)
+    }
+
+    /**
+     * 添加一个关注关键词:去首尾空白、空串不存、忽略大小写去重(已存在则移到最前)、
+     * 已达上限静默忽略。返回是否真的写入(调用方据此提示「已达上限」)。
+     */
+    suspend fun addFollowedKeyword(keyword: String): Boolean {
+        val k = keyword.trim()
+        if (k.isEmpty()) return false
+        var added = false
+        dataStore.edit { p ->
+            val old = p[KEY_FOLLOWED_KEYWORDS].orEmpty()
+                .split('\n')
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+            if (old.any { it.equals(k, ignoreCase = true) }) return@edit
+            if (old.size >= MAX_FOLLOWED_KEYWORDS) return@edit
+            p[KEY_FOLLOWED_KEYWORDS] = (listOf(k) + old).take(MAX_FOLLOWED_KEYWORDS).joinToString("\n")
+            added = true
+        }
+        return added
+    }
+
+    /** 删除一个关注关键词(忽略大小写匹配存储值,匹配不到则无操作)。 */
+    suspend fun removeFollowedKeyword(keyword: String) {
+        val k = keyword.trim()
+        if (k.isEmpty()) return
+        dataStore.edit { p ->
+            val old = p[KEY_FOLLOWED_KEYWORDS].orEmpty()
+                .split('\n')
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+            p[KEY_FOLLOWED_KEYWORDS] =
+                old.filterNot { it.equals(k, ignoreCase = true) }.joinToString("\n")
+        }
+    }
+
     /**
      * 挂起式读取数据源模式 —— 供 ViewModel 在 init 协程里取首帧真实值
      * (替代原构造期 runBlocking 同步读:那是主线程磁盘 I/O,拖慢冷启动)。
@@ -210,6 +266,7 @@ class SettingsStore(context: Context) {
         val KEY_LANGUAGE = stringPreferencesKey("language")
         val KEY_SEARCH_HISTORY = stringPreferencesKey("search_history")
         val KEY_SOURCE_ORDER = stringPreferencesKey("source_order")
+        val KEY_FOLLOWED_KEYWORDS = stringPreferencesKey("followed_keywords")
         val KEY_DAILY_NOTIFY = booleanPreferencesKey("daily_notify")
         val KEY_LAST_NOTIFIED_OVERVIEW_AT = longPreferencesKey("last_notified_overview_at")
         val KEY_LAST_NOTIFY_CHECK_AT = longPreferencesKey("last_notify_check_at")

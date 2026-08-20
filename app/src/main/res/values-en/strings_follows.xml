@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- My Follows strings (English; Chinese full set in values/strings_follows.xml). -->
+<resources>
+    <!-- Page top bar title -->
+    <string name="follows_title">My Follows</string>
+    <!-- Content description of the Overview top-bar entry icon -->
+    <string name="follows_entry_cd">Open My Follows</string>
+    <!-- Header stats line: %1$d=keyword count, %2$d=today\'s matched items -->
+    <string name="follows_stats_caption">Following %1$d keywords · %2$d matches today</string>
+
+    <!-- Empty state 1: no keywords yet (onboarding) -->
+    <string name="follows_empty_no_keywords_title">Follow the AI topics you care about</string>
+    <string name="follows_empty_no_keywords_subtitle">Subscribe to keywords and we\'ll filter the day\'s overview and source digests for matches</string>
+    <!-- Shared by the onboarding action button and the header edit icon content description -->
+    <string name="follows_manage_action">Manage keywords</string>
+    <!-- Suggestion section title (shared by onboarding and the manage sheet) -->
+    <string name="follows_suggestions_title">Today\'s trending keywords</string>
+
+    <!-- Empty state 2: keywords exist but nothing matched today -->
+    <string name="follows_empty_no_match_title">No matches today</string>
+    <string name="follows_empty_no_match_subtitle">Try another keyword, or check back tomorrow</string>
+
+    <!-- Manage sheet (ModalBottomSheet) -->
+    <string name="follows_manage_title">Manage keywords</string>
+    <!-- Manage sheet "following" section title -->
+    <string name="follows_following_section">Following</string>
+    <!-- Text field hint -->
+    <string name="follows_input_hint">Enter a keyword, Chinese or English</string>
+    <!-- Add button -->
+    <string name="follows_add_action">Add</string>
+    <!-- Content description for removing a followed keyword: %1$s=keyword -->
+    <string name="follows_remove_cd">Remove keyword %1$s</string>
+    <!-- Over-limit toast (matches SettingsStore.MAX_FOLLOWED_KEYWORDS) -->
+    <string name="follows_limit_toast">Up to 20 keywords</string>
+
+    <!-- Footer note for sources that failed to load: %1$s=comma-separated source names -->
+    <string name="follows_missing_sources">Some sources failed to load: %1$s</string>
+</resources>

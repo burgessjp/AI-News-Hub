@@ -44,6 +44,8 @@ internal sealed interface Page {
     data object Search : Page
     /** 本地搜索 —— 独立页:查设备内 Room 索引(浏览过的 8 源批次),总览顶栏进入。 */
     data object LocalSearch : Page
+    /** 我的关注 —— 关键词订阅的当日命中流(总览 Top10 + 8 源摘要过滤),总览顶栏进入。 */
+    data object Follows : Page
     data object Settings : Page
     /** AI 服务 —— 服务商/模型/翻译开关 + 用量统计,从「更多」页进入。 */
     data object AiService : Page
@@ -100,6 +102,7 @@ internal fun Page.toBundle(): Bundle = Bundle().apply {
         is Page.Daily -> putString("t", "Daily")
         is Page.Search -> putString("t", "Search")
         is Page.LocalSearch -> putString("t", "LocalSearch")
+        is Page.Follows -> putString("t", "Follows")
         is Page.Settings -> putString("t", "Settings")
         is Page.AiService -> putString("t", "AiService")
         is Page.About -> putString("t", "About")
@@ -139,6 +142,7 @@ internal fun pageFromBundle(b: Bundle, webFallbackTitle: String): Page? {
         "Daily" -> Page.Daily
         "Search" -> Page.Search
         "LocalSearch" -> Page.LocalSearch
+        "Follows" -> Page.Follows
         "Settings" -> Page.Settings
         "AiService" -> Page.AiService
         "About" -> Page.About

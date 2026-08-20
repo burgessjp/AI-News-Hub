@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  「我的关注」域文案(中文全集,默认 locale;英文在 values-en/strings_follows.xml)。
+  覆盖:关注页(FollowsScreen)—— 关键词 chips、命中条目、空态、管理弹层;
+  总览顶栏入口图标的 contentDescription。
+  术语遵守 values/strings_common.xml 头注释术语表;共用条(common_*/error_* 等)与
+  overview_data_until / overview_breaking_tag 等复用不重复造。
+-->
+<resources>
+    <!-- 页面顶栏标题 -->
+    <string name="follows_title">我的关注</string>
+    <!-- 总览顶栏入口图标的 contentDescription -->
+    <string name="follows_entry_cd">打开我的关注</string>
+    <!-- 顶部统计行:%1$d=关注词数,%2$d=今天命中条数 -->
+    <string name="follows_stats_caption">已关注 %1$d 个关键词 · 今天命中 %2$d 条</string>
+
+    <!-- 空态一:还没有任何关注词(onboarding) -->
+    <string name="follows_empty_no_keywords_title">关注你在意的 AI 动态</string>
+    <string name="follows_empty_no_keywords_subtitle">订阅关键词,从当日总览与各源摘要里筛出相关内容</string>
+    <!-- 空态一的动作按钮 / 顶栏编辑图标 contentDescription 共用 -->
+    <string name="follows_manage_action">管理关键词</string>
+    <!-- 推荐词区标题(onboarding 空态与管理弹层共用) -->
+    <string name="follows_suggestions_title">今日热词推荐</string>
+
+    <!-- 空态二:有关注词但今天没有命中 -->
+    <string name="follows_empty_no_match_title">今天没有相关内容</string>
+    <string name="follows_empty_no_match_subtitle">换个关键词试试,或明天再来看看</string>
+
+    <!-- 管理弹层(ModalBottomSheet) -->
+    <string name="follows_manage_title">管理关键词</string>
+    <!-- 管理弹层「已关注」区标题 -->
+    <string name="follows_following_section">已关注</string>
+    <!-- 输入框提示 -->
+    <string name="follows_input_hint">输入关键词,中英文均可</string>
+    <!-- 添加按钮 -->
+    <string name="follows_add_action">添加</string>
+    <!-- 删除已关注词的 contentDescription:%1$s=关键词 -->
+    <string name="follows_remove_cd">删除关键词 %1$s</string>
+    <!-- 超出上限的提示(与 SettingsStore.MAX_FOLLOWED_KEYWORDS 对应) -->
+    <string name="follows_limit_toast">最多关注 20 个关键词</string>
+
+    <!-- 页脚缺失源标注:%1$s=逗号分隔的源名列表 -->
+    <string name="follows_missing_sources">部分源未能加载:%1$s</string>
+</resources>
