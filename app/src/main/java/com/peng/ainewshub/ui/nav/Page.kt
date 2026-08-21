@@ -44,7 +44,7 @@ internal sealed interface Page {
     data object Search : Page
     /** 本地搜索 —— 独立页:查设备内 Room 索引(浏览过的 8 源批次),总览顶栏进入。 */
     data object LocalSearch : Page
-    /** 我的关注 —— 关键词订阅的当日命中流(总览 Top10 + 8 源摘要过滤),总览顶栏进入。 */
+    /** 我的关注 —— 关键词订阅的当日命中流(总览 Top10 + 8 源摘要过滤),趋势页顶栏进入。 */
     data object Follows : Page
     data object Settings : Page
     /** AI 服务 —— 服务商/模型/翻译开关 + 用量统计,从「更多」页进入。 */
