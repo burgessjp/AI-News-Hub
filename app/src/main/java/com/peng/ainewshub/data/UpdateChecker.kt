@@ -9,7 +9,8 @@ import org.json.JSONObject
  * App 更新检查 —— 查 GitHub Releases 最新版本,与本地 versionName 逐段比较。
  *
  * 发版链路(docs/release.md):打 tag 触发 GitHub Actions 出 APK 到 GitHub Release,
- * 不上架商店 —— 用户感知新版本的唯一途径就是本检查(关于页手动触发)。
+ * 不上架商店 —— 用户感知新版本的唯一途径就是本检查(关于页手动触发)。命中新版本后
+ * 经 [UpdateDownloader] 应用内直接下载 APK 并拉起系统安装器,不再跳 Release 网页。
  *
  * 约束与取舍:
  *  - GitHub 匿名 API 限频 60 次/小时,仅手动触发,无压力;
@@ -20,7 +21,7 @@ import org.json.JSONObject
  */
 object UpdateChecker {
 
-    /** 发版仓库(release 页即 APK 下载页;WebView 内点资产链接走 DownloadManager 下载)。 */
+    /** 发版仓库(响应里的 assets 带 APK 直链,html_url 是无资产时的网页兜底)。 */
     private const val LATEST_RELEASE_URL =
         "https://api.github.com/repos/burgessjp/AI-News-Hub/releases/latest"
 
@@ -29,9 +30,10 @@ object UpdateChecker {
 
     /** 新版本信息(检查命中时返回)。 */
     data class UpdateInfo(
-        val version: String,    // 去掉 v 前缀,如 "1.2.2"
-        val releaseUrl: String, // Release 页(「去下载」打开)
-        val notes: String       // 更新说明(body,可为空)
+        val version: String,      // 去掉 v 前缀,如 "1.2.2"
+        val releaseUrl: String,   // Release 页(无 APK 资产时的网页兜底)
+        val downloadUrl: String?, // APK 资产直链(browser_download_url;Release 未挂资产时为 null)
+        val notes: String         // 更新说明(body,可为空)
     )
 
     /**
@@ -55,6 +57,15 @@ object UpdateChecker {
                 else UpdateInfo(
                     version = tag,
                     releaseUrl = root.optString("html_url").ifBlank { RELEASES_PAGE_URL },
+                    // 发版流水线(release.yml)固定挂单个 app-release.apk 资产;
+                    // 仍按「取第一个 .apk 资产」解析,资产改名不脆断
+                    downloadUrl = root.optJSONArray("assets")?.run {
+                        (0 until length()).firstNotNullOfOrNull { i ->
+                            optJSONObject(i)?.takeIf {
+                                it.optString("name").endsWith(".apk", ignoreCase = true)
+                            }?.optString("browser_download_url")?.ifBlank { null }
+                        }
+                    },
                     notes = root.optString("body").trim()
                 )
             }

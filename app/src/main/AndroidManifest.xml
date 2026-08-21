@@ -6,6 +6,9 @@
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
+    <!-- 应用内更新直装:Android 8+ 拉起系统安装器装下载好的 APK 需要此权限,
+         首次安装前用户还需在系统设置为本 App 开「安装未知应用」(见 data/UpdateDownloader.kt) -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- 网页唤起外部 App:Android 11+ 需声明 <queries> 才能 resolveActivity
          判断目标 App 是否存在(intent:// 及普通自定义 scheme)。 -->
@@ -71,6 +74,18 @@
                 <data android:scheme="ainewshub" />
             </intent-filter>
         </activity>
+
+        <!-- 应用内更新直装:把 cacheDir/updates/ 下的 APK 以 content:// 授给系统安装器
+             (Android 7+ 禁止 file:// 直发),authority 见 file_paths.xml -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
         <!-- 「今日热点」桌面小组件(Glance):只处理系统 APPWIDGET_UPDATE 广播 -->
         <receiver

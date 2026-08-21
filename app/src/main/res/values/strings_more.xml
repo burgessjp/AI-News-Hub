@@ -75,7 +75,15 @@
     <string name="about_update_checking">检查中…</string>
     <string name="about_update_up_to_date">已是最新</string>
     <string name="about_update_available_title">发现新版本 v%1$s</string>
-    <string name="about_update_download">去下载</string>
+    <!-- 弹窗内直装链路(data/UpdateDownloader.kt):下载 → 进度 → 安装,失败兜底回网页 -->
+    <string name="about_update_download">下载安装包</string>
+    <string name="about_update_downloading">下载中…</string>
+    <string name="about_update_downloading_percent">下载中… %1$d%%</string>
+    <string name="about_update_download_done">下载完成,可安装</string>
+    <string name="about_update_download_failed">下载失败,请重试;也可前往 Release 页手动下载</string>
+    <string name="about_update_install">安装</string>
+    <string name="about_update_install_hint">需先在系统设置中允许本应用「安装未知应用」,授权后返回再点安装</string>
+    <string name="about_update_web_fallback">去网页下载</string>
     <!-- 发现新版本弹窗的「查看更新日志」入口(跳更新日志页) -->
     <string name="changelog_view">查看更新日志</string>
 

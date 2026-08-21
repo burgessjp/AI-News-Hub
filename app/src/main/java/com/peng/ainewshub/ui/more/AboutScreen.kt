@@ -1,5 +1,6 @@
 package com.peng.ainewshub.ui.more
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -21,6 +22,7 @@ import androidx.compose.material.icons.filled.TravelExplore
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -43,13 +45,17 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.peng.ainewshub.R
 import com.peng.ainewshub.data.UpdateChecker
+import com.peng.ainewshub.data.UpdateDownloader
 import com.peng.ainewshub.ui.components.AppCard
 import com.peng.ainewshub.ui.components.AppTopBar
 import com.peng.ainewshub.ui.components.AppTopBarDefaults
 import com.peng.ainewshub.ui.components.SectionHeader
 import com.peng.ainewshub.ui.components.SettingsRow
 import com.peng.ainewshub.ui.theme.AppText
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import java.io.File
 
 /**
  * 关于页 —— 居中品牌头 + 两组入口。
@@ -88,8 +94,8 @@ fun AboutScreen(
     val projectSourceTitle = stringResource(R.string.about_project_source_title)
 
     // 检查更新:手动查 GitHub Releases 最新 tag 与本地 versionName 比较(见 UpdateChecker)。
-    // 失败静默视为「已是最新」;命中新版本弹窗展示说明,「去下载」经内置 WebView 打开
-    // Release 页(点 APK 资产链接走 DownloadManager 下载,与网页下载体验一致)。
+    // 失败静默视为「已是最新」;命中新版本弹窗内直接下载 APK 并拉起系统安装器
+    // (见 UpdateDownloader),失败才兜底回 Release 网页。
     val scope = rememberCoroutineScope()
     var updateChecking by remember { mutableStateOf(false) }
     var updateUpToDate by remember { mutableStateOf(false) }
@@ -103,6 +109,49 @@ fun AboutScreen(
             val info = UpdateChecker.check(versionName ?: "1.0")
             updateChecking = false
             if (info != null) updateInfo = info else updateUpToDate = true
+        }
+    }
+
+    // 弹窗内直装状态机:下载中(进度,null 为不确定进度)→ 完成(已下载文件)/失败 → 安装。
+    // 进程重建丢失状态时回退到「待下载」重来即可,APK 落缓存目录会先清旧再写,无残留问题
+    var downloadJob by remember { mutableStateOf<Job?>(null) }
+    var downloadProgress by remember { mutableStateOf<Float?>(null) }
+    var downloadFailed by remember { mutableStateOf(false) }
+    var downloadedApk by remember { mutableStateOf<File?>(null) }
+    val downloading = downloadJob?.isActive == true
+
+    fun startDownload(info: UpdateChecker.UpdateInfo) {
+        // Release 未挂 APK 资产(异常情况):直接回网页兜底
+        val url = info.downloadUrl ?: run {
+            updateInfo = null
+            onOpenUrl(info.releaseUrl, updatePageTitle)
+            return
+        }
+        downloadFailed = false
+        downloadedApk = null
+        downloadProgress = null
+        downloadJob = scope.launch {
+            try {
+                downloadedApk = UpdateDownloader.download(context, url, info.version) { read, total ->
+                    downloadProgress = if (total > 0) read.toFloat() / total else null
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                downloadFailed = true
+            }
+        }
+    }
+
+    fun install(apk: File) {
+        when (UpdateDownloader.install(context, apk)) {
+            // Android 8+ 首次需在系统设置授权「安装未知应用」:提示后跳设置页,
+            // 授权返回后弹窗仍在(状态未清),再点「安装」即真正拉起安装器
+            UpdateDownloader.InstallState.NeedPermission -> {
+                Toast.makeText(context, R.string.about_update_install_hint, Toast.LENGTH_LONG).show()
+                UpdateDownloader.requestInstallPermission(context)
+            }
+            UpdateDownloader.InstallState.Started -> updateInfo = null
         }
     }
 
@@ -201,12 +250,12 @@ fun AboutScreen(
         }
     }
 
-    // 发现新版本:版本号 + 更新说明(截断防超长 body 撑爆弹窗)。「去下载」经内置
-    // WebView 打开 Release 页;「查看更新日志」跳应用内更新日志页;「忽略」仅关弹窗,
-    // 下次手动检查仍会提示
+    // 发现新版本弹窗:状态机驱动 —— 待下载(版本号 + 说明截断)→ 下载中(进度条)→
+    // 完成(「安装」)/ 失败(重试 + 网页兜底)。始终保留「查看更新日志」与「忽略」,
+    // 下载中「忽略」兼作取消
     updateInfo?.let { info ->
         AlertDialog(
-            onDismissRequest = { updateInfo = null },
+            onDismissRequest = { if (!downloading) updateInfo = null },
             title = {
                 Text(
                     text = stringResource(R.string.about_update_available_title, info.version),
@@ -215,33 +264,103 @@ fun AboutScreen(
                 )
             },
             text = {
-                if (info.notes.isNotBlank()) {
-                    Text(
-                        text = info.notes,
-                        style = AppText.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 12,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                Column {
+                    when {
+                        downloading -> {
+                            val progress = downloadProgress
+                            if (progress != null) {
+                                LinearProgressIndicator(
+                                    progress = { progress },
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                Text(
+                                    text = stringResource(
+                                        R.string.about_update_downloading_percent,
+                                        (progress * 100).toInt()
+                                    ),
+                                    style = AppText.caption,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(top = 8.dp)
+                                )
+                            } else {
+                                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                                Text(
+                                    text = stringResource(R.string.about_update_downloading),
+                                    style = AppText.caption,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(top = 8.dp)
+                                )
+                            }
+                        }
+                        downloadFailed -> Text(
+                            text = stringResource(R.string.about_update_download_failed),
+                            style = AppText.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                        downloadedApk != null -> Text(
+                            text = stringResource(R.string.about_update_download_done),
+                            style = AppText.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        else -> if (info.notes.isNotBlank()) {
+                            Text(
+                                text = info.notes,
+                                style = AppText.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 12,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
                 }
             },
             confirmButton = {
-                TextButton(onClick = {
-                    updateInfo = null
-                    onOpenUrl(info.releaseUrl, updatePageTitle)
-                }) {
-                    Text(stringResource(R.string.about_update_download))
+                when {
+                    downloading -> TextButton(onClick = {
+                        UpdateDownloader.cancel()
+                        downloadJob?.cancel()
+                    }) {
+                        Text(stringResource(R.string.common_cancel))
+                    }
+                    downloadFailed -> TextButton(onClick = { startDownload(info) }) {
+                        Text(stringResource(R.string.common_retry))
+                    }
+                    downloadedApk != null -> TextButton(
+                        onClick = { downloadedApk?.let(::install) }
+                    ) {
+                        Text(stringResource(R.string.about_update_install))
+                    }
+                    else -> TextButton(onClick = { startDownload(info) }) {
+                        Text(stringResource(R.string.about_update_download))
+                    }
                 }
             },
             dismissButton = {
                 Row {
+                    // 下载失败时额外给网页兜底入口(直链异常时仍可手动下载)
+                    if (downloadFailed) {
+                        TextButton(onClick = {
+                            updateInfo = null
+                            onOpenUrl(info.releaseUrl, updatePageTitle)
+                        }) {
+                            Text(stringResource(R.string.about_update_web_fallback))
+                        }
+                    }
                     TextButton(onClick = {
                         updateInfo = null
                         onOpenChangelog()
                     }) {
                         Text(stringResource(R.string.changelog_view))
                     }
-                    TextButton(onClick = { updateInfo = null }) {
+                    TextButton(
+                        onClick = {
+                            if (downloading) {
+                                UpdateDownloader.cancel()
+                                downloadJob?.cancel()
+                            }
+                            updateInfo = null
+                        }
+                    ) {
                         Text(stringResource(R.string.common_ignore))
                     }
                 }

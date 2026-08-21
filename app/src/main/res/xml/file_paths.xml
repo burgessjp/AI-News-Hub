@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- FileProvider 暴露路径白名单:仅应用内更新下载目录(data/UpdateDownloader.kt),
+     供系统安装器以 content:// 读取 APK;Android 7+ 禁止 file:// 直发安装 -->
+<paths>
+    <cache-path
+        name="updates"
+        path="updates/" />
+</paths>
