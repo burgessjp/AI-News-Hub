@@ -43,6 +43,14 @@ interface BrowseHistoryDao {
     @Query("UPDATE browse_history SET title = :title WHERE url = :url")
     suspend fun updateTitle(url: String, title: String)
 
+    /**
+     * 回写阅读进度(0-100;WebView 离开页面/切后台时更新)。
+     * 语义对齐 [updateTitle]:只动 progress,不碰 visitCount/visitedAt ——
+     * 进度回写不是一次「访问」,绝不能经 record() 走(会重复计数)。
+     */
+    @Query("UPDATE browse_history SET progress = :progress WHERE url = :url")
+    suspend fun updateProgress(url: String, progress: Int)
+
     /** 历史总数(顶栏计数 / 空态判断备用)。 */
     @Query("SELECT COUNT(*) FROM browse_history")
     fun observeCount(): Flow<Int>

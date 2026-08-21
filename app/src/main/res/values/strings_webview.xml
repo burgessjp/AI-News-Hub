@@ -64,4 +64,10 @@
     <string name="webview_bar_reader">阅读模式</string>
     <string name="webview_bar_exit_reader">退出阅读</string>
     <string name="webview_bar_translate">翻译</string>
+
+    <!-- ===== 阅读进度(「继续上次阅读」) ===== -->
+    <!-- 页内恢复提示 chip:%1$d=上次进度百分比(0-100) -->
+    <string name="webview_resume_reading">继续上次阅读 · %1$d%%</string>
+    <!-- 浏览历史行的进度徽章:%1$d=百分比 -->
+    <string name="webview_progress_badge">%1$d%%</string>
 </resources>

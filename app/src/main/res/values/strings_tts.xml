@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  语音速报域文案(中文全集,默认 locale;英文在 values-en/strings_tts.xml)。
+  覆盖:playback/TtsPlaybackService(通知渠道/通知本体/四个控制 action/引擎缺失提示)、
+  playback/TtsBriefing(权限拒绝提示)、总览与关注页顶栏播报入口 contentDescription、
+  播放列表拼装词条(首条标题/关注流导语)。
+  术语遵守 values/strings_common.xml 头注释术语表;播报正文(流水线内容)恒中文,
+  与每日更新通知同策略。
+-->
+<resources>
+    <!-- ===== 通知渠道与本体 ===== -->
+    <string name="tts_channel_name">语音速报</string>
+    <string name="tts_notification_title">今日 AI 速报</string>
+    <!-- 通知正文:%1$d=当前条序号(1 起),%2$d=总条数,后接条目标题 -->
+    <string name="tts_playing_index">第 %1$d/%2$d 条</string>
+
+    <!-- ===== 通知栏控制 action ===== -->
+    <string name="tts_action_prev">上一条</string>
+    <string name="tts_action_pause">暂停</string>
+    <string name="tts_action_play">继续</string>
+    <string name="tts_action_next">下一条</string>
+    <string name="tts_action_stop">停止</string>
+
+    <!-- ===== 入口与提示 ===== -->
+    <!-- 总览/关注页顶栏播报图标的 contentDescription -->
+    <string name="tts_entry_cd">语音速报</string>
+    <!-- 设备无可用的中文 TTS 语音数据(引擎缺失/未装中文包) -->
+    <string name="tts_engine_missing">未找到可用的中文语音引擎,请在系统设置的语音库中安装中文语音</string>
+    <!-- API 33+ 通知权限被拒(播报仍可用,仅通知栏控制不可见) -->
+    <string name="tts_notify_denied">未获通知权限,通知栏控制不可见</string>
+
+    <!-- ===== 播放列表拼装(首条导语) ===== -->
+    <!-- 总览速报首条标题 -->
+    <string name="tts_playlist_overview_title">今日速报</string>
+    <!-- 关注速报首条标题 -->
+    <string name="tts_playlist_follows_title">我的关注速报</string>
+    <!-- 关注速报首条导语正文:%1$d=今天命中条数 -->
+    <string name="tts_playlist_follows_intro">我的关注,今天命中 %1$d 条相关内容。</string>
+</resources>

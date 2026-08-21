@@ -46,6 +46,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -55,6 +56,7 @@ import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Refresh
@@ -92,6 +94,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -110,6 +113,7 @@ import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
 import com.peng.ainewshub.R
 import com.peng.ainewshub.data.AiConfig
+import com.peng.ainewshub.data.BrowseHistoryRepository
 import com.peng.ainewshub.data.FavoritesRepository
 import com.peng.ainewshub.data.TranslationRepository
 import com.peng.ainewshub.ui.ErrorState
@@ -158,6 +162,9 @@ fun WebViewScreen(
     fontScale: FontScale = FontScale.Standard,
     aiConfig: AiConfig = AiConfig(),
     favoritesRepo: FavoritesRepository,
+    // 浏览历史仓库:阅读进度(「继续上次阅读」)按 URL 落库读取(PageEnv 下传,
+    // 与 favoritesRepo 同款方式)
+    browseHistoryRepo: BrowseHistoryRepository,
     // 来源标签(如 "GitHub Trending"),随收藏落库;少数入口未标注时为 null
     source: String? = null,
     onBack: () -> Unit,
@@ -220,9 +227,38 @@ fun WebViewScreen(
     val fullscreenCallbackRef = remember { object { var cb: WebChromeClient.CustomViewCallback? = null } }
     val translateJobRef = remember { object { var job: Job? = null } }
     val readabilityRef = remember { object { var js: String? = null } }
+
+    // ===== 阅读进度(「继续上次阅读」) =====
+    // 滚动节流只写 Ref(不发重组、不落库);落库统一在 flushReadingProgress()
+    // (onDispose / ON_PAUSE / 站内跳转前)。url 记录进度归属,防站内导航后误写新 URL。
+    val readingProgressRef = remember { object { var percent: Int = 0; var url: String? = null } }
+    // 恢复提示(非 null 即显示 chip);每个 URL 每次会话只提示一次
+    var resumeProgress by remember { mutableStateOf<Int?>(null) }
+    val resumeShownUrls = remember { mutableSetOf<String>() }
+
+    /** 滚动位置 → 0-100 百分比(contentHeight 为 density 无关单位,需换算)。 */
+    fun computeReadingPercent(web: WebView): Int {
+        val maxScroll = (web.contentHeight * web.resources.displayMetrics.density).toInt() - web.height
+        if (maxScroll <= 0) return 0
+        return (web.scrollY * 100 / maxScroll).coerceIn(0, 100)
+    }
+
+    /**
+     * 进度落库并清空 Ref。仓库内部 fire-and-forget(独立作用域),页面销毁同帧写入
+     * 也能完成。url 为空 = 本页未滚过,不动库(保留旧进度供恢复)。
+     */
+    fun flushReadingProgress() {
+        val u = readingProgressRef.url
+        if (!u.isNullOrEmpty()) browseHistoryRepo.saveProgress(u, readingProgressRef.percent)
+        readingProgressRef.percent = 0
+        readingProgressRef.url = null
+    }
+
     DisposableEffect(Unit) {
         onDispose {
             translateJobRef.job?.cancel()
+            // 离开页面:进度落库要在 destroy 前读(scrollY 随 destroy 失效)
+            flushReadingProgress()
             webViewRef.web?.let { web ->
                 web.removeJavascriptInterface("AndroidBlobSaver")
                 (web.parent as? android.view.ViewGroup)?.removeView(web)
@@ -239,7 +275,11 @@ fun WebViewScreen(
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_PAUSE -> webViewRef.web?.onPause()
+                // 切后台先落进度再暂停:进程被杀时 onDispose 不一定执行,这里是兜底
+                Lifecycle.Event.ON_PAUSE -> {
+                    flushReadingProgress()
+                    webViewRef.web?.onPause()
+                }
                 Lifecycle.Event.ON_RESUME -> webViewRef.web?.onResume()
                 else -> Unit
             }
@@ -512,6 +552,11 @@ fun WebViewScreen(
                                             scrollAccum = 0
                                         }
                                     }
+                                    // 阅读进度:节流只写 Ref(阅读模式是另一套内容,不记录)
+                                    if (!readerActive) {
+                                        readingProgressRef.percent = computeReadingPercent(this)
+                                        readingProgressRef.url = currentUrl
+                                    }
                                 }
                                 webViewClient = object : WebViewClient() {
                                     override fun shouldOverrideUrlLoading(
@@ -541,6 +586,10 @@ fun WebViewScreen(
                                         loadError = null
                                         // 新页面起始:底部栏复位为可见(浏览器惯例)
                                         webBottomBarVisible = true
+                                        // 离开当前页(站内跳转/进出阅读模式):旧页进度先落库再清空,
+                                        // 防止归到新 URL 头上;恢复提示同时隐藏
+                                        flushReadingProgress()
+                                        resumeProgress = null
                                         val isReader = url?.endsWith(READER_SENTINEL) == true
                                         if (!isReader) {
                                             // 离开阅读页(点链接/回退/退出):清理翻译状态
@@ -566,6 +615,18 @@ fun WebViewScreen(
                                         val resolvedUrl = finishedUrl ?: currentUrl
                                         val resolvedTitle = view.title?.takeIf { it.isNotBlank() }
                                         if (resolvedTitle != null) onTitleResolved(resolvedUrl, resolvedTitle)
+                                        // 「继续上次阅读」:查上次进度,深浅适中才提示;每 URL 每会话一次
+                                        if (!readerActive && resolvedUrl.isNotBlank()) {
+                                            scope.launch {
+                                                val saved = browseHistoryRepo.progressOf(resolvedUrl)
+                                                if (saved in RESUME_PROGRESS_MIN..RESUME_PROGRESS_MAX &&
+                                                    resolvedUrl !in resumeShownUrls
+                                                ) {
+                                                    resumeShownUrls += resolvedUrl
+                                                    resumeProgress = saved
+                                                }
+                                            }
+                                        }
                                     }
 
                                     override fun doUpdateVisitedHistory(view: WebView, url: String?, isReload: Boolean) {
@@ -712,6 +773,60 @@ fun WebViewScreen(
                 // 正在提取正文(Readability 注入通常 <1s):居中 loading
                 if (readerLoading) {
                     LoadingState()
+                }
+            }
+        }
+
+        // 「继续上次阅读」提示:6 秒无操作自动消失;视频全屏时隐藏
+        LaunchedEffect(resumeProgress) {
+            if (resumeProgress != null) {
+                delay(RESUME_HINT_DISMISS_MS)
+                resumeProgress = null
+            }
+        }
+        if (fullscreenView == null) {
+            AnimatedVisibility(
+                visible = resumeProgress != null,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    // 悬浮于底部工具栏之上(工具栏含导航栏留白约 80dp,再加间距)
+                    .padding(bottom = 96.dp),
+                enter = fadeIn(),
+                exit = fadeOut()
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        // inverse 系在浅色/深色网页内容上都足够醒目,不依赖主题
+                        .background(MaterialTheme.colorScheme.inverseSurface)
+                        .clickable {
+                            val percent = resumeProgress
+                            val web = webViewRef.web
+                            resumeProgress = null
+                            if (percent != null && web != null) {
+                                // 内容高度就绪前 scrollTo 会被吞,post 到下一帧执行
+                                web.post {
+                                    val maxScroll = (web.contentHeight *
+                                        web.resources.displayMetrics.density).toInt() - web.height
+                                    if (maxScroll > 0) web.scrollTo(0, percent * maxScroll / 100)
+                                }
+                            }
+                        }
+                        .padding(horizontal = 16.dp, vertical = 10.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.History,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.inverseOnSurface,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = stringResource(R.string.webview_resume_reading, resumeProgress ?: 0),
+                        style = AppText.caption,
+                        color = MaterialTheme.colorScheme.inverseOnSurface
+                    )
                 }
             }
         }
@@ -1480,3 +1595,10 @@ private fun WebBarItem(
         Text(text = label, style = AppText.caption, color = color)
     }
 }
+
+// ===== 阅读进度(「继续上次阅读」)常量 =====
+// 提示区间:太浅不值得恢复(<8),读完了不提示(>92)
+private const val RESUME_PROGRESS_MIN = 8
+private const val RESUME_PROGRESS_MAX = 92
+// 恢复提示自动消失时长(毫秒)
+private const val RESUME_HINT_DISMISS_MS = 6_000L

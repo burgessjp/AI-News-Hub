@@ -26,6 +26,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.HourglassEmpty
@@ -60,6 +61,8 @@ import com.peng.ainewshub.R
 import com.peng.ainewshub.data.OverviewDigest
 import com.peng.ainewshub.data.OverviewEntry
 import com.peng.ainewshub.data.SummaryRepository
+import com.peng.ainewshub.playback.TtsEntry
+import com.peng.ainewshub.playback.rememberTtsStartHandler
 import com.peng.ainewshub.ui.EmptyState
 import com.peng.ainewshub.ui.ErrorState
 import com.peng.ainewshub.ui.components.AppTopBar
@@ -69,6 +72,7 @@ import com.peng.ainewshub.ui.components.HairlineDivider
 import com.peng.ainewshub.ui.components.RankBadge
 import com.peng.ainewshub.ui.components.RankRowSkeletonList
 import com.peng.ainewshub.ui.components.rememberReadUrls
+import com.peng.ainewshub.ui.i18n.AppLocale
 import com.peng.ainewshub.ui.theme.AppAlpha
 import com.peng.ainewshub.ui.theme.AppText
 import com.peng.ainewshub.ui.theme.BrandGradient
@@ -117,6 +121,8 @@ fun OverviewScreen(
 
     val context = LocalContext.current
     val dateText = remember { formatToday(context) }
+    // 语音速报:通知权限请求 + 服务启动统一收口(见 playback/TtsBriefing.kt)
+    val startBriefing = rememberTtsStartHandler()
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
@@ -130,6 +136,24 @@ fun OverviewScreen(
                 },
                 horizontalPadding = 18.dp,
                 actions = {
+                    // 语音速报入口:朗读综述 + Top10(通勤/睡前场景);数据未就绪时禁用
+                    IconButton(
+                        onClick = {
+                            val digest = (state as? OverviewState.Success)?.digest ?: return@IconButton
+                            startBriefing(buildOverviewPlaylist(context, digest))
+                        },
+                        enabled = state is OverviewState.Success
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.VolumeUp,
+                            contentDescription = stringResource(R.string.tts_entry_cd),
+                            tint = if (state is OverviewState.Success) {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            } else {
+                                MaterialTheme.colorScheme.outline
+                            }
+                        )
+                    }
                     // 本地搜索入口:查设备内索引(浏览过的 8 源数据),一步直达
                     IconButton(onClick = onOpenSearch) {
                         Icon(
@@ -622,3 +646,27 @@ private fun formatFetchedAt(context: Context, ms: Long): String =
     runCatching {
         SimpleDateFormat(context.getString(R.string.date_fmt_month_day_time), Locale.getDefault()).format(Date(ms))
     }.getOrDefault(context.getString(R.string.overview_time_unknown))
+
+/**
+ * 总览速报播放列表:首条 = 跨源综述(有则朗读,无则跳过),其后 = Top10 各条
+ * (标题 + AI 点评)。在 Composable 点击回调里调用(词条随语言取词)。
+ */
+private fun buildOverviewPlaylist(context: Context, digest: OverviewDigest): List<TtsEntry> {
+    val overviewTitle = AppLocale.wrap(context).getString(R.string.tts_playlist_overview_title)
+    return buildList {
+        val lead = digest.digest.trim()
+        if (lead.isNotEmpty()) {
+            add(TtsEntry(id = "overview-lead", title = overviewTitle, text = lead))
+        }
+        digest.items.forEachIndexed { i, item ->
+            val text = buildString {
+                append(item.title)
+                if (item.comment.isNotBlank()) {
+                    append("。")
+                    append(item.comment)
+                }
+            }
+            add(TtsEntry(id = "overview-$i", title = item.title, text = text))
+        }
+    }
+}

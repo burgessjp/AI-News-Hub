@@ -16,7 +16,7 @@
 [![Release](https://img.shields.io/github/v/release/burgessjp/AI-News-Hub?label=最新版本)](https://github.com/burgessjp/AI-News-Hub/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/burgessjp/AI-News-Hub/total?label=APK%20下载量)](https://github.com/burgessjp/AI-News-Hub/releases/latest)
 
-从 [Releases](https://github.com/burgessjp/AI-News-Hub/releases/latest) 页面下载最新 APK，或从 [Actions](https://github.com/burgessjp/AI-News-Hub/actions/workflows/build.yml) 获取最新 Debug 构建。
+从 [Releases](https://github.com/burgessjp/AI-News-Hub/releases/latest) 页面下载最新 APK。
 
 ## 为什么用它
 
@@ -57,7 +57,7 @@
 |-----|--------|
 | **总览** | 当日跨源「今日综述」导读（2-3 句 hero）+「今日热点 Top10」——均由流水线预生成；AI 判定为「突发重磅」的条目带 Breaking 标签、特殊样式，排最前。打开即看、零等待。 |
 | **摘要** | 8 个归档源当日的 AI 中文要点（流水线预生成），条目整行可点、经内置 WebView 直达原文。打开即看、无需等待。 |
-| **趋势** | 跨源热词排行榜——流水线对近 14 天快照的纯统计词频（不调 AI）：窗口命中数、迷你趋势曲线、涨跌箭头；点击词条展开代表文章。 |
+| **趋势** | 跨源热词排行榜——流水线对近 14 天快照的纯统计词频（不调 AI）：窗口命中数、迷你趋势曲线、涨跌箭头；点击词条展开代表文章。顶栏还提供「我的关注」入口（关键词订阅）。 |
 | **更多** | 设置、AI 服务配置、信息源聚合入口、收藏（稍后读）、历史摘要、AI 日报归档、关于页等。 |
 
 三个内容 Tab（总览 / 摘要 / 趋势）支持**下拉刷新**，绕过归档缓存立即拉取流水线最新批次。
@@ -90,6 +90,7 @@
 - 阅读模式（注入 Mozilla Readability 提取正文）
 - 整页翻译（与原文对照、可拖拽半/全屏弹层）
 - 顶栏星标收藏当前页面（稍后读）
+- 继续上次阅读：长文滚动位置按 URL 记忆，重开同一篇文章时浮出提示一键回到上次位置（浏览历史行同步显示进度徽章）
 - 底栏随网页下滚自动隐藏、上滚复现
 - 网页下载、HTML5 视频全屏、长按图片/链接操作
 - 字号跟随系统设置
@@ -99,11 +100,13 @@
 - **AI 日报** 与 **历史归档**（按日期回溯）
 - **本地搜索**：独立搜索页（总览页顶栏 🔍 进入），查设备内索引——联网浏览各源时自动建立，可搜标题与摘要；已读条目弱化，点击直达原文
 - **联网搜索**：「全部动态」页顶栏进入（AIHot 第三方 API），本地搜索历史 + 今日热点热词引导
+- **我的关注**：趋势页顶栏进入，订阅 ≤20 个关键词（手动输入或从今日热词一键添加），把当日总览 Top10 与 8 源摘要中的命中条目聚合成专属流；纯端上过滤，增删关键词即时生效
+- **语音速报**：总览页与关注页顶栏播报入口，用系统 TTS 引擎朗读当日综述 + Top10 点评、关注流命中条目（通勤/睡前场景）；前台服务通知栏提供上一条/暂停/下一条/停止控制，背景音乐压低而非打断；全程离线、零新增依赖
 - **已读状态**：打开过的条目在各列表自动弱化，动态列表支持「只看未读」过滤（删除对应浏览历史即可恢复未读）
 - **断网兜底**：归档数据落盘缓存，断网冷启动仍可查看最近拉取的内容
 - **浏览历史与收藏**（本地 Room 存储；WebView 顶栏星标任意页面即可稍后读）
 - **每日更新通知**（可选、默认关）：流水线有新内容时本地通知提醒，每天至多 1 条；开启后冷启动遇到新数据还会弹「查看」快捷弹窗
-- **App 内检查更新**（关于页，对查 GitHub Releases）与 `ainewshub://` 深链（`web?url=…`、`tab/<overview|summary|trends|more>`、`settings`，供浏览器/二维码/自动化工具直达）
+- **App 内检查更新与直装**（关于页，对查 GitHub Releases；「发现新版本」弹窗内下载 APK（实时进度、可取消）并拉起系统安装器，无安装包或下载失败回退 Release 页）与 `ainewshub://` 深链（`web?url=…`、`tab/<overview|summary|trends|more>`、`settings`，供浏览器/二维码/自动化工具直达）
 - **主题**：Material You 动态取色（Android 12+）、字体族切换（默认/衬线/等宽）、字号档位、暗色模式
 - **多语言**：简体中文 / English 切换
 
@@ -186,15 +189,17 @@ app/                       唯一 Android 模块
     MainActivity.kt        Activity 壳（深链解析）；自实现多栈导航在 ui/nav/（不用 Navigation Compose）
     data/                  Repository、数据模型、Room、DataStore、数据源模式
     notify/                每日更新本地通知（WorkManager）
+    playback/              语音速报：TTS 前台服务 + 通知栏控制
     ui/                    ViewModel + Compose Screen，按功能分包
       nav/                 自实现多栈导航（页面路由 / 状态机 / 应用壳）
       tabs/                AIHot「全部动态 / 精选」二级页
       overview/            今日总览（读流水线预生成的跨源分析）
       summary/             摘要 Tab + 历史摘要
       trends/              趋势 Tab + 词云 + 历史热词
+      follows/             「我的关注」关键词订阅流（趋势页顶栏进入）
       items/               各信息源详情页（HackerNews、GitHub Trending……）+ 搜索 + 浏览历史
       daily/               AI 日报与归档
-      more/                更多页 / 信息源 / 关于
+      more/                更多页 / 信息源 / 关于 / 应用内更新日志
       webview/             内置 WebView + 阅读模式 + 整页翻译
       translate/           翻译仓库 + 系统选中翻译入口
       components/           复用组件（卡片、徽章、骨架屏、SectionHeader）

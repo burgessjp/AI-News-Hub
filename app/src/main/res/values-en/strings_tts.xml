@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Voice briefing strings (English; Chinese full set in values/strings_tts.xml).
+     Spoken content (pipeline data) is always Chinese, same policy as the daily-update
+     notification; only UI labels are localized. -->
+<resources>
+    <!-- ===== Notification channel and body ===== -->
+    <string name="tts_channel_name">Voice briefing</string>
+    <string name="tts_notification_title">Today\'s AI briefing</string>
+    <!-- Notification text: %1$d = current item (1-based), %2$d = total, followed by item title -->
+    <string name="tts_playing_index">Item %1$d of %2$d</string>
+
+    <!-- ===== Notification control actions ===== -->
+    <string name="tts_action_prev">Previous</string>
+    <string name="tts_action_pause">Pause</string>
+    <string name="tts_action_play">Resume</string>
+    <string name="tts_action_next">Next</string>
+    <string name="tts_action_stop">Stop</string>
+
+    <!-- ===== Entry points and hints ===== -->
+    <!-- Content description of the briefing icon in the Overview/Follows top bar -->
+    <string name="tts_entry_cd">Voice briefing</string>
+    <!-- No usable Chinese TTS voice on the device (engine missing / no zh voice data) -->
+    <string name="tts_engine_missing">No Chinese text-to-speech voice found. Install one in system speech settings</string>
+    <!-- Notification permission denied on API 33+ (playback still works, controls hidden) -->
+    <string name="tts_notify_denied">Notification permission denied; controls won\'t be visible</string>
+
+    <!-- ===== Playlist assembly (lead-in entry) ===== -->
+    <!-- Lead-in title of the overview briefing -->
+    <string name="tts_playlist_overview_title">Today\'s briefing</string>
+    <!-- Lead-in title of the follows briefing -->
+    <string name="tts_playlist_follows_title">My Follows briefing</string>
+    <!-- Lead-in text of the follows briefing: %1$d = today\'s matched items -->
+    <string name="tts_playlist_follows_intro">My follows: %1$d matched items today.</string>
+</resources>

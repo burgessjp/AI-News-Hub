@@ -139,6 +139,8 @@ internal fun PageView(
             fontScale = display.prefs.fontScale,
             aiConfig = env.aiConfig,
             favoritesRepo = env.favoritesRepo,
+            // 浏览历史仓库:阅读进度(「继续上次阅读」)按 URL 落库读取
+            browseHistoryRepo = env.browseHistoryRepo,
             source = page.source,
             onBack = onBack,
             onOpenSettings = onOpenSettings,

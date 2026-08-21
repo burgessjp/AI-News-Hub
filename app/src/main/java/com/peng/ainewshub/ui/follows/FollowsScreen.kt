@@ -30,6 +30,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.PersonAddAlt
@@ -76,7 +77,10 @@ import com.peng.ainewshub.ui.components.AppTopBarDefaults
 import com.peng.ainewshub.ui.components.RankRowSkeletonList
 import com.peng.ainewshub.ui.components.SectionHeader
 import com.peng.ainewshub.ui.components.rememberReadUrls
+import com.peng.ainewshub.ui.i18n.AppLocale
 import com.peng.ainewshub.ui.more.MAX_FOLLOWED_KEYWORDS
+import com.peng.ainewshub.playback.TtsEntry
+import com.peng.ainewshub.playback.rememberTtsStartHandler
 import com.peng.ainewshub.ui.theme.AppAlpha
 import com.peng.ainewshub.ui.theme.AppText
 import java.text.SimpleDateFormat
@@ -111,6 +115,9 @@ fun FollowsScreen(
     val isRefreshing by vm.isRefreshing.collectAsStateWithLifecycle()
     val readUrls = rememberReadUrls()
     var showManage by rememberSaveable { mutableStateOf(false) }
+    val context = LocalContext.current
+    // 语音速报:通知权限请求 + 服务启动统一收口(见 playback/TtsBriefing.kt)
+    val startBriefing = rememberTtsStartHandler()
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
@@ -123,6 +130,27 @@ fun FollowsScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(R.string.common_back)
+                        )
+                    }
+                },
+                actions = {
+                    // 语音速报入口:朗读命中流(导语 + 各条标题与摘要);无命中时禁用
+                    val canPlay = (state as? UiState.Success)?.data?.items?.isNotEmpty() == true
+                    IconButton(
+                        onClick = {
+                            val ui = (state as? UiState.Success)?.data ?: return@IconButton
+                            startBriefing(buildFollowsPlaylist(context, ui))
+                        },
+                        enabled = canPlay
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.VolumeUp,
+                            contentDescription = stringResource(R.string.tts_entry_cd),
+                            tint = if (canPlay) {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            } else {
+                                MaterialTheme.colorScheme.outline
+                            }
                         )
                     }
                 }
@@ -691,3 +719,32 @@ private fun formatFetchedAt(context: Context, ms: Long): String =
     runCatching {
         SimpleDateFormat(context.getString(R.string.date_fmt_month_day_time), Locale.getDefault()).format(Date(ms))
     }.getOrDefault("")
+
+/**
+ * 关注速报播放列表:首条 = 命中数导语,其后 = 各命中条目(标题 + 摘要正文)。
+ * 在 Composable 点击回调里调用(词条随语言取词)。
+ */
+private fun buildFollowsPlaylist(context: Context, ui: FollowsUi): List<TtsEntry> {
+    val localized = AppLocale.wrap(context)
+    val leadTitle = localized.getString(R.string.tts_playlist_follows_title)
+    return buildList {
+        add(
+            TtsEntry(
+                id = "follows-lead",
+                title = leadTitle,
+                text = localized.getString(R.string.tts_playlist_follows_intro, ui.items.size)
+            )
+        )
+        ui.items.forEachIndexed { i, feedItem ->
+            val entry = feedItem.entry
+            val text = buildString {
+                append(entry.title)
+                if (entry.desc.isNotBlank()) {
+                    append("。")
+                    append(entry.desc)
+                }
+            }
+            add(TtsEntry(id = "follows-$i", title = entry.title, text = text))
+        }
+    }
+}

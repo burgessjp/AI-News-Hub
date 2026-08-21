@@ -1,8 +1,12 @@
 package com.peng.ainewshub.data
 
 import android.net.Uri
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 
 /**
  * 浏览历史仓库 —— 对 [BrowseHistoryDao] 的薄封装,负责记录时机的领域逻辑:
@@ -70,6 +74,27 @@ class BrowseHistoryRepository(private val dao: BrowseHistoryDao) {
         if (title.isBlank()) return
         dao.updateTitle(url, title)
     }
+
+    // ===== 阅读进度(「继续上次阅读」) =====
+
+    /**
+     * fire-and-forget 进度落库(0-100;0 = 无进度)。
+     *
+     * 调用时机是 WebView 页面销毁(onDispose)/切后台(ON_PAUSE)—— composable
+     * 的 rememberCoroutineScope 同帧即被取消,写不完;故仓库持独立作用域发出写入,
+     * 活过页面销毁。语义对齐 [updateTitle]:只动 progress,不碰 visitCount/visitedAt。
+     */
+    fun saveProgress(url: String, progress: Int) {
+        if (!isRecordable(url)) return
+        progressScope.launch { dao.updateProgress(url, progress.coerceIn(0, 100)) }
+    }
+
+    /** 读某 URL 的上次阅读进度(无记录/无进度返回 0;恢复判定区间由 UI 决定)。 */
+    suspend fun progressOf(url: String): Int =
+        if (!isRecordable(url)) 0 else (dao.get(url)?.progress ?: 0)
+
+    /** 进度写入专用作用域:SupervisorJob + IO,仓库生命周期即进程生命周期。 */
+    private val progressScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /** 历史总数流(顶栏计数 / 空态判断备用)。 */
     fun observeCount(): Flow<Int> = dao.observeCount()

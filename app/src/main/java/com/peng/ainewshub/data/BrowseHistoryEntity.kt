@@ -15,6 +15,10 @@ import androidx.room.PrimaryKey
  *    可空 —— 少数调用点暂未标注时为 null,UI 不显示该标签即可。
  *  - [visitedAt]:最近一次访问的毫秒时间戳,主排序键(倒序),已建索引。
  *  - [visitCount]:累计打开次数,>1 时 UI 显示 ×N 徽章。
+ *  - [progress]:上次阅读进度(0-100 百分比,浏览页滚动位置换算;v5 新增)。
+ *    0 = 无记录(未滚过/已读完/清空)。按 URL 存百分比而非绝对 px:内容高度随
+ *    图片加载与字号缩放变化,百分比跨会话最稳。record() 的 upsert 用 copy() 不
+ *    覆盖本字段,重开页面到首次滚动前旧值保留,供「继续上次阅读」恢复。
  */
 @Entity(
     tableName = "browse_history",
@@ -27,5 +31,6 @@ data class BrowseHistoryEntity(
     val host: String,
     val source: String?,
     val visitedAt: Long,
-    val visitCount: Int = 1
+    val visitCount: Int = 1,
+    val progress: Int = 0
 )

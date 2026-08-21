@@ -406,6 +406,11 @@ private fun HistoryRow(
                         Spacer(Modifier.width(2.dp))
                         VisitBadge(count = entity.visitCount)
                     }
+                    // 阅读进度徽章:深浅适中才显示(太浅/读完不标),提示可「继续上次阅读」
+                    if (entity.progress in 8..92) {
+                        Spacer(Modifier.width(2.dp))
+                        ProgressBadge(percent = entity.progress)
+                    }
                 }
             }
         }
@@ -446,6 +451,24 @@ private fun VisitBadge(count: Int) {
             style = AppText.caption,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.primary
+        )
+    }
+}
+
+/** 阅读进度徽章:N%,tertiary 强调(与 ×N 访问徽章区分),语义 = 可继续上次阅读。 */
+@Composable
+private fun ProgressBadge(percent: Int) {
+    Box(
+        modifier = Modifier
+            .clip(MaterialTheme.shapes.extraSmall)
+            .background(MaterialTheme.colorScheme.tertiary.copy(alpha = AppAlpha.badgeOverlay))
+            .padding(horizontal = 4.dp, vertical = 1.dp)
+    ) {
+        Text(
+            text = stringResource(R.string.webview_progress_badge, percent),
+            style = AppText.caption,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.tertiary
         )
     }
 }

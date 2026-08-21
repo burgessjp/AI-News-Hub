@@ -19,10 +19,12 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  *    [MIGRATION_2_3](仅 CREATE TABLE,旧表不受影响)。
  *  - v4:本地搜索索引改为只收本 App 归档数据 —— 清掉开发期由 aihot 实时 API
  *    流回填的站内阅读页条目(schema 不变,仅 DELETE,见 [MIGRATION_3_4])。
+ *  - v5:browse_history 加 progress 列(阅读进度 0-100,仅 ADD COLUMN,
+ *    旧数据默认 0 = 无进度,行为不变,见 [MIGRATION_4_5])。
  */
 @Database(
     entities = [BrowseHistoryEntity::class, FavoriteEntity::class, SearchItemEntity::class],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -79,6 +81,16 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v4 → v5:browse_history 新增阅读进度列(0-100 百分比)。
+         * 仅 ADD COLUMN 带默认值 0,既有行不受影响(0 = 无进度,不触发恢复提示)。
+         */
+        private val MIGRATION_4_5 = object : androidx.room.migration.Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `browse_history` ADD COLUMN `progress` INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         @Volatile
         private var instance: AppDatabase? = null
 
@@ -89,7 +101,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "ainewshub.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                     .fallbackToDestructiveMigration()
                     .build()
                     .also { instance = it }
