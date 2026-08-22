@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# AI News Hub 数据流水线(需求 b):抓数据 → AI 总结 → 推仓库。
+# AI News Hub 数据流水线(需求 b):抓数据 → AI 总结 → 语音速报 → 推仓库。
 #
 # 这是 CI 的唯一入口(.github/workflows/fetch-data.yml 只调本脚本),
 # 也可在本地手工跑:`bash scripts/pipeline.sh`。
@@ -15,6 +15,7 @@
 #   - 任一环境变量缺失 → exit 1(执行前检测,根本不跑抓取)
 #   - 抓取全失败(fetch_data.py exit 1)→ set -e 让脚本停下,不推空数据
 #   - 抓取部分成功 → 照常推送(单源失败不影响其余,对齐 fetch_data.py 策略)
+#   - 语音速报(tts_broadcast.py)自身保证任何失败只告警不抛非零,不拦推送
 set -euo pipefail
 
 # 切到仓库根(脚本可从任意目录调用)
@@ -41,10 +42,13 @@ if [ ${#missing[@]} -gt 0 ]; then
   exit 1
 fi
 
-echo "=== [1/2] 抓取数据 + AI 总结 ==="
+echo "=== [1/3] 抓取数据 + AI 总结 ==="
 python3 scripts/fetch_data.py --out-dir out
 
-echo "=== [2/2] 推送到 gitcode (news-hub-data) ==="
+echo "=== [2/3] 语音速报预合成(MOSS-TTS-Nano,失败只告警) ==="
+python3 scripts/tts_broadcast.py --out-dir out
+
+echo "=== [3/3] 推送到 gitcode (news-hub-data) ==="
 python3 scripts/push_data.py --data-dir out
 
 echo "=== 流水线完成 ==="

@@ -101,7 +101,7 @@ Every link in the app opens in-app, never in an external browser:
 - **On-device search**: a dedicated page (🔍 in the Overview top bar) querying a local index built automatically as you browse the 8 sources — search titles and summaries, read items dim, results open the original page
 - **Online search**: from the All-feeds page top bar (third-party AIHot API), with local search history + trending-word hints
 - **My Follows** (keyword subscriptions): from the Trends top bar, subscribe to up to 20 keywords (typed in, or one tap on today's trending words) and see the day's matching items from the Overview Top 10 and all 8 source digests in one feed; filtering is fully on-device, so adding or removing keywords is instant
-- **Voice briefing**: TTS narration of today's overview (digest + Top 10 with AI comments) and your follows feed — for commutes and bedtime; a foreground-service notification offers prev / pause / next / stop, background music ducks instead of stopping, and it's all offline via the system speech engine (zero new dependencies)
+- **Voice briefing**: narration of today's overview (digest + Top 10 with AI comments) and your follows feed — for commutes and bedtime. The overview briefing prefers pipeline pre-synthesized neural speech (MOSS-TTS-Nano, streamed from the data repo with true pause/resume) and falls back to the system engine when unavailable; a foreground-service notification offers prev / pause / next / stop, and background music ducks instead of stopping (zero new dependencies)
 - **Read state**: opened items dim across every feed, with an "Unread only" filter on the items list (delete a history entry to un-read)
 - **Offline fallback**: archive data is written through to a disk cache, so a cold start without network still shows the last fetched content
 - **Browsing history & Favorites** (stored locally in Room; star any page from the built-in WebView to read it later)
@@ -189,7 +189,7 @@ app/                       the single Android module
     MainActivity.kt        Activity shell only (deep-link extras); custom multi-stack navigation in ui/nav/ (no Navigation Compose)
     data/                  Repository, data models, Room, DataStore, source modes
     notify/                daily-update local notification (WorkManager)
-    playback/              voice briefing: TTS foreground service + notification controls
+    playback/              voice briefing: prebuilt-audio/system-TTS dual-channel foreground service + notification controls
     ui/                    ViewModel + Compose Screen, split by feature
       nav/                 custom multi-stack navigation (pages, nav state, app scaffold)
       tabs/                AIHot "All activity" and "Picks" secondary screens

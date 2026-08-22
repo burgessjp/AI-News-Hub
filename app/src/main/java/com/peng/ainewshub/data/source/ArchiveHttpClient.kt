@@ -27,7 +27,7 @@ import java.util.concurrent.ConcurrentHashMap
  *
  * 取数流程(对齐 docs/news-hub-data-usage.md):
  *  1. GET `index.json?ref=news-hub-data` → 读 `latest.<source>` 拿最新快照路径
- *     (index 只含即时字段:updated_at / latest / latest_overview)
+ *     (index 只含即时字段:updated_at / latest / latest_overview / latest_audio)
  *  2. 拼 `<API_BASE>/<source>/<相对路径>?ref=news-hub-data` GET 该快照 JSON
  *  3. 解析顶层 `fetched_at_ms` 与 `items[]`,交由各 Repository 做字段映射
  *  4. 按需另拉根级独立文件:趋势 `trends.json`(趋势 Tab)与历史索引
@@ -315,6 +315,26 @@ object ArchiveHttpClient {
     suspend fun fetchLatestOverview(force: Boolean = false, networkOnly: Boolean = false): JSONObject? = withContext(Dispatchers.IO) {
         fetchIndex(force, allowDiskFallback = !networkOnly).optJSONObject("latest_overview")?.takeIf { it.has("items") }
     }
+
+    /**
+     * 读 index.json 顶层的 `latest_audio` 字段(语音速报预生成音频清单,流水线
+     * tts_broadcast.py 以 MOSS-TTS-Nano 合成后写入)。与 [fetchLatestOverview]
+     * 同一份 index 缓存(一次请求双读);字段缺失或无 entries 返回 null
+     * (语义:预生成音频未就绪,调用方回落系统 TTS)。断网时随 index 磁盘兜底
+     * 一起生效 —— 盘上旧清单由调用方按 generatedAt 新鲜度判定取舍。
+     */
+    suspend fun fetchLatestAudio(force: Boolean = false): JSONObject? = withContext(Dispatchers.IO) {
+        fetchIndex(force).optJSONObject("latest_audio")?.takeIf { it.has("entries") }
+    }
+
+    /**
+     * 预生成音频文件的 CDN 直读 URL(与 [fetchSnapshot] 的 REST API raw 端点同拼法;
+     * 播放走 MediaPlayer 流式拉取,不经本客户端的 JSON 解析链路)。
+     *
+     * @param relPath 仓库根相对路径,即 latest_audio.entries[].file(如
+     *                `audio/2026-08-19/entry-00.mp3`)
+     */
+    fun audioUrl(relPath: String): String = "$API_BASE/$relPath?ref=$REF"
 
     /**
      * 拉根级独立文件 `trends.json`(跨源热词趋势榜,流水线 trend_keywords.py 在

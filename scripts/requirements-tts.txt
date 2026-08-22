@@ -1,0 +1,17 @@
+# 语音速报(scripts/tts_broadcast.py / MOSS-TTS-Nano ONNX 推理)的额外依赖。
+# 与 scripts/requirements.txt(抓取 + AI 总结)互不重叠;本地未装时 TTS 阶段
+# 自动跳过(告警不阻断推送),CI 在「Install TTS dependencies」步骤统一安装。
+#
+# 注意 torch / torchaudio / pynini / WeTextProcessing 不在此文件 —— 各有特殊
+# 安装姿势,由 .github/workflows/fetch-data.yml 的固定命令处理:
+#   - torch CPU 版需 --index-url https://download.pytorch.org/whl/cpu(仅为满足
+#     MOSS 模块顶层 import,内置音色路径不实际调用 torchaudio);
+#   - pynini 必须先于 WeTextProcessing 安装,且后者要 --no-deps --no-build-isolation
+#     (顺序错会因构建隔离产出空包);macOS 本地无 pynini wheel,需 conda-forge,
+#     可直接 AI_NEWS_HUB_TTS_DISABLE=1 跳过 TTS 阶段,不影响其余流水线。
+
+numpy>=1.24
+onnxruntime>=1.20.0
+sentencepiece>=0.1.99
+huggingface_hub
+soundfile

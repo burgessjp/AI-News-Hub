@@ -44,16 +44,23 @@ data class TtsPlaybackState(
 )
 
 /**
- * 语音速报前台服务 —— 用系统 TextToSpeech 引擎按队列朗读当日内容(总览速报/
- * 我的关注速报),通知栏提供「上一条 / 播放暂停 / 下一条 / 停止」控制。
+ * 语音速报前台服务 —— 按队列播报当日内容(总览速报/我的关注速报),通知栏提供
+ * 「上一条 / 播放暂停 / 下一条 / 停止」控制。
+ *
+ * 播放双通道(用户无感):
+ *  - 条目带 [TtsEntry.audioUrl](总览速报,流水线 MOSS-TTS-Nano 预生成)→
+ *    [AudioEntryPlayer] 流式播 CDN MP3,真暂停/原地续播,任何失败回落本条系统 TTS;
+ *  - 纯文本条目(关注速报/回落)→ 系统 TextToSpeech 引擎朗读。
  *
  * 项目首例前台服务,纪律:
  *  - 任何 [onStartCommand] 路径先升前台(5 秒红线)再处理动作;类型 mediaPlayback
  *    (targetSdk 34+ 强制,manifest 已声明 FOREGROUND_SERVICE(_MEDIA_PLAYBACK) 权限);
  *  - 仅由前台 UI 点击启动(无后台自启,不涉后台启动限制);
- *  - TTS 用系统引擎,零网络零依赖;语言恒简体中文(流水线内容恒中文,与通知/摘要同策略);
- *  - 「暂停」实现为 stop + 记住 index(引擎级 pause 兼容性参差),恢复时重读当前条 ——
- *    播报条目多在百字级,重听一句可接受,换取全引擎一致的确定行为;
+ *  - 系统通道语言恒简体中文(流水线内容恒中文,与通知/摘要同策略);预生成音频
+ *    本身即中文,不依赖引擎存在;
+ *  - 系统 TTS 通道的「暂停」实现为 stop + 记住 index(引擎级 pause 兼容性参差),
+ *    恢复时重读当前条 —— 播报条目多在百字级,重听一句可接受,换取全引擎一致的
+ *    确定行为;音频通道为播放器级真暂停,原地续播不重读;
  *  - AudioFocus 用 GAIN_TRANSIENT_MAY_DUCK:背景音乐压低而非打断;
  *  - 播放状态经 companion 的 [state] StateFlow 回流 App 内浮窗(浮窗控制走
  *    companion 的 prev/playPause/next/stop 便捷方法,与通知栏 action 同一通路)。
@@ -65,6 +72,15 @@ class TtsPlaybackService : Service() {
     private var playlist: List<TtsEntry> = emptyList()
     private var index = 0
     private var paused = false
+
+    /** 当前条目的预生成音频播放器(音频通道在位时非空;推进/回落即销毁重建)。 */
+    private var audioPlayer: AudioEntryPlayer? = null
+
+    /** 当前条是否走音频通道(决定暂停/续播的策略与回落方向)。 */
+    private var usingAudio = false
+
+    /** 音频失败回落系统 TTS、但引擎尚未就绪时的暂存条目(TTS init 回调里消费)。 */
+    private var fallbackOnReady: TtsEntry? = null
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private var audioManager: AudioManager? = null
@@ -82,10 +98,16 @@ class TtsPlaybackService : Service() {
                     stopPlayback()
                     return START_NOT_STICKY
                 }
+                // 换列表:清上一轮音频播放器与回落暂存;起播交给 playCurrent 分派 ——
+                // 首条即音频时不预建系统 TTS(引擎缺失也不拦预生成音频的播放)
+                audioPlayer?.release()
+                audioPlayer = null
+                usingAudio = false
+                fallbackOnReady = null
                 playlist = list
                 index = 0
                 paused = false
-                ensureTtsAndPlay()
+                playCurrent()
             }
             ACTION_PREV -> if (playlist.isNotEmpty()) {
                 index = (index - 1).coerceAtLeast(0)
@@ -95,10 +117,12 @@ class TtsPlaybackService : Service() {
             ACTION_PLAY_PAUSE -> if (playlist.isNotEmpty()) {
                 if (paused) {
                     paused = false
-                    playCurrent()
+                    // 音频通道:播放器仍在位则原地续播(真暂停成果);不在位(被系统
+                    // 回收/未就绪)则销毁重起当前条。TTS 通道维持重读语义。
+                    if (!(usingAudio && audioPlayer?.resume() == true)) playCurrent()
                 } else {
                     paused = true
-                    tts?.stop()
+                    if (usingAudio) audioPlayer?.pause() else tts?.stop()
                     updateNotification()
                 }
             }
@@ -129,10 +153,10 @@ class TtsPlaybackService : Service() {
         intent.getParcelableArrayListExtra<TtsEntry>(EXTRA_ENTRIES).orEmpty().filter { it.text.isNotBlank() }
     }.getOrDefault(emptyList())
 
-    /** 懒建 TTS;就绪后若队列在等(首个 START 先到)自动起播。 */
+    /** 懒建 TTS;就绪后消费音频回落暂存(优先)或起播当前队列(纯文本首条先到时)。 */
     private fun ensureTtsAndPlay() {
         if (tts != null) {
-            if (ttsReady && !paused) playCurrent()
+            if (ttsReady) speakPendingOrCurrent()
             return
         }
         tts = TextToSpeech(applicationContext) { status ->
@@ -158,19 +182,68 @@ class TtsPlaybackService : Service() {
                 }
             })
             ttsReady = true
-            if (!paused && playlist.isNotEmpty()) mainHandler.post { playCurrent() }
+            mainHandler.post { speakPendingOrCurrent() }
         }
     }
 
-    /** 朗读当前条(TTS 未就绪则等 init 回调补播)。 */
+    /**
+     * 播放当前条:带 [TtsEntry.audioUrl] 走音频通道(MediaPlayer 流式播,失败由
+     * 播放器回调回落),否则系统 TTS(TTS 未建则先建,init 回调里补播)。
+     */
     private fun playCurrent() {
         val entry = playlist.getOrNull(index) ?: return stopPlayback()
         updateNotification()
         publishState()
-        val t = tts ?: return
+        val audioUrl = entry.audioUrl
+        if (audioUrl != null) {
+            usingAudio = true
+            requestAudioFocus()
+            audioPlayer?.release()
+            audioPlayer = AudioEntryPlayer(
+                this, audioUrl,
+                onCompletion = { mainHandler.post { advanceAfterFinish() } },
+                onError = { _ -> mainHandler.post { fallbackToSystemTts(entry) } }
+            )
+            return
+        }
+        usingAudio = false
+        audioPlayer?.release()
+        audioPlayer = null
+        val t = tts ?: return ensureTtsAndPlay()
         if (!ttsReady) return
         requestAudioFocus()
         t.speak(entry.text, TextToSpeech.QUEUE_FLUSH, null, entry.id)
+    }
+
+    /** 预生成音频播放失败:当前条回落系统 TTS 重读(引擎未就绪则先建,回调里读)。 */
+    private fun fallbackToSystemTts(entry: TtsEntry) {
+        audioPlayer?.release()
+        audioPlayer = null
+        usingAudio = false
+        val t = tts
+        if (ttsReady && t != null) {
+            requestAudioFocus()
+            updateNotification()
+            publishState()
+            t.speak(entry.text, TextToSpeech.QUEUE_FLUSH, null, entry.id)
+        } else {
+            fallbackOnReady = entry
+            ensureTtsAndPlay()
+        }
+    }
+
+    /** TTS 就绪后的统一起播口:音频回落暂存优先,否则(未暂停)播当前条。 */
+    private fun speakPendingOrCurrent() {
+        val pending = fallbackOnReady
+        fallbackOnReady = null
+        if (pending != null) {
+            requestAudioFocus()
+            updateNotification()
+            publishState()
+            tts?.speak(pending.text, TextToSpeech.QUEUE_FLUSH, null, pending.id)
+        } else if (!paused && playlist.isNotEmpty()) {
+            playCurrent()
+        }
     }
 
     /** 一条读完/出错:未暂停则推进;已到末尾自然收尾(停服务、散通知)。 */
@@ -186,6 +259,10 @@ class TtsPlaybackService : Service() {
 
     private fun stopPlayback() {
         paused = true
+        audioPlayer?.release()
+        audioPlayer = null
+        usingAudio = false
+        fallbackOnReady = null
         runCatching { tts?.stop() }
         abandonAudioFocus()
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
@@ -205,6 +282,8 @@ class TtsPlaybackService : Service() {
     }
 
     override fun onDestroy() {
+        audioPlayer?.release()
+        audioPlayer = null
         runCatching { tts?.stop() }
         runCatching { tts?.shutdown() }
         tts = null

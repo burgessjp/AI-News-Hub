@@ -27,7 +27,7 @@ import shutil
 import subprocess
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # 北京时间(UTC+8):提交信息里的时间戳与文件名一致(统一从 common 引入)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -44,6 +44,10 @@ DEFAULT_BRANCH = "news-hub-data"
 # push 是全链路最后一步,瞬时网络抖动 / 非快进会废掉整轮(下一轮要等次日 15:30),
 # 故与抓取/AI 同等对待:失败重试,push 类失败时重 clone 规避脏本地状态。
 PUSH_MAX_ATTEMPTS = 3
+
+# 语音速报音频目录(audio/<YYYY-MM-DD>/)保留天数:每日 ≈2.4MB,14 天 ≈34MB 封顶。
+# _overlay 只增不删,过期目录须在 overlay 后显式清理(见 _prune_old_audio)。
+AUDIO_RETAIN_DAYS = 14
 
 
 def run(cmd, cwd=None, check=True):
@@ -136,6 +140,10 @@ def _clone_overlay_commit_push(data_dir, repo_dir, authed_url, branch, repo_url,
     # 历史的环节;纯统计不调 AI,失败只告警不阻断推送(文件暂缺,App 走空态)
     trend_keywords.write_trends(repo_dir)
 
+    # 语音速报音频滚动清理:overlay 只增不删,过期日期目录在这里显式删除,
+    # 随后的 git add -A 捕获删除并随本次提交推走(工作区稳定 ≈34MB)
+    _prune_old_audio(repo_dir)
+
     # bot 身份(对齐原 workflow:github-actions[bot])
     run(["git", "config", "user.name", "github-actions[bot]"], cwd=repo_dir)
     run(["git", "config", "user.email", "41898282+github-actions[bot]@users.noreply.github.com"],
@@ -164,6 +172,38 @@ def _inject_token(repo_url, token):
         raise ValueError(f"repo-url 必须是 https URL: {repo_url}")
     scheme, rest = repo_url.split("://", 1)
     return f"{scheme}://x-access-token:{token}@{rest}"
+
+
+def _prune_old_audio(repo_dir):
+    """删除 audio/ 下日期目录名早于 AUDIO_RETAIN_DAYS 天的目录(告警不阻断)。
+
+    overlay 只增不删,若不清理,音频会以 ≈2.4MB/天 无限累积;目录名即北京
+    时间日期(YYYY-MM-DD,与 fetch 的按日归档同构),按名比较即可,无需读
+    文件元数据。非日期命名的目录/文件一律不动;任何异常只告警不抛
+    (清理失败顶多多占些仓库空间,不值得废掉整轮推送)。
+    """
+    try:
+        audio_root = os.path.join(repo_dir, "audio")
+        if not os.path.isdir(audio_root):
+            return
+        cutoff = datetime.now(CST).date() - timedelta(days=AUDIO_RETAIN_DAYS)
+        removed = 0
+        for name in os.listdir(audio_root):
+            path = os.path.join(audio_root, name)
+            if not os.path.isdir(path):
+                continue
+            try:
+                dir_date = datetime.strptime(name, "%Y-%m-%d").date()
+            except ValueError:
+                continue
+            if dir_date < cutoff:
+                shutil.rmtree(path)
+                removed += 1
+        if removed:
+            print(f"[PUSH] 清理 {removed} 个过期音频目录(>{AUDIO_RETAIN_DAYS} 天)")
+    except Exception as e:
+        print(f"[PUSH][WARN] 音频目录清理失败(不阻断推送):{type(e).__name__}: {e}",
+              file=sys.stderr)
 
 
 def _overlay(src_dir, dst_dir):

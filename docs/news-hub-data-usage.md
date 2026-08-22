@@ -17,7 +17,7 @@
 ```
 news-hub-data 分支/
 ├── index.json                          ← 入口:即时字段(updated_at / latest /
-│                                         latest_overview)
+│                                         latest_overview / latest_audio)
 ├── history.json                        ← 摘要历史索引:{源名: {日期: relpath}}(每源 31 天)
 ├── overview_history.json               ← 总览归档索引:{日期: relpath}(保留 90 天)
 ├── trends.json                         ← 热词趋势榜(纯统计,每次批次整文件覆盖)
@@ -30,6 +30,9 @@ news-hub-data 分支/
 ├── trends/                             ← 热词趋势榜按日归档(内容与当期 trends.json 同构)
 │   └── 2026-08-15/
 │       └── 18-00-data.json
+├── audio/                              ← 语音速报预生成 MP3(单声道 48kHz 64kbps,按日目录,保留 14 天)
+│   └── 2026-08-15/
+│       └── entry-00.mp3 … entry-10.mp3
 ├── hackernews/
 │   ├── 2026-07-14/
 │   │   └── 08-00-data.json
@@ -97,6 +100,8 @@ news-hub-data 分支/
 `latest` 里的路径是**相对于源目录**的。设计行为:某源当天抓取失败时,`index.json` 会保留它最后一次成功的指向(可能落在前一天),客户端永远能拿到有效数据。
 
 `latest_overview` 是**今日总览**(流水线预生成的跨源综合分析,详见下文「今日总览 latest_overview」)。App 首页「总览」tab 直接读这个字段,不再端侧调 AI。
+
+`latest_audio` 是**语音速报预生成音频清单**(流水线 `tts_broadcast.py` 用 MOSS-TTS-Nano 按当日总览预合成的 MP3,详见下文「语音速报音频」章节)。App「语音速报」优先流式播放这些音频,清单缺失/批次滞后时回落系统 TTS。
 
 按日期回看的数据走根级独立索引文件(不在 index.json 里,按需拉取):`history.json`(摘要历史,`{源名: {日期: relpath}}`,详见「按日期取历史快照」)与 `overview_history.json`(总览归档,`{日期: relpath}`,详见「历史总览归档」)。
 
@@ -328,6 +333,37 @@ print(hn['items'][0]['title'])
 - **relpath 相对 `trends/` 目录**,拼前缀后走 gitcode raw API(同 history / overview_history 消费方式)。
 - **归档文件内容与当期 `trends.json` 完全同构**(同一对象两处落盘)。
 - **用途**:① 每期 `rankChange` / `isNewEntry` 以「昨日最后一期」归档为基准计算(基准读取失败只是少这两个字段,不影响榜单本身);② App「更多 → 历史热词」按日期回看(经 `trends_history.json` 寻址,复用 `fetchSnapshot` 路径缓存,归档内容与当期榜单同构渲染)。
+
+## 语音速报音频(audio/ 目录 + index.json 顶层 latest_audio 字段)
+
+App「语音速报」的预生成神经语音:流水线(`scripts/tts_broadcast.py`,fetch 与 push 之间)按当日 `latest_overview` 内容(综述条 + Top10,与 App 端播放列表拼装规则一致)用 MOSS-TTS-Nano(Apache-2.0,音色 Yuewen)合成 MP3 落盘 `audio/<YYYY-MM-DD>/entry-NN.mp3`(北京时间),并把清单写进 `index.json` 顶层即时字段 `latest_audio`:
+
+```json
+{
+  "latest_audio": {
+    "generatedAt": 1784073612000,
+    "voice": "Yuewen",
+    "model": "moss-tts-nano",
+    "entries": [
+      {"file": "audio/2026-08-15/entry-00.mp3", "title": "今日速报", "durationMs": 25280, "bytes": 202796}
+    ]
+  }
+}
+```
+
+| 字段 | 说明 |
+|------|------|
+| `generatedAt` | 与同批 `latest_overview.generatedAt` **严格同值**(音频按总览文本合成,批次绑定;App 比对判定新鲜度,不一致回落系统 TTS) |
+| `voice` / `model` | 音色名 / 模型名(信息字段) |
+| `entries[].file` | 仓库根相对路径,走 gitcode raw API 直读(见上「文件直链」) |
+| `entries[].title` | 条目标题(综述条为「今日速报」,其余为条目标题;清单参考值,App 端播放列表仍用本地化标题) |
+| `entries[].durationMs` | 音频时长,毫秒(ffprobe 预读) |
+| `entries[].bytes` | 文件大小,字节 |
+
+- **MP3 规格**:单声道 48kHz 64kbps(≈0.48MB/分钟;11 条全量约 1-2.5MB/天)。
+- **同日覆盖**:文件名按播放列表序号固定编号(entry-00 起,综述条存在时 00 = 综述),同日多批次天然覆盖不累积;清单「成功才写」,部分条目合成失败时仅写成功的条目(条数与总览条目数不符时 App 整批回落系统 TTS)。
+- **保留 14 天**:`audio/` 下过期日期目录由 `push_data.py` 在 overlay 后显式删除(overlay 只增不删),仓库工作区稳定 ≈34MB。
+- **失败语义**:语音合成任何失败(依赖缺失/模型下载失败/单条失败)只告警不阻断推送,当次不写 `latest_audio`(App 回落系统 TTS,下次批次自愈)。
 
 ## 单个数据文件的通用结构
 

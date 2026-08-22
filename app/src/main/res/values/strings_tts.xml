@@ -28,6 +28,8 @@
     <string name="tts_engine_missing">未找到可用的中文语音引擎,请在系统设置的语音库中安装中文语音</string>
     <!-- API 33+ 通知权限被拒(播报仍可用,仅通知栏控制不可见) -->
     <string name="tts_notify_denied">未获通知权限,通知栏控制不可见</string>
+    <!-- 预生成音频不可用(未生成/批次滞后/拉取失败),总览播报回落系统 TTS -->
+    <string name="tts_audio_unavailable">音频未就绪,已切换离线合成</string>
 
     <!-- ===== 应用内播放浮窗 ===== -->
     <!-- 浮窗容器无障碍描述(含可拖动提示) -->

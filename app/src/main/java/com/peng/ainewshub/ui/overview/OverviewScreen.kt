@@ -1,6 +1,7 @@
 package com.peng.ainewshub.ui.overview
 
 import android.content.Context
+import android.widget.Toast
 import androidx.compose.ui.platform.LocalContext
 
 import androidx.compose.foundation.background
@@ -43,6 +44,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,9 +60,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.peng.ainewshub.R
+import com.peng.ainewshub.data.BroadcastRepository
 import com.peng.ainewshub.data.OverviewDigest
 import com.peng.ainewshub.data.OverviewEntry
 import com.peng.ainewshub.data.SummaryRepository
+import com.peng.ainewshub.data.source.ArchiveHttpClient
 import com.peng.ainewshub.playback.TtsEntry
 import com.peng.ainewshub.playback.rememberTtsStartHandler
 import com.peng.ainewshub.ui.EmptyState
@@ -76,6 +80,7 @@ import com.peng.ainewshub.ui.i18n.AppLocale
 import com.peng.ainewshub.ui.theme.AppAlpha
 import com.peng.ainewshub.ui.theme.AppText
 import com.peng.ainewshub.ui.theme.BrandGradient
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -123,6 +128,9 @@ fun OverviewScreen(
     val dateText = remember { formatToday(context) }
     // 语音速报:通知权限请求 + 服务启动统一收口(见 playback/TtsBriefing.kt)
     val startBriefing = rememberTtsStartHandler()
+    // 预生成音频清单:播报优先流水线神经语音(MOSS-TTS-Nano),清单不可用回落系统 TTS
+    val scope = rememberCoroutineScope()
+    val broadcastRepo = remember { BroadcastRepository() }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
@@ -140,7 +148,30 @@ fun OverviewScreen(
                     IconButton(
                         onClick = {
                             val digest = (state as? OverviewState.Success)?.digest ?: return@IconButton
-                            startBriefing(buildOverviewPlaylist(context, digest))
+                            scope.launch {
+                                // 清单新鲜度(generatedAt 对齐)在 Repository 内判定;条数须与
+                                // 本地播放列表一致(部分合成的批次整批回落,避免错位拼 audioUrl)
+                                val audio = runCatching {
+                                    broadcastRepo.load(overviewGeneratedAt = digest.generatedAt)
+                                }.getOrNull()
+                                val fallback = buildOverviewPlaylist(context, digest)
+                                val entries = if (audio != null && audio.entries.size == fallback.size) {
+                                    fallback.mapIndexed { i, e ->
+                                        e.copy(
+                                            audioUrl = ArchiveHttpClient.audioUrl(audio.entries[i].file),
+                                            durationMs = audio.entries[i].durationMs
+                                        )
+                                    }
+                                } else {
+                                    Toast.makeText(
+                                        context,
+                                        AppLocale.wrap(context).getString(R.string.tts_audio_unavailable),
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                    fallback
+                                }
+                                startBriefing(entries)
+                            }
                         },
                         enabled = state is OverviewState.Success
                     ) {

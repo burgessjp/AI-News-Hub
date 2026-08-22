@@ -23,6 +23,8 @@
     <string name="tts_engine_missing">No Chinese text-to-speech voice found. Install one in system speech settings</string>
     <!-- Notification permission denied on API 33+ (playback still works, controls hidden) -->
     <string name="tts_notify_denied">Notification permission denied; controls won\'t be visible</string>
+    <!-- Prebuilt audio unavailable (not generated / stale batch / fetch failed); overview briefing falls back to system TTS -->
+    <string name="tts_audio_unavailable">Audio not ready yet; switched to offline synthesis</string>
 
     <!-- ===== In-app floating player ===== -->
     <!-- Accessibility description of the floating pill container (with drag hint) -->

@@ -35,6 +35,8 @@ Thumbs.db
 
 # 数据抓取本地输出(scripts/fetch_data.py 的 --out-dir 产物,不入库)
 out/
+# MOSS-TTS-Nano 代码+模型动态克隆(语音速报 tts_broadcast.py 自举,含 728MB 模型)
+third_party/
 # 数据仓库浅克隆目录(scripts/push_data.py 推送前 clone 到 repo/,临时产物)
 repo/
 
