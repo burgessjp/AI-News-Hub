@@ -315,10 +315,13 @@ class TtsPlaybackService : Service() {
         ensureChannel()
         val localized = AppLocale.wrap(this)
         val entry = playlist.getOrNull(index)
-        val text = if (entry != null) {
-            localized.getString(R.string.tts_playing_index, index + 1, playlist.size) + " · " + entry.title
-        } else {
-            localized.getString(R.string.tts_notification_title)
+        // 单条播放(总览单段音频)没有序号概念,直接显标题
+        val text = when {
+            entry == null -> localized.getString(R.string.tts_notification_title)
+            playlist.size > 1 -> localized.getString(
+                R.string.tts_playing_index, index + 1, playlist.size
+            ) + " · " + entry.title
+            else -> entry.title.ifBlank { localized.getString(R.string.tts_notification_title) }
         }
         // 点击正文回 App(singleTask,无 extra 落默认总览 tab)
         val contentIntent = PendingIntent.getActivity(

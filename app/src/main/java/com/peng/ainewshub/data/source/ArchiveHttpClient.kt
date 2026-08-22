@@ -317,11 +317,11 @@ object ArchiveHttpClient {
     }
 
     /**
-     * 读 index.json 顶层的 `latest_audio` 字段(语音速报预生成音频清单,流水线
-     * tts_broadcast.py 以 Qwen3-TTS 合成后写入)。与 [fetchLatestOverview]
-     * 同一份 index 缓存(一次请求双读);字段缺失或无 entries 返回 null
+     * 读 index.json 顶层的 `latest_audio` 字段(语音速报预生成音频描述,流水线
+     * tts_broadcast.py 以 Qwen3-TTS 合成单段全量 MP3 后写入)。与 [fetchLatestOverview]
+     * 同一份 index 缓存(一次请求双读);字段缺失或无 file 返回 null
      * (语义:预生成音频未就绪,调用方回落系统 TTS)。断网时随 index 磁盘兜底
-     * 一起生效 —— 盘上旧清单由调用方按 generatedAt 新鲜度判定取舍。
+     * 一起生效 —— 盘上旧描述由调用方按 generatedAt 新鲜度判定取舍。
      */
     suspend fun fetchLatestAudio(force: Boolean = false): JSONObject? = withContext(Dispatchers.IO) {
         fetchIndex(force).optJSONObject("latest_audio")?.takeIf { it.has("entries") }

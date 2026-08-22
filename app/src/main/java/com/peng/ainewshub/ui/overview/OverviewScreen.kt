@@ -149,19 +149,25 @@ fun OverviewScreen(
                         onClick = {
                             val digest = (state as? OverviewState.Success)?.digest ?: return@IconButton
                             scope.launch {
-                                // 清单新鲜度(generatedAt 对齐)在 Repository 内判定;条数须与
-                                // 本地播放列表一致(部分合成的批次整批回落,避免错位拼 audioUrl)
+                                // 新鲜度(generatedAt 对齐)在 Repository 内判定。预生成音频是
+                                // 单段全量(综述 + Top10 连读):一条 TtsEntry 承载整段,text =
+                                // 全量拼接(音频播放失败回落系统 TTS 时朗读同一内容);清单
+                                // 不可用回落本地播放列表(分段系统 TTS)。
                                 val audio = runCatching {
                                     broadcastRepo.load(overviewGeneratedAt = digest.generatedAt)
                                 }.getOrNull()
                                 val fallback = buildOverviewPlaylist(context, digest)
-                                val entries = if (audio != null && audio.entries.size == fallback.size) {
-                                    fallback.mapIndexed { i, e ->
-                                        e.copy(
-                                            audioUrl = ArchiveHttpClient.audioUrl(audio.entries[i].file),
-                                            durationMs = audio.entries[i].durationMs
+                                val entries = if (audio != null) {
+                                    listOf(
+                                        TtsEntry(
+                                            id = "overview-broadcast",
+                                            title = AppLocale.wrap(context)
+                                                .getString(R.string.tts_playlist_overview_title),
+                                            text = fallback.joinToString("\n") { it.text },
+                                            audioUrl = ArchiveHttpClient.audioUrl(audio.file),
+                                            durationMs = audio.durationMs
                                         )
-                                    }
+                                    )
                                 } else {
                                     Toast.makeText(
                                         context,

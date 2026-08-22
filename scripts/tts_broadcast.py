@@ -1,21 +1,24 @@
 #!/usr/bin/env python3
-"""语音速报:把今日总览(latest_overview)预合成为播报音频并回写 index.json 清单。
+"""语音速报:把今日总览(latest_overview)预合成为单段播报音频并回写 index.json。
 
 流水线位置:fetch_data.py 之后、push_data.py 之前(pipeline.sh 步骤 2/3)。
 App 端「语音速报」优先播放这里的预生成音频(Qwen3-TTS 神经语音,自然度
 远超系统 TTS);音频清单缺失 / 批次滞后时 App 自动回落系统 TTS,互不影响。
 
 产物:
-  - out/audio/<YYYY-MM-DD>/entry-NN.mp3  单声道 24kHz 48kbps(ffmpeg 缺失时保留
-    wav);固定文件名,同日多批次天然覆盖不累积;
-  - out/index.json 顶层追加 latest_audio(即时字段,≈1.5KB 有界):
+  - out/audio/<YYYY-MM-DD>/broadcast.mp3  单段全量播报(综述 + Top10 连读,
+    段间 0.6s 静音;单声道 24kHz 48kbps,ffmpeg 缺失时保留 wav);同日多
+    批次天然覆盖不累积;
+  - out/index.json 顶层追加 latest_audio(即时字段,有界):
     { generatedAt(对齐 latest_overview.generatedAt,App 据此判定新鲜度),
-      voice, model, entries: [{file, title, durationMs, bytes}] }
+      voice, model, file, title, durationMs, bytes }
 
 失败语义(对齐 trend_keywords.write_trends「失败只告警不阻断推送」):
-  引擎/模型缺失且自举失败 / overview 缺失 / 单条合成失败 / 整阶段异常
+  引擎/模型缺失且自举失败 / overview 缺失 / 任一条目合成失败 / 整阶段异常
   —— 一律告警 + exit 0;index.json 不写 latest_audio → App 回落系统 TTS,
   下个批次自愈。任何路径都不抛非零(pipeline.sh set -e 下不拦推送)。
+  单段音频要求全条成功才产出(缺任何一条都整批不写,避免用户听着缺条目
+  却无从察觉;与此前分段方案「条数不符整批回落」的用户效果一致)。
 
 引擎(Qwen3-TTS,qwentts.cpp,纯 C++ 无 Python ML 依赖):
   - 模型  Qwen3-TTS-12Hz-0.6B-CustomVoice(Apache-2.0,预置音色),GGUF
@@ -75,6 +78,8 @@ TTS_LANG = "Chinese"
 TTS_SEED = "1793"
 # 单条合成上限(秒):CI 4 核 CPU 上 RTF≈1~3,百字条目最坏 ~2 分钟,长综述留足余量
 SYNTH_TIMEOUT_S = 900
+# 拼接单段音频时的段间静音时长(秒):条目连读的自然停顿
+SEGMENT_GAP_S = 0.6
 
 ENGINE_ROOT = Path(__file__).resolve().parent.parent / "third_party" / "tts-engine"
 
@@ -199,86 +204,107 @@ def _build_playlist(overview):
     return playlist
 
 
-def _duration_ms(path, ffprobe):
-    """读音频时长(毫秒):优先 ffprobe,wav 用标准库 wave 兜底;失败返回 0。"""
-    try:
-        if ffprobe:
-            out = subprocess.run(
-                [ffprobe, "-v", "error", "-show_entries", "format=duration",
-                 "-of", "csv=p=0", str(path)],
-                capture_output=True, text=True,
-            )
-            if out.returncode == 0 and out.stdout.strip():
-                return int(float(out.stdout.strip()) * 1000)
-        if path.suffix == ".wav":
-            with wave.open(str(path), "rb") as wav_file:
-                return int(wav_file.getnframes() / float(wav_file.getframerate()) * 1000)
-    except Exception:
-        pass
-    return 0
+def _write_silence(path, seconds):
+    """生成静音 wav(24kHz 单声道 S16,与引擎输出同规格)。"""
+    with wave.open(str(path), "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(24000)
+        w.writeframes(b"\x00\x00" * int(24000 * seconds))
 
 
-def _synthesize_all(binary, models, playlist, voice, audio_dir, rel_prefix):
-    """逐条合成 + 编码,返回 latest_audio.entries;单条失败跳过该条(告警)。
+def _concat_wavs(paths, out_path):
+    """按序拼接 wav 到单个文件,返回总时长(秒)。
 
-    MP3 规格:单声道 24kHz 48kbps(≈0.36MB/分钟,11 条全量 ≈1.8MB/天;
-    引擎原生输出即 24kHz,无需升采样)。ffmpeg 缺失(本地调试机常见)时
-    保留 wav,时长用 wave 模块兜底读取。
+    各段参数须一致(引擎输出恒 24kHz/mono/S16,静音段同规格手工生成);
+    不一致即抛错,由调用方按整阶段失败处理。
+    """
+    frames = 0
+    with wave.open(str(out_path), "wb") as out:
+        for i, p in enumerate(paths):
+            with wave.open(str(p), "rb") as r:
+                if i == 0:
+                    out.setparams(r.getparams())
+                elif (r.getnchannels(), r.getsampwidth(), r.getframerate()) != (
+                    out.getnchannels(), out.getsampwidth(), out.getframerate()
+                ):
+                    raise ValueError(f"wav 参数不一致,无法拼接: {p}")
+                data = r.readframes(r.getnframes())
+                out.writeframes(data)
+                frames += r.getnframes()
+    return frames / 24000.0
+
+
+def _synthesize_merged(binary, models, playlist, voice, audio_dir, rel_prefix):
+    """合成全部条目并拼接为单段全量音频,返回 (file, durationMs, bytes)。
+
+    逐条独立合成(引擎单次上限 2048 帧 ≈164s,全量连读会超;逐条也让超时
+    控制有界)→ 按播放顺序拼接、段间插 SEGMENT_GAP_S 静音 → 整体编码 MP3
+    (单声道 24kHz 48kbps,引擎原生 24kHz 不升采样,全量 ≈1MB/天)。任一
+    条目失败返回 None(单段缺条用户无从察觉,全条成功才产出,App 整批回落
+    系统 TTS);ffmpeg 缺失(本地调试机常见)时保留 wav(App 可直接播,
+    CI runner 预装 ffmpeg)。
     """
     talker, codec = models
     ffmpeg = shutil.which("ffmpeg")
-    ffprobe = shutil.which("ffprobe")
     if not ffmpeg:
         print("[TTS][WARN] 本机无 ffmpeg,产物保留 wav(App 可直接播,CI runner 预装 ffmpeg)",
               file=sys.stderr)
 
-    entries = []
-    for index, (title, text) in enumerate(playlist):
-        wav_path = audio_dir / f"entry-{index:02d}.wav"
-        try:
-            # 文本经 stdin 传入(避免命令行转义/长度问题);固定 --seed 保证
-            # 同日重跑同文本产物一致。超时视作单条失败,跳过不拦整批。
-            synth = _run(
-                [str(binary), "--model", str(talker), "--codec", str(codec),
-                 "--speaker", voice, "--lang", TTS_LANG, "--seed", TTS_SEED,
-                 "-o", str(wav_path)],
-                input=text.encode("utf-8"), timeout=SYNTH_TIMEOUT_S,
-            )
-            if synth.returncode != 0 or not wav_path.is_file():
-                raise RuntimeError(
-                    f"exit={synth.returncode}: "
-                    f"{(synth.stderr or b'').decode(errors='replace')[-300:]}")
-        except Exception as e:
-            print(f"[TTS][WARN] 第 {index} 条合成失败,跳过:{type(e).__name__}: {e}",
-                  file=sys.stderr)
-            wav_path.unlink(missing_ok=True)
-            continue
+    seg_paths = []
+    try:
+        for index, (title, text) in enumerate(playlist):
+            wav_path = audio_dir / f"seg-{index:02d}.wav"
+            try:
+                # 文本经 stdin 传入(避免命令行转义/长度问题);固定 --seed 保证
+                # 同日重跑同文本产物一致。超时/失败视作整批失败。
+                synth = _run(
+                    [str(binary), "--model", str(talker), "--codec", str(codec),
+                     "--speaker", voice, "--lang", TTS_LANG, "--seed", TTS_SEED,
+                     "-o", str(wav_path)],
+                    input=text.encode("utf-8"), timeout=SYNTH_TIMEOUT_S,
+                )
+                if synth.returncode != 0 or not wav_path.is_file():
+                    raise RuntimeError(
+                        f"exit={synth.returncode}: "
+                        f"{(synth.stderr or b'').decode(errors='replace')[-300:]}")
+            except Exception as e:
+                print(f"[TTS][WARN] 第 {index} 条({title[:24]})合成失败,本批不产音频:"
+                      f"{type(e).__name__}: {e}", file=sys.stderr)
+                return None
+            seg_paths.append(wav_path)
+            if index < len(playlist) - 1:
+                gap_path = audio_dir / f"gap-{index:02d}.wav"
+                _write_silence(gap_path, SEGMENT_GAP_S)
+                seg_paths.append(gap_path)
 
-        final_path = wav_path
+        # 时长直接从拼接后 wav 的帧数算(精确且不依赖 ffprobe)
+        merged_wav = audio_dir / "broadcast.wav"
+        duration_s = _concat_wavs(seg_paths, merged_wav)
+
+        final_path = merged_wav
         if ffmpeg:
-            mp3_path = audio_dir / f"entry-{index:02d}.mp3"
+            mp3_path = audio_dir / "broadcast.mp3"
             enc = subprocess.run(
-                [ffmpeg, "-y", "-loglevel", "error", "-i", str(wav_path),
+                [ffmpeg, "-y", "-loglevel", "error", "-i", str(merged_wav),
                  "-ac", "1", "-ar", "24000", "-b:a", "48k", str(mp3_path)],
                 capture_output=True, text=True,
             )
             if enc.returncode != 0:
-                print(f"[TTS][WARN] 第 {index} 条 MP3 编码失败,保留 wav:{enc.stderr.strip()}",
-                      file=sys.stderr)
+                print(f"[TTS][WARN] MP3 编码失败,保留 wav:{enc.stderr.strip()}", file=sys.stderr)
             else:
-                wav_path.unlink(missing_ok=True)
+                merged_wav.unlink(missing_ok=True)
                 final_path = mp3_path
 
         if not final_path.exists() or final_path.stat().st_size == 0:
-            print(f"[TTS][WARN] 第 {index} 条产物缺失,跳过", file=sys.stderr)
-            continue
-        entries.append({
-            "file": f"{rel_prefix}/{final_path.name}",
-            "title": title,
-            "durationMs": _duration_ms(final_path, ffprobe),
-            "bytes": final_path.stat().st_size,
-        })
-    return entries
+            print("[TTS][WARN] 单段音频产物缺失", file=sys.stderr)
+            return None
+        return f"{rel_prefix}/{final_path.name}", int(duration_s * 1000), final_path.stat().st_size
+    finally:
+        # 分段/静音临时文件不落盘推送(overlay 会推 out/ 全量)
+        for pattern in ("seg-*.wav", "gap-*.wav"):
+            for p in audio_dir.glob(pattern):
+                p.unlink(missing_ok=True)
 
 
 def main():
@@ -325,12 +351,13 @@ def main():
         print("[TTS][WARN] GGUF 模型未能就绪,跳过语音速报", file=sys.stderr)
         return 0
 
-    print(f"[TTS] 合成 {len(playlist)} 条(voice={voice},输出 {audio_dir})…")
-    entries = _synthesize_all(binary, models, playlist, voice, audio_dir, f"audio/{date_dir}")
-    if not entries:
-        print("[TTS][WARN] 全部条目合成失败,本批不写 latest_audio(App 回落系统 TTS)",
+    print(f"[TTS] 合成 {len(playlist)} 条并拼接单段(voice={voice},输出 {audio_dir})…")
+    merged = _synthesize_merged(binary, models, playlist, voice, audio_dir, f"audio/{date_dir}")
+    if merged is None:
+        print("[TTS][WARN] 音频未能产出,本批不写 latest_audio(App 回落系统 TTS)",
               file=sys.stderr)
         return 0
+    audio_file, duration_ms, size_bytes = merged
 
     # 读-改-写 index.json:只在成功后追加 latest_audio,格式与 fetch_data.write_index
     # 一致(ensure_ascii=False + indent=2)
@@ -338,12 +365,14 @@ def main():
         "generatedAt": generated_at,
         "voice": voice,
         "model": "qwen3-tts-0.6b-customvoice",
-        "entries": entries,
+        "file": audio_file,
+        "title": "今日速报",
+        "durationMs": duration_ms,
+        "bytes": size_bytes,
     }
     index_path.write_text(json.dumps(index, ensure_ascii=False, indent=2), encoding="utf-8")
-    total_mb = sum(e["bytes"] for e in entries) / 1024 / 1024
-    print(f"[TTS] 完成:{len(entries)}/{len(playlist)} 条,{total_mb:.2f}MB,"
-          f"latest_audio 已写入 index.json")
+    print(f"[TTS] 完成:单段全量 {len(playlist)} 条内容,{duration_ms / 1000:.0f}s,"
+          f"{size_bytes / 1024 / 1024:.2f}MB,latest_audio 已写入 index.json")
     return 0
 
 

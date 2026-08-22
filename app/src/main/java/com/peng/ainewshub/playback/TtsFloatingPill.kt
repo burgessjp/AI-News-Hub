@@ -311,11 +311,14 @@ fun TtsFloatingPill(modifier: Modifier = Modifier) {
                         modifier = Modifier.padding(start = 16.dp, end = 6.dp, top = 5.dp, bottom = 5.dp)
                     ) {
                         Column(modifier = Modifier.widthIn(max = PillTextMaxWidth)) {
-                            Text(
-                                text = stringResource(R.string.tts_playing_index, playback.index + 1, playback.total),
-                                style = AppText.caption,
-                                color = cs.onSurfaceVariant
-                            )
+                            // 单条播放(总览单段音频)没有序号与上一条/下一条概念,只显标题
+                            if (playback.total > 1) {
+                                Text(
+                                    text = stringResource(R.string.tts_playing_index, playback.index + 1, playback.total),
+                                    style = AppText.caption,
+                                    color = cs.onSurfaceVariant
+                                )
+                            }
                             Text(
                                 text = playback.title.ifBlank { stringResource(R.string.tts_notification_title) },
                                 style = AppText.bodyCompact,
@@ -324,11 +327,13 @@ fun TtsFloatingPill(modifier: Modifier = Modifier) {
                                 overflow = TextOverflow.Ellipsis
                             )
                         }
-                        PillIconButton(
-                            icon = R.drawable.ic_tts_prev,
-                            label = stringResource(R.string.tts_action_prev),
-                            tint = cs.onSurfaceVariant
-                        ) { TtsPlaybackService.prev(context) }
+                        if (playback.total > 1) {
+                            PillIconButton(
+                                icon = R.drawable.ic_tts_prev,
+                                label = stringResource(R.string.tts_action_prev),
+                                tint = cs.onSurfaceVariant
+                            ) { TtsPlaybackService.prev(context) }
+                        }
                         PillIconButton(
                             icon = if (playback.paused) R.drawable.ic_tts_play else R.drawable.ic_tts_pause,
                             label = stringResource(
@@ -336,11 +341,13 @@ fun TtsFloatingPill(modifier: Modifier = Modifier) {
                             ),
                             tint = cs.onSurface
                         ) { TtsPlaybackService.playPause(context) }
-                        PillIconButton(
-                            icon = R.drawable.ic_tts_next,
-                            label = stringResource(R.string.tts_action_next),
-                            tint = cs.onSurfaceVariant
-                        ) { TtsPlaybackService.next(context) }
+                        if (playback.total > 1) {
+                            PillIconButton(
+                                icon = R.drawable.ic_tts_next,
+                                label = stringResource(R.string.tts_action_next),
+                                tint = cs.onSurfaceVariant
+                            ) { TtsPlaybackService.next(context) }
+                        }
                         PillIconButton(
                             icon = R.drawable.ic_tts_stop,
                             label = stringResource(R.string.tts_widget_close),

@@ -101,7 +101,7 @@ news-hub-data 分支/
 
 `latest_overview` 是**今日总览**(流水线预生成的跨源综合分析,详见下文「今日总览 latest_overview」)。App 首页「总览」tab 直接读这个字段,不再端侧调 AI。
 
-`latest_audio` 是**语音速报预生成音频清单**(流水线 `tts_broadcast.py` 用 Qwen3-TTS 按当日总览预合成的 MP3,详见下文「语音速报音频」章节)。App「语音速报」优先流式播放这些音频,清单缺失/批次滞后时回落系统 TTS。
+`latest_audio` 是**语音速报预生成音频描述**(流水线 `tts_broadcast.py` 用 Qwen3-TTS 按当日总览预合成的单段全量 MP3,详见下文「语音速报音频」章节)。App「语音速报」优先流式播放该音频,描述缺失/批次滞后时回落系统 TTS。
 
 按日期回看的数据走根级独立索引文件(不在 index.json 里,按需拉取):`history.json`(摘要历史,`{源名: {日期: relpath}}`,详见「按日期取历史快照」)与 `overview_history.json`(总览归档,`{日期: relpath}`,详见「历史总览归档」)。
 
@@ -336,7 +336,7 @@ print(hn['items'][0]['title'])
 
 ## 语音速报音频(audio/ 目录 + index.json 顶层 latest_audio 字段)
 
-App「语音速报」的预生成神经语音:流水线(`scripts/tts_broadcast.py`,fetch 与 push 之间)按当日 `latest_overview` 内容(综述条 + Top10,与 App 端播放列表拼装规则一致)用 Qwen3-TTS(Qwen3-TTS-12Hz-0.6B-CustomVoice,Apache-2.0,音色 serena,经 qwentts.cpp 纯 C++ 推理)合成 MP3 落盘 `audio/<YYYY-MM-DD>/entry-NN.mp3`(北京时间),并把清单写进 `index.json` 顶层即时字段 `latest_audio`:
+App「语音速报」的预生成神经语音:流水线(`scripts/tts_broadcast.py`,fetch 与 push 之间)按当日 `latest_overview` 内容(综述条 + Top10,与 App 端播放列表拼装规则一致)用 Qwen3-TTS(Qwen3-TTS-12Hz-0.6B-CustomVoice,Apache-2.0,音色 serena,经 qwentts.cpp 纯 C++ 推理)逐条合成后拼接为**单段全量 MP3**(段间 0.6s 静音)落盘 `audio/<YYYY-MM-DD>/broadcast.mp3`(北京时间),并把描述写进 `index.json` 顶层即时字段 `latest_audio`:
 
 ```json
 {
@@ -344,9 +344,10 @@ App「语音速报」的预生成神经语音:流水线(`scripts/tts_broadcast.p
     "generatedAt": 1784073612000,
     "voice": "serena",
     "model": "qwen3-tts-0.6b-customvoice",
-    "entries": [
-      {"file": "audio/2026-08-15/entry-00.mp3", "title": "今日速报", "durationMs": 25280, "bytes": 202796}
-    ]
+    "file": "audio/2026-08-15/broadcast.mp3",
+    "title": "今日速报",
+    "durationMs": 176000,
+    "bytes": 1058000
   }
 }
 ```
@@ -355,15 +356,16 @@ App「语音速报」的预生成神经语音:流水线(`scripts/tts_broadcast.p
 |------|------|
 | `generatedAt` | 与同批 `latest_overview.generatedAt` **严格同值**(音频按总览文本合成,批次绑定;App 比对判定新鲜度,不一致回落系统 TTS) |
 | `voice` / `model` | 音色名 / 模型名(信息字段) |
-| `entries[].file` | 仓库根相对路径,走 gitcode raw API 直读(见上「文件直链」) |
-| `entries[].title` | 条目标题(综述条为「今日速报」,其余为条目标题;清单参考值,App 端播放列表仍用本地化标题) |
-| `entries[].durationMs` | 音频时长,毫秒(ffprobe 预读) |
-| `entries[].bytes` | 文件大小,字节 |
+| `file` | 单段全量音频的仓库根相对路径,走 gitcode raw API 直读(见上「文件直链」) |
+| `title` | 音频标题(清单参考值,App 端仍用本地化标题) |
+| `durationMs` | 音频时长,毫秒(流水线按拼接 wav 帧数预读) |
+| `bytes` | 文件大小,字节 |
 
-- **MP3 规格**:单声道 24kHz 48kbps(≈0.36MB/分钟;11 条全量约 1.8MB/天,引擎原生 24kHz 输出不升采样)。
-- **同日覆盖**:文件名按播放列表序号固定编号(entry-00 起,综述条存在时 00 = 综述),同日多批次天然覆盖不累积;清单「成功才写」,部分条目合成失败时仅写成功的条目(条数与总览条目数不符时 App 整批回落系统 TTS)。
+- **MP3 规格**:单声道 24kHz 48kbps(≈0.36MB/分钟;全段约 3 分钟 ≈1MB/天,引擎原生 24kHz 输出不升采样)。
+- **单段全量**:逐条合成(规避引擎单次 2048 帧上限,超时控制有界)后拼接为一段,App 以单条播放(无上一条/下一条概念);**全条成功才写**——任一条目合成失败当批不写 `latest_audio`(单段缺条用户无从察觉,App 整批回落系统 TTS,下次批次自愈)。
+- **同日覆盖**:文件名恒为 `broadcast.mp3`,同日多批次天然覆盖不累积;分段/静音临时文件(seg-*.wav/gap-*.wav)不出流水线。
 - **保留 14 天**:`audio/` 下过期日期目录由 `push_data.py` 在 overlay 后显式删除(overlay 只增不删),仓库工作区稳定 ≈34MB。
-- **失败语义**:语音合成任何失败(依赖缺失/模型下载失败/单条失败)只告警不阻断推送,当次不写 `latest_audio`(App 回落系统 TTS,下次批次自愈)。
+- **失败语义**:语音合成任何失败(引擎/模型缺失/单条失败/整阶段异常)只告警不阻断推送,当次不写 `latest_audio`(App 回落系统 TTS,下次批次自愈)。
 
 ## 单个数据文件的通用结构
 
