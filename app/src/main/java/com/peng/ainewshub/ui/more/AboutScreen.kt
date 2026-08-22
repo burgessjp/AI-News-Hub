@@ -114,11 +114,15 @@ fun AboutScreen(
 
     // 弹窗内直装状态机:下载中(进度,null 为不确定进度)→ 完成(已下载文件)/失败 → 安装。
     // 进程重建丢失状态时回退到「待下载」重来即可,APK 落缓存目录会先清旧再写,无残留问题
+    //
+    // downloading 必须是独立可观察状态,不能由 Job.isActive 派生:下载结束时只写
+    // downloadedApk/downloadFailed,而弹窗 when 在「下载中」分支短路、从未读过这两个
+    // 状态 → 不订阅也就不重组,界面会永远停在「下载中 100%」,安装/重试按钮永不出现
     var downloadJob by remember { mutableStateOf<Job?>(null) }
+    var downloading by remember { mutableStateOf(false) }
     var downloadProgress by remember { mutableStateOf<Float?>(null) }
     var downloadFailed by remember { mutableStateOf(false) }
     var downloadedApk by remember { mutableStateOf<File?>(null) }
-    val downloading = downloadJob?.isActive == true
 
     fun startDownload(info: UpdateChecker.UpdateInfo) {
         // Release 未挂 APK 资产(异常情况):直接回网页兜底
@@ -130,6 +134,7 @@ fun AboutScreen(
         downloadFailed = false
         downloadedApk = null
         downloadProgress = null
+        downloading = true
         downloadJob = scope.launch {
             try {
                 downloadedApk = UpdateDownloader.download(context, url, info.version) { read, total ->
@@ -139,6 +144,9 @@ fun AboutScreen(
                 throw e
             } catch (_: Exception) {
                 downloadFailed = true
+            } finally {
+                // 结束(成功/失败/取消)统一翻牌,驱动弹窗离开「下载中」分支
+                downloading = false
             }
         }
     }
