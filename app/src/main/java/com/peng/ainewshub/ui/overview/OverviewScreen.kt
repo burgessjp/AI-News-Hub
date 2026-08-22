@@ -149,34 +149,31 @@ fun OverviewScreen(
                         onClick = {
                             val digest = (state as? OverviewState.Success)?.digest ?: return@IconButton
                             scope.launch {
-                                // 新鲜度(generatedAt 对齐)在 Repository 内判定。预生成音频是
-                                // 单段全量(综述 + Top10 连读):一条 TtsEntry 承载整段,text =
-                                // 全量拼接(音频播放失败回落系统 TTS 时朗读同一内容);清单
-                                // 不可用回落本地播放列表(分段系统 TTS)。
+                                // 新鲜度(generatedAt 对齐)在 Repository 内判定。总览播报恒为
+                                // 单条整段(综述 + Top10 连读):text = 全量拼接;预生成音频可用
+                                // 时挂 audioUrl 走 CDN 流播,否则同一段文本交系统 TTS 整段朗读
+                                // (清单缺失/批次滞后时 Toast 提示)—— 两条通道听感一致,浮窗/
+                                // 通知栏均为单条形态(无上一条/下一条)。
                                 val audio = runCatching {
                                     broadcastRepo.load(overviewGeneratedAt = digest.generatedAt)
                                 }.getOrNull()
-                                val fallback = buildOverviewPlaylist(context, digest)
-                                val entries = if (audio != null) {
-                                    listOf(
-                                        TtsEntry(
-                                            id = "overview-broadcast",
-                                            title = AppLocale.wrap(context)
-                                                .getString(R.string.tts_playlist_overview_title),
-                                            text = fallback.joinToString("\n") { it.text },
-                                            audioUrl = ArchiveHttpClient.audioUrl(audio.file),
-                                            durationMs = audio.durationMs
-                                        )
-                                    )
-                                } else {
+                                val entry = TtsEntry(
+                                    id = "overview-broadcast",
+                                    title = AppLocale.wrap(context)
+                                        .getString(R.string.tts_playlist_overview_title),
+                                    text = buildOverviewPlaylist(context, digest)
+                                        .joinToString("\n") { it.text },
+                                    audioUrl = audio?.let { ArchiveHttpClient.audioUrl(it.file) },
+                                    durationMs = audio?.durationMs ?: 0L
+                                )
+                                if (audio == null) {
                                     Toast.makeText(
                                         context,
                                         AppLocale.wrap(context).getString(R.string.tts_audio_unavailable),
                                         Toast.LENGTH_SHORT
                                     ).show()
-                                    fallback
                                 }
-                                startBriefing(entries)
+                                startBriefing(listOf(entry))
                             }
                         },
                         enabled = state is OverviewState.Success
@@ -685,8 +682,10 @@ private fun formatFetchedAt(context: Context, ms: Long): String =
     }.getOrDefault(context.getString(R.string.overview_time_unknown))
 
 /**
- * 总览速报播放列表:首条 = 跨源综述(有则朗读,无则跳过),其后 = Top10 各条
- * (标题 + AI 点评)。在 Composable 点击回调里调用(词条随语言取词)。
+ * 总览速报全量文本的分段构造:首段 = 跨源综述(有则朗读,无则跳过),其后 =
+ * Top10 各条(标题 + AI 点评)。调用侧 joinToString 拼为**单条整段**交播放服务
+ * (预生成音频与系统 TTS 兜底两通道共用,拼装规则与流水线 tts_broadcast.py 一致,
+ * 两侧必须同步改动)。在 Composable 点击回调里调用(词条随语言取词)。
  */
 private fun buildOverviewPlaylist(context: Context, digest: OverviewDigest): List<TtsEntry> {
     val overviewTitle = AppLocale.wrap(context).getString(R.string.tts_playlist_overview_title)
