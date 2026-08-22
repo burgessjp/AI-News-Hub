@@ -2,38 +2,44 @@
 """语音速报:把今日总览(latest_overview)预合成为播报音频并回写 index.json 清单。
 
 流水线位置:fetch_data.py 之后、push_data.py 之前(pipeline.sh 步骤 2/3)。
-App 端「语音速报」优先播放这里的预生成音频(MOSS-TTS-Nano 神经语音,自然度
+App 端「语音速报」优先播放这里的预生成音频(Qwen3-TTS 神经语音,自然度
 远超系统 TTS);音频清单缺失 / 批次滞后时 App 自动回落系统 TTS,互不影响。
 
 产物:
-  - out/audio/<YYYY-MM-DD>/entry-NN.mp3  单声道 48kHz 64kbps(ffmpeg 缺失时保留
+  - out/audio/<YYYY-MM-DD>/entry-NN.mp3  单声道 24kHz 48kbps(ffmpeg 缺失时保留
     wav);固定文件名,同日多批次天然覆盖不累积;
   - out/index.json 顶层追加 latest_audio(即时字段,≈1.5KB 有界):
     { generatedAt(对齐 latest_overview.generatedAt,App 据此判定新鲜度),
       voice, model, entries: [{file, title, durationMs, bytes}] }
 
 失败语义(对齐 trend_keywords.write_trends「失败只告警不阻断推送」):
-  依赖缺失(本地未装 TTS 依赖)/ overview 缺失 / 单条合成失败 / 整阶段异常
+  引擎/模型缺失且自举失败 / overview 缺失 / 单条合成失败 / 整阶段异常
   —— 一律告警 + exit 0;index.json 不写 latest_audio → App 回落系统 TTS,
   下个批次自愈。任何路径都不抛非零(pipeline.sh set -e 下不拦推送)。
 
-资产自举(仓库零大二进制,全部动态获取):
-  - MOSS_TTS_NANO_DIR      直接指向已有 MOSS-TTS-Nano 克隆(本地复用已下载模型)
-  - 否则用 third_party/MOSS-TTS-Nano:缺代码标记文件 onnx_tts_runtime.py 时
-    git 浅拉固定 SHA(MOSS_TTS_NANO_REF 可覆盖)。CI 以 actions/cache 缓存整个
-    目录(key 绑同一 SHA)—— 不能只缓存 models/ 子目录,cache 恢复会让 clone
-    目标目录非空,代码永远补不上,TTS 自缓存命中之日起静默失效;
-  - 模型两件套(728MB)由 OnnxTtsRuntime 首次初始化经 huggingface_hub 自动
-    下载至 <MOSS_REPO>/models(仅首次;HF_ENDPOINT=https://hf-mirror.com 可镜像)。
+引擎(Qwen3-TTS,qwentts.cpp,纯 C++ 无 Python ML 依赖):
+  - 模型  Qwen3-TTS-12Hz-0.6B-CustomVoice(Apache-2.0,预置音色),GGUF
+    两件套 ≈1.2GB:talker(924MB Q8_0)+ tokenizer/codec(278MB Q8_0),
+    24kHz 单声道输出,文本规范化内建(数字/符号原生处理);
+  - 工具  ServeurpersoCom/qwentts.cpp(MIT,GGML C++17),CPU/CUDA/Metal
+    通用;固定 --seed 保证同日重跑产物稳定;
+  - 资产自举(仓库零大二进制):third_party/tts-engine/ 下按需克隆代码
+    (pin SHA)+ cmake 构建 + curl 下载 GGUF;CI 以 actions/cache 缓存整个
+    目录(key 绑同一 SHA)。文件级判在位(二进制/GGUF 各自查),缓存部分
+    恢复也能补齐缺失部分。
 
 用法:
   python3 scripts/tts_broadcast.py --out-dir out
 
 环境变量:
   AI_NEWS_HUB_TTS_DISABLE=1  整体跳过
-  AI_NEWS_HUB_TTS_VOICE      音色,默认 Yuewen(备选 Junhao/Zhiming/Weiguo/Xiaoyu/Lingyu)
-  MOSS_TTS_NANO_DIR          已有 MOSS-TTS-Nano 克隆路径
-  MOSS_TTS_NANO_REF          代码库 pin(SHA),默认下方 DEFAULT_MOSS_REF
+  AI_NEWS_HUB_TTS_VOICE      音色,默认 serena(备选 vivian/uncle_fu/dylan
+                             北京话/eric 四川话/ryan/aiden/ono_anna/sohee)
+  QWENTTS_DIR                已有 qwentts.cpp 检出路径(含 build/qwen-tts)
+  QWENTTS_MODELS_DIR         已有 GGUF 目录
+  QWENTTS_REF                代码库 pin(SHA),默认下方 DEFAULT_QWENTTS_REF
+  QWENTTS_HF_HOST            GGUF 下载源(默认 huggingface.co,失败自动换
+                             hf-mirror.com 镜像;CI 境外直连,本地可指镜像)
 """
 
 import argparse
@@ -49,50 +55,125 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from common import now_cst
 
-# MOSS-TTS-Nano 代码库 pin:升级时改这里 + .github/workflows/fetch-data.yml 的
-# MOSS_TTS_NANO_REF(缓存 key 绑它,两处不同步会导致缓存与代码版本错配)。
-DEFAULT_MOSS_REF = "cc7bdf19c7639c0870dab22045a33b442760f6be"
-MOSS_REPO_URL = "https://github.com/OpenMOSS/MOSS-TTS-Nano.git"
+# qwentts.cpp 代码库 pin:升级时改这里 + .github/workflows/fetch-data.yml 的
+# QWENTTS_REF(缓存 key 绑它,两处不同步会导致缓存与代码版本错配)。
+DEFAULT_QWENTTS_REF = "a8a7716b530e49fed537c57711247c12fbbb903c"
+QWENTTS_REPO_URL = "https://github.com/ServeurpersoCom/qwentts.cpp.git"
 
-# 代码标记文件:存在即视为克隆完整(clone 条件判它而非目录是否存在,兼容
-# 「models/ 已被 actions/cache 恢复但代码缺失」的缓存场景)。
-CODE_MARKER = "onnx_tts_runtime.py"
+# GGUF 两件套(Serveurperso/Qwen3-TTS-GGUF,Q8_0;talker 924MB + codec 278MB)
+TALKER_GGUF = "qwen-talker-0.6b-customvoice-Q8_0.gguf"
+CODEC_GGUF = "qwen-tokenizer-12hz-Q8_0.gguf"
+GGUF_HOSTS = [
+    "https://huggingface.co/Serveurperso/Qwen3-TTS-GGUF/resolve/main",
+    "https://hf-mirror.com/Serveurperso/Qwen3-TTS-GGUF/resolve/main",
+]
 
-DEFAULT_VOICE = "Yuewen"
+# CustomVoice 预置音色(小写);--lang 取 GGUF 元数据里的语言名
+DEFAULT_VOICE = "serena"
+TTS_LANG = "Chinese"
+# 固定采样种子:同日多批次重跑时同文本产物一致,manifest 字节数稳定
+TTS_SEED = "1793"
+# 单条合成上限(秒):CI 4 核 CPU 上 RTF≈1~3,百字条目最坏 ~2 分钟,长综述留足余量
+SYNTH_TIMEOUT_S = 900
+
+ENGINE_ROOT = Path(__file__).resolve().parent.parent / "third_party" / "tts-engine"
 
 
-def _ensure_moss_repo():
-    """定位/自举 MOSS-TTS-Nano 代码库,返回仓库 Path;无法就绪返回 None。
+def _run(cmd, **kwargs):
+    """subprocess.run 包装:统一 text=False、check 由调用方判定。"""
+    return subprocess.run(cmd, capture_output=True, **kwargs)
 
-    优先级:MOSS_TTS_NANO_DIR 指定路径 > third_party/MOSS-TTS-Nano(缺代码
-    标记时按 pin SHA 浅拉)。任何失败由调用方的整阶段兜底捕获(告警 exit 0)。
+
+def _clone_pinned(url, ref, dest):
+    """按 pin SHA 浅拉代码库到 dest(容忍半初始化目录重试,remote 冲突兜底)。"""
+    dest.mkdir(parents=True, exist_ok=True)
+    _run(["git", "init", "-q", str(dest)], check=True)
+    add = _run(["git", "-C", str(dest), "remote", "add", "origin", url])
+    if add.returncode != 0:
+        _run(["git", "-C", str(dest), "remote", "set-url", "origin", url], check=True)
+    _run(["git", "-C", str(dest), "fetch", "--depth", "1", "origin", ref], check=True)
+    _run(["git", "-C", str(dest), "checkout", "--quiet", "FETCH_HEAD"], check=True)
+
+
+def _ensure_binary():
+    """定位/构建 qwen-tts 二进制,返回其 Path;无法就绪返回 None。
+
+    QWENTTS_DIR 指定路径优先(需已含 build/qwen-tts);否则用
+    third_party/tts-engine/qwentts.cpp,缺代码/缺二进制时按 pin 克隆并
+    cmake 构建(构建依赖 cmake + C++ 编译器,缺失即告警跳过,CI 与本地
+    均已预装)。文件级判在位:缓存部分恢复(如有)也能各补各的。
     """
-    env_dir = os.environ.get("MOSS_TTS_NANO_DIR", "").strip()
-    if env_dir:
-        repo = Path(env_dir).expanduser().resolve()
-        if not (repo / CODE_MARKER).is_file():
-            print(f"[TTS][WARN] MOSS_TTS_NANO_DIR 缺代码标记 {CODE_MARKER}:{repo},跳过语音速报",
+    env_dir = os.environ.get("QWENTTS_DIR", "").strip()
+    repo = Path(env_dir).expanduser().resolve() if env_dir else ENGINE_ROOT / "qwentts.cpp"
+    binary = repo / "build" / "qwen-tts"
+    if binary.is_file() and os.access(binary, os.X_OK):
+        return binary
+
+    if not (repo / "CMakeLists.txt").is_file():
+        ref = os.environ.get("QWENTTS_REF", "").strip() or DEFAULT_QWENTTS_REF
+        print(f"[TTS] 浅拉 qwentts.cpp @ {ref} → {repo}")
+        try:
+            _clone_pinned(QWENTTS_REPO_URL, ref, repo)
+            # ggml 是子模块(ServeurpersoCom/ggml fork),必须一并检出才能构建
+            _run(["git", "-C", str(repo), "submodule", "update", "--init", "ggml"], check=True)
+        except Exception as e:
+            print(f"[TTS][WARN] qwentts.cpp 克隆失败:{type(e).__name__}: {e},跳过语音速报",
                   file=sys.stderr)
             return None
-        return repo
 
-    repo = Path(__file__).resolve().parent.parent / "third_party" / "MOSS-TTS-Nano"
-    if (repo / CODE_MARKER).is_file():
-        return repo
+    cmake = shutil.which("cmake")
+    if not cmake:
+        print("[TTS][WARN] 本机无 cmake,无法构建 qwen-tts,跳过语音速报", file=sys.stderr)
+        return None
+    jobs = str(max(1, (os.cpu_count() or 4)))
+    print(f"[TTS] 构建 qwen-tts(cmake -j{jobs})…")
+    try:
+        cfg = _run([cmake, "-S", str(repo), "-B", str(repo / "build"),
+                    "-DCMAKE_BUILD_TYPE=Release"])
+        if cfg.returncode != 0:
+            raise RuntimeError(cfg.stderr.decode(errors="replace")[-500:])
+        build = _run([cmake, "--build", str(repo / "build"),
+                      "--config", "Release", "-j", jobs])
+        if build.returncode != 0:
+            raise RuntimeError(build.stderr.decode(errors="replace")[-500:])
+    except Exception as e:
+        print(f"[TTS][WARN] qwen-tts 构建失败:{e},跳过语音速报", file=sys.stderr)
+        return None
+    if not binary.is_file():
+        print(f"[TTS][WARN] 构建成功但未找到 {binary},跳过语音速报", file=sys.stderr)
+        return None
+    return binary
 
-    ref = os.environ.get("MOSS_TTS_NANO_REF", "").strip() or DEFAULT_MOSS_REF
-    print(f"[TTS] 浅拉 MOSS-TTS-Nano @ {ref} → {repo}")
-    repo.mkdir(parents=True, exist_ok=True)
-    subprocess.run(["git", "init", "-q", str(repo)], check=True)
-    # remote add 在目录半初始化的重试场景会因 origin 已存在而失败,set-url 兜底
-    add = subprocess.run(["git", "-C", str(repo), "remote", "add", "origin", MOSS_REPO_URL],
-                         capture_output=True, text=True)
-    if add.returncode != 0:
-        subprocess.run(["git", "-C", str(repo), "remote", "set-url", "origin", MOSS_REPO_URL],
-                       check=True)
-    subprocess.run(["git", "-C", str(repo), "fetch", "--depth", "1", "origin", ref], check=True)
-    subprocess.run(["git", "-C", str(repo), "checkout", "--quiet", "FETCH_HEAD"], check=True)
-    return repo
+
+def _download_gguf(name, dest_dir):
+    """下载单个 GGUF(断点续传,主源失败换 hf-mirror 镜像),成功返回 True。"""
+    target = dest_dir / name
+    for host in ([os.environ.get("QWENTTS_HF_HOST", "").strip()] if
+                 os.environ.get("QWENTTS_HF_HOST", "").strip() else GGUF_HOSTS):
+        url = f"{host.rstrip('/')}/{name}"
+        for attempt in range(3):
+            print(f"[TTS] 下载 {name} ← {host}(第 {attempt + 1} 次)…")
+            dl = _run(["curl", "-sL", "--retry", "5", "--retry-delay", "3", "-C", "-",
+                       "--max-time", "3600", "-o", str(target), url])
+            if dl.returncode == 0 and target.is_file() and target.stat().st_size > 0:
+                return True
+        print(f"[TTS][WARN] {url} 下载失败,尝试下一源", file=sys.stderr)
+    target.unlink(missing_ok=True)
+    return False
+
+
+def _ensure_models():
+    """定位/下载 GGUF 两件套,返回 (talker, codec);无法就绪返回 None。"""
+    env_dir = os.environ.get("QWENTTS_MODELS_DIR", "").strip()
+    models_dir = Path(env_dir).expanduser().resolve() if env_dir else ENGINE_ROOT / "models"
+    models_dir.mkdir(parents=True, exist_ok=True)
+    talker, codec = models_dir / TALKER_GGUF, models_dir / CODEC_GGUF
+    for name, path in ((TALKER_GGUF, talker), (CODEC_GGUF, codec)):
+        if path.is_file() and path.stat().st_size > 0:
+            continue
+        if not _download_gguf(name, models_dir):
+            return None
+    return talker, codec
 
 
 def _build_playlist(overview):
@@ -137,12 +218,14 @@ def _duration_ms(path, ffprobe):
     return 0
 
 
-def _synthesize_all(runtime, playlist, voice, audio_dir, rel_prefix):
+def _synthesize_all(binary, models, playlist, voice, audio_dir, rel_prefix):
     """逐条合成 + 编码,返回 latest_audio.entries;单条失败跳过该条(告警)。
 
-    MP3 规格:单声道 48kHz 64kbps(≈0.48MB/分钟,11 条全量 ≈2.4MB/天)。
-    ffmpeg 缺失(本地调试机常见)时保留 wav,时长用 wave 模块兜底读取。
+    MP3 规格:单声道 24kHz 48kbps(≈0.36MB/分钟,11 条全量 ≈1.8MB/天;
+    引擎原生输出即 24kHz,无需升采样)。ffmpeg 缺失(本地调试机常见)时
+    保留 wav,时长用 wave 模块兜底读取。
     """
+    talker, codec = models
     ffmpeg = shutil.which("ffmpeg")
     ffprobe = shutil.which("ffprobe")
     if not ffmpeg:
@@ -153,11 +236,18 @@ def _synthesize_all(runtime, playlist, voice, audio_dir, rel_prefix):
     for index, (title, text) in enumerate(playlist):
         wav_path = audio_dir / f"entry-{index:02d}.wav"
         try:
-            # 长文本自动按 75 token 分块 + 块间插静音(synthesize 内建),无需外层切分
-            runtime.synthesize(
-                text=text, voice=voice, output_audio_path=str(wav_path),
-                streaming=False, sample_mode="fixed",
+            # 文本经 stdin 传入(避免命令行转义/长度问题);固定 --seed 保证
+            # 同日重跑同文本产物一致。超时视作单条失败,跳过不拦整批。
+            synth = _run(
+                [str(binary), "--model", str(talker), "--codec", str(codec),
+                 "--speaker", voice, "--lang", TTS_LANG, "--seed", TTS_SEED,
+                 "-o", str(wav_path)],
+                input=text.encode("utf-8"), timeout=SYNTH_TIMEOUT_S,
             )
+            if synth.returncode != 0 or not wav_path.is_file():
+                raise RuntimeError(
+                    f"exit={synth.returncode}: "
+                    f"{(synth.stderr or b'').decode(errors='replace')[-300:]}")
         except Exception as e:
             print(f"[TTS][WARN] 第 {index} 条合成失败,跳过:{type(e).__name__}: {e}",
                   file=sys.stderr)
@@ -169,7 +259,7 @@ def _synthesize_all(runtime, playlist, voice, audio_dir, rel_prefix):
             mp3_path = audio_dir / f"entry-{index:02d}.mp3"
             enc = subprocess.run(
                 [ffmpeg, "-y", "-loglevel", "error", "-i", str(wav_path),
-                 "-ac", "1", "-ar", "48000", "-b:a", "64k", str(mp3_path)],
+                 "-ac", "1", "-ar", "24000", "-b:a", "48k", str(mp3_path)],
                 capture_output=True, text=True,
             )
             if enc.returncode != 0:
@@ -192,7 +282,7 @@ def _synthesize_all(runtime, playlist, voice, audio_dir, rel_prefix):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="语音速报:总览预合成播报音频(MOSS-TTS-Nano)")
+    parser = argparse.ArgumentParser(description="语音速报:总览预合成播报音频(Qwen3-TTS)")
     parser.add_argument("--out-dir", default="out", help="产物根目录(默认 ./out,与 fetch_data 一致)")
     args = parser.parse_args()
 
@@ -227,23 +317,16 @@ def main():
     shutil.rmtree(audio_dir, ignore_errors=True)
     audio_dir.mkdir(parents=True, exist_ok=True)
 
-    repo = _ensure_moss_repo()
-    if repo is None:
+    binary = _ensure_binary()
+    if binary is None:
         return 0
-    sys.path.insert(0, str(repo))
-    try:
-        from onnx_tts_runtime import OnnxTtsRuntime
-    except ImportError as e:
-        print(f"[TTS][WARN] TTS 依赖未安装({e}),跳过语音速报;"
-              f"CI 装 scripts/requirements-tts.txt + torch CPU / WeTextProcessing"
-              f"(见该文件头注释)", file=sys.stderr)
+    models = _ensure_models()
+    if models is None:
+        print("[TTS][WARN] GGUF 模型未能就绪,跳过语音速报", file=sys.stderr)
         return 0
 
     print(f"[TTS] 合成 {len(playlist)} 条(voice={voice},输出 {audio_dir})…")
-    # model_dir 走默认(<repo>/models),缺失自动从 HuggingFace 下载(仅首次)
-    runtime = OnnxTtsRuntime(thread_count=4)
-
-    entries = _synthesize_all(runtime, playlist, voice, audio_dir, f"audio/{date_dir}")
+    entries = _synthesize_all(binary, models, playlist, voice, audio_dir, f"audio/{date_dir}")
     if not entries:
         print("[TTS][WARN] 全部条目合成失败,本批不写 latest_audio(App 回落系统 TTS)",
               file=sys.stderr)
@@ -254,7 +337,7 @@ def main():
     index["latest_audio"] = {
         "generatedAt": generated_at,
         "voice": voice,
-        "model": "moss-tts-nano",
+        "model": "qwen3-tts-0.6b-customvoice",
         "entries": entries,
     }
     index_path.write_text(json.dumps(index, ensure_ascii=False, indent=2), encoding="utf-8")

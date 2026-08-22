@@ -35,13 +35,13 @@ concurrency:
 jobs:
   fetch:
     runs-on: ubuntu-latest
-    timeout-minutes: 35   # 25(抓取+AI+推送)+ 语音速报合成(11 条 2-6 分钟)+ 首次模型下载余量
+    timeout-minutes: 35   # 25(抓取+AI+推送)+ 语音速报合成(4 核 CPU 上 5-15 分钟)+ 首次构建/下载余量
     env:
       TZ: Asia/Shanghai    # 脚本据此把文件名日期/时间统一成北京时间
-      # MOSS-TTS-Nano 代码 pin(语音速报):与 scripts/tts_broadcast.py 的
-      # DEFAULT_MOSS_REF 同源;actions/cache 的 key 绑定它,升级模型改这里 +
-      # 脚本常量两处同步(缓存自动换 key 重新拉取)
-      MOSS_TTS_NANO_REF: cc7bdf19c7639c0870dab22045a33b442760f6be
+      # qwentts.cpp 代码 pin(语音速报):与 scripts/tts_broadcast.py 的
+      # DEFAULT_QWENTTS_REF 同源;actions/cache 的 key 绑定它,升级引擎改这里 +
+      # 脚本常量两处同步(缓存自动换 key 重新拉取/构建)
+      QWENTTS_REF: a8a7716b530e49fed537c57711247c12fbbb903c
 
     steps:
       - uses: actions/checkout@v4
@@ -49,39 +49,25 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          # 钉 3.12:torch 2.7.0 / pynini 2.1.6.post1 的 manylinux wheel 均只到
-          # cp313,'3.x' 漂移到 3.14 即无 wheel 可装,TTS 依赖步骤会整体失败
-          python-version: '3.12'
+          python-version: '3.x'
           cache: pip
-          cache-dependency-path: |
-            scripts/requirements.txt
-            scripts/requirements-tts.txt
+          cache-dependency-path: scripts/requirements.txt
 
       - name: Install dependencies
         run: pip install -r scripts/requirements.txt
 
-      # 语音速报依赖:torch CPU / pynini→WeTextProcessing 的安装姿势有讲究,
-      # 不能并进 requirements 文件(见 scripts/requirements-tts.txt 头注释)。
-      # 顺序固定:pynini 先装(有 manylinux wheel),WeTextProcessing 后装且必须
-      # --no-deps --no-build-isolation —— 顺序错会因构建隔离产出空包;
-      # torch 只为满足 MOSS 模块顶层 import(内置音色路径不实际调用)。
-      - name: Install TTS dependencies
-        run: |
-          pip install -r scripts/requirements-tts.txt
-          pip install setuptools
-          pip install torch==2.7.0 torchaudio==2.7.0 --index-url https://download.pytorch.org/whl/cpu
-          pip install pynini==2.1.6.post1
-          pip install --no-deps --no-build-isolation WeTextProcessing==1.0.4.1
-
-      # 缓存整个克隆(代码 + 728MB 模型):不能只缓存 models/ 子目录 —— cache
-      # 恢复会让 clone 目标目录非空,代码永远补不上。key 绑 pin SHA,同 SHA 秒回,
-      # 升级换 key 全量重建(代码由 tts_broadcast.py 按需自举,模型首次初始化
-      # 自动从 HuggingFace 下载,均无需本步骤处理)
-      - name: Cache MOSS-TTS-Nano (code + models)
+      # 语音速报引擎(qwentts.cpp / Qwen3-TTS GGUF)零 Python 依赖:代码克隆 +
+      # cmake 构建 + GGUF 下载全部由 scripts/tts_broadcast.py 按需自举。这里只
+      # 缓存整个 third_party/tts-engine(源码 + build 二进制 + ≈1.2GB GGUF),
+      # key 绑 pin SHA:同 SHA 秒回,升 SHA 换 key 全量重建;脚本按「二进制 /
+      # GGUF 文件级判在位」补齐缓存缺失部分,不存在 MOSS 方案的目录级陷阱。
+      # 构建需 cmake + g++(ubuntu runner 预装);GGUF 从 huggingface.co 直连
+      # (runner 在境外,主源即成功;脚本内置 hf-mirror 兜底供本地中国网络用)。
+      - name: Cache TTS engine (qwentts.cpp + GGUF models)
         uses: actions/cache@v4
         with:
-          path: third_party/MOSS-TTS-Nano
-          key: moss-tts-${{ env.MOSS_TTS_NANO_REF }}
+          path: third_party/tts-engine
+          key: qwentts-${{ env.QWENTTS_REF }}
 
       - name: Run pipeline (fetch + AI summary + push)
         env:

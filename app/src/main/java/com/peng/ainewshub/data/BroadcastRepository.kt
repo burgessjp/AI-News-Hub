@@ -22,12 +22,12 @@ data class AudioEntry(
 )
 
 /**
- * 语音速报预生成音频清单 —— 流水线 `scripts/tts_broadcast.py` 用 MOSS-TTS-Nano
+ * 语音速报预生成音频清单 —— 流水线 `scripts/tts_broadcast.py` 用 Qwen3-TTS
  * (神经语音)按总览内容预合成的 MP3 列表,gitcode 数据仓库托管,App 流式播放。
  *
  * @param generatedAt 生成时刻(毫秒)—— 与 `latest_overview.generatedAt` 严格
  *   同值(音频按总览文本合成,批次绑定),App 侧据此判定新鲜度
- * @param voice 音色名(信息字段,如 "Yuewen")
+ * @param voice 音色名(信息字段,如 "serena")
  * @param entries 播报条目(综述条在前,顺序与总览播放列表一致)
  */
 data class AudioBroadcast(

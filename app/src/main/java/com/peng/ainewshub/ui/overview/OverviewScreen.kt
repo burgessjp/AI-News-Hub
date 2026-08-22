@@ -128,7 +128,7 @@ fun OverviewScreen(
     val dateText = remember { formatToday(context) }
     // 语音速报:通知权限请求 + 服务启动统一收口(见 playback/TtsBriefing.kt)
     val startBriefing = rememberTtsStartHandler()
-    // 预生成音频清单:播报优先流水线神经语音(MOSS-TTS-Nano),清单不可用回落系统 TTS
+    // 预生成音频清单:播报优先流水线神经语音(Qwen3-TTS),清单不可用回落系统 TTS
     val scope = rememberCoroutineScope()
     val broadcastRepo = remember { BroadcastRepository() }
 

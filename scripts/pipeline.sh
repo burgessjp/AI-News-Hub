@@ -45,7 +45,7 @@ fi
 echo "=== [1/3] 抓取数据 + AI 总结 ==="
 python3 scripts/fetch_data.py --out-dir out
 
-echo "=== [2/3] 语音速报预合成(MOSS-TTS-Nano,失败只告警) ==="
+echo "=== [2/3] 语音速报预合成(Qwen3-TTS,失败只告警) ==="
 python3 scripts/tts_broadcast.py --out-dir out
 
 echo "=== [3/3] 推送到 gitcode (news-hub-data) ==="

@@ -48,7 +48,7 @@ data class TtsPlaybackState(
  * 「上一条 / 播放暂停 / 下一条 / 停止」控制。
  *
  * 播放双通道(用户无感):
- *  - 条目带 [TtsEntry.audioUrl](总览速报,流水线 MOSS-TTS-Nano 预生成)→
+ *  - 条目带 [TtsEntry.audioUrl](总览速报,流水线 Qwen3-TTS 预生成)→
  *    [AudioEntryPlayer] 流式播 CDN MP3,真暂停/原地续播,任何失败回落本条系统 TTS;
  *  - 纯文本条目(关注速报/回落)→ 系统 TextToSpeech 引擎朗读。
  *
