@@ -324,15 +324,15 @@ object ArchiveHttpClient {
      * 一起生效 —— 盘上旧描述由调用方按 generatedAt 新鲜度判定取舍。
      */
     suspend fun fetchLatestAudio(force: Boolean = false): JSONObject? = withContext(Dispatchers.IO) {
-        fetchIndex(force).optJSONObject("latest_audio")?.takeIf { it.has("entries") }
+        fetchIndex(force).optJSONObject("latest_audio")?.takeIf { it.optString("file").isNotBlank() }
     }
 
     /**
      * 预生成音频文件的 CDN 直读 URL(与 [fetchSnapshot] 的 REST API raw 端点同拼法;
      * 播放走 MediaPlayer 流式拉取,不经本客户端的 JSON 解析链路)。
      *
-     * @param relPath 仓库根相对路径,即 latest_audio.entries[].file(如
-     *                `audio/2026-08-19/entry-00.mp3`)
+     * @param relPath 仓库根相对路径,即 latest_audio.file(如
+     *                `audio/2026-08-22/broadcast.mp3`)
      */
     fun audioUrl(relPath: String): String = "$API_BASE/$relPath?ref=$REF"
 
