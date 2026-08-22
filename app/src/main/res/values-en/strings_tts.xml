@@ -24,6 +24,14 @@
     <!-- Notification permission denied on API 33+ (playback still works, controls hidden) -->
     <string name="tts_notify_denied">Notification permission denied; controls won\'t be visible</string>
 
+    <!-- ===== In-app floating player ===== -->
+    <!-- Accessibility description of the floating pill container (with drag hint) -->
+    <string name="tts_widget_cd">Voice briefing player, drag to reposition</string>
+    <!-- Close button of the floating pill (fully stops playback, notification and service included) -->
+    <string name="tts_widget_close">Close and stop playback</string>
+    <!-- Docked ball: tap to expand back into the full control pill -->
+    <string name="tts_widget_expand">Expand player controls</string>
+
     <!-- ===== Playlist assembly (lead-in entry) ===== -->
     <!-- Lead-in title of the overview briefing -->
     <string name="tts_playlist_overview_title">Today\'s briefing</string>

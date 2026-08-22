@@ -50,6 +50,7 @@ import com.peng.ainewshub.data.FavoritesRepository
 import com.peng.ainewshub.data.SummaryRepository
 import com.peng.ainewshub.data.source.ArchiveHttpClient
 import com.peng.ainewshub.notify.DailyNotifyScheduler
+import com.peng.ainewshub.playback.TtsFloatingPill
 import com.peng.ainewshub.ui.anim.pageTransition
 import com.peng.ainewshub.ui.anim.predictivePopTransition
 import com.peng.ainewshub.ui.components.AppBottomBar
@@ -430,6 +431,12 @@ internal fun AiNewsHubApp(
                         .navigationBarsPadding()
                         .padding(bottom = 92.dp)
                 )
+
+                // 语音速报播放浮窗:播放期间悬浮于任意 tab / 二级页(含 WebView 页)之上,
+                // 与底栏/Snackbar 同级挂载(转场层之上,不随页面 push/pop 销毁);
+                // 组件以屏幕绝对坐标定位(TopStart + offset),默认停在右下、底栏上方,
+                // 整条可拖,松手后吸附到左右边缘并缩小为悬浮球。显隐由服务 state 驱动。
+                TtsFloatingPill(modifier = Modifier.align(Alignment.TopStart))
             }
         }
     }

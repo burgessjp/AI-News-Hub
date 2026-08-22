@@ -24,7 +24,24 @@ import androidx.core.content.ContextCompat
 import com.peng.ainewshub.MainActivity
 import com.peng.ainewshub.R
 import com.peng.ainewshub.ui.i18n.AppLocale
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import java.util.Locale
+
+/**
+ * 播放状态快照 —— 供 App 内浮窗([TtsFloatingPill])消费的可观察状态。
+ * 服务存活且有播放列表时 [active] 为 true,浮窗据此显隐;
+ * 服务被系统杀死时由 [TtsPlaybackService.onDestroy] 兜底复位,防止浮窗残留。
+ */
+data class TtsPlaybackState(
+    val active: Boolean = false,
+    val index: Int = 0,
+    val total: Int = 0,
+    /** 当前条目标题(仅展示,不朗读)。 */
+    val title: String = "",
+    val paused: Boolean = false
+)
 
 /**
  * 语音速报前台服务 —— 用系统 TextToSpeech 引擎按队列朗读当日内容(总览速报/
@@ -37,7 +54,9 @@ import java.util.Locale
  *  - TTS 用系统引擎,零网络零依赖;语言恒简体中文(流水线内容恒中文,与通知/摘要同策略);
  *  - 「暂停」实现为 stop + 记住 index(引擎级 pause 兼容性参差),恢复时重读当前条 ——
  *    播报条目多在百字级,重听一句可接受,换取全引擎一致的确定行为;
- *  - AudioFocus 用 GAIN_TRANSIENT_MAY_DUCK:背景音乐压低而非打断。
+ *  - AudioFocus 用 GAIN_TRANSIENT_MAY_DUCK:背景音乐压低而非打断;
+ *  - 播放状态经 companion 的 [state] StateFlow 回流 App 内浮窗(浮窗控制走
+ *    companion 的 prev/playPause/next/stop 便捷方法,与通知栏 action 同一通路)。
  */
 class TtsPlaybackService : Service() {
 
@@ -100,6 +119,7 @@ class TtsPlaybackService : Service() {
             else -> if (playlist.isEmpty()) stopPlayback()
         }
         updateNotification()
+        publishState()
         return START_NOT_STICKY
     }
 
@@ -146,6 +166,7 @@ class TtsPlaybackService : Service() {
     private fun playCurrent() {
         val entry = playlist.getOrNull(index) ?: return stopPlayback()
         updateNotification()
+        publishState()
         val t = tts ?: return
         if (!ttsReady) return
         requestAudioFocus()
@@ -169,6 +190,18 @@ class TtsPlaybackService : Service() {
         abandonAudioFocus()
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         stopSelf()
+        _state.value = TtsPlaybackState()
+    }
+
+    /** 状态回流统一出口:把服务内私有播放态快照进 companion 的 StateFlow 供浮窗消费。 */
+    private fun publishState() {
+        _state.value = TtsPlaybackState(
+            active = true,
+            index = index,
+            total = playlist.size,
+            title = playlist.getOrNull(index)?.title.orEmpty(),
+            paused = paused
+        )
     }
 
     override fun onDestroy() {
@@ -177,6 +210,8 @@ class TtsPlaybackService : Service() {
         tts = null
         ttsReady = false
         abandonAudioFocus()
+        // 兜底复位:stopPlayback 之外的销毁路径(系统杀服务)也不让浮窗残留
+        _state.value = TtsPlaybackState()
         super.onDestroy()
     }
 
@@ -314,6 +349,28 @@ class TtsPlaybackService : Service() {
                 .setAction(ACTION_START)
                 .putParcelableArrayListExtra(EXTRA_ENTRIES, ArrayList(entries))
             ContextCompat.startForegroundService(context, intent)
+        }
+
+        /** App 内浮窗消费的播放状态(无 DI 框架,companion 单例即服务的对外观察面)。 */
+        private val _state = MutableStateFlow(TtsPlaybackState())
+        val state: StateFlow<TtsPlaybackState> = _state.asStateFlow()
+
+        // ===== 浮窗控制便捷方法:与通知栏 action 同一通路(仅 onStartCommand 分支不同) =====
+        // 仅由前台 UI 调用:服务必已在运行(active=true 才显示浮窗)且 App 在前台,
+        // 普通 startService 即可(不再走 startForegroundService,规避 5 秒前台红线误伤)。
+
+        fun prev(context: Context) = send(context, ACTION_PREV)
+
+        fun playPause(context: Context) = send(context, ACTION_PLAY_PAUSE)
+
+        fun next(context: Context) = send(context, ACTION_NEXT)
+
+        fun stop(context: Context) = send(context, ACTION_STOP)
+
+        private fun send(context: Context, action: String) {
+            context.startService(
+                Intent(context, TtsPlaybackService::class.java).setAction(action)
+            )
         }
     }
 }
