@@ -7,7 +7,7 @@ import org.json.JSONObject
 
 /**
  * 语音速报预生成音频 —— 流水线 `scripts/tts_broadcast.py` 用 Qwen3-TTS 按当日
- * 总览内容预合成的**单段全量 MP3**(综述 + Top10 连读),gitcode 数据仓库托管,
+ * 总览综述预合成的**单段 MP3**(仅 digest,不含条目明细),gitcode 数据仓库托管,
  * App 流式播放。
  *
  * @param generatedAt 生成时刻(毫秒)—— 与 `latest_overview.generatedAt` 严格

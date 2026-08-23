@@ -144,16 +144,18 @@ fun OverviewScreen(
                 },
                 horizontalPadding = 18.dp,
                 actions = {
-                    // 语音速报入口:朗读综述 + Top10(通勤/睡前场景);数据未就绪时禁用
+                    // 语音速报入口:朗读今日综述(通勤/睡前场景);数据未就绪时禁用
                     IconButton(
                         onClick = {
                             val digest = (state as? OverviewState.Success)?.digest ?: return@IconButton
                             scope.launch {
                                 // 新鲜度(generatedAt 对齐)在 Repository 内判定。总览播报恒为
-                                // 单条整段(综述 + Top10 连读):text = 全量拼接;预生成音频可用
-                                // 时挂 audioUrl 走 CDN 流播,否则同一段文本交系统 TTS 整段朗读
-                                // (清单缺失/批次滞后时 Toast 提示)—— 两条通道听感一致,浮窗/
-                                // 通知栏均为单条形态(无上一条/下一条)。
+                                // 单条整段(仅今日综述,不含条目明细,文本与流水线合成侧一致):
+                                // 预生成音频可用时挂 audioUrl 走 CDN 流播,否则同一段文本交
+                                // 系统 TTS 整段朗读(清单缺失/批次滞后时 Toast 提示)——
+                                // 两条通道听感一致,浮窗/通知栏均为单条形态(无上一条/下一条)。
+                                val text = digest.digest.trim()
+                                if (text.isEmpty()) return@launch // 综述为空无可播,流水线同样跳过
                                 val audio = runCatching {
                                     broadcastRepo.load(overviewGeneratedAt = digest.generatedAt)
                                 }.getOrNull()
@@ -161,8 +163,7 @@ fun OverviewScreen(
                                     id = "overview-broadcast",
                                     title = AppLocale.wrap(context)
                                         .getString(R.string.tts_playlist_overview_title),
-                                    text = buildOverviewPlaylist(context, digest)
-                                        .joinToString("\n") { it.text },
+                                    text = text,
                                     audioUrl = audio?.let { ArchiveHttpClient.audioUrl(it.file) },
                                     durationMs = audio?.durationMs ?: 0L
                                 )
@@ -680,29 +681,3 @@ private fun formatFetchedAt(context: Context, ms: Long): String =
     runCatching {
         SimpleDateFormat(context.getString(R.string.date_fmt_month_day_time), Locale.getDefault()).format(Date(ms))
     }.getOrDefault(context.getString(R.string.overview_time_unknown))
-
-/**
- * 总览速报全量文本的分段构造:首段 = 跨源综述(有则朗读,无则跳过),其后 =
- * Top10 各条(标题 + AI 点评)。调用侧 joinToString 拼为**单条整段**交播放服务
- * (预生成音频与系统 TTS 兜底两通道共用,拼装规则与流水线 tts_broadcast.py 一致,
- * 两侧必须同步改动)。在 Composable 点击回调里调用(词条随语言取词)。
- */
-private fun buildOverviewPlaylist(context: Context, digest: OverviewDigest): List<TtsEntry> {
-    val overviewTitle = AppLocale.wrap(context).getString(R.string.tts_playlist_overview_title)
-    return buildList {
-        val lead = digest.digest.trim()
-        if (lead.isNotEmpty()) {
-            add(TtsEntry(id = "overview-lead", title = overviewTitle, text = lead))
-        }
-        digest.items.forEachIndexed { i, item ->
-            val text = buildString {
-                append(item.title)
-                if (item.comment.isNotBlank()) {
-                    append("。")
-                    append(item.comment)
-                }
-            }
-            add(TtsEntry(id = "overview-$i", title = item.title, text = text))
-        }
-    }
-}

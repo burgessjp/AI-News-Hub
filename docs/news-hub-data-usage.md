@@ -336,7 +336,7 @@ print(hn['items'][0]['title'])
 
 ## 语音速报音频(audio/ 目录 + index.json 顶层 latest_audio 字段)
 
-App「语音速报」的预生成神经语音:流水线(`scripts/tts_broadcast.py`,fetch 与 push 之间)按当日 `latest_overview` 内容(综述条 + Top10,与 App 端播放列表拼装规则一致)用 Qwen3-TTS(Qwen3-TTS-12Hz-0.6B-CustomVoice,Apache-2.0,音色 serena,经 qwentts.cpp 纯 C++ 推理)逐条合成后拼接为**单段全量 MP3**(段间 0.6s 静音)落盘 `audio/<YYYY-MM-DD>/broadcast.mp3`(北京时间),并把描述写进 `index.json` 顶层即时字段 `latest_audio`:
+App「语音速报」的预生成神经语音:流水线(`scripts/tts_broadcast.py`,fetch 与 push 之间)按当日 `latest_overview` 的**综述 digest**(仅综述,不含 Top10 条目明细;文本与 App 端兜底朗读一致)用 Qwen3-TTS(Qwen3-TTS-12Hz-0.6B-CustomVoice,Apache-2.0,音色 serena,经 qwentts.cpp 纯 C++ 推理)合成为**单段 MP3**落盘 `audio/<YYYY-MM-DD>/broadcast.mp3`(北京时间),并把描述写进 `index.json` 顶层即时字段 `latest_audio`:
 
 ```json
 {
@@ -346,26 +346,26 @@ App「语音速报」的预生成神经语音:流水线(`scripts/tts_broadcast.p
     "model": "qwen3-tts-0.6b-customvoice",
     "file": "audio/2026-08-15/broadcast.mp3",
     "title": "今日速报",
-    "durationMs": 176000,
-    "bytes": 1058000
+    "durationMs": 42000,
+    "bytes": 252000
   }
 }
 ```
 
 | 字段 | 说明 |
 |------|------|
-| `generatedAt` | 与同批 `latest_overview.generatedAt` **严格同值**(音频按总览文本合成,批次绑定;App 比对判定新鲜度,不一致回落系统 TTS) |
+| `generatedAt` | 与同批 `latest_overview.generatedAt` **严格同值**(音频按综述文本合成,批次绑定;App 比对判定新鲜度,不一致回落系统 TTS) |
 | `voice` / `model` | 音色名 / 模型名(信息字段) |
-| `file` | 单段全量音频的仓库根相对路径,走 gitcode raw API 直读(见上「文件直链」) |
+| `file` | 单段音频的仓库根相对路径,走 gitcode raw API 直读(见上「文件直链」) |
 | `title` | 音频标题(清单参考值,App 端仍用本地化标题) |
-| `durationMs` | 音频时长,毫秒(流水线按拼接 wav 帧数预读) |
+| `durationMs` | 音频时长,毫秒(流水线按 wav 帧数预读) |
 | `bytes` | 文件大小,字节 |
 
-- **MP3 规格**:单声道 24kHz 48kbps(≈0.36MB/分钟;全段约 3 分钟 ≈1MB/天,引擎原生 24kHz 输出不升采样)。
-- **单段全量**:逐条合成(规避引擎单次 2048 帧上限,超时控制有界)后拼接为一段,App 以单条播放(无上一条/下一条概念);**全条成功才写**——任一条目合成失败当批不写 `latest_audio`(单段缺条用户无从察觉,App 整批回落系统 TTS,下次批次自愈)。
-- **同日覆盖**:文件名恒为 `broadcast.mp3`,同日多批次天然覆盖不累积;分段/静音临时文件(seg-*.wav/gap-*.wav)不出流水线。
+- **MP3 规格**:单声道 24kHz 48kbps(≈0.36MB/分钟;综述百字级约 0.5-1 分钟 ≈0.2-0.4MB/天,引擎原生 24kHz 输出不升采样)。
+- **单段综述**:综述百字级,单次合成远低于引擎 2048 帧上限,无需分段拼接;App 以单条播放(无上一条/下一条概念);合成失败(重试 1 次后)当批不写 `latest_audio`(App 整批回落系统 TTS,下次批次自愈)。
+- **同日覆盖**:文件名恒为 `broadcast.mp3`,同日多批次天然覆盖不累积。
 - **保留 14 天**:`audio/` 下过期日期目录由 `push_data.py` 在 overlay 后显式删除(overlay 只增不删),仓库工作区稳定 ≈34MB。
-- **失败语义**:语音合成任何失败(引擎/模型缺失/单条失败/整阶段异常)只告警不阻断推送,当次不写 `latest_audio`(App 回落系统 TTS,下次批次自愈)。
+- **失败语义**:语音合成任何失败(引擎/模型缺失/综述合成失败/整阶段异常/阶段墙钟预算耗尽)只告警不阻断推送,当次不写 `latest_audio`(App 回落系统 TTS,下次批次自愈)。
 
 ## 单个数据文件的通用结构
 
