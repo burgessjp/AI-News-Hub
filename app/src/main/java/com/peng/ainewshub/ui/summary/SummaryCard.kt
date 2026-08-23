@@ -24,6 +24,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.CloudOff
+import androidx.compose.material.icons.outlined.HourglassEmpty
+import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -46,6 +48,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.peng.ainewshub.R
+import com.peng.ainewshub.data.SourceFreshness
 import com.peng.ainewshub.data.SourceKeys
 import com.peng.ainewshub.data.SourceSummary
 import com.peng.ainewshub.data.SummaryContent
@@ -213,7 +216,8 @@ internal fun SummaryCardPage(
                     content = state.data.content,
                     accent = accent,
                     reserveBottomBarSpace = reserveBottomBarSpace,
-                    onOpenItem = onOpenItem
+                    onOpenItem = onOpenItem,
+                    onOpenFullList = spec.onOpen
                 )
             }
         }
@@ -259,10 +263,22 @@ private fun SummaryPageHeader(
             modifier = Modifier.weight(1f)
         )
         if (state is UiState.Success) {
+            // 断供警示:数据时刻超 24h 未前进(该源连续多批抓取失败)时错误色 + 警示图标;
+            // 完整说明在源列表页顶部的断供横幅,这里只做轻量提示
+            val stale = SourceFreshness.isStale(state.data.fetchedAtMs)
+            if (stale) {
+                Icon(
+                    Icons.Outlined.Warning,
+                    contentDescription = null,
+                    tint = cs.error,
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(Modifier.size(2.dp))
+            }
             Text(
                 text = stringResource(R.string.summary_data_moment, formatFetchedAt(context, state.data.fetchedAtMs)),
                 style = AppText.caption,
-                color = cs.onSurfaceVariant
+                color = if (stale) cs.error else cs.onSurfaceVariant
             )
         }
         if (onOpen != null) {
@@ -312,16 +328,19 @@ private fun sourceAccentOf(source: String): Color {
  * 摘要正文 —— 条目化排版:每行一条,两位序号(01、02……源强调色 Bold)
  * 与正文首行基线对齐,条目间距 12dp。
  *
- * 两种数据格式视觉等价:
+ * 三种形态的视觉处理:
  * - [SummaryContent.Structured]:每项 title(加粗)+ desc(常规)拼成一行富文本;
- * - [SummaryContent.Plain]:整段纯文本按行切分,解析 **加粗** 标记(bullet 符号 trim 掉)。
+ * - [SummaryContent.Plain]:整段纯文本按行切分,解析 **加粗** 标记(bullet 符号 trim 掉);
+ * - [SummaryContent.Unavailable]:本批 AI 摘要缺失(快照 items 完好)→ 居中降级提示
+ *   + 「查看完整列表」出口(重试无意义,刻意不走错误态)。
  */
 @Composable
 private fun SummaryBody(
     content: SummaryContent,
     accent: Color,
     reserveBottomBarSpace: Boolean,
-    onOpenItem: (SummaryItem) -> Unit
+    onOpenItem: (SummaryItem) -> Unit,
+    onOpenFullList: (() -> Unit)?
 ) {
     when (content) {
         is SummaryContent.Structured -> SummaryItems(
@@ -335,6 +354,47 @@ private fun SummaryBody(
             accent = accent,
             reserveBottomBarSpace = reserveBottomBarSpace
         )
+        is SummaryContent.Unavailable -> SummaryUnavailable(onOpenFullList = onOpenFullList)
+    }
+}
+
+/**
+ * 「本批未生成 AI 摘要」降级态 —— 流水线 AI 调用失败、仅摘要字段缺失,原始列表不受影响。
+ * 与错误态刻意区分:这不是网络问题,重试大概率无效;历史摘要页无出口([onOpenFullList]
+ * 为 null)时只显示说明。
+ */
+@Composable
+private fun SummaryUnavailable(onOpenFullList: (() -> Unit)?) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            Icons.Outlined.HourglassEmpty,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(Modifier.size(8.dp))
+        Text(
+            text = stringResource(R.string.summary_unavailable_title),
+            style = AppText.bodySmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Spacer(Modifier.size(4.dp))
+        Text(
+            text = stringResource(R.string.summary_unavailable_subtitle),
+            style = AppText.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        if (onOpenFullList != null) {
+            Spacer(Modifier.size(8.dp))
+            TextButton(onClick = onOpenFullList) {
+                Text(stringResource(R.string.summary_view_full_list), style = AppText.bodySmall, fontWeight = FontWeight.SemiBold)
+            }
+        }
     }
 }
 

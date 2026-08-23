@@ -11,6 +11,9 @@
     <string name="summary_view_full_list">View full list</string>
     <string name="summary_not_generated_yet">Today\'s digest hasn\'t been generated yet</string>
     <string name="summary_error_title">Couldn\'t load the digest</string>
+    <!-- Degraded state: AI digest missing but snapshot items intact (distinct from error state) -->
+    <string name="summary_unavailable_title">No AI digest for this batch</string>
+    <string name="summary_unavailable_subtitle">The original list is unaffected — view the full list instead</string>
 
     <!-- ===== Digest history ===== -->
     <string name="summary_archive_title">Digest History</string>

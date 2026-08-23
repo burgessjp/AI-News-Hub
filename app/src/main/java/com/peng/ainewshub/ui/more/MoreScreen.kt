@@ -224,6 +224,8 @@ internal fun IconTileRow(
     iconColor: IconAccent = IconAccent.Neutral,
     brand: SourceBrandColors? = null,
     showDivider: Boolean = true,
+    /** 尾部自定义槽位(渲染在文本列与 chevron 之间);null 保持原样。信息源页断供徽标用。 */
+    trailing: (@Composable () -> Unit)? = null,
     onClick: () -> Unit
 ) {
     val cs = MaterialTheme.colorScheme
@@ -285,6 +287,7 @@ internal fun IconTileRow(
                     color = cs.onSurfaceVariant
                 )
             }
+            if (trailing != null) trailing()
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,

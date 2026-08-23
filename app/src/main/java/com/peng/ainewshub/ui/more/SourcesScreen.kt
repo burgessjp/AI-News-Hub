@@ -1,16 +1,21 @@
 package com.peng.ainewshub.ui.more
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -18,14 +23,18 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.peng.ainewshub.R
+import com.peng.ainewshub.data.SourceFreshness
 import com.peng.ainewshub.ui.components.AppTopBar
 import com.peng.ainewshub.ui.components.AppTopBarDefaults
+import com.peng.ainewshub.ui.theme.AppText
 import kotlinx.coroutines.launch
 import org.burnoutcrew.reorderable.ReorderableItem
 import org.burnoutcrew.reorderable.detectReorderAfterLongPress
@@ -77,6 +86,17 @@ fun SourcesScreen(
         }
     )
 
+    // 源健康度:断供(>24h 未成功抓取,latest 指针未前进)的源在行尾显示警示徽标,
+    // 正常源保持干净。数据来自 index latest 指针(共享 2 分钟缓存,通常零额外网络);
+    // 拉取失败静默不显示 —— 健康度是增强信息,不值得为它单独弹错误态。
+    var staleDays by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
+    LaunchedEffect(Unit) {
+        val now = System.currentTimeMillis()
+        staleDays = SourceFreshness.lastSuccessTimes()
+            .mapNotNull { (key, ms) -> SourceFreshness.staleDays(ms, now)?.let { key to it } }
+            .toMap()
+    }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
@@ -105,16 +125,47 @@ fun SourcesScreen(
             itemsIndexed(localOrder, key = { _, key -> key }) { idx, key ->
                 val meta = sourceMeta(key)
                 ReorderableItem(reorderState, key = key) { isDragging ->
+                    val stale = staleDays[key]
                     IconTileRow(
                         icon = meta.icon,
                         brand = meta.brand,
                         title = meta.title,
                         subtitle = meta.subtitle,
                         showDivider = idx != localOrder.lastIndex,
+                        // let 内不是可组合上下文,须在 composable 作用域现建 lambda
+                        trailing = if (stale == null) null else ({ StaleBadge(stale) }),
                         onClick = { onOpen(key) }
                     )
                 }
             }
         }
+    }
+}
+
+/**
+ * 断供警示徽标 —— 小字 + 错误色,提示该源已连续多批抓取失败(latest 指针 >24h 未前进)。
+ * 仅断供源渲染,正常源不占位。
+ */
+@Composable
+private fun StaleBadge(days: Int) {
+    val cs = MaterialTheme.colorScheme
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        Icon(
+            Icons.Outlined.Warning,
+            contentDescription = null,
+            tint = cs.error,
+            modifier = Modifier.size(14.dp)
+        )
+        Text(
+            text = stringResource(
+                R.string.source_stale_badge,
+                pluralStringResource(R.plurals.source_stale_days, days, days)
+            ),
+            style = AppText.caption,
+            color = cs.error
+        )
     }
 }

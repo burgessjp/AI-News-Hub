@@ -38,6 +38,12 @@
     <!-- 下拉刷新后批次未变化:归档一天只更数批,主动说清非实时 -->
     <string name="refresh_no_new_batch">已是最新批次 · 数据生成于 %1$s</string>
     <string name="refresh_no_new_batch_plain">已是最新批次</string>
+    <!-- 源断供警示:index latest 指针 >24h 未前进 = 该源连续多批抓取失败 -->
+    <string name="source_stale_warning">数据已 %1$s 未更新，该源可能暂时断供</string>
+    <string name="source_stale_badge">已 %1$s 未更新</string>
+    <plurals name="source_stale_days">
+        <item quantity="other">%1$d 天</item>
+    </plurals>
 
     <!-- ===== 错误文案(UiState.toUiError 按 ErrorKind 取词) ===== -->
     <string name="error_no_data">今日内容尚未更新,请稍后再试</string>

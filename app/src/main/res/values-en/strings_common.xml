@@ -26,6 +26,13 @@
     <!-- Pull-to-refresh found no new batch: archive updates a few times a day -->
     <string name="refresh_no_new_batch">You\'re up to date · data generated at %1$s</string>
     <string name="refresh_no_new_batch_plain">You\'re up to date</string>
+    <!-- Source staleness: latest pointer hasn't advanced for >24h = fetches keep failing -->
+    <string name="source_stale_warning">Data hasn\'t updated for %1$s — this source may be interrupted</string>
+    <string name="source_stale_badge">No updates for %1$s</string>
+    <plurals name="source_stale_days">
+        <item quantity="one">%1$d day</item>
+        <item quantity="other">%1$d days</item>
+    </plurals>
 
     <!-- ===== Error messages (UiState.toUiError by ErrorKind) ===== -->
     <string name="error_no_data">Today\'s content isn\'t available yet, please try again later</string>

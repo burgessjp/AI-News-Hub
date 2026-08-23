@@ -16,6 +16,9 @@
     <string name="summary_view_full_list">查看完整列表</string>
     <string name="summary_not_generated_yet">今日摘要尚未生成</string>
     <string name="summary_error_title">摘要暂时没加载出来</string>
+    <!-- AI 摘要缺失降级态:快照 items 完好,仅 AI 生成失败(区别于上面的错误态) -->
+    <string name="summary_unavailable_title">本批未生成 AI 摘要</string>
+    <string name="summary_unavailable_subtitle">原始列表不受影响，可直接查看完整列表</string>
 
     <!-- ===== 历史摘要 ===== -->
     <string name="summary_archive_title">历史摘要</string>

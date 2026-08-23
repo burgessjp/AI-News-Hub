@@ -18,15 +18,19 @@ data class SourceSummary(
 )
 
 /**
- * 摘要正文。兼容两种数据格式:
+ * 摘要正文。兼容三种形态:
  * - [Structured]:新格式 `ai_summary_v2`(JSON 数组,每项含 title + desc + url),数据流水线只产出这种;
- * - [Plain]:旧格式 `ai_summary`(纯文本 `• **标题**：描述` 串),仅历史快照存在,作回退。
+ * - [Plain]:旧格式 `ai_summary`(纯文本 `• **标题**：描述` 串),仅历史快照存在,作回退;
+ * - [Unavailable]:本批 AI 摘要缺失(流水线 AI 调用失败)但快照 items 仍可用 ——
+ *   降级而非失败,UI 提示「本批未生成」并引导查看完整列表(重试无意义)。
  */
 sealed interface SummaryContent {
     /** v2:结构化条目列表。 */
     data class Structured(val items: List<SummaryItem>) : SummaryContent
     /** v1:整段纯文本(含 markdown 加粗与 bullet)。 */
     data class Plain(val text: String) : SummaryContent
+    /** 本批 AI 摘要缺失,快照 items 可用。 */
+    data object Unavailable : SummaryContent
 }
 
 /**
@@ -78,8 +82,10 @@ private enum class SummarySource(val key: String, @StringRes val titleRes: Int) 
  *   适合做每日摘要;实时源波动大、用户可直接看列表。
  * - 「历史摘要」经 [summarizeOn] / [availableDates] 走 index.json 的 `history` 索引
  *   按日期寻址(流水线每源仅保留最近 31 天),同样与 SourceMode 无关。
- * - 同时兼容两种格式:优先读结构化 `ai_summary_v2`,缺失则回退旧纯文本 `ai_summary`
- *   (仅历史快照);两者都缺失(当天流水线 AI 调用失败 / 源不支持)时返回失败,UI 显示「暂无摘要 + 重试」。
+ * - 同时兼容三种形态:优先读结构化 `ai_summary_v2`,缺失则回退旧纯文本 `ai_summary`
+ *   (仅历史快照);两者都缺失但快照 items 仍在(当天流水线 AI 调用失败 / 源不支持)时
+ *   返回 [SummaryContent.Unavailable] 降级,UI 引导查看完整列表;连 items 都缺失才
+ *   返回失败(UI 显示「暂无摘要 + 重试」)。
  * - 不再依赖任何 AI 服务配置:无 baseUrl/apiKey/model 依赖,无需 [AiConfigStore]。
  */
 class SummaryRepository {
@@ -145,10 +151,11 @@ class SummaryRepository {
     }
 
     /**
-     * 从归档快照顶层解析摘要正文(兼容两种格式):
+     * 从归档快照顶层解析摘要正文(兼容三种形态):
      * - 优先读 `ai_summary_v2`(JSON 数组,每项 title + desc + url)→ [SummaryContent.Structured];
      * - 回退读 `ai_summary`(纯文本)→ [SummaryContent.Plain];
-     * - 都缺失或为空 → 失败 [AppException.NoData]。
+     * - 两者都缺失但快照 `items` 仍在(仅 AI 生成失败,原始数据完好)→
+     *   [SummaryContent.Unavailable] 降级;连 `items` 都缺失 → 失败 [AppException.NoData]。
      */
     private fun parseSummary(snapshot: JSONObject): Result<SummaryContent> {
         // 优先 v2 结构化数组
@@ -169,6 +176,11 @@ class SummaryRepository {
         val text = snapshot.optString("ai_summary").orEmpty().trim()
         if (text.isNotBlank()) {
             return Result.success(SummaryContent.Plain(text))
+        }
+        // 两者都缺失:仅 AI 摘要生成失败(items 完好)→ 降级引导看完整列表,而非误导性的失败态
+        val itemCount = snapshot.optJSONArray("items")?.length() ?: 0
+        if (itemCount > 0) {
+            return Result.success(SummaryContent.Unavailable)
         }
         return Result.failure(AppException.NoData())
     }
