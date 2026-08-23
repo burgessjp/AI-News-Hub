@@ -174,7 +174,7 @@ Open the app → **More → AI Service**, pick a provider preset (DeepSeek / Zhi
 |------|------|------|
 | Third-party API | `aihot.virxact.com` public API | AIHot Picks (Today's Hot + TOP20), AI Daily and archive |
 | Third-party · live (partial) | HackerNews comments | Fetched live from the Firebase API inside the app; all source lists read archived snapshots (live mode not exposed) |
-| Third-party · archive | Companion data pipeline | Fetched in daily batches (Beijing time; this repo's CI covers the 15:30 batch) + AI-summarized + pushed to the [gitcode data repo](https://gitcode.com/peng1818/AI-News-Hub-Data) |
+| Third-party · archive | Companion data pipeline | Fetched in daily batches (Beijing time; this repo's CI covers the 22:00 batch) + AI-summarized + pushed to the [gitcode data repo](https://gitcode.com/peng1818/AI-News-Hub-Data) |
 | Runtime AI (user-supplied key) | User-provided | Web full-page translation, system text-selection translation |
 
 The data-repo format is documented in [`docs/news-hub-data-usage.md`](docs/news-hub-data-usage.md).

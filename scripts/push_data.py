@@ -41,7 +41,7 @@ DEFAULT_REPO_URL = "https://gitcode.com/peng1818/AI-News-Hub-Data.git"
 DEFAULT_BRANCH = "news-hub-data"
 
 # push 重试次数与退避(对齐 fetch/summary 链路的 3 次重试)。
-# push 是全链路最后一步,瞬时网络抖动 / 非快进会废掉整轮(下一轮要等次日 15:30),
+# push 是全链路最后一步,瞬时网络抖动 / 非快进会废掉整轮(下一轮要等次日 22:00),
 # 故与抓取/AI 同等对待:失败重试,push 类失败时重 clone 规避脏本地状态。
 PUSH_MAX_ATTEMPTS = 3
 

@@ -32,7 +32,7 @@
   - 日期显示:与数据日期同年显示 MM-dd,跨年显示完整 yyyy-MM-dd(防旧文看似新鲜);
     rundown-ai 列表页无文章日期,其日期为抓取兜底,输入中标注「抓取日期」;
   - 数据日期 = 全源快照最大 fetched_at_ms 的北京日期;
-    breaking 时效窗口 = 数据日期及其前一天(15:30 北京跑批时,前一日晚间大事仍算突发);
+    breaking 时效窗口 = 数据日期及其前一天(每日批次制,晚间跑批时前一日大事对未及阅读的用户仍是突发);
   - 调 OpenAI 兼容 /v1/chat/completions,温度 0.3,read 超时放宽到 120s(输出长);
   - 解析后做 ref 回填 + 时效兜底 + URL/标题双层去重 + breaking 截断到 MAX_BREAKING;
   - 失败返回 None,不阻断推送(对齐单源 AI 摘要失败的优雅降级,
@@ -423,8 +423,8 @@ def _title_not_duplicate(title, history):
 def _parse_result(ai_data, snapshots, breaking_dates):
     """
     解析 AI 输出为统一的热点列表(完成 ref 回填 + 时效兜底 + 双层去重 + breaking 截断)。
-    breaking_dates: 允许标 breaking 的北京日期集合(数据日期及其前一天——15:30 北京
-    跑批时,前一日晚间的大事仍算突发)。
+    breaking_dates: 允许标 breaking 的北京日期集合(数据日期及其前一天——每日
+    批次制下,前一日的大事对多数用户仍是新闻)。
     返回 [{source, title, url, metrics, comment, breaking, breakingReason}, ...]。
     """
     raw_items = ai_data.get("items") or []
@@ -521,7 +521,7 @@ def generate_overview(out_dir, now):
     # 数据日期 = 全源快照最大 fetched_at_ms 的北京日期
     data_date_ms = max((s.get("fetched_at_ms", 0) or 0) for s in snapshots.values())
     data_today = _beijing_date_key_of_ms(data_date_ms)
-    # breaking 时效窗口:数据日期及其前一天(15:30 北京跑批时,前一日晚间大事仍算突发)
+    # breaking 时效窗口:数据日期及其前一天(每日批次制,前一日大事对未及阅读的用户仍是突发)
     data_yesterday = _beijing_date_key_of_ms(data_date_ms - 86400000)
     breaking_dates = {d for d in (data_today, data_yesterday) if d}
 

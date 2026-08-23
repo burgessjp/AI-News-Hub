@@ -174,7 +174,7 @@ AI News Hub 的整页翻译等运行时 AI 能力**不内置任何 key**，由�
 |------|------|------|
 | 第三方 API | `aihot.virxact.com` 公开 API | AIHot 精选（今日热点 + TOP20）、AI 日报与归档 |
 | 第三方 · 实时（局部） | HackerNews 评论 | 应用内实时拉自 Firebase API；各源列表一律读归档快照（实时模式未开放入口） |
-| 第三方 · 归档 | 配套数据流水线 | 每天多批次（北京时间；仓库 CI 承载 15:30 批）抓取 + AI 总结 + 推送到 [gitcode 数据仓库](https://gitcode.com/peng1818/AI-News-Hub-Data) |
+| 第三方 · 归档 | 配套数据流水线 | 每天多批次（北京时间；仓库 CI 承载 22:00 批）抓取 + AI 总结 + 推送到 [gitcode 数据仓库](https://gitcode.com/peng1818/AI-News-Hub-Data) |
 | 运行时 AI（用户自配 key） | 用户填入 | 网页整页翻译、系统选中翻译 |
 
 数据仓库格式详见 [`docs/news-hub-data-usage.md`](docs/news-hub-data-usage.md)。

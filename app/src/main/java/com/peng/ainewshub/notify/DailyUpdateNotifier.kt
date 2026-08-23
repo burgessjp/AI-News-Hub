@@ -103,11 +103,11 @@ object DailyNotifyScheduler {
     private val BEIJING: TimeZone = TimeZone.getTimeZone("Asia/Shanghai")
 
     /**
-     * 检查时刻表(北京时间,小时 to 分钟)—— 与流水线批次 08:00 / 15:30 / 18:00 一一对应,
+     * 检查时刻表(北京时间,小时 to 分钟)—— 与流水线批次 08:00 / 18:00 / 22:00 一一对应,
      * 各 +40 分钟余量(GitHub cron 漂移 + 抓取与 AI 生成耗时)。
      * ⚠️ 流水线批次时间变更时必须同步改这里(AGENTS.md 有同样提醒)。
      */
-    private val CHECK_SLOTS = listOf(8 to 40, 16 to 10, 18 to 40)
+    private val CHECK_SLOTS = listOf(8 to 40, 18 to 40, 22 to 40)
 
     /**
      * 设置页开关同步入口:开 → 从下一档开始续链;关 → 取消全部,链终止。

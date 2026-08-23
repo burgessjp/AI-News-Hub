@@ -515,7 +515,8 @@ def _ph_today_pt_start():
 
     不要改回 UTC 当日 0 点:北京 08:00(=UTC 00:00 整)抓取时,UTC 边界晚于
     当前榜单全部帖子的规范化时间,会把结果过滤成空列表、误报「源站改版」;
-    冬令时下连北京 15:30 批(UTC 07:30,新批次 08:01 才上线)同样会拿空。"""
+    冬令时下新批次 08:01(UTC)才上线,贴近边界的批次同样会拿空
+    (本仓库 22:00 批 = UTC 14:00,距边界已远,无此风险)。"""
     pt = ZoneInfo("America/Los_Angeles")
     return datetime.now(pt).replace(
         hour=0, minute=0, second=0, microsecond=0

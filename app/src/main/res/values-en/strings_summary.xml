@@ -16,7 +16,7 @@
     <string name="summary_archive_title">Digest History</string>
     <string name="summary_archive_load_failed">Failed to load digest history</string>
     <string name="summary_archive_empty_title">No digest history yet</string>
-    <string name="summary_archive_empty_subtitle">Updated daily at 07:00 / 15:00 (Beijing time)\nHistory accumulates since the feature launched (last 31 days)</string>
+    <string name="summary_archive_empty_subtitle">Updated daily at 08:00 / 18:00 / 22:00 (Beijing time)\nHistory accumulates since the feature launched (last 31 days)</string>
     <plurals name="summary_sources_with_digest">
         <item quantity="one">%1$d source has a digest for this day</item>
         <item quantity="other">%1$d sources have digests for this day</item>
