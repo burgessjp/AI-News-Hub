@@ -30,9 +30,9 @@ news-hub-data 分支/
 ├── trends/                             ← 热词趋势榜按日归档(内容与当期 trends.json 同构)
 │   └── 2026-08-15/
 │       └── 18-00-data.json
-├── audio/                              ← 语音速报预生成 MP3(单声道 48kHz 64kbps,按日目录,保留 14 天)
+├── audio/                              ← 语音速报预生成 MP3(单声道 24kHz 48kbps,按日目录,保留 14 天)
 │   └── 2026-08-15/
-│       └── entry-00.mp3 … entry-10.mp3
+│       └── broadcast.mp3
 ├── hackernews/
 │   ├── 2026-07-14/
 │   │   └── 08-00-data.json

@@ -35,7 +35,7 @@ concurrency:
 jobs:
   fetch:
     runs-on: ubuntu-latest
-    timeout-minutes: 35   # 25(抓取+AI+推送)+ 语音速报合成(4 核 CPU 上 5-15 分钟)+ 首次构建/下载余量
+    timeout-minutes: 50   # 25(抓取+AI+推送)+ 语音速报硬上限 20 分钟(阶段墙钟预算,超时告警跳过)+ 冷缓存自举/推送余量
     env:
       TZ: Asia/Shanghai    # 脚本据此把文件名日期/时间统一成北京时间
       # qwentts.cpp 代码 pin(语音速报):与 scripts/tts_broadcast.py 的

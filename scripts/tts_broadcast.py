@@ -14,9 +14,11 @@ App 端「语音速报」优先播放这里的预生成音频(Qwen3-TTS 神经�
       voice, model, file, title, durationMs, bytes }
 
 失败语义(对齐 trend_keywords.write_trends「失败只告警不阻断推送」):
-  引擎/模型缺失且自举失败 / overview 缺失 / 任一条目合成失败 / 整阶段异常
-  —— 一律告警 + exit 0;index.json 不写 latest_audio → App 回落系统 TTS,
-  下个批次自愈。任何路径都不抛非零(pipeline.sh set -e 下不拦推送)。
+  引擎/模型缺失且自举失败 / overview 缺失 / 任一条目重试 1 次后仍失败 /
+  阶段墙钟预算耗尽 / 整阶段异常 —— 一律告警 + exit 0;index.json 不写
+  latest_audio → App 回落系统 TTS,下个批次自愈。任何路径都不抛非零
+  (pipeline.sh set -e 下不拦推送);阶段预算(STAGE_BUDGET_S)从墙钟上
+  钉死本阶段耗时上限,是「不拦推送」不靠运气成立的兜底。
   单段音频要求全条成功才产出(缺任何一条都整批不写,避免用户听着缺条目
   却无从察觉;与此前分段方案「条数不符整批回落」的用户效果一致)。
 
@@ -38,6 +40,8 @@ App 端「语音速报」优先播放这里的预生成音频(Qwen3-TTS 神经�
   AI_NEWS_HUB_TTS_DISABLE=1  整体跳过
   AI_NEWS_HUB_TTS_VOICE      音色,默认 serena(备选 vivian/uncle_fu/dylan
                              北京话/eric 四川话/ryan/aiden/ono_anna/sohee)
+  AI_NEWS_HUB_TTS_BUDGET_S   整阶段墙钟预算秒数(默认 1200,含自举与合成,
+                             超时告警跳过;0 = 不限,仅本地调试)
   QWENTTS_DIR                已有 qwentts.cpp 检出路径(含 build/qwen-tts)
   QWENTTS_MODELS_DIR         已有 GGUF 目录
   QWENTTS_REF                代码库 pin(SHA),默认下方 DEFAULT_QWENTTS_REF
@@ -51,6 +55,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 import wave
 from pathlib import Path
 
@@ -70,14 +75,27 @@ GGUF_HOSTS = [
     "https://huggingface.co/Serveurperso/Qwen3-TTS-GGUF/resolve/main",
     "https://hf-mirror.com/Serveurperso/Qwen3-TTS-GGUF/resolve/main",
 ]
+# GGUF 完整性校验:文件头 magic + 字节数下限(实测 talker 968,588,544 /
+# codec 291,150,624,留 ~10% 余量)。只查「非空」会被缓存恢复出的残卷骗过 ——
+# 坏文件加载天天失败,而缓存 key 绑 pin 不变、坏文件每天原样恢复,永不自愈
+GGUF_MAGIC = b"GGUF"
+MODEL_MIN_BYTES = {
+    TALKER_GGUF: 850 * 1024 * 1024,
+    CODEC_GGUF: 260 * 1024 * 1024,
+}
 
 # CustomVoice 预置音色(小写);--lang 取 GGUF 元数据里的语言名
 DEFAULT_VOICE = "serena"
 TTS_LANG = "Chinese"
 # 固定采样种子:同日多批次重跑时同文本产物一致,manifest 字节数稳定
 TTS_SEED = "1793"
-# 单条合成上限(秒):CI 4 核 CPU 上 RTF≈1~3,百字条目最坏 ~2 分钟,长综述留足余量
-SYNTH_TIMEOUT_S = 900
+# 单次合成上限(秒):CI 4 核 CPU 上 RTF≈1~3,最坏条目 ~2 分钟,2.5 倍余量
+SYNTH_TIMEOUT_S = 300
+# 整阶段墙钟预算(秒):自举(构建/下载)+ 全部合成共用一个 deadline,超时
+# 告警跳过。TTS 在 push 之前执行,预算保证任何 hang/慢批次都吃不穿 workflow
+# 总时限、「不拦推送」不靠运气成立(单次合成 timeout 取 min(上限,剩余预算))。
+# AI_NEWS_HUB_TTS_BUDGET_S 可覆盖,0 = 不限(仅本地调试用)
+STAGE_BUDGET_S = 1200
 # 拼接单段音频时的段间静音时长(秒):条目连读的自然停顿
 SEGMENT_GAP_S = 0.6
 
@@ -150,6 +168,17 @@ def _ensure_binary():
     return binary
 
 
+def _gguf_ok(path):
+    """GGUF 在位校验:magic 头 + 字节数下限(空文件/残卷不算在位)。"""
+    try:
+        if path.stat().st_size < MODEL_MIN_BYTES[path.name]:
+            return False
+        with path.open("rb") as f:
+            return f.read(4) == GGUF_MAGIC
+    except OSError:
+        return False
+
+
 def _download_gguf(name, dest_dir):
     """下载单个 GGUF(断点续传,主源失败换 hf-mirror 镜像),成功返回 True。"""
     target = dest_dir / name
@@ -160,8 +189,13 @@ def _download_gguf(name, dest_dir):
             print(f"[TTS] 下载 {name} ← {host}(第 {attempt + 1} 次)…")
             dl = _run(["curl", "-sL", "--retry", "5", "--retry-delay", "3", "-C", "-",
                        "--max-time", "3600", "-o", str(target), url])
-            if dl.returncode == 0 and target.is_file() and target.stat().st_size > 0:
-                return True
+            if dl.returncode == 0:
+                if _gguf_ok(target):
+                    return True
+                # curl 报成功但校验不过(截断/损坏):删掉整份重来,残卷续传只会继续错
+                print(f"[TTS][WARN] {name} 下载成功但完整性校验不过,删除重试",
+                      file=sys.stderr)
+                target.unlink(missing_ok=True)
         print(f"[TTS][WARN] {url} 下载失败,尝试下一源", file=sys.stderr)
     target.unlink(missing_ok=True)
     return False
@@ -174,8 +208,12 @@ def _ensure_models():
     models_dir.mkdir(parents=True, exist_ok=True)
     talker, codec = models_dir / TALKER_GGUF, models_dir / CODEC_GGUF
     for name, path in ((TALKER_GGUF, talker), (CODEC_GGUF, codec)):
-        if path.is_file() and path.stat().st_size > 0:
+        if _gguf_ok(path):
             continue
+        if path.is_file():
+            # 非空残卷(缓存恢复损坏/历史假成功下载):删掉强制重下,否则天天失败不自愈
+            print(f"[TTS][WARN] {name} 已存在但完整性校验不过,删除重下", file=sys.stderr)
+            path.unlink(missing_ok=True)
         if not _download_gguf(name, models_dir):
             return None
     return talker, codec
@@ -235,15 +273,20 @@ def _concat_wavs(paths, out_path):
     return frames / 24000.0
 
 
-def _synthesize_merged(binary, models, playlist, voice, audio_dir, rel_prefix):
+def _synthesize_merged(binary, models, playlist, voice, audio_dir, rel_prefix, deadline):
     """合成全部条目并拼接为单段全量音频,返回 (file, durationMs, bytes)。
 
     逐条独立合成(引擎单次上限 2048 帧 ≈164s,全量连读会超;逐条也让超时
-    控制有界)→ 按播放顺序拼接、段间插 SEGMENT_GAP_S 静音 → 整体编码 MP3
+    控制有界;单条失败重试 1 次,瞬时抖动不损失全天音频,两次失败才整批
+    放弃)→ 按播放顺序拼接、段间插 SEGMENT_GAP_S 静音 → 整体编码 MP3
     (单声道 24kHz 48kbps,引擎原生 24kHz 不升采样,全量 ≈1MB/天)。任一
-    条目失败返回 None(单段缺条用户无从察觉,全条成功才产出,App 整批回落
-    系统 TTS);ffmpeg 缺失(本地调试机常见)时保留 wav(App 可直接播,
-    CI runner 预装 ffmpeg)。
+    条目最终失败返回 None(单段缺条用户无从察觉,全条成功才产出,App 整批
+    回落系统 TTS);ffmpeg 缺失(本地调试机常见)时保留 wav(App 可直接
+    播,CI runner 预装 ffmpeg)。
+
+    deadline 是整阶段墙钟预算的时刻(time.monotonic 口径,None = 不限):
+    每次起进程前查剩余,不足即告警放弃;单次合成 timeout 取 min(单次上限,
+    剩余)—— 阶段墙钟被硬性钉住,任何 hang/慢批次都拖不垮其后的推送步骤。
     """
     talker, codec = models
     ffmpeg = shutil.which("ffmpeg")
@@ -251,26 +294,44 @@ def _synthesize_merged(binary, models, playlist, voice, audio_dir, rel_prefix):
         print("[TTS][WARN] 本机无 ffmpeg,产物保留 wav(App 可直接播,CI runner 预装 ffmpeg)",
               file=sys.stderr)
 
+    def remaining():
+        return None if deadline is None else deadline - time.monotonic()
+
     seg_paths = []
     try:
         for index, (title, text) in enumerate(playlist):
             wav_path = audio_dir / f"seg-{index:02d}.wav"
-            try:
-                # 文本经 stdin 传入(避免命令行转义/长度问题);固定 --seed 保证
-                # 同日重跑同文本产物一致。超时/失败视作整批失败。
-                synth = _run(
-                    [str(binary), "--model", str(talker), "--codec", str(codec),
-                     "--speaker", voice, "--lang", TTS_LANG, "--seed", TTS_SEED,
-                     "-o", str(wav_path)],
-                    input=text.encode("utf-8"), timeout=SYNTH_TIMEOUT_S,
-                )
-                if synth.returncode != 0 or not wav_path.is_file():
-                    raise RuntimeError(
-                        f"exit={synth.returncode}: "
-                        f"{(synth.stderr or b'').decode(errors='replace')[-300:]}")
-            except Exception as e:
-                print(f"[TTS][WARN] 第 {index} 条({title[:24]})合成失败,本批不产音频:"
-                      f"{type(e).__name__}: {e}", file=sys.stderr)
+            done = False
+            for attempt in (1, 2):
+                rem = remaining()
+                if rem is not None and rem <= 0:
+                    print(f"[TTS][WARN] 阶段墙钟预算耗尽(第 {index} 条未起),"
+                          f"本批不产音频", file=sys.stderr)
+                    return None
+                timeout = SYNTH_TIMEOUT_S if rem is None else min(SYNTH_TIMEOUT_S, rem)
+                try:
+                    # 文本经 stdin 传入(避免命令行转义/长度问题);固定 --seed 保证
+                    # 同日重跑同文本产物一致
+                    synth = _run(
+                        [str(binary), "--model", str(talker), "--codec", str(codec),
+                         "--speaker", voice, "--lang", TTS_LANG, "--seed", TTS_SEED,
+                         "-o", str(wav_path)],
+                        input=text.encode("utf-8"), timeout=timeout,
+                    )
+                    if synth.returncode != 0 or not wav_path.is_file():
+                        raise RuntimeError(
+                            f"exit={synth.returncode}: "
+                            f"{(synth.stderr or b'').decode(errors='replace')[-300:]}")
+                    done = True
+                    break
+                except Exception as e:
+                    wav_path.unlink(missing_ok=True)  # 半成品不留,重试整份重来
+                    if attempt == 1:
+                        print(f"[TTS][WARN] 第 {index} 条({title[:24]})合成失败,"
+                              f"重试 1 次:{type(e).__name__}: {e}", file=sys.stderr)
+            if not done:
+                print(f"[TTS][WARN] 第 {index} 条({title[:24]})重试仍失败,本批不产音频",
+                      file=sys.stderr)
                 return None
             seg_paths.append(wav_path)
             if index < len(playlist) - 1:
@@ -316,6 +377,12 @@ def main():
         print("[TTS] AI_NEWS_HUB_TTS_DISABLE=1,跳过语音速报")
         return 0
 
+    # 阶段墙钟预算:覆盖自举(构建/下载)+ 合成的全阶段(非法值交给顶层
+    # 异常兜底,告警跳过本批)。预算保证 TTS 永远吃不穿 workflow 总时限。
+    budget_raw = os.environ.get("AI_NEWS_HUB_TTS_BUDGET_S", "").strip()
+    budget = float(budget_raw) if budget_raw else float(STAGE_BUDGET_S)
+    deadline = time.monotonic() + budget if budget > 0 else None
+
     index_path = Path(args.out_dir) / "index.json"
     if not index_path.is_file():
         print(f"[TTS][WARN] {index_path} 不存在(fetch 未产出?),跳过语音速报", file=sys.stderr)
@@ -352,7 +419,8 @@ def main():
         return 0
 
     print(f"[TTS] 合成 {len(playlist)} 条并拼接单段(voice={voice},输出 {audio_dir})…")
-    merged = _synthesize_merged(binary, models, playlist, voice, audio_dir, f"audio/{date_dir}")
+    merged = _synthesize_merged(binary, models, playlist, voice, audio_dir,
+                                 f"audio/{date_dir}", deadline)
     if merged is None:
         print("[TTS][WARN] 音频未能产出,本批不写 latest_audio(App 回落系统 TTS)",
               file=sys.stderr)
