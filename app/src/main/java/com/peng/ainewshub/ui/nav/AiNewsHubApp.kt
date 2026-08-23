@@ -1,6 +1,7 @@
 package com.peng.ainewshub.ui.nav
 
 import android.app.Activity
+import android.os.SystemClock
 import androidx.activity.BackEventCompat
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -57,6 +58,7 @@ import com.peng.ainewshub.ui.components.AppBottomBar
 import com.peng.ainewshub.ui.components.AppTab
 import com.peng.ainewshub.ui.i18n.AppLanguage
 import com.peng.ainewshub.ui.i18n.AppLocale
+import com.peng.ainewshub.ui.RefreshNotices
 import com.peng.ainewshub.ui.more.FontChoice
 import com.peng.ainewshub.ui.more.FontScale
 import com.peng.ainewshub.ui.more.SettingsStore
@@ -66,6 +68,9 @@ import com.peng.ainewshub.widget.HotNowWidgetUpdater
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /** 浅色系统栏 scrim(与 AndroidX enableEdgeToEdge 默认值一致)。ARGB 32 位带符号整数。 */
 private val LIGHT_SCRIM = 0xE6FFFFFF.toInt()
@@ -250,6 +255,30 @@ internal fun AiNewsHubApp(
         snapshotFlow { offlineMode }.collect { offline ->
             if (offline) {
                 snackbarHostState.showSnackbar(offlineBannerText, duration = SnackbarDuration.Long)
+            }
+        }
+    }
+
+    // 「已是最新批次」轻提示:用户下拉强刷成功但批次指纹未变时,各页 ViewModel 经
+    // RefreshNotices 发事件(归档一天只更数批,刷新大概率无新内容;完整播放刷新动画
+    // 却纹丝不动会被误读为「App 坏了」,这里主动说清)。与离线提示共用宿主;
+    // 2 秒节流防多页连刷排队连弹。时间戳缺失(0)时退化为不带时间的短文案。
+    val noNewBatchText = stringResource(R.string.refresh_no_new_batch)
+    val noNewBatchPlain = stringResource(R.string.refresh_no_new_batch_plain)
+    val noNewBatchTimeFmt = stringResource(R.string.date_fmt_month_day_time_dash)
+    LaunchedEffect(Unit) {
+        var lastShownAt = 0L
+        RefreshNotices.noNewBatch.collect { dataAtMs ->
+            val now = SystemClock.elapsedRealtime()
+            if (now - lastShownAt >= 2_000L) {
+                lastShownAt = now
+                val message = if (dataAtMs > 0) {
+                    val time = SimpleDateFormat(noNewBatchTimeFmt, Locale.getDefault()).format(Date(dataAtMs))
+                    String.format(noNewBatchText, time)
+                } else {
+                    noNewBatchPlain
+                }
+                snackbarHostState.showSnackbar(message, duration = SnackbarDuration.Short)
             }
         }
     }

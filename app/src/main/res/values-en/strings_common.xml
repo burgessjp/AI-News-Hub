@@ -23,6 +23,9 @@
     <string name="common_translate_config_missing">Set up the translation service in Settings → Translate first</string>
     <!-- Offline fallback: shown once when archive fetches fall back to disk data -->
     <string name="offline_banner">You\'re offline — showing cached data</string>
+    <!-- Pull-to-refresh found no new batch: archive updates a few times a day -->
+    <string name="refresh_no_new_batch">You\'re up to date · data generated at %1$s</string>
+    <string name="refresh_no_new_batch_plain">You\'re up to date</string>
 
     <!-- ===== Error messages (UiState.toUiError by ErrorKind) ===== -->
     <string name="error_no_data">Today\'s content isn\'t available yet, please try again later</string>

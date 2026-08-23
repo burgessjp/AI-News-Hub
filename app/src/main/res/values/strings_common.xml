@@ -35,6 +35,9 @@
     <string name="common_translate_config_missing">请先在 设置 → 翻译 中配置翻译服务</string>
     <!-- 离线兜底:归档取数网络失败但盘上有旧数据时提示一次 -->
     <string name="offline_banner">网络不可用，正在展示缓存数据</string>
+    <!-- 下拉刷新后批次未变化:归档一天只更数批,主动说清非实时 -->
+    <string name="refresh_no_new_batch">已是最新批次 · 数据生成于 %1$s</string>
+    <string name="refresh_no_new_batch_plain">已是最新批次</string>
 
     <!-- ===== 错误文案(UiState.toUiError 按 ErrorKind 取词) ===== -->
     <string name="error_no_data">今日内容尚未更新,请稍后再试</string>

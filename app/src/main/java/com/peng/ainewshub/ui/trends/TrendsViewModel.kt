@@ -9,6 +9,8 @@ import com.peng.ainewshub.R
 import com.peng.ainewshub.data.AppException
 import com.peng.ainewshub.data.TrendsDigest
 import com.peng.ainewshub.data.TrendsRepository
+import com.peng.ainewshub.data.source.ArchiveHttpClient
+import com.peng.ainewshub.ui.RefreshNotices
 import com.peng.ainewshub.ui.i18n.localized
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
@@ -68,11 +70,20 @@ class TrendsViewModel(application: Application) : AndroidViewModel(application) 
         _isRefreshing.value = true
         // 已有内容时保留展示,后台重读;否则进 Loading
         if (_state.value !is TrendsState.Success) _state.value = TrendsState.Loading
+        // 强刷前的批次指纹:Success 保留旧内容,天然提供「刷新前」参照
+        val previousGeneratedAt = (_state.value as? TrendsState.Success)?.digest?.generatedAt
         viewModelScope.launch {
             val startedAt = SystemClock.elapsedRealtime()
             try {
                 repo.loadTrends(force).fold(
                     onSuccess = {
+                        // 强刷成功但批次指纹未变(且非离线兜底)→ 告知「已是最新批次」,
+                        // 消除「刷新了却没变化 = App 坏了」的误解(归档一天只更数批)
+                        if (force && previousGeneratedAt == it.generatedAt &&
+                            !ArchiveHttpClient.offlineMode.value
+                        ) {
+                            RefreshNotices.notifyNoNewBatch(it.generatedAt)
+                        }
                         _state.value = TrendsState.Success(it)
                     },
                     onFailure = { e ->

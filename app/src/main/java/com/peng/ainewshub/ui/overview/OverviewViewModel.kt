@@ -9,6 +9,8 @@ import com.peng.ainewshub.R
 import com.peng.ainewshub.data.AppException
 import com.peng.ainewshub.data.OverviewDigest
 import com.peng.ainewshub.data.OverviewRepository
+import com.peng.ainewshub.data.source.ArchiveHttpClient
+import com.peng.ainewshub.ui.RefreshNotices
 import com.peng.ainewshub.ui.i18n.localized
 import com.peng.ainewshub.widget.HotNowWidgetUpdater
 import kotlinx.coroutines.CancellationException
@@ -67,11 +69,20 @@ class OverviewViewModel(application: Application) : AndroidViewModel(application
         _isRefreshing.value = true
         // 已有内容时保留展示,后台重读;否则进 Loading
         if (_state.value !is OverviewState.Success) _state.value = OverviewState.Loading
+        // 强刷前的批次指纹:Success 保留旧内容,天然提供「刷新前」参照
+        val previousGeneratedAt = (_state.value as? OverviewState.Success)?.digest?.generatedAt
         viewModelScope.launch {
             val startedAt = SystemClock.elapsedRealtime()
             try {
                 repo.loadDigest(force).fold(
                     onSuccess = {
+                        // 强刷成功但批次指纹未变(且非离线兜底)→ 告知「已是最新批次」,
+                        // 消除「刷新了却没变化 = App 坏了」的误解(归档一天只更数批)
+                        if (force && previousGeneratedAt == it.generatedAt &&
+                            !ArchiveHttpClient.offlineMode.value
+                        ) {
+                            RefreshNotices.notifyNoNewBatch(it.generatedAt)
+                        }
                         _state.value = OverviewState.Success(it)
                         // 联动刷新「今日热点」小组件(同进程命中 ArchiveHttpClient 2 分钟
                         // 内存缓存,零额外网络;失败静默,不影响本页 UI 态)

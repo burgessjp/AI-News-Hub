@@ -9,6 +9,7 @@ import com.peng.ainewshub.data.AiConfigStore
 import com.peng.ainewshub.data.ShortContentException
 import com.peng.ainewshub.data.SourceListResult
 import com.peng.ainewshub.data.TranslationRepository
+import com.peng.ainewshub.data.source.ArchiveHttpClient
 import com.peng.ainewshub.data.source.SourceMode
 import com.peng.ainewshub.ui.i18n.localized
 import com.peng.ainewshub.ui.more.SettingsStore
@@ -103,8 +104,19 @@ abstract class SourceListViewModel<T>(application: Application) : AndroidViewMod
         viewModelScope.launch {
             val startedAt = SystemClock.elapsedRealtime()
             try {
+                // 强刷前的批次指纹(上次成功数据的落盘时刻)
+                val previousFetchedAt = _lastRefreshAt.value
                 runCatching { doForceRefresh() }
-                    .onSuccess { handleSuccess(it) }
+                    .onSuccess {
+                        // 强刷成功但数据落盘时刻未变(且非离线兜底)→ 告知「已是最新批次」,
+                        // 消除「刷新了却没变化 = App 坏了」的误解(归档一天只更数批)
+                        if (previousFetchedAt != null && previousFetchedAt == it.fetchedAt &&
+                            !ArchiveHttpClient.offlineMode.value
+                        ) {
+                            RefreshNotices.notifyNoNewBatch(it.fetchedAt)
+                        }
+                        handleSuccess(it)
+                    }
                     .onFailure {
                         // 有旧数据就保留(保可用),无数据才显示错误。
                         if (_state.value !is UiState.Success) {
