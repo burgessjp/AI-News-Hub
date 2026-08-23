@@ -31,7 +31,7 @@ internal data class ChangelogSection(
     val entries: List<String>
 )
 
-/** 版本节标题：`## [1.2.3] - 2026-08-16` 或 `## [Unreleased]`。 */
+/** 版本节标题：`## [1.2.3] - 2026-08-16` 或 `## [Unreleased]` / `## [未发布]`。 */
 private val VERSION_HEADER_REGEX = Regex("^##\\s+\\[([^]]+)](?:\\s+-\\s+(.+))?$")
 
 /** 解析 CHANGELOG.md 全文。输入为空或格式异常时返回空列表。 */
@@ -60,8 +60,9 @@ internal fun parseChangelog(text: String): List<ChangelogVersion> {
                 val match = VERSION_HEADER_REGEX.find(line)
                 if (match != null) {
                     val tag = match.groupValues[1].trim()
-                    // Unreleased 是开发中内容，App 内不展示
-                    if (!tag.equals("unreleased", ignoreCase = true)) {
+                    // Unreleased/未发布 是开发中内容，App 内不展示
+                    val unreleased = tag.equals("unreleased", ignoreCase = true) || tag == "未发布"
+                    if (!unreleased) {
                         currentVersion = MutableVersion(
                             version = tag,
                             date = match.groupValues[2].trim().ifEmpty { null }
