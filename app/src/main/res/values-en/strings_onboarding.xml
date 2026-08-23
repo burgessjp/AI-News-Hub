@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- English translations. Terminology: see values/strings_onboarding.xml header. -->
+<resources>
+    <string name="onboarding_title">Welcome to AI News Hub</string>
+    <string name="onboarding_subtitle">Understand the AI world in 3 minutes a day</string>
+
+    <string name="onboarding_item_brief_title">AI reads the day\'s news for you</string>
+    <string name="onboarding_item_brief_desc">8 quality sources are fetched ahead of time by the data pipeline with Chinese digests — open and read, no waiting</string>
+    <string name="onboarding_item_batch_title">Content updates in batches, not real-time</string>
+    <string name="onboarding_item_batch_desc">Data refreshes several times a day on a schedule; a pull-to-refresh saying \"You\'re up to date\" means this batch has nothing new</string>
+    <string name="onboarding_item_reading_title">A reader that stays out of your way</string>
+    <string name="onboarding_item_reading_desc">The built-in reader supports reader mode, AI page translation and resume reading; tap the star while reading to save for later</string>
+    <string name="onboarding_item_tips_title">A few tips</string>
+    <string name="onboarding_item_tips_desc">Tap the active tab again to scroll to top and refresh; drag the voice-brief pill to tuck it away; long-press to reorder sources on the Sources page</string>
+
+    <string name="onboarding_start">Get started</string>
+</resources>

@@ -376,6 +376,11 @@ internal fun AiNewsHubApp(
         onToggleDailyNotify = onToggleDailyNotify
     )
 
+    // 首启引导展示状态(上提):升级用户可能同时满足冷启动新数据弹窗的触发条件
+    // (通知开关已开 + 批次指纹落后 + 引导未看过),两个弹窗须互斥 —— 引导优先,
+    // 新数据弹窗排队等引导关闭后再弹(见 NewDataPromptHost 的 deferWhile)。
+    var onboardingActive by remember { mutableStateOf(false) }
+
     AiNewsHubTheme(
         darkTheme = darkTheme,
         dynamicColor = dynamicColor,
@@ -467,14 +472,24 @@ internal fun AiNewsHubApp(
                 // 整条可拖,松手后吸附到左右边缘并缩小为悬浮球。显隐由服务 state 驱动。
                 TtsFloatingPill(modifier = Modifier.align(Alignment.TopStart))
             }
+
+            // 首次启动引导:一次性 BottomSheet,悬浮于任意 tab / 二级页之上。须挂在
+            // AiNewsHubTheme 内 —— ModalBottomSheet 沿调用处 CompositionLocal 取主题色,
+            // 放主题外深色模式会退化成默认浅色。
+            OnboardingHost(
+                settingsStore = settingsStore,
+                onActiveChanged = { onboardingActive = it }
+            )
         }
     }
 
     // 冷启动新数据全局弹窗:悬浮于任意 tab / 二级页之上(检查与渲染见 NewDataPromptHost)。
     // 「查看」直达总览根页(切 tab + 清空该 tab 二级栈);数据经 ArchiveHttpClient
     // 共享 2 分钟缓存(与总览 Tab 取数同源),到屏时已是最新,无需再触发刷新。
+    // deferWhile:与首启引导互斥 —— 引导展示期间暂停弹窗渲染,关闭后补弹(引导优先)。
     NewDataPromptHost(
         settingsStore = settingsStore,
-        onGoOverview = { nav.goToRoot(AppTab.Overview) }
+        onGoOverview = { nav.goToRoot(AppTab.Overview) },
+        deferWhile = onboardingActive
     )
 }

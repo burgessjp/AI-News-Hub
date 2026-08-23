@@ -129,6 +129,21 @@ class SettingsStore(context: Context) {
         dataStore.edit { it[KEY_LAST_NOTIFY_CHECK_AT] = ms }
     }
 
+    // ===== 首次启动引导 =====
+
+    /**
+     * 首次启动引导是否已完成;false = 尚未展示过。一次性标志,不进 [DisplayPrefs]。
+     * 布尔键无历史版本记录:存量老用户升级到引导功能上线版本后也会看到一次
+     * (正好借此传达「批次制更新」的产品心智,见 ui/nav/OnboardingSheet.kt)。
+     */
+    val onboardingDoneFlow: Flow<Boolean> = dataStore.data.map { p ->
+        p[KEY_ONBOARDING_DONE] ?: false
+    }
+
+    suspend fun setOnboardingDone() {
+        dataStore.edit { it[KEY_ONBOARDING_DONE] = true }
+    }
+
     // ===== 搜索历史 =====
 
     /**
@@ -270,6 +285,7 @@ class SettingsStore(context: Context) {
         val KEY_DAILY_NOTIFY = booleanPreferencesKey("daily_notify")
         val KEY_LAST_NOTIFIED_OVERVIEW_AT = longPreferencesKey("last_notified_overview_at")
         val KEY_LAST_NOTIFY_CHECK_AT = longPreferencesKey("last_notify_check_at")
+        val KEY_ONBOARDING_DONE = booleanPreferencesKey("onboarding_done")
         const val MAX_SEARCH_HISTORY = 10
     }
 }

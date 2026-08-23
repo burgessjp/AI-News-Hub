@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  首次启动引导文案(中文全集,默认 locale;英文在 values-en/strings_onboarding.xml)。
+  措辞刻意泛化:不写死批次时刻(流水线时间会调)、不穷举功能(会过期),
+  只讲「猜不到且影响预期」的四件事;共用条(common_* / refresh_no_new_batch 等)
+  一律复用 strings_common.xml。
+-->
+<resources>
+    <string name="onboarding_title">欢迎使用 AI News Hub</string>
+    <string name="onboarding_subtitle">每天 3 分钟，看懂 AI 圈发生了什么</string>
+
+    <string name="onboarding_item_brief_title">AI 帮你读好每天的大事</string>
+    <string name="onboarding_item_brief_desc">8 个优质信源由数据流水线提前抓取并生成中文摘要，打开即读、无需等待</string>
+    <string name="onboarding_item_batch_title">内容按批次更新，不是实时</string>
+    <string name="onboarding_item_batch_desc">每天定时批量更新数次；下拉刷新提示「已是最新批次」，即代表本批没有新内容</string>
+    <string name="onboarding_item_reading_title">顺手的阅读体验</string>
+    <string name="onboarding_item_reading_desc">内置阅读器支持阅读模式、AI 整页翻译与续读；阅读中点顶部星标可收藏稍后读</string>
+    <string name="onboarding_item_tips_title">几个小技巧</string>
+    <string name="onboarding_item_tips_desc">重击底部标签页回到顶部并刷新；语音速报浮窗可拖拽收起；「信息源」页长按可拖拽排序</string>
+
+    <string name="onboarding_start">开始使用</string>
+</resources>

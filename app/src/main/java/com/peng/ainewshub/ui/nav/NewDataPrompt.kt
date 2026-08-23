@@ -48,12 +48,17 @@ private object NewDataPromptGate {
  * 确认/忽略都写回指纹(= 用户已感知该批次),语义上与每日通知互补:每天至多 1 条
  * 提醒,通知与弹窗任一形式先触达即静默;用户冷启动在先,当天批次就不再推送打扰。
  *
+ * [deferWhile] 为 true 时(首启引导正在展示)只照常探测、**暂停弹窗渲染**,引导
+ * 关闭后参数翻 false 随重组补弹 —— 升级用户可能同时满足两个弹窗的触发条件
+ * (通知开关已开 + 批次指纹落后 + 引导未看过),不互斥会双层弹窗同屏;引导优先。
+ *
  * onGoOverview:「查看」直达总览根页(切 tab + 清空该 tab 二级栈)。
  */
 @Composable
 internal fun NewDataPromptHost(
     settingsStore: SettingsStore,
-    onGoOverview: () -> Unit
+    onGoOverview: () -> Unit,
+    deferWhile: Boolean = false
 ) {
     val scope = rememberCoroutineScope()
     var newDataPrompt by remember { mutableStateOf<NewDataPrompt?>(null) }
@@ -87,7 +92,8 @@ internal fun NewDataPromptHost(
         }
     }
 
-    newDataPrompt?.let { prompt ->
+    // 引导展示期间不渲染(探测照常);引导关闭后 deferWhile 翻 false,此处随重组补弹
+    newDataPrompt?.takeIf { !deferWhile }?.let { prompt ->
         AlertDialog(
             onDismissRequest = { dismissNewDataPrompt(prompt) },
             title = { Text(stringResource(R.string.notify_daily_title)) },
