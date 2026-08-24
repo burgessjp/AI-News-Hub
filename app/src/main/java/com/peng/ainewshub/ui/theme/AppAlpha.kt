@@ -17,6 +17,7 @@ package com.peng.ainewshub.ui.theme
  *  - [bottomBarSurface]: 底栏近实底(遮内容透出)            0.94f
  *  - [hairlineOverlay]:  发丝分隔线(顶栏下缘)                0.50f
  *  - [glassEdge]:        玻璃边缘高光描边(白色)              0.30f
+ *  - [selectedTabWash]:  底栏选中 tab 水洗底(onSurface 基色)     0.12f
  *  - [chipOverlay]:      标签 chip 弱化底                    0.60f
  *  - [badgeOutline]:     徽章同色描边                        0.20f
  *  - [neutralOverlay]:   中性灰弱化底                        0.20f
@@ -54,6 +55,11 @@ object AppAlpha {
 
     /** 玻璃边缘高光描边 —— 底栏药丸的白色半透明描边,模拟玻璃边缘反光。 */
     const val glassEdge: Float = 0.3f
+
+    /** 选中 tab 水洗底 —— 底栏药丸内选中项的半透明底,基色 onSurface:浅色下近黑
+     *  (选中项压深)、深色下近白(提亮),始终朝与底栏底色相反的方向走,保证对比;
+     *  纯白基色在浅色底栏上几乎隐形,不可用。比 [glassEdge] 描边更淡(面要退让于线)。 */
+    const val selectedTabWash: Float = 0.12f
 
     /** 标签 chip 弱化底 —— secondaryContainer 降透明做浅底小标签。 */
     const val chipOverlay: Float = 0.6f

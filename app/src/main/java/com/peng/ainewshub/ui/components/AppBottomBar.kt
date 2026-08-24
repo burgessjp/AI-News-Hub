@@ -115,7 +115,8 @@ val BottomBarPillHeight = 56.dp
  *    + 1px 白色半透明描边(AppAlpha.glassEdge,近实底下仍有型的玻璃边缘高光)
  *  - 容器内边距:horizontal 24dp / vertical 4dp(紧凑化:原 12dp 偏高,
  *    药丸整体高度压缩约 1/3,只收内间距,图标/字号不动)
- *  - 选中项:secondary-container 实心填充药丸 + on-secondary-container 文字/图标 +
+ *  - 选中项:onSurface 半透明水洗药丸(AppAlpha.selectedTabWash,浅色压深/深色
+ *    提亮,与底栏底色反向保证对比) + secondary 文字/图标 +
  *    实心图标(FILL 1);未选中:透明 + on-surface-variant + 描边图标(FILL 0)
  *
  * 调用方负责:(1) 在 Box 内用 Modifier.align(BottomCenter) 定位;(2) 给内容区补底部
@@ -165,11 +166,14 @@ fun AppBottomBar(
  * 药丸内单项。
  *
  * 视觉:
- *  - 选中:secondary-container 实心填充的圆角药丸(horizontal 20dp / vertical 4dp),
- *    图标用 Filled 实心变体(FILL 1),图标/文字着 on-secondary-container
+ *  - 选中:onSurface 半透明水洗圆角药丸(horizontal 20dp / vertical 4dp,
+ *    AppAlpha.selectedTabWash,浅色压深/深色提亮,与底栏底色反向保证对比),
+ *    图标用 Filled 实心变体(FILL 1),图标/文字着 secondary(深浅两套色板均为
+ *    可辨紫,见 Color.kt 的 fixed-dim 设计;secondaryContainer 深色值过暗,
+ *    不可用作内容色)
  *  - 未选中:透明底(horizontal 8dp / vertical 4dp),图标用 Outlined 描边变体(FILL 0),
  *    图标/文字着 on-surface-variant
- *  - 点击:无 ripple;状态靠填充色 + 图标 FILL 表达
+ *  - 点击:无 ripple;状态靠水洗底 + 图标 FILL 表达
  */
 @Composable
 private fun NavPillItem(
@@ -181,13 +185,18 @@ private fun NavPillItem(
     val interactionSource = remember { MutableInteractionSource() }
     // 选中:实心图标(FILL 1);未选中:描边图标(FILL 0)
     val icon = if (selected) tab.selectedIcon else tab.icon
-    // 选中:on-secondary-container;未选中:on-surface-variant
-    val tint = if (selected) cs.onSecondaryContainer else cs.onSurfaceVariant
+    // 选中:secondary 着色到图标/文字(深浅色板均为可辨紫,无需模式判断;
+    // secondaryContainer 深色值过暗不可用);未选中:on-surface-variant
+    val tint = if (selected) cs.secondary else cs.onSurfaceVariant
     Box(
         modifier = Modifier
             .clip(CircleShape)
-            // 选中:secondary-container 实心填充;未选中:透明
-            .background(if (selected) cs.secondaryContainer else Color.Transparent)
+            // 选中:onSurface 半透明水洗底(浅色压深/深色提亮,与底栏底色反向);
+            // 未选中:透明
+            .background(
+                if (selected) cs.onSurface.copy(alpha = AppAlpha.selectedTabWash)
+                else Color.Transparent
+            )
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
