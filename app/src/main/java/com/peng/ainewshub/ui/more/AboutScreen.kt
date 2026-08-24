@@ -1,10 +1,12 @@
 package com.peng.ainewshub.ui.more
 
 import android.widget.Toast
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -19,15 +21,18 @@ import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.TravelExplore
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -74,6 +79,7 @@ import java.io.File
  *
  * 版本号取自 build.gradle.kts 的 versionName(运行时 PackageManager 读取,避免硬编码漂移)。
  */
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun AboutScreen(
     onBack: () -> Unit,
@@ -259,92 +265,108 @@ fun AboutScreen(
     }
 
     // 发现新版本弹窗:状态机驱动 —— 待下载(版本号 + 说明截断)→ 下载中(进度条)→
-    // 完成(「安装」)/ 失败(重试 + 网页兜底)。始终保留「查看更新日志」与「忽略」,
-    // 下载中「忽略」兼作取消
+    // 完成(「安装」)/ 失败(重试 + 网页兜底)。底部半屏样式(对齐 OnboardingSheet):
+    // 主操作为全宽按钮(按状态切换),次操作收为下方居中文字按钮;始终保留
+    // 「查看更新日志」与「忽略」,下载中「忽略」兼作取消
     updateInfo?.let { info ->
-        AlertDialog(
+        ModalBottomSheet(
             onDismissRequest = { if (!downloading) updateInfo = null },
-            title = {
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 16.dp)
+            ) {
                 Text(
                     text = stringResource(R.string.about_update_available_title, info.version),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
+                    style = AppText.titleSection,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
-            },
-            text = {
-                Column {
-                    when {
-                        downloading -> {
-                            val progress = downloadProgress
-                            if (progress != null) {
-                                LinearProgressIndicator(
-                                    progress = { progress },
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                                Text(
-                                    text = stringResource(
-                                        R.string.about_update_downloading_percent,
-                                        (progress * 100).toInt()
-                                    ),
-                                    style = AppText.caption,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(top = 8.dp)
-                                )
-                            } else {
-                                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                                Text(
-                                    text = stringResource(R.string.about_update_downloading),
-                                    style = AppText.caption,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(top = 8.dp)
-                                )
-                            }
-                        }
-                        downloadFailed -> Text(
-                            text = stringResource(R.string.about_update_download_failed),
-                            style = AppText.bodySmall,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                        downloadedApk != null -> Text(
-                            text = stringResource(R.string.about_update_download_done),
-                            style = AppText.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        else -> if (info.notes.isNotBlank()) {
+                Spacer(Modifier.height(16.dp))
+                when {
+                    downloading -> {
+                        val progress = downloadProgress
+                        if (progress != null) {
+                            LinearProgressIndicator(
+                                progress = { progress },
+                                modifier = Modifier.fillMaxWidth()
+                            )
                             Text(
-                                text = info.notes,
-                                style = AppText.bodySmall,
+                                text = stringResource(
+                                    R.string.about_update_downloading_percent,
+                                    (progress * 100).toInt()
+                                ),
+                                style = AppText.caption,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 12,
-                                overflow = TextOverflow.Ellipsis
+                                modifier = Modifier.padding(top = 8.dp)
+                            )
+                        } else {
+                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                            Text(
+                                text = stringResource(R.string.about_update_downloading),
+                                style = AppText.caption,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 8.dp)
                             )
                         }
                     }
-                }
-            },
-            confirmButton = {
-                when {
-                    downloading -> TextButton(onClick = {
-                        UpdateDownloader.cancel()
-                        downloadJob?.cancel()
-                    }) {
-                        Text(stringResource(R.string.common_cancel))
-                    }
-                    downloadFailed -> TextButton(onClick = { startDownload(info) }) {
-                        Text(stringResource(R.string.common_retry))
-                    }
-                    downloadedApk != null -> TextButton(
-                        onClick = { downloadedApk?.let(::install) }
-                    ) {
-                        Text(stringResource(R.string.about_update_install))
-                    }
-                    else -> TextButton(onClick = { startDownload(info) }) {
-                        Text(stringResource(R.string.about_update_download))
+                    downloadFailed -> Text(
+                        text = stringResource(R.string.about_update_download_failed),
+                        style = AppText.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                    downloadedApk != null -> Text(
+                        text = stringResource(R.string.about_update_download_done),
+                        style = AppText.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    else -> if (info.notes.isNotBlank()) {
+                        Text(
+                            text = info.notes,
+                            style = AppText.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 12,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
                 }
-            },
-            dismissButton = {
-                Row {
+                Spacer(Modifier.height(24.dp))
+                // 主操作(按状态切换):下载中取消 / 失败重试 / 已下载安装 / 默认下载
+                Button(
+                    onClick = {
+                        when {
+                            downloading -> {
+                                UpdateDownloader.cancel()
+                                downloadJob?.cancel()
+                            }
+                            downloadFailed -> startDownload(info)
+                            downloadedApk != null -> downloadedApk?.let(::install)
+                            else -> startDownload(info)
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = stringResource(
+                            when {
+                                downloading -> R.string.common_cancel
+                                downloadFailed -> R.string.common_retry
+                                downloadedApk != null -> R.string.about_update_install
+                                else -> R.string.about_update_download
+                            }
+                        ),
+                        style = AppText.body,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+                // 次操作:失败时网页兜底 / 更新日志 / 忽略。FlowRow 居中排布,
+                // 英文文案较长时自动换行不溢出
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center
+                ) {
                     // 下载失败时额外给网页兜底入口(直链异常时仍可手动下载)
                     if (downloadFailed) {
                         TextButton(onClick = {
@@ -373,7 +395,7 @@ fun AboutScreen(
                     }
                 }
             }
-        )
+        }
     }
 }
 

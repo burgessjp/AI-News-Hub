@@ -1,8 +1,16 @@
 package com.peng.ainewshub.ui.nav
 
-import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -10,10 +18,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import com.peng.ainewshub.R
 import com.peng.ainewshub.data.source.ArchiveHttpClient
 import com.peng.ainewshub.ui.more.SettingsStore
+import com.peng.ainewshub.ui.theme.AppText
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -21,7 +33,7 @@ import kotlinx.coroutines.launch
 /**
  * 冷启动新数据弹窗载荷。
  *
- * [generatedAt] 为最新批次指纹(latest_overview.generatedAt),弹窗确认/忽略时写回
+ * [generatedAt] 为最新批次指纹(latest_overview.generatedAt),弹窗关闭时写回
  * `lastNotified_overview_at`(与每日通知共用,见 [NewDataPromptHost] 注释);[digest] 为今日综述
  * 正文(流水线内容,始终中文;空则弹窗正文退回 fallback 文案)。
  */
@@ -45,19 +57,17 @@ private object NewDataPromptGate {
  *
  * 冷启动新数据弹窗随「每日更新通知」开关,与通知共用批次指纹 lastNotifiedOverviewAt
  * —— 开关开启且最新 latest_overview.generatedAt 领先指纹 → 全局弹窗提示。
- * 确认/忽略都写回指纹(= 用户已感知该批次),语义上与每日通知互补:每天至多 1 条
- * 提醒,通知与弹窗任一形式先触达即静默;用户冷启动在先,当天批次就不再推送打扰。
+ * 关闭(「我知道了」/ 点外部 / 下滑)都写回指纹(= 用户已感知该批次),语义上与每日
+ * 通知互补:每天至多 1 条提醒,通知与弹窗任一形式先触达即静默;用户冷启动在先,
+ * 当天批次就不再推送打扰。
  *
  * [deferWhile] 为 true 时(首启引导正在展示)只照常探测、**暂停弹窗渲染**,引导
  * 关闭后参数翻 false 随重组补弹 —— 升级用户可能同时满足两个弹窗的触发条件
  * (通知开关已开 + 批次指纹落后 + 引导未看过),不互斥会双层弹窗同屏;引导优先。
- *
- * onGoOverview:「查看」直达总览根页(切 tab + 清空该 tab 二级栈)。
  */
 @Composable
 internal fun NewDataPromptHost(
     settingsStore: SettingsStore,
-    onGoOverview: () -> Unit,
     deferWhile: Boolean = false
 ) {
     val scope = rememberCoroutineScope()
@@ -94,21 +104,53 @@ internal fun NewDataPromptHost(
 
     // 引导展示期间不渲染(探测照常);引导关闭后 deferWhile 翻 false,此处随重组补弹
     newDataPrompt?.takeIf { !deferWhile }?.let { prompt ->
-        AlertDialog(
-            onDismissRequest = { dismissNewDataPrompt(prompt) },
-            title = { Text(stringResource(R.string.notify_daily_title)) },
-            text = { Text(prompt.digest ?: stringResource(R.string.notify_daily_text_fallback)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    dismissNewDataPrompt(prompt)
-                    onGoOverview()
-                }) { Text(stringResource(R.string.common_view)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { dismissNewDataPrompt(prompt) }) {
-                    Text(stringResource(R.string.common_ignore))
-                }
-            }
+        NewDataSheet(
+            digest = prompt.digest,
+            onDismiss = { dismissNewDataPrompt(prompt) }
         )
+    }
+}
+
+/**
+ * 冷启动新数据底部半屏提示(对齐 OnboardingSheet 的视觉语言):标题 + 今日综述正文 +
+ * 全宽「我知道了」按钮。按钮点击、点外部、下滑关闭都走 [onDismiss](写回批次指纹)。
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun NewDataSheet(
+    digest: String?,
+    onDismiss: () -> Unit
+) {
+    val cs = MaterialTheme.colorScheme
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 16.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.notify_daily_title),
+                style = AppText.titleSection,
+                color = cs.onSurface
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = digest ?: stringResource(R.string.notify_daily_text_fallback),
+                style = AppText.body,
+                color = cs.onSurfaceVariant
+            )
+            Spacer(Modifier.height(24.dp))
+            Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = stringResource(R.string.common_got_it),
+                    style = AppText.body,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
     }
 }

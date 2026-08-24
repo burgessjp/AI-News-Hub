@@ -480,16 +480,14 @@ internal fun AiNewsHubApp(
                 settingsStore = settingsStore,
                 onActiveChanged = { onboardingActive = it }
             )
+
+            // 冷启动新数据全局弹窗(检查与渲染见 NewDataPromptHost):同为
+            // ModalBottomSheet,同样须挂在主题内(原因同上)。deferWhile:与首启引导
+            // 互斥 —— 引导展示期间暂停弹窗渲染,关闭后补弹(引导优先)。
+            NewDataPromptHost(
+                settingsStore = settingsStore,
+                deferWhile = onboardingActive
+            )
         }
     }
-
-    // 冷启动新数据全局弹窗:悬浮于任意 tab / 二级页之上(检查与渲染见 NewDataPromptHost)。
-    // 「查看」直达总览根页(切 tab + 清空该 tab 二级栈);数据经 ArchiveHttpClient
-    // 共享 2 分钟缓存(与总览 Tab 取数同源),到屏时已是最新,无需再触发刷新。
-    // deferWhile:与首启引导互斥 —— 引导展示期间暂停弹窗渲染,关闭后补弹(引导优先)。
-    NewDataPromptHost(
-        settingsStore = settingsStore,
-        onGoOverview = { nav.goToRoot(AppTab.Overview) },
-        deferWhile = onboardingActive
-    )
 }

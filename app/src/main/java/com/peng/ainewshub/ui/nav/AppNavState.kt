@@ -24,7 +24,7 @@ import com.peng.ainewshub.ui.components.AppTab
  *  - [selectTab] 切 tab:各 tab 二级栈保留;重击当前 tab 时栈非空 → 清空回根,
  *    已在根 → reselectTick++(根屏据此滚回顶部并刷新)
  *  - [push] 进二级页 / [pop] 弹栈顶;isNavigatingBack 记录转场方向(push 前进 / pop 返回)
- *  - [goToRoot] 直达某 tab 根页(冷启动新数据弹窗「查看」):切 tab + 清空该 tab 栈
+ *  - [goToRoot] 直达某 tab 根页(外部深链切 tab):切 tab + 清空该 tab 二级栈
  */
 @Stable
 internal class AppNavState(
