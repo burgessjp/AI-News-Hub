@@ -231,7 +231,11 @@ def _extract_items(source, snapshot, limit=ITEMS_PER_SOURCE):
                     _beijing_date_key_of_iso(_s(o, "createdAt")))
             raw_heat = _raw_heat_producthunt(o)
         elif source == "rundown-ai":
-            view = (i, _s(o, "title"), _s(o, "url"), "", _s(o, "subtitle"), fallback_date_key)
+            # 2026-08 站点改版后快照带真实 publishedAt(北京时间 yyyy-MM-dd HH:mm);
+            # 旧快照无此字段,回退抓取日期(_build_section 里标注「抓取日期」)
+            pub = _s(o, "publishedAt").strip()
+            date_key = pub[:10] if len(pub) >= 10 else fallback_date_key
+            view = (i, _s(o, "title"), _s(o, "url"), "", _s(o, "subtitle"), date_key)
             raw_heat = 0.0  # 无指标源,按序号归一化
         elif source == "stormzhang-ai":
             # "2026-07-15 20:00" 北京时间无时区,直接取前 10 字符(yyyy-MM-dd)
@@ -351,7 +355,7 @@ def _build_section(source, snapshot, data_today=""):
     """
     单源输入段:标题行 + AI 要点(上下文)+ 编号条目(标题/简介/热度/指标/日期)。
     日期显示:与数据日期同年显示 MM-dd;跨年显示完整 yyyy-MM-dd(防上一年旧文看似新鲜);
-    rundown-ai 列表页无文章日期,其日期为抓取兜底,标注「抓取日期」。
+    rundown-ai 条目优先用真实 publishedAt;旧快照无此字段的用抓取兜底,标注「抓取日期」。
     """
     sb = [f"## {source}({SOURCE_TITLES.get(source, source)})"]
     ai_summary = _read_ai_summary(snapshot)
@@ -368,7 +372,11 @@ def _build_section(source, snapshot, data_today=""):
             line += f" | {metrics}"
         if len(date_key) >= 10:
             date_text = date_key[5:] if date_key[:4] == data_today[:4] else date_key
-            if source == "rundown-ai":
+            # rundown-ai 旧快照无 publishedAt,日期为抓取兜底,标注「抓取日期」;
+            # 带真实 publishedAt 的条目正常参与时效判断(同日发布撞抓取日的极少数
+            # 条目会降级为保守处理,可接受)
+            if source == "rundown-ai" and date_key == _beijing_date_key_of_ms(
+                    snapshot.get("fetched_at_ms", 0)):
                 date_text += "(抓取日期)"
             line += f" | {date_text}"
         sb.append(line)
