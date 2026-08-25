@@ -3,7 +3,7 @@
   语音速报域文案(中文全集,默认 locale;英文在 values-en/strings_tts.xml)。
   覆盖:playback/TtsPlaybackService(通知渠道/通知本体/四个控制 action/引擎缺失提示)、
   playback/TtsBriefing(权限拒绝提示)、playback/TtsFloatingPill(应用内播放浮窗)、
-  总览与关注页顶栏播报入口 contentDescription、播放列表拼装词条(首条标题/关注流导语)。
+  总览页顶栏播报入口 contentDescription、播放列表拼装词条(首条标题)。
   术语遵守 values/strings_common.xml 头注释术语表;播报正文(流水线内容)恒中文,
   与每日更新通知同策略。
 -->
@@ -22,7 +22,7 @@
     <string name="tts_action_stop">停止</string>
 
     <!-- ===== 入口与提示 ===== -->
-    <!-- 总览/关注页顶栏播报图标的 contentDescription -->
+    <!-- 总览页顶栏播报图标的 contentDescription -->
     <string name="tts_entry_cd">语音速报</string>
     <!-- 设备无可用的中文 TTS 语音数据(引擎缺失/未装中文包) -->
     <string name="tts_engine_missing">未找到可用的中文语音引擎,请在系统设置的语音库中安装中文语音</string>
@@ -42,8 +42,4 @@
     <!-- ===== 播放列表拼装(首条导语) ===== -->
     <!-- 总览速报首条标题 -->
     <string name="tts_playlist_overview_title">今日速报</string>
-    <!-- 关注速报首条标题 -->
-    <string name="tts_playlist_follows_title">我的关注速报</string>
-    <!-- 关注速报首条导语正文:%1$d=今天命中条数 -->
-    <string name="tts_playlist_follows_intro">我的关注,今天命中 %1$d 条相关内容。</string>
 </resources>

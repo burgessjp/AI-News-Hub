@@ -30,7 +30,6 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.PersonAddAlt
@@ -80,10 +79,7 @@ import com.peng.ainewshub.ui.components.BrandWordmark
 import com.peng.ainewshub.ui.components.RankRowSkeletonList
 import com.peng.ainewshub.ui.components.SectionHeader
 import com.peng.ainewshub.ui.components.rememberReadUrls
-import com.peng.ainewshub.ui.i18n.AppLocale
 import com.peng.ainewshub.ui.more.MAX_FOLLOWED_KEYWORDS
-import com.peng.ainewshub.playback.TtsEntry
-import com.peng.ainewshub.playback.rememberTtsStartHandler
 import com.peng.ainewshub.ui.theme.AppAlpha
 import com.peng.ainewshub.ui.theme.AppText
 import java.text.SimpleDateFormat
@@ -119,9 +115,6 @@ fun FollowsScreen(
     val isRefreshing by vm.isRefreshing.collectAsStateWithLifecycle()
     val readUrls = rememberReadUrls()
     var showManage by rememberSaveable { mutableStateOf(false) }
-    val context = LocalContext.current
-    // 语音速报:通知权限请求 + 服务启动统一收口(见 playback/TtsBriefing.kt)
-    val startBriefing = rememberTtsStartHandler()
 
     // 重击当前 tab:滚回顶部 + 重读语料(归档取数带缓存,低开销;同趋势 tab 套路)。
     // lastHandled 防「重新进入组合就自动刷新」。
@@ -137,34 +130,13 @@ fun FollowsScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
-            // 一级根 tab 规格:品牌 wordmark;右上角语音速报(命中流可朗读)
+            // 一级根 tab 规格:品牌 wordmark;刷新收口到下拉手势(同趋势 tab)
             AppTopBar(
                 title = "AI NEWS HUB",
                 titleContent = {
                     BrandWordmark(modifier = Modifier.height(44.dp))
                 },
-                horizontalPadding = 18.dp,
-                actions = {
-                    // 语音速报入口:朗读命中流(导语 + 各条标题与摘要);无命中时禁用
-                    val canPlay = (state as? UiState.Success)?.data?.items?.isNotEmpty() == true
-                    IconButton(
-                        onClick = {
-                            val ui = (state as? UiState.Success)?.data ?: return@IconButton
-                            startBriefing(buildFollowsPlaylist(context, ui))
-                        },
-                        enabled = canPlay
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.VolumeUp,
-                            contentDescription = stringResource(R.string.tts_entry_cd),
-                            tint = if (canPlay) {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            } else {
-                                MaterialTheme.colorScheme.outline
-                            }
-                        )
-                    }
-                }
+                horizontalPadding = 18.dp
             )
         }
     ) { padding ->
@@ -339,7 +311,7 @@ private fun FollowKeywordChip(text: String, selected: Boolean, onClick: () -> Un
     val cs = MaterialTheme.colorScheme
     Text(
         text = text,
-        style = AppText.caption,
+        style = AppText.bodySmall,
         fontWeight = if (selected) FontWeight.SemiBold else null,
         color = if (selected) cs.onPrimary else cs.onSurfaceVariant,
         maxLines = 1,
@@ -349,7 +321,7 @@ private fun FollowKeywordChip(text: String, selected: Boolean, onClick: () -> Un
             .clip(CircleShape)
             .background(if (selected) cs.primary else cs.surfaceContainerHigh)
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .padding(horizontal = 12.dp, vertical = 6.dp)
     )
 }
 
@@ -559,10 +531,10 @@ private fun FollowsManageSheet(
                 .padding(horizontal = 18.dp)
                 .padding(bottom = 24.dp)
         ) {
+            // 弹层标题对齐全 App 弹层惯例 titleSection(20sp),与 14sp 小节条/12sp chips 拉开层级
             Text(
                 text = stringResource(R.string.follows_manage_title),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
+                style = AppText.titleSection
             )
             Spacer(Modifier.height(12.dp))
             Row(
@@ -597,7 +569,12 @@ private fun FollowsManageSheet(
                 )
             }
             if (keywords.isNotEmpty()) {
-                SectionHeader(title = stringResource(R.string.follows_following_section))
+                // 弹层内容层已统一 18dp 边距:章节条去竖线、清零水平缩进,与其他内容左对齐
+                SectionHeader(
+                    title = stringResource(R.string.follows_following_section),
+                    showAccent = false,
+                    contentPadding = PaddingValues(top = 12.dp, bottom = 6.dp)
+                )
                 FlowRow(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -612,7 +589,11 @@ private fun FollowsManageSheet(
                 }
             }
             if (suggestions.isNotEmpty()) {
-                SectionHeader(title = stringResource(R.string.follows_suggestions_title))
+                SectionHeader(
+                    title = stringResource(R.string.follows_suggestions_title),
+                    showAccent = false,
+                    contentPadding = PaddingValues(top = 12.dp, bottom = 6.dp)
+                )
                 FlowRow(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -685,11 +666,11 @@ private fun FollowRemoveChip(text: String, onRemove: () -> Unit) {
             .clip(CircleShape)
             .background(cs.surfaceContainerHigh)
             .clickable(onClick = onRemove)
-            .padding(start = 12.dp, end = 6.dp, top = 4.dp, bottom = 4.dp)
+            .padding(start = 12.dp, end = 8.dp, top = 6.dp, bottom = 6.dp)
     ) {
         Text(
             text = text,
-            style = AppText.caption,
+            style = AppText.bodySmall,
             color = cs.onSurfaceVariant,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
@@ -717,7 +698,7 @@ private fun FollowSuggestChip(text: String, onClick: () -> Unit) {
     val cs = MaterialTheme.colorScheme
     Text(
         text = text,
-        style = MaterialTheme.typography.bodyMedium,
+        style = AppText.bodySmall,
         color = cs.onSurface,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
@@ -726,7 +707,7 @@ private fun FollowSuggestChip(text: String, onClick: () -> Unit) {
             .clip(CircleShape)
             .background(cs.surfaceContainerHigh)
             .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 8.dp)
+            .padding(horizontal = 12.dp, vertical = 6.dp)
     )
 }
 
@@ -740,32 +721,3 @@ private fun formatFetchedAt(context: Context, ms: Long): String =
     runCatching {
         SimpleDateFormat(context.getString(R.string.date_fmt_month_day_time), Locale.getDefault()).format(Date(ms))
     }.getOrDefault("")
-
-/**
- * 关注速报播放列表:首条 = 命中数导语,其后 = 各命中条目(标题 + 摘要正文)。
- * 在 Composable 点击回调里调用(词条随语言取词)。
- */
-private fun buildFollowsPlaylist(context: Context, ui: FollowsUi): List<TtsEntry> {
-    val localized = AppLocale.wrap(context)
-    val leadTitle = localized.getString(R.string.tts_playlist_follows_title)
-    return buildList {
-        add(
-            TtsEntry(
-                id = "follows-lead",
-                title = leadTitle,
-                text = localized.getString(R.string.tts_playlist_follows_intro, ui.items.size)
-            )
-        )
-        ui.items.forEachIndexed { i, feedItem ->
-            val entry = feedItem.entry
-            val text = buildString {
-                append(entry.title)
-                if (entry.desc.isNotBlank()) {
-                    append("。")
-                    append(entry.desc)
-                }
-            }
-            add(TtsEntry(id = "follows-$i", title = entry.title, text = text))
-        }
-    }
-}

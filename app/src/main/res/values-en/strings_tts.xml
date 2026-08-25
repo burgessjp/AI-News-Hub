@@ -17,7 +17,7 @@
     <string name="tts_action_stop">Stop</string>
 
     <!-- ===== Entry points and hints ===== -->
-    <!-- Content description of the briefing icon in the Overview/Follows top bar -->
+    <!-- Content description of the briefing icon in the Overview top bar -->
     <string name="tts_entry_cd">Voice briefing</string>
     <!-- No usable Chinese TTS voice on the device (engine missing / no zh voice data) -->
     <string name="tts_engine_missing">No Chinese text-to-speech voice found. Install one in system speech settings</string>
@@ -37,8 +37,4 @@
     <!-- ===== Playlist assembly (lead-in entry) ===== -->
     <!-- Lead-in title of the overview briefing -->
     <string name="tts_playlist_overview_title">Today\'s briefing</string>
-    <!-- Lead-in title of the follows briefing -->
-    <string name="tts_playlist_follows_title">My Follows briefing</string>
-    <!-- Lead-in text of the follows briefing: %1$d = today\'s matched items -->
-    <string name="tts_playlist_follows_intro">My follows: %1$d matched items today.</string>
 </resources>

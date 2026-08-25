@@ -2,7 +2,7 @@
 <!--
   「我的关注」域文案(中文全集,默认 locale;英文在 values-en/strings_follows.xml)。
   覆盖:关注 tab 根屏(FollowsScreen)—— 关键词 chips、命中条目、空态、管理弹层;
-  tab 名词条 tab_follows 在 values/strings.xml,语音速报词条在 strings_tts.xml。
+  tab 名词条 tab_follows 在 values/strings.xml。
   术语遵守 values/strings_common.xml 头注释术语表;共用条(common_*/error_* 等)与
   overview_data_until / overview_breaking_tag 等复用不重复造。
 -->
