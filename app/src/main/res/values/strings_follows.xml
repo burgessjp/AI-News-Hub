@@ -1,16 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   「我的关注」域文案(中文全集,默认 locale;英文在 values-en/strings_follows.xml)。
-  覆盖:关注页(FollowsScreen)—— 关键词 chips、命中条目、空态、管理弹层;
-  总览顶栏入口图标的 contentDescription。
+  覆盖:关注 tab 根屏(FollowsScreen)—— 关键词 chips、命中条目、空态、管理弹层;
+  tab 名词条 tab_follows 在 values/strings.xml,语音速报词条在 strings_tts.xml。
   术语遵守 values/strings_common.xml 头注释术语表;共用条(common_*/error_* 等)与
   overview_data_until / overview_breaking_tag 等复用不重复造。
 -->
 <resources>
-    <!-- 页面顶栏标题 -->
-    <string name="follows_title">我的关注</string>
-    <!-- 总览顶栏入口图标的 contentDescription -->
-    <string name="follows_entry_cd">打开我的关注</string>
     <!-- 顶部统计行:%1$d=关注词数,%2$d=今天命中条数 -->
     <string name="follows_stats_caption">已关注 %1$d 个关键词 · 今天命中 %2$d 条</string>
 

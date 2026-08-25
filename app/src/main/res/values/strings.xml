@@ -4,6 +4,7 @@
     <!-- 底部导航 tab -->
     <string name="tab_overview">总览</string>
     <string name="tab_summary">摘要</string>
+    <string name="tab_follows">关注</string>
     <string name="tab_trends">趋势</string>
     <string name="tab_more">更多</string>
 

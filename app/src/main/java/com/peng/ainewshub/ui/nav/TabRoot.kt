@@ -4,6 +4,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.runtime.Composable
 import com.peng.ainewshub.ui.components.AppTab
+import com.peng.ainewshub.ui.follows.FollowsScreen
 import com.peng.ainewshub.ui.more.MoreScreen
 import com.peng.ainewshub.ui.overview.OverviewScreen
 import com.peng.ainewshub.ui.summary.SummaryScreen
@@ -20,6 +21,7 @@ internal fun TabRoot(
     reselectTick: Int,
     summaryPagerState: PagerState,
     overviewListState: LazyListState,
+    followsListState: LazyListState,
     trendsListState: LazyListState,
     onOpenUrl: (String, String, String?) -> Unit
 ) {
@@ -45,11 +47,15 @@ internal fun TabRoot(
             // 摘要条目点击直达原文(走 openUrl 单点:内置 WebView + 记浏览历史)
             onOpenUrl = { url, title, source -> onOpenUrl(url, title, source) }
         )
+        // 关注 tab 根屏:关键词订阅的当日命中流(原为趋势页顶栏进入的二级页,现升为根 tab)
+        AppTab.Follows -> FollowsScreen(
+            onOpenUrl = { url, title, source -> onOpenUrl(url, title, source) },
+            listState = followsListState,
+            reselectSignal = reselectTick
+        )
         AppTab.Trends -> TrendsScreen(
             onOpenUrl = onOpenUrl,
             onOpenCloud = { nav.push(Page.TrendsCloud) },
-            // 顶栏关注图标 → 我的关注独立页(关键词订阅的当日命中流;趋势页同是关键词场景)
-            onOpenFollows = { nav.push(Page.Follows) },
             listState = trendsListState,
             reselectSignal = reselectTick
         )

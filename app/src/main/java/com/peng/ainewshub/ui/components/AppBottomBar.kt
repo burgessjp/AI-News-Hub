@@ -19,9 +19,11 @@ import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Insights
+import androidx.compose.material.icons.filled.PersonAddAlt
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.Insights
+import androidx.compose.material.icons.outlined.PersonAddAlt
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -41,7 +43,7 @@ import com.peng.ainewshub.ui.theme.AppAlpha
 import com.peng.ainewshub.ui.theme.AppText
 
 /**
- * 根 tab 集合(总览 / 摘要 / 趋势 / 更多,entries 顺序即底栏顺序)。
+ * 根 tab 集合(总览 / 摘要 / 关注 / 趋势 / 更多,entries 顺序即底栏顺序)。
  *
  * 设计稿(参考 system_stream_editorial)用图标 FILL 区分选中态:
  *  - 选中:[selectedIcon] 实心(Filled)变体
@@ -49,6 +51,8 @@ import com.peng.ainewshub.ui.theme.AppText
  *
  * 「总览」是默认首页:端侧 AI 对全部归档源榜单的当日综合分析(OverviewScreen)。
  * 「趋势」是流水线纯统计的跨源热词榜(TrendsScreen,读归档 trends.json)。
+ * 「关注」是关键词订阅的当日命中流(FollowsScreen),原为趋势页顶栏图标进入的
+ * 二级页(Page.Follows),现升为根 tab,沿用入口原「人形+加号」图标语义。
  * 「AIHot 精选」原为独立根 tab,现改为从「更多」页进入的二级页(Page.FeaturedHub),
  * 精选 tab 的 Whatshot 图标语义迁移到 MoreScreen 浏览组入口。
  *
@@ -70,6 +74,11 @@ enum class AppTab(
         R.string.tab_summary,
         Icons.Outlined.AutoAwesome,
         Icons.Filled.AutoAwesome
+    ),
+    Follows(
+        R.string.tab_follows,
+        Icons.Outlined.PersonAddAlt,
+        Icons.Filled.PersonAddAlt
     ),
     Trends(
         R.string.tab_trends,
@@ -146,8 +155,9 @@ fun AppBottomBar(
         )
     ) {
         Row(
-            // 容器内边距:横向维持 24dp,纵向收紧到 4dp(原 12dp,压缩药丸高度)
-            modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
+            // 容器内边距:横向 16dp(原 24dp,tab 增至 5 个后收紧防英文长词溢出),
+            // 纵向 4dp(原 12dp,压缩药丸高度)
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {

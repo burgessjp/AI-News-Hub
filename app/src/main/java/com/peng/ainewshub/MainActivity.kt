@@ -111,7 +111,7 @@ class MainActivity : ComponentActivity() {
      * 解析 ainewshub:// 深链(非本 scheme 或路由不认识返回 null):
      *  - ainewshub://web?url=<encoded>&title=<encoded>&source=<encoded> → 内置 WebView
      *    (url 仅接受 http/https,防 file:// 等本地 scheme 注入)
-     *  - ainewshub://tab/<overview|summary|trends|more> → 切根 tab
+     *  - ainewshub://tab/<overview|summary|follows|trends|more> → 切根 tab
      *  - ainewshub://settings → 设置页
      */
     private fun Intent.deepLink(): DeepLink? {
@@ -138,6 +138,7 @@ class MainActivity : ComponentActivity() {
     private fun tabOf(name: String?): AppTab? = when (name) {
         "overview" -> AppTab.Overview
         "summary" -> AppTab.Summary
+        "follows" -> AppTab.Follows
         "trends" -> AppTab.Trends
         "more" -> AppTab.More
         else -> null

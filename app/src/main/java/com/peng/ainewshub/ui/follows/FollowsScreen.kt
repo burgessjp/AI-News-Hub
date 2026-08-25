@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -29,7 +30,6 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
@@ -47,7 +47,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -73,7 +75,8 @@ import com.peng.ainewshub.ui.EmptyState
 import com.peng.ainewshub.ui.ErrorState
 import com.peng.ainewshub.ui.UiState
 import com.peng.ainewshub.ui.components.AppTopBar
-import com.peng.ainewshub.ui.components.AppTopBarDefaults
+import com.peng.ainewshub.ui.components.BottomBarPillHeight
+import com.peng.ainewshub.ui.components.BrandWordmark
 import com.peng.ainewshub.ui.components.RankRowSkeletonList
 import com.peng.ainewshub.ui.components.SectionHeader
 import com.peng.ainewshub.ui.components.rememberReadUrls
@@ -88,7 +91,8 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * 「我的关注」页(独立二级页,总览顶栏进入)—— 关键词订阅的命中流。
+ * 「关注」tab 根屏(底栏第 3 个根 tab)—— 关键词订阅的命中流。
+ * 原为趋势页顶栏图标进入的二级页(Page.Follows),现升为根 tab。
  *
  * 语料为当日总览 Top10 + 8 源结构化摘要(见 [com.peng.ainewshub.data.FollowsRepository]),
  * 过滤在 [FollowsViewModel] 内完成;本页只渲染三种形态:
@@ -96,19 +100,19 @@ import java.util.Locale
  *  - **命中流**:关键词 chips(点选单词过滤/再点恢复)+ 命中条目列表 + 页脚时效标注;
  *  - **无命中**:有关注词但今天没有命中 → 引导换个词。
  *
- * 行为对齐既有二级页:点击经 [onOpenUrl] 进内置 WebView(已读置灰自动联动浏览历史);
- * 下拉刷新绕过归档缓存重拉语料(仅 Success 分支,不回骨架)。
+ * 行为对齐既有根 tab(趋势):点击经 [onOpenUrl] 进内置 WebView(已读置灰自动联动浏览历史);
+ * 下拉刷新绕过归档缓存重拉语料(仅 Success 分支,不回骨架);重击当前 tab 滚回顶部并重读。
  *
- * @param onBack 返回回调
  * @param onOpenUrl 条目点击直达内置 WebView(source 标签传条目自身来源)
- * @param listState 滚动状态由 MainActivity 按 Page 持有:进 WebView 返回后保持位置
+ * @param listState 滚动状态由 AiNewsHubApp 同层上提持有:切 tab / 进二级页返回后保持位置
+ * @param reselectSignal 重击当前 tab 的信号(每次递增),据此滚回顶部并刷新
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun FollowsScreen(
-    onBack: () -> Unit,
     onOpenUrl: (String, String, String) -> Unit,
     listState: LazyListState,
+    reselectSignal: Int = 0,
     vm: FollowsViewModel = viewModel()
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -119,20 +123,27 @@ fun FollowsScreen(
     // 语音速报:通知权限请求 + 服务启动统一收口(见 playback/TtsBriefing.kt)
     val startBriefing = rememberTtsStartHandler()
 
+    // 重击当前 tab:滚回顶部 + 重读语料(归档取数带缓存,低开销;同趋势 tab 套路)。
+    // lastHandled 防「重新进入组合就自动刷新」。
+    var lastHandledReselect by remember { mutableIntStateOf(reselectSignal) }
+    LaunchedEffect(reselectSignal) {
+        if (reselectSignal != lastHandledReselect) {
+            lastHandledReselect = reselectSignal
+            listState.animateScrollToItem(0)
+            vm.load()
+        }
+    }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
+            // 一级根 tab 规格:品牌 wordmark;右上角语音速报(命中流可朗读)
             AppTopBar(
-                title = stringResource(R.string.follows_title),
-                titleFontSize = AppTopBarDefaults.secondaryTitleFontSize,
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.common_back)
-                        )
-                    }
+                title = "AI NEWS HUB",
+                titleContent = {
+                    BrandWordmark(modifier = Modifier.height(44.dp))
                 },
+                horizontalPadding = 18.dp,
                 actions = {
                     // 语音速报入口:朗读命中流(导语 + 各条标题与摘要);无命中时禁用
                     val canPlay = (state as? UiState.Success)?.data?.items?.isNotEmpty() == true
@@ -157,7 +168,14 @@ fun FollowsScreen(
             )
         }
     ) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                // 列表可滚入药丸 TAB 之下,但可视区不超出药丸底缘(同趋势 tab)
+                .navigationBarsPadding()
+                .padding(bottom = 16.dp)
+        ) {
             when (val s = state) {
                 is UiState.Loading -> RankRowSkeletonList()
                 is UiState.Error -> ErrorState(
@@ -230,7 +248,8 @@ private fun FollowsContent(
     }
     LazyColumn(
         state = listState,
-        contentPadding = PaddingValues(top = 4.dp, bottom = 24.dp),
+        // 底部预留悬浮药丸底栏(末项可停到药丸之上,同趋势 tab)
+        contentPadding = PaddingValues(top = 4.dp, bottom = BottomBarPillHeight + 16.dp),
         modifier = Modifier.fillMaxSize()
     ) {
         item(key = "keywords") {
@@ -480,6 +499,8 @@ private fun FollowsOnboarding(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
+            // 底部预留悬浮药丸底栏(scroll 之后 = 内容 padding,推荐词可滚到药丸之上)
+            .padding(bottom = BottomBarPillHeight + 16.dp)
     ) {
         EmptyState(
             title = stringResource(R.string.follows_empty_no_keywords_title),

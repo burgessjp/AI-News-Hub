@@ -5,6 +5,7 @@
     <!-- Bottom navigation tabs -->
     <string name="tab_overview">Overview</string>
     <string name="tab_summary">Digest</string>
+    <string name="tab_follows">Follows</string>
     <string name="tab_trends">Trends</string>
     <string name="tab_more">More</string>
 

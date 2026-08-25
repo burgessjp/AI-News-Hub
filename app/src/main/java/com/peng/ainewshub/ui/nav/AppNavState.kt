@@ -17,7 +17,7 @@ import com.peng.ainewshub.ui.components.AppTab
  * 多栈导航状态机 —— 顶层壳 AiNewsHubApp 的导航模型收编为单类。
  *
  * 模型:
- *  - currentTab: 当前选中的 4 个根 tab 之一(总览 / 摘要 / 趋势 / 更多)
+ *  - currentTab: 当前选中的 5 个根 tab 之一(总览 / 摘要 / 关注 / 趋势 / 更多)
  *  - pageStacks: 每个 tab 独立的二级页栈(栈空 = 处于根)
  *
  * 行为(与原 AiNewsHubApp 内联实现逐条一致):

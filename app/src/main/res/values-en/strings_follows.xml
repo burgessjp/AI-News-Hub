@@ -1,10 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- My Follows strings (English; Chinese full set in values/strings_follows.xml). -->
 <resources>
-    <!-- Page top bar title -->
-    <string name="follows_title">My Follows</string>
-    <!-- Content description of the Overview top-bar entry icon -->
-    <string name="follows_entry_cd">Open My Follows</string>
     <!-- Header stats line: %1$d=keyword count, %2$d=today\'s matched items -->
     <string name="follows_stats_caption">Following %1$d keywords · %2$d matches today</string>
 

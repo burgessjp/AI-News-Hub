@@ -82,7 +82,7 @@ private val DARK_SCRIM = 0x801B1B1B.toInt()
  * App 顶层路由 —— 多栈底部导航。
  *
  * 模型(详见 [AppNavState]):
- *  - currentTab: 当前选中的 4 个根 tab 之一(总览 / 摘要 / 趋势 / 更多)
+ *  - currentTab: 当前选中的 5 个根 tab 之一(总览 / 摘要 / 关注 / 趋势 / 更多)
  *  - pageStacks: 每个 tab 独立的二级页栈(栈空 = 处于根)
  *
  * 行为:
@@ -343,6 +343,8 @@ internal fun AiNewsHubApp(
     val summaryPagerState = rememberPagerState(pageCount = { SummaryRepository.SOURCE_KEYS.size })
     // 总览 tab 的列表滚动状态(与 summaryPagerState 同层上提)
     val overviewListState = rememberLazyListState()
+    // 关注 tab 的列表滚动状态(同上提)
+    val followsListState = rememberLazyListState()
     // 趋势 tab 的列表滚动状态(同上提)
     val trendsListState = rememberLazyListState()
     // 二级页滚动状态:以 Page 值(data class,可作 key)索引,页面弹出后清理。
@@ -424,6 +426,7 @@ internal fun AiNewsHubApp(
                             reselectTick = nav.reselectTick,
                             summaryPagerState = summaryPagerState,
                             overviewListState = overviewListState,
+                            followsListState = followsListState,
                             trendsListState = trendsListState,
                             onOpenUrl = openUrl
                         )
