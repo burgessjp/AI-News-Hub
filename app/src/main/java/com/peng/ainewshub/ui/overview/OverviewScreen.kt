@@ -376,8 +376,7 @@ internal fun OverviewContent(
         }
 
         // Top10 全量平铺(去卡片,无头条特殊位;breaking 条目数据层已排最前,
-        // 由 TopEntryRow 浅底带承接强调)。发丝线仅在同类型相邻行间绘制;
-        // 与 breaking 浅底带相邻时不画,由色带边缘自然分隔
+        // 由「Breaking」标签承接强调)。相邻行间统一绘制发丝线
         val items = digest.items
         itemsIndexed(
             items,
@@ -391,8 +390,7 @@ internal fun OverviewContent(
                     isRead = entry.url in readUrls,
                     onClick = { onOpenUrl(entry.url, entry.title, SummaryRepository.titleOf(context, entry.source)) }
                 )
-                val next = items.getOrNull(index + 1)
-                if (next != null && entry.breaking == next.breaking) {
+                if (index < items.lastIndex) {
                     RowDivider()
                 }
             }
@@ -497,7 +495,7 @@ private fun BreakingTag(modifier: Modifier = Modifier) {
 
 /**
  * 平铺热点行(1~10 名):[RankBadge] + 原标题 + AI 一句话 + 来源/指标,无卡片容器。
- * breaking 条目:整行 tertiary 浅底通栏(无圆角描边)+「Breaking」标签,
+ * breaking 条目仅以「Breaking」标签提示,不加整行特殊背景;
  * 推荐理由为左侧 2dp 竖条引述块(原「卡中卡」面板随卡片容器一并去除)。
  */
 @Composable
@@ -506,20 +504,13 @@ private fun TopEntryRow(
     entry: OverviewEntry,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    // 已读(打开过原文)时标题降透明弱化;breaking 浅底带/推荐理由等强调不受影响
+    // 已读(打开过原文)时标题降透明弱化;推荐理由等强调不受影响
     isRead: Boolean = false
 ) {
     val cs = MaterialTheme.colorScheme
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .then(
-                if (entry.breaking) {
-                    Modifier.background(cs.tertiary.copy(alpha = AppAlpha.badgeOverlay))
-                } else {
-                    Modifier
-                }
-            )
             .clickable(onClick = onClick)
             .padding(horizontal = 18.dp, vertical = 14.dp)
     ) {
