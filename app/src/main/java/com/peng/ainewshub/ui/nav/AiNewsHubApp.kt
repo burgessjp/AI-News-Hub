@@ -22,9 +22,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.WifiOff
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -56,6 +57,8 @@ import com.peng.ainewshub.ui.anim.pageTransition
 import com.peng.ainewshub.ui.anim.predictivePopTransition
 import com.peng.ainewshub.ui.components.AppBottomBar
 import com.peng.ainewshub.ui.components.AppTab
+import com.peng.ainewshub.ui.components.NoticePillHost
+import com.peng.ainewshub.ui.components.rememberNoticePillState
 import com.peng.ainewshub.ui.i18n.AppLanguage
 import com.peng.ainewshub.ui.i18n.AppLocale
 import com.peng.ainewshub.ui.RefreshNotices
@@ -77,6 +80,15 @@ private val LIGHT_SCRIM = 0xE6FFFFFF.toInt()
 
 /** 深色系统栏 scrim(与 AndroidX enableEdgeToEdge 默认值一致)。ARGB 32 位带符号整数。 */
 private val DARK_SCRIM = 0x801B1B1B.toInt()
+
+/** 「已是最新批次」轻提示自动消失时长:一眼即过的确认型信息,比原 Snackbar Short(4s)更短促。 */
+private const val BATCH_NOTICE_DURATION_MS = 2_500L
+
+/** 离线兜底提示自动消失时长:状态类信息需多留几秒读完整句,但仍短于原 Snackbar Long(10s)。 */
+private const val OFFLINE_NOTICE_DURATION_MS = 5_000L
+
+/** 离线提示的 tag:恢复在线时据此识别并提前淡出当前离线胶囊。 */
+private const val OFFLINE_NOTICE_TAG = "offline"
 
 /**
  * App 顶层路由 —— 多栈底部导航。
@@ -245,23 +257,34 @@ internal fun AiNewsHubApp(
         }
     }
 
-    // 离线兜底提示:归档取数落到盘上旧数据时弹一次性 Snackbar(每次离线事件只提示一次,
-    // 任一请求网络成功后状态复位,下次再离线会重新提示)。不做常驻横幅 —— 会盖住各页
-    // 顶栏的返回导航;数据新旧由列表页自带的「数据更新时间」头体现。
+    // 全局轻提示顶部胶囊(「已是最新批次」/ 离线兜底的宿主,样式见 NoticePill):
+    // 替代原 Material 默认 Snackbar —— 与项目的悬浮玻璃药丸家族同款视觉。
+    val noticeState = rememberNoticePillState()
+
+    // 离线兜底提示:归档取数落到盘上旧数据时弹一次(每次离线事件只提示一次,
+    // 任一请求网络成功后状态复位,下次再离线会重新提示);恢复在线且前台仍是
+    // 离线胶囊时提前淡出。不做常驻横幅 —— 会盖住各页顶栏的返回导航;数据新旧
+    // 由列表页自带的「数据更新时间」头体现。
     val offlineMode by ArchiveHttpClient.offlineMode.collectAsStateWithLifecycle()
-    val snackbarHostState = remember { SnackbarHostState() }
     val offlineBannerText = stringResource(R.string.offline_banner)
     LaunchedEffect(Unit) {
         snapshotFlow { offlineMode }.collect { offline ->
             if (offline) {
-                snackbarHostState.showSnackbar(offlineBannerText, duration = SnackbarDuration.Long)
+                noticeState.show(
+                    offlineBannerText,
+                    Icons.Outlined.WifiOff,
+                    OFFLINE_NOTICE_DURATION_MS,
+                    tag = OFFLINE_NOTICE_TAG
+                )
+            } else {
+                noticeState.clearIfTag(OFFLINE_NOTICE_TAG)
             }
         }
     }
 
     // 「已是最新批次」轻提示:用户下拉强刷成功但批次指纹未变时,各页 ViewModel 经
     // RefreshNotices 发事件(归档一天只更数批,刷新大概率无新内容;完整播放刷新动画
-    // 却纹丝不动会被误读为「App 坏了」,这里主动说清)。与离线提示共用宿主;
+    // 却纹丝不动会被误读为「App 坏了」,这里主动说清)。与离线提示共用胶囊宿主;
     // 2 秒节流防多页连刷排队连弹。时间戳缺失(0)时退化为不带时间的短文案。
     val noNewBatchText = stringResource(R.string.refresh_no_new_batch)
     val noNewBatchPlain = stringResource(R.string.refresh_no_new_batch_plain)
@@ -278,7 +301,7 @@ internal fun AiNewsHubApp(
                 } else {
                     noNewBatchPlain
                 }
-                snackbarHostState.showSnackbar(message, duration = SnackbarDuration.Short)
+                noticeState.show(message, Icons.Rounded.CheckCircle, BATCH_NOTICE_DURATION_MS)
             }
         }
     }
@@ -460,17 +483,19 @@ internal fun AiNewsHubApp(
                     AppBottomBar(current = nav.currentTab, onSelect = { nav.selectTab(it) })
                 }
 
-                // 离线兜底提示的宿主:悬浮在浮动药丸底栏上方,不遮挡内容交互。
-                SnackbarHost(
-                    hostState = snackbarHostState,
+                // 全局轻提示胶囊宿主:「已是最新批次」/ 离线兜底都从这里浮现,悬浮于
+                // 页面转场层之上(与语音浮窗同级,不随页面 push/pop 销毁),自状态栏
+                // 下方滑入滑出。
+                NoticePillHost(
+                    state = noticeState,
                     modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .navigationBarsPadding()
-                        .padding(bottom = 92.dp)
+                        .align(Alignment.TopCenter)
+                        .statusBarsPadding()
+                        .padding(top = 8.dp)
                 )
 
                 // 语音速报播放浮窗:播放期间悬浮于任意 tab / 二级页(含 WebView 页)之上,
-                // 与底栏/Snackbar 同级挂载(转场层之上,不随页面 push/pop 销毁);
+                // 与底栏/轻提示胶囊同级挂载(转场层之上,不随页面 push/pop 销毁);
                 // 组件以屏幕绝对坐标定位(TopStart + offset),默认停在右下、底栏上方,
                 // 整条可拖,松手后吸附到左右边缘并缩小为悬浮球。显隐由服务 state 驱动。
                 TtsFloatingPill(modifier = Modifier.align(Alignment.TopStart))
