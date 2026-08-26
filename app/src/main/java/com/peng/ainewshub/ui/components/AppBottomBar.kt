@@ -1,6 +1,5 @@
 package com.peng.ainewshub.ui.components
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -113,6 +112,15 @@ val BottomBarReservedHeight = 96.dp
 val BottomBarPillHeight = 56.dp
 
 /**
+ * 选中项水洗底的统一最小宽 —— 各 tab 选中态椭圆严格等宽的保证。
+ *
+ * 32dp 横向内边距 + 两字中文标签(内容列约 24dp)的自然宽刚好在本值附近,
+ * 但自适应宽度会随标签字符数/系统字号漂移(英文 Overview 更是长出一截);
+ * 以 min 宽拉齐后任意 tab 选中椭圆完全一致,且更长标签只放宽不被裁剪。
+ */
+val SelectedTabMinWidth = 96.dp
+
+/**
  * 浮动药丸底栏 —— 对齐 "Synthetic Intelligence News" 设计系统
  * (参考 system_stream_editorial 原型底栏)。
  *
@@ -120,10 +128,9 @@ val BottomBarPillHeight = 56.dp
  *  - 浮在内容上(由调用方在 Box 内对齐 BottomCenter,不再用 Scaffold bottomBar 槽)
  *  - 90% 宽 + max 400dp,圆角 50dp(完全药丸)
  *  - 近实底:surface-container × AppAlpha.bottomBarSurface(0.94——Compose 无真模糊,
- *    半透明叠滚动内容显脏,近实底遮透出)+ 3dp 浮起阴影
- *    + 1px 白色半透明描边(AppAlpha.glassEdge,近实底下仍有型的玻璃边缘高光)
- *  - 容器内边距:horizontal 24dp / vertical 4dp(紧凑化:原 12dp 偏高,
- *    药丸整体高度压缩约 1/3,只收内间距,图标/字号不动)
+ *    半透明叠滚动内容显脏,近实底遮透出)+ 3dp 浮起阴影(无边框,靠阴影分层)
+ *  - 容器内边距:horizontal 16dp(tab 增至 5 个后从 24dp 收紧)/ vertical 4dp
+ *    (紧凑化:原 12dp 偏高,药丸整体高度压缩约 1/3,只收内间距,图标/字号不动)
  *  - 选中项:onSurface 半透明水洗药丸(AppAlpha.selectedTabWash,浅色压深/深色
  *    提亮,与底栏底色反向保证对比) + secondary 文字/图标 +
  *    实心图标(FILL 1);未选中:透明 + on-surface-variant + 描边图标(FILL 0)
@@ -140,7 +147,7 @@ fun AppBottomBar(
     onSelect: (AppTab) -> Unit
 ) {
     val cs = MaterialTheme.colorScheme
-    // 药丸 Surface:近实底(遮内容透出)+ 3dp 浮起阴影 + 白色半透明描边(玻璃边缘高光)
+    // 药丸 Surface:近实底(遮内容透出)+ 3dp 浮起阴影
     Surface(
         modifier = Modifier
             .fillMaxWidth(0.9f)
@@ -148,11 +155,7 @@ fun AppBottomBar(
         shape = CircleShape,
         color = cs.surfaceContainer.copy(alpha = AppAlpha.bottomBarSurface),
         // 浮动层的合理浮起(卡片零阴影惯例的例外,仅悬浮底栏)
-        shadowElevation = 3.dp,
-        border = BorderStroke(
-            width = 1.dp,
-            color = Color.White.copy(alpha = AppAlpha.glassEdge)
-        )
+        shadowElevation = 3.dp
     ) {
         Row(
             // 容器内边距:横向 16dp(原 24dp,tab 增至 5 个后收紧防英文长词溢出),
@@ -176,7 +179,8 @@ fun AppBottomBar(
  * 药丸内单项。
  *
  * 视觉:
- *  - 选中:onSurface 半透明水洗圆角药丸(horizontal 20dp / vertical 4dp,
+ * 视觉:
+ *  - 选中:onSurface 半透明水洗长椭圆(horizontal 32dp / vertical 4dp,
  *    AppAlpha.selectedTabWash,浅色压深/深色提亮,与底栏底色反向保证对比),
  *    图标用 Filled 实心变体(FILL 1),图标/文字着 secondary(深浅两套色板均为
  *    可辨紫,见 Color.kt 的 fixed-dim 设计;secondaryContainer 深色值过暗,
@@ -184,11 +188,17 @@ fun AppBottomBar(
  *  - 未选中:透明底(horizontal 8dp / vertical 4dp),图标用 Outlined 描边变体(FILL 0),
  *    图标/文字着 on-surface-variant
  *  - 点击:无 ripple;状态靠水洗底 + 图标 FILL 表达
+ *
+ * @param tab 对应根 tab(取 label 与图标变体)
+ * @param selected 是否选中态
+ * @param modifier 外部布局约束
+ * @param onClick 点击回调
  */
 @Composable
 private fun NavPillItem(
     tab: AppTab,
     selected: Boolean,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     val cs = MaterialTheme.colorScheme
@@ -199,7 +209,7 @@ private fun NavPillItem(
     // secondaryContainer 深色值过暗不可用);未选中:on-surface-variant
     val tint = if (selected) cs.secondary else cs.onSurfaceVariant
     Box(
-        modifier = Modifier
+        modifier = modifier
             .clip(CircleShape)
             // 选中:onSurface 半透明水洗底(浅色压深/深色提亮,与底栏底色反向);
             // 未选中:透明
@@ -212,14 +222,19 @@ private fun NavPillItem(
                 indication = null,
                 onClick = onClick
             )
-            // 选中态横向展开(20dp)未选中收紧(8dp);纵向统一 4dp(原 8dp,压缩药丸高度)
+            // 选中:统一椭圆最小宽(各 tab 等宽,见 [SelectedTabMinWidth]);
+            // 未选中:触控宽保底 48dp(8×2+22=38dp 不达标,补足)。
+            // 注意 widthIn 必须排在 padding 之前 —— 约束的是含内边距的水洗底整体,
+            // 排在后面会把内边距加在 min 之外导致椭圆过宽
+            .widthIn(min = if (selected) SelectedTabMinWidth else 48.dp)
+            // 选中态横向展开(32dp)未选中收紧(8dp);纵向统一 4dp(原 8dp,压缩药丸高度)。
+            // 选中 32dp 把 wash 拉成横向长椭圆(20dp 时宽高比 ~1.3 趋圆);
+            // 不要用 weight 等份代替自适应:等份钳宽会把选中项连 padding 一起钳小,
+            // 导致图标文字被裁(已踩坑回退);超宽设备的竖排防线是文字 maxLines=1
             .padding(
-                horizontal = if (selected) 20.dp else 8.dp,
+                horizontal = if (selected) 32.dp else 8.dp,
                 vertical = 4.dp
-            )
-            // 触控宽保底 48dp(未选中态 8×2+22=38dp 不达标,补足);
-            // 高 48dp 由内容(icon 22 + 间距 2 + 文字行高 16)+ padding 8 保证,仍达触控下限
-            .widthIn(min = 48.dp),
+            ),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -236,7 +251,10 @@ private fun NavPillItem(
                 text = stringResource(tab.labelRes),
                 style = AppText.caption,
                 color = tint,
-                fontWeight = FontWeight.SemiBold
+                fontWeight = FontWeight.SemiBold,
+                // 大字体/窄屏设备预算受钳时禁止折行 —— 竖排堆叠比轻微截断更破相
+                maxLines = 1,
+                softWrap = false
             )
         }
     }

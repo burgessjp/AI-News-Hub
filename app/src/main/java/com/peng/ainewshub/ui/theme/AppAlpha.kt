@@ -53,12 +53,13 @@ object AppAlpha {
     /** 发丝分隔线 —— 顶栏下缘 1dp 发丝线,半透明比实色更柔和,贴合"低对比分层"。 */
     const val hairlineOverlay: Float = 0.5f
 
-    /** 玻璃边缘高光描边 —— 底栏药丸的白色半透明描边,模拟玻璃边缘反光。 */
+    /** 玻璃边缘高光描边 —— 语音播放浮窗的白色半透明描边,模拟玻璃边缘反光
+     *  (底栏药丸原也用,现已去边框)。 */
     const val glassEdge: Float = 0.3f
 
     /** 选中 tab 水洗底 —— 底栏药丸内选中项的半透明底,基色 onSurface:浅色下近黑
      *  (选中项压深)、深色下近白(提亮),始终朝与底栏底色相反的方向走,保证对比;
-     *  纯白基色在浅色底栏上几乎隐形,不可用。比 [glassEdge] 描边更淡(面要退让于线)。 */
+     *  纯白基色在浅色底栏上几乎隐形,不可用。 */
     const val selectedTabWash: Float = 0.12f
 
     /** 标签 chip 弱化底 —— secondaryContainer 降透明做浅底小标签。 */
