@@ -148,6 +148,9 @@ def _clone_overlay_commit_push(data_dir, repo_dir, authed_url, branch, repo_url,
     run(["git", "config", "user.name", "github-actions[bot]"], cwd=repo_dir)
     run(["git", "config", "user.email", "41898282+github-actions[bot]@users.noreply.github.com"],
         cwd=repo_dir)
+    # gitcode 对 HTTP/2 大包推送易返回 514 断连(2026-08-26 18:05 三连败,
+    # 强制 HTTP/1.1 后一次成功);每次推送都是全新 clone,必须固化到脚本里
+    run(["git", "config", "http.version", "HTTP/1.1"], cwd=repo_dir)
     run(["git", "add", "-A"], cwd=repo_dir)
 
     # 无改动则跳过(对齐原 workflow 的 git diff --cached --quiet 判空)
