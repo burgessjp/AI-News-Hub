@@ -32,7 +32,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.peng.ainewshub.data.HackerNewsStory
@@ -161,12 +160,15 @@ private fun HackerNewsRow(
             // ① 标题 + 内联来源域名 (host) —— HN 原生风,域名 tertiary 色括注在末尾(源识别记忆点)
             val host = storyHost(story)
             val noTitle = stringResource(R.string.hn_no_title)
-            val titleAnnotated = remember(story.title, host, cs.tertiary, noTitle) {
+            // 域名字号单独读出入 key:字号档位/字体切换时值变化,AnnotatedString 需重建
+            val domainFontSize = AppText.bodySmall.fontSize
+            val titleAnnotated = remember(story.title, host, cs.tertiary, noTitle, domainFontSize) {
                 buildAnnotatedString {
                     append(story.title.ifBlank { noTitle })
                     append("  ")
-                    // 域名括注局部 SpanStyle:刻意比 titleCompact(14sp)小一档做弱化,局部样式不抽 token
-                    withStyle(SpanStyle(color = cs.tertiary, fontSize = 12.sp)) {
+                    // 域名括注局部 SpanStyle:比 titleCompact(14sp)小一档做弱化,
+                    // 字号取 bodySmall 档 —— 跟随设置页字号档位缩放,不再硬编码 sp
+                    withStyle(SpanStyle(color = cs.tertiary, fontSize = domainFontSize)) {
                         append("($host)")
                     }
                 }

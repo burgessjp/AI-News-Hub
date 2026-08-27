@@ -23,8 +23,10 @@ import androidx.compose.ui.text.font.FontFamily
  * @param fontFamily 字体族覆盖。默认 null 跟随系统字体;
  *        设置页"衬线/等宽"选项传 Serif/Monospace 将全 App 文字统一切换。
  *        同时作用于语义字号层 [AppTextStyles](经 [LocalAppTextStyles] 下发)。
- * @param fontScale 字号整体缩放(设置页「字号」档位),只作用于 [AppTextStyles]
- *        的 fontSize/lineHeight;MD3 typography 不缩放,避免组件内部错位。
+ * @param fontScale 字号整体缩放(设置页「字号」档位),同时作用于 [AppTextStyles]
+ *        与 [AppTypography](MD3 typography)的 fontSize/lineHeight —— 只缩这两项,
+ *        字重/字距不动,避免组件内部错位;此前 typography 不缩放,导致约 80 处
+ *        `MaterialTheme.typography` 调用与 AppText 同屏字号层级倒挂。
  */
 @Composable
 fun AiNewsHubTheme(
@@ -43,7 +45,11 @@ fun AiNewsHubTheme(
         else -> LightColors
     }
 
-    val typography = if (fontFamily != null) AppTypography.withFontFamily(fontFamily) else AppTypography
+    // 字体族替换与字号缩放同源应用:fontScale = 1 时 TextStyle.scaled 原样返回,零开销
+    val typography = remember(fontFamily, fontScale) {
+        (if (fontFamily != null) AppTypography.withFontFamily(fontFamily) else AppTypography)
+            .withFontScale(fontScale)
+    }
     // 语义字号层:字体族与缩放随设置变化,与 typography 同源(fontFamily 缺省 = 跟随系统)
     val appTextStyles = remember(fontFamily, fontScale) {
         AppTextStyles(fontFamily = fontFamily, fontScale = fontScale)
@@ -82,3 +88,32 @@ private fun Typography.withFontFamily(family: FontFamily): Typography = copy(
     labelMedium = labelMedium.copy(fontFamily = family),
     labelSmall = labelSmall.copy(fontFamily = family)
 )
+
+/**
+ * 将一个 [Typography] 里每个 [TextStyle] 的 fontSize/lineHeight 乘以 [scale]。
+ *
+ * 设置页「字号」档位的 MD3 typography 侧实现,与 [AppTextStyles] 的缩放规则一致:
+ * 只缩 fontSize/lineHeight,字重/字距不动。scale = 1(默认档)时原样返回,不产生
+ * 新 Typography 实例。
+ */
+private fun Typography.withFontScale(scale: Float): Typography = copy(
+    displayLarge = displayLarge.scaled(scale),
+    displayMedium = displayMedium.scaled(scale),
+    displaySmall = displaySmall.scaled(scale),
+    headlineLarge = headlineLarge.scaled(scale),
+    headlineMedium = headlineMedium.scaled(scale),
+    headlineSmall = headlineSmall.scaled(scale),
+    titleLarge = titleLarge.scaled(scale),
+    titleMedium = titleMedium.scaled(scale),
+    titleSmall = titleSmall.scaled(scale),
+    bodyLarge = bodyLarge.scaled(scale),
+    bodyMedium = bodyMedium.scaled(scale),
+    bodySmall = bodySmall.scaled(scale),
+    labelLarge = labelLarge.scaled(scale),
+    labelMedium = labelMedium.scaled(scale),
+    labelSmall = labelSmall.scaled(scale)
+)
+
+/** fontSize/lineHeight 按 [scale] 缩放;scale = 1 时返回自身(默认档零开销)。 */
+private fun TextStyle.scaled(scale: Float): TextStyle =
+    if (scale == 1f) this else copy(fontSize = fontSize * scale, lineHeight = lineHeight * scale)
