@@ -40,6 +40,7 @@
     <string name="error_network">Network error, check your connection and try again</string>
     <string name="error_server">Service unavailable, please try again later</string>
     <string name="error_ai_service">AI service is temporarily unavailable, please try again later</string>
+    <string name="error_ai_auth">AI service authentication failed. Check your API key and provider settings</string>
     <string name="error_rate_limited">Access is limited, please try again later</string>
     <string name="error_unknown">Failed to load, please try again later</string>
     <string name="error_too_short">Content too short</string>

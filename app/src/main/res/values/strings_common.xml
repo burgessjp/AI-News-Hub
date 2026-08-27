@@ -51,6 +51,7 @@
     <string name="error_network">网络异常,请检查连接后重试</string>
     <string name="error_server">服务暂不可用,请稍后重试</string>
     <string name="error_ai_service">AI 服务暂时不可用,请稍后重试</string>
+    <string name="error_ai_auth">AI 服务鉴权失败,请检查 API Key 与服务商设置</string>
     <string name="error_rate_limited">访问受限,请稍后重试</string>
     <string name="error_unknown">加载失败,请稍后重试</string>
     <string name="error_too_short">内容过短</string>

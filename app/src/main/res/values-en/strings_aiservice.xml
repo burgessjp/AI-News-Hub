@@ -54,4 +54,10 @@
     <string name="aiservice_hide">Hide</string>
     <string name="aiservice_show">Show</string>
     <string name="aiservice_save">Save</string>
+
+    <!-- ===== Edit dialog validation & save feedback ===== -->
+    <string name="aiservice_error_empty">This field can\'t be empty</string>
+    <string name="aiservice_error_price">Invalid format, enter a number</string>
+    <string name="aiservice_saved">Saved</string>
+    <string name="aiservice_cleared">Cleared</string>
 </resources>

@@ -27,12 +27,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -70,9 +73,11 @@ fun AiServiceScreen(
     onBack: () -> Unit
 ) {
     val config by configStore.configFlow.collectAsStateWithLifecycle(initialValue = AiConfig())
+    val snackbarHostState = remember { SnackbarHostState() }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             AppTopBar(
                 title = stringResource(R.string.aiservice_title),
@@ -92,7 +97,7 @@ fun AiServiceScreen(
             // 服务商 section —— 翻译开关 + 服务商/API 地址/API Key/模型(自定义时另有单价两行)
             item { SectionHeader(stringResource(R.string.aiservice_provider)) }
             item {
-                AiServiceSection(config = config, configStore = configStore)
+                AiServiceSection(config = config, configStore = configStore, snackbarHostState = snackbarHostState)
             }
 
             // 用量与费用 section —— token 消耗统计 + 官方刊例价估算
@@ -115,13 +120,23 @@ fun AiServiceScreen(
 @Composable
 private fun AiServiceSection(
     config: AiConfig,
-    configStore: AiConfigStore
+    configStore: AiConfigStore,
+    snackbarHostState: SnackbarHostState
 ) {
     val scope = rememberCoroutineScope()
     // 当前正在编辑的字段:null=未弹窗;非空=对应字段对话框打开
     var editingField by rememberSaveable { mutableStateOf<String?>(null) }
     var showProviderDialog by rememberSaveable { mutableStateOf(false) }
     var showModelDialog by rememberSaveable { mutableStateOf(false) }
+
+    // 编辑对话框保存/清除后的轻量确认反馈(行副标题「未设置→已设置」之外,
+    // 显式告知配置已落库,消除「存没存上」的疑虑)
+    val savedMsg = stringResource(R.string.aiservice_saved)
+    val clearedMsg = stringResource(R.string.aiservice_cleared)
+    suspend fun persist(update: (AiConfig) -> AiConfig, cleared: Boolean) {
+        configStore.update(update(config))
+        snackbarHostState.showSnackbar(if (cleared) clearedMsg else savedMsg)
+    }
 
     val cs = MaterialTheme.colorScheme
 
@@ -270,8 +285,8 @@ private fun AiServiceSection(
                 placeholder = apiUrlPlaceholder,
                 onDismiss = { editingField = null },
                 onConfirm = { v ->
-                    scope.launch { configStore.update(config.copy(baseUrl = v)) }
                     editingField = null
+                    scope.launch { persist({ c -> c.copy(baseUrl = v) }, v.isBlank()) }
                 }
             )
             "key" -> EditDialog(
@@ -280,8 +295,8 @@ private fun AiServiceSection(
                 isSecret = true,
                 onDismiss = { editingField = null },
                 onConfirm = { v ->
-                    scope.launch { configStore.update(config.copy(apiKey = v)) }
                     editingField = null
+                    scope.launch { persist({ c -> c.copy(apiKey = v) }, v.isBlank()) }
                 }
             )
             "model" -> EditDialog(
@@ -291,8 +306,8 @@ private fun AiServiceSection(
                 keyboardType = KeyboardType.Text,
                 onDismiss = { editingField = null },
                 onConfirm = { v ->
-                    scope.launch { configStore.update(config.copy(model = v)) }
                     editingField = null
+                    scope.launch { persist({ c -> c.copy(model = v) }, v.isBlank()) }
                 }
             )
             "inputPrice" -> EditDialog(
@@ -300,10 +315,11 @@ private fun AiServiceSection(
                 initial = config.customInputPrice,
                 placeholder = pricePlaceholder,
                 keyboardType = KeyboardType.Decimal,
+                isPrice = true,
                 onDismiss = { editingField = null },
                 onConfirm = { v ->
-                    scope.launch { configStore.update(config.copy(customInputPrice = v)) }
                     editingField = null
+                    scope.launch { persist({ c -> c.copy(customInputPrice = v) }, v.isBlank()) }
                 }
             )
             "outputPrice" -> EditDialog(
@@ -311,10 +327,11 @@ private fun AiServiceSection(
                 initial = config.customOutputPrice,
                 placeholder = pricePlaceholder,
                 keyboardType = KeyboardType.Decimal,
+                isPrice = true,
                 onDismiss = { editingField = null },
                 onConfirm = { v ->
-                    scope.launch { configStore.update(config.copy(customOutputPrice = v)) }
                     editingField = null
+                    scope.launch { persist({ c -> c.copy(customOutputPrice = v) }, v.isBlank()) }
                 }
             )
         }
@@ -563,11 +580,18 @@ private fun DialogRadioRow(
 }
 
 /**
- * 单行文本输入对话框。保存时回写配置 Store。
+ * 单行文本输入对话框。保存时回写配置 Store(由调用方附 Snackbar 确认)。
+ *
+ * 输入校验:
+ *  - 空 + 原值也为空 = 无效保存,确认键置灰并提示「内容不能为空」;
+ *  - 空 + 原值非空 = 显式清除,确认键转「清空」(回写空串前用户明确知情);
+ *  - 单价格式错误实时标红说明 —— 此前任意文本可保存,`toDoubleOrNull` 静默失效,
+ *    用户无从知晓费用估算为何不出现。
  *
  * @param isSecret 密码态输入(API Key),带显隐切换
  * @param placeholder 输入框占位提示(为空时显示)
  * @param keyboardType 键盘类型;null 时按 isSecret 取 Password/Uri(旧行为)
+ * @param isPrice 单价格式校验(非空时必须能解析为数字)
  */
 @Composable
 private fun EditDialog(
@@ -576,6 +600,7 @@ private fun EditDialog(
     isSecret: Boolean = false,
     placeholder: String? = null,
     keyboardType: KeyboardType? = null,
+    isPrice: Boolean = false,
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit
 ) {
@@ -588,6 +613,20 @@ private fun EditDialog(
     // 文案提前取出:trailingIcon 等 lambda 内不能调 stringResource
     val hideLabel = stringResource(R.string.aiservice_hide)
     val showLabel = stringResource(R.string.aiservice_show)
+    val saveLabel = stringResource(R.string.aiservice_save)
+    val clearLabel = stringResource(R.string.aiservice_clear)
+    val errorEmpty = stringResource(R.string.aiservice_error_empty)
+    val errorPrice = stringResource(R.string.aiservice_error_price)
+
+    val trimmed = text.trim()
+    val blankNoop = trimmed.isEmpty() && initial.isBlank()
+    val willClear = trimmed.isEmpty() && initial.isNotBlank()
+    val priceInvalid = isPrice && trimmed.isNotEmpty() && trimmed.toDoubleOrNull() == null
+    val supporting: (@Composable () -> Unit)? = when {
+        priceInvalid -> { -> Text(errorPrice, style = MaterialTheme.typography.bodySmall) }
+        blankNoop -> { -> Text(errorEmpty, style = MaterialTheme.typography.bodySmall) }
+        else -> null
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -598,6 +637,8 @@ private fun EditDialog(
                 onValueChange = { text = it },
                 singleLine = true,
                 placeholder = placeholder?.let { { Text(it) } },
+                isError = priceInvalid || blankNoop,
+                supportingText = supporting,
                 visualTransformation = if (isSecret && !visible) PasswordVisualTransformation()
                 else androidx.compose.ui.text.input.VisualTransformation.None,
                 trailingIcon = if (isSecret) {
@@ -615,7 +656,10 @@ private fun EditDialog(
             )
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(text.trim()) }) { Text(stringResource(R.string.aiservice_save)) }
+            TextButton(
+                enabled = !blankNoop && !priceInvalid,
+                onClick = { onConfirm(trimmed) }
+            ) { Text(if (willClear) clearLabel else saveLabel) }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }

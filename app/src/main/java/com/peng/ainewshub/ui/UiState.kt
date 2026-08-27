@@ -23,6 +23,7 @@ enum class ErrorKind {
     Network,
     ServerError,
     AiService,
+    AiAuth,
     RateLimited,
     Unknown
 }
@@ -43,6 +44,7 @@ fun Throwable.toUiError(context: Context): UiState.Error {
         is AppException.Network      -> UiState.Error(context.getString(R.string.error_network), ErrorKind.Network)
         is AppException.ServerError  -> UiState.Error(context.getString(R.string.error_server), ErrorKind.ServerError)
         is AppException.AiService    -> UiState.Error(context.getString(R.string.error_ai_service), ErrorKind.AiService)
+        is AppException.AiAuth       -> UiState.Error(context.getString(R.string.error_ai_auth), ErrorKind.AiAuth)
         is AppException.RateLimited  -> UiState.Error(context.getString(R.string.error_rate_limited), ErrorKind.RateLimited)
         is ShortContentException     -> UiState.Error(context.getString(R.string.error_too_short), ErrorKind.Unknown)
         // OkHttp/IO 层抛出的连接失败、超时、SSL 异常等,统一归 Network

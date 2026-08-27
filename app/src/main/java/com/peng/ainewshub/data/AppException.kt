@@ -26,8 +26,15 @@ sealed class AppException(message: String) : RuntimeException(message) {
     /** 服务端返回数据解析失败:JSON 解析失败、响应非预期格式、index 缺字段。用户语义:服务暂不可用。 */
     class ServerError : AppException("server")
 
-    /** AI 服务问题:AI 接口鉴权失败、AI 输出解析失败。用户语义:AI 服务暂时不可用。 */
+    /** AI 服务问题:AI 接口服务端故障、AI 输出解析失败。用户语义:AI 服务暂时不可用。 */
     class AiService : AppException("ai_service")
+
+    /**
+     * AI 服务鉴权失败:HTTP 401/403,API Key 无效 / 欠费 / 无权限。
+     * 用户自填 key 场景下必须与 [AiService] 区分 —— 否则 key 填错会被误读为服务方
+     * 故障,用户不知道该去检查「AI 服务」配置。
+     */
+    class AiAuth : AppException("ai_auth")
 
     /** 第三方限流/拦截:Cloudflare 挑战、反爬。用户语义:访问受限,请稍后重试。 */
     class RateLimited : AppException("rate_limited")

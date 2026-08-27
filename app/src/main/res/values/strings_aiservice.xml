@@ -59,4 +59,10 @@
     <string name="aiservice_hide">隐藏</string>
     <string name="aiservice_show">显示</string>
     <string name="aiservice_save">保存</string>
+
+    <!-- ===== 编辑对话框校验与保存反馈 ===== -->
+    <string name="aiservice_error_empty">内容不能为空</string>
+    <string name="aiservice_error_price">格式无效,请输入数字</string>
+    <string name="aiservice_saved">已保存</string>
+    <string name="aiservice_cleared">已清除</string>
 </resources>

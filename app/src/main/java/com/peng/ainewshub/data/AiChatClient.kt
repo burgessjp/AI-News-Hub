@@ -91,6 +91,8 @@ class AiChatClient {
         val callClient = if (longOutput) HttpClients.longRead else client
         callClient.newCall(req).execute().use { resp ->
             if (!resp.isSuccessful) {
+                // 401/403 单独归因鉴权失败,其余按服务故障;错误文案见 toUiError 的 error_ai_auth
+                if (resp.code == 401 || resp.code == 403) throw AppException.AiAuth()
                 throw AppException.AiService()
             }
             val root = JSONObject(resp.body?.string().orEmpty())
