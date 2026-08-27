@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -35,11 +36,13 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.SearchOff
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -100,6 +103,8 @@ fun SearchScreen(
     val settingsStore = remember { SettingsStore(context) }
     val searchHistory by settingsStore.searchHistoryFlow.collectAsStateWithLifecycle(initialValue = emptyList())
     val scope = rememberCoroutineScope()
+    // 清空搜索历史确认弹窗:破坏性操作与收藏/历史清空同范式,不直接清
+    var showClearHistoryDialog by rememberSaveable { mutableStateOf(false) }
 
     // 今日热词:与精选 tab「今日热点」同源(/hot-topics),进页拉一次;
     // 失败/为空时 hotTopics 保持空列表,热词区整块静默不显示
@@ -117,6 +122,24 @@ fun SearchScreen(
         text = t
         vm.setQuery(t)
         scope.launch { settingsStore.addSearchHistory(t) }
+    }
+
+    // 清空搜索历史二次确认(此前为唯一无确认的清空操作)
+    if (showClearHistoryDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearHistoryDialog = false },
+            title = { Text(stringResource(R.string.search_clear_history_title)) },
+            text = { Text(stringResource(R.string.search_clear_history_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    scope.launch { settingsStore.clearSearchHistory() }
+                    showClearHistoryDialog = false
+                }) { Text(stringResource(R.string.items_clear), color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearHistoryDialog = false }) { Text(stringResource(R.string.common_cancel)) }
+            }
+        )
     }
 
     Scaffold(
@@ -141,7 +164,8 @@ fun SearchScreen(
             )
         }
     ) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+        // imePadding:输入法弹出时结果列表收在键盘之上(此前列表下半被键盘遮住)
+        Column(modifier = Modifier.fillMaxSize().padding(padding).imePadding()) {
             if (!filter.isSearching) {
                 if (searchHistory.isEmpty() && hotTopics.isEmpty()) {
                     // 历史与热词皆空(冷启动 + 热词拉取失败)的兜底引导
@@ -154,7 +178,7 @@ fun SearchScreen(
                     SearchDiscovery(
                         history = searchHistory,
                         hotTopics = hotTopics,
-                        onClearHistory = { scope.launch { settingsStore.clearSearchHistory() } },
+                        onClearHistory = { showClearHistoryDialog = true },
                         onSubmit = { submitSearch(it) }
                     )
                 }

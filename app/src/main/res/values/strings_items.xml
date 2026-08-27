@@ -72,6 +72,9 @@
     <string name="search_no_result_title">没有找到相关内容</string>
     <string name="search_history_title">搜索历史</string>
     <string name="search_hot_title">热门</string>
+    <!-- 清空搜索历史确认弹窗(与收藏/历史清空同范式) -->
+    <string name="search_clear_history_title">清空搜索历史？</string>
+    <string name="search_clear_history_message">将删除全部搜索记录,此操作不可撤销。</string>
     <!-- 本地搜索独立页(设备内索引,总览顶栏进入;与联网搜索页互不相干) -->
     <string name="local_search_cd">搜索</string>
     <string name="local_search_hint">搜索已浏览的资讯…</string>

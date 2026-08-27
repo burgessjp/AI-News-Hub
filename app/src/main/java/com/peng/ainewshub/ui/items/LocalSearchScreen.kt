@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -36,10 +37,12 @@ import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Devices
 import androidx.compose.material.icons.outlined.SearchOff
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -119,6 +122,8 @@ fun LocalSearchScreen(
     val settingsStore = remember { SettingsStore(context) }
     val searchHistory by settingsStore.searchHistoryFlow.collectAsStateWithLifecycle(initialValue = emptyList())
     val scope = rememberCoroutineScope()
+    // 清空搜索历史确认弹窗:破坏性操作与收藏/历史清空同范式,不直接清
+    var showClearHistoryDialog by rememberSaveable { mutableStateOf(false) }
 
     // 仅「用户明确提交搜索」时记录(键盘搜索键 / 点历史 chip),防抖自动查询不入库
     fun submitSearch(term: String) {
@@ -126,6 +131,24 @@ fun LocalSearchScreen(
         if (t.length < 2) return
         text = t
         scope.launch { settingsStore.addSearchHistory(t) }
+    }
+
+    // 清空搜索历史二次确认(此前注释自认「不做二次确认」,是全 App 唯一无确认的清空操作)
+    if (showClearHistoryDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearHistoryDialog = false },
+            title = { Text(stringResource(R.string.search_clear_history_title)) },
+            text = { Text(stringResource(R.string.search_clear_history_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    scope.launch { settingsStore.clearSearchHistory() }
+                    showClearHistoryDialog = false
+                }) { Text(stringResource(R.string.items_clear), color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearHistoryDialog = false }) { Text(stringResource(R.string.common_cancel)) }
+            }
+        )
     }
 
     Scaffold(
@@ -140,7 +163,8 @@ fun LocalSearchScreen(
             )
         }
     ) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+        // imePadding:输入法弹出时结果/历史区收在键盘之上
+        Column(modifier = Modifier.fillMaxSize().padding(padding).imePadding()) {
             val queryActive = text.trim().length >= 2
             when {
                 // 查询为空:搜索历史发现区(无历史时给本页说明的引导空态)
@@ -160,7 +184,7 @@ fun LocalSearchScreen(
                             SectionHeader(
                                 title = stringResource(R.string.search_history_title),
                                 trailing = {
-                                    // 条目少,直接清空,不做二次确认
+                                    // 弹确认框后再清(破坏性操作统一范式)
                                     Text(
                                         text = stringResource(R.string.items_clear),
                                         style = MaterialTheme.typography.labelLarge,
@@ -168,7 +192,7 @@ fun LocalSearchScreen(
                                         modifier = Modifier.clickable(
                                             interactionSource = remember { MutableInteractionSource() },
                                             indication = androidx.compose.material3.ripple(bounded = false),
-                                            onClick = { scope.launch { settingsStore.clearSearchHistory() } }
+                                            onClick = { showClearHistoryDialog = true }
                                         )
                                     )
                                 }

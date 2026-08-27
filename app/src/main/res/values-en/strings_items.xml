@@ -56,6 +56,9 @@
     <string name="search_no_result_title">No results found</string>
     <string name="search_history_title">Search history</string>
     <string name="search_hot_title">Trending</string>
+    <!-- Clear search history confirm dialog (same pattern as favorites/history clear) -->
+    <string name="search_clear_history_title">Clear search history?</string>
+    <string name="search_clear_history_message">All search history will be deleted. This can\'t be undone.</string>
     <!-- Dedicated on-device search page (local index, entered from the Overview top bar) -->
     <string name="local_search_cd">Search</string>
     <string name="local_search_hint">Search browsed feeds…</string>
