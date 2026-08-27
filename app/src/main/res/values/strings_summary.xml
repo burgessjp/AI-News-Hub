@@ -31,4 +31,6 @@
     <!-- 按日期页:顶栏标题(%1$s = yyyy-MM-dd)与顶部提示行 -->
     <string name="summary_date_title">%1$s 摘要</string>
     <string name="summary_date_hint">当日 AI 精选</string>
+    <!-- 摘要页头部断供警示图标(TalkBack 描述) -->
+    <string name="summary_stale_cd">该数据源已断供</string>
 </resources>

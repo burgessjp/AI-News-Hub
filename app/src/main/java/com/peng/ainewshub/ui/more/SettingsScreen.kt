@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CleaningServices
@@ -40,6 +41,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -403,7 +405,7 @@ private fun CacheSection(cacheSizeBytes: Long, onClearCache: (Boolean, Boolean) 
     }
 }
 
-/** 清理确认弹窗里的可勾选项(整行可点,不限于 Checkbox 本身)。 */
+/** 清理确认弹窗里的可勾选项(整行 toggleable,读屏声明 Checkbox 角色与勾选状态)。 */
 @Composable
 private fun ClearOptionRow(
     checked: Boolean,
@@ -415,10 +417,11 @@ private fun ClearOptionRow(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onCheckedChange(!checked) }
+            .toggleable(value = checked, role = Role.Checkbox, onValueChange = onCheckedChange)
             .padding(vertical = 4.dp)
     ) {
-        Checkbox(checked = checked, onCheckedChange = onCheckedChange)
+        // 勾选状态由整行 toggleable 声明,Checkbox 不再自处理点击(避免双重语义)
+        Checkbox(checked = checked, onCheckedChange = null)
         Column {
             Text(title, style = MaterialTheme.typography.bodyMedium)
             if (caption != null) {

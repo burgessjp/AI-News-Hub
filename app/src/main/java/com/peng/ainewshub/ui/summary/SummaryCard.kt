@@ -5,6 +5,8 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -156,7 +158,8 @@ internal fun SummaryHeaderRow(
                     modifier = Modifier
                         .clip(CircleShape)
                         .background(bg)
-                        .clickable { onSelect(i) }
+                        // selectable:向读屏声明 Tab 角色与选中态(pager 页选择器)
+                        .selectable(selected = isCurrent, role = Role.Tab) { onSelect(i) }
                         .padding(horizontal = 12.dp, vertical = 8.dp)
                 ) {
                     Text(
@@ -269,7 +272,8 @@ private fun SummaryPageHeader(
             if (stale) {
                 Icon(
                     Icons.Outlined.Warning,
-                    contentDescription = null,
+                    // 断供状态语义只靠图形+颜色表达不行,补读屏描述
+                    contentDescription = stringResource(R.string.summary_stale_cd),
                     tint = cs.error,
                     modifier = Modifier.size(14.dp)
                 )

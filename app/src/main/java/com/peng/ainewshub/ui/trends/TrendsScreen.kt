@@ -362,6 +362,14 @@ private fun KeywordRow(
 @Composable
 private fun TrendArrow(trend: String) {
     val cs = MaterialTheme.colorScheme
+    // 方向语义不只靠图形+颜色:给读屏显式描述
+    val cd = stringResource(
+        when (trend) {
+            "up" -> R.string.trends_trend_up_cd
+            "down" -> R.string.trends_trend_down_cd
+            else -> R.string.trends_trend_flat_cd
+        }
+    )
     val (icon, tint) = when (trend) {
         "up" -> Icons.AutoMirrored.Filled.TrendingUp to cs.primary
         "down" -> Icons.AutoMirrored.Filled.TrendingDown to cs.tertiary
@@ -369,7 +377,7 @@ private fun TrendArrow(trend: String) {
     }
     Icon(
         imageVector = icon,
-        contentDescription = null,
+        contentDescription = cd,
         tint = tint,
         modifier = Modifier.size(16.dp)
     )

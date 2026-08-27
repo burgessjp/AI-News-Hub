@@ -52,4 +52,5 @@
 
     <!-- ===== 新闻卡片 ===== -->
     <string name="news_card_cd_hot">热度</string>
+    <string name="news_card_cd_featured">精选条目</string>
 </resources>

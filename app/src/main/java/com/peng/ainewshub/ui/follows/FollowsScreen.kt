@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -305,6 +306,7 @@ private fun FollowsHeaderRow(
 /**
  * 关注词 chip —— 配色对齐摘要 Tab 源名 chips:选中 primary 实底 SemiBold,
  * 未选 surfaceContainerHigh;点选 = 只看该词,再点恢复全部。
+ * selectable 声明选中态,读屏可播报(此前只靠颜色区分)。
  */
 @Composable
 private fun FollowKeywordChip(text: String, selected: Boolean, onClick: () -> Unit) {
@@ -320,7 +322,7 @@ private fun FollowKeywordChip(text: String, selected: Boolean, onClick: () -> Un
             .widthIn(max = 200.dp)
             .clip(CircleShape)
             .background(if (selected) cs.primary else cs.surfaceContainerHigh)
-            .clickable(onClick = onClick)
+            .selectable(selected = selected, onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 6.dp)
     )
 }

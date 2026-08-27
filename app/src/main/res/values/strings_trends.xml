@@ -43,4 +43,9 @@
     <string name="trends_cloud_no_data_subtitle">词云由每日流水线统计生成,请稍后再来</string>
     <!-- 错误态标题 -->
     <string name="trends_cloud_load_failed">词云加载失败</string>
+
+    <!-- ===== 涨跌箭头(TalkBack 描述,方向语义不靠图形/颜色单独表达) ===== -->
+    <string name="trends_trend_up_cd">热度上升</string>
+    <string name="trends_trend_down_cd">热度下降</string>
+    <string name="trends_trend_flat_cd">热度持平</string>
 </resources>

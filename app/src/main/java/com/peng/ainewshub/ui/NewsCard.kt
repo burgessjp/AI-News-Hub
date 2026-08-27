@@ -140,7 +140,8 @@ fun NewsCard(
                 if (item.selected) {
                     Icon(
                         Icons.Filled.Star,
-                        contentDescription = null,
+                        // 精选状态只靠图标表达,需向读屏声明(与 HotBadge 同风格)
+                        contentDescription = stringResource(R.string.news_card_cd_featured),
                         tint = cs.primary,
                         modifier = Modifier.size(12.dp)
                     )

@@ -49,4 +49,5 @@
 
     <!-- ===== News card ===== -->
     <string name="news_card_cd_hot">Popularity</string>
+    <string name="news_card_cd_featured">Featured item</string>
 </resources>

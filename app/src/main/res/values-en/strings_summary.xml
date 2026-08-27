@@ -26,4 +26,6 @@
     </plurals>
     <string name="summary_date_title">Digest for %1$s</string>
     <string name="summary_date_hint">AI picks of the day</string>
+    <!-- Stale-source warning icon in the digest header (TalkBack description) -->
+    <string name="summary_stale_cd">This source stopped updating</string>
 </resources>

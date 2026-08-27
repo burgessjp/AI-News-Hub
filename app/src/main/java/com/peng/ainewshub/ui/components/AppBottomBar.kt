@@ -1,7 +1,6 @@
 package com.peng.ainewshub.ui.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
@@ -35,6 +35,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.peng.ainewshub.R
@@ -217,9 +218,13 @@ private fun NavPillItem(
                 if (selected) cs.onSurface.copy(alpha = AppAlpha.selectedTabWash)
                 else Color.Transparent
             )
-            .clickable(
+            // selectable(非 clickable):向读屏声明 Tab 角色与选中状态,
+            // TalkBack 会播报「已选中」;视觉仍靠水洗底 + 图标 FILL 表达
+            .selectable(
+                selected = selected,
                 interactionSource = interactionSource,
                 indication = null,
+                role = Role.Tab,
                 onClick = onClick
             )
             // 选中:统一椭圆最小宽(各 tab 等宽,见 [SelectedTabMinWidth]);
