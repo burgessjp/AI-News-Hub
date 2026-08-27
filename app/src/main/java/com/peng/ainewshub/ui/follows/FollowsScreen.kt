@@ -654,19 +654,24 @@ private fun KeywordInputPill(
     }
 }
 
-/** 可删除的已关注词 chip:文字 + ✕。 */
+/**
+ * 可删除的已关注词 chip:文字 + ✕。
+ *
+ * 仅 ✕ 触发删除(此前整个 chip 可点删除,误触即删关注词);✕ 命中区 28dp 圆形
+ * (chip 内留足命中范围,与相邻 chip 间距 8dp 不重叠 —— 删除是破坏性操作,
+ * 不采用跨 chip 的触控外扩)。
+ */
 @Composable
 private fun FollowRemoveChip(text: String, onRemove: () -> Unit) {
     val cs = MaterialTheme.colorScheme
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
         modifier = Modifier
             .widthIn(max = 220.dp)
             .clip(CircleShape)
             .background(cs.surfaceContainerHigh)
-            .clickable(onClick = onRemove)
-            .padding(start = 12.dp, end = 8.dp, top = 6.dp, bottom = 6.dp)
+            .padding(start = 12.dp, end = 4.dp, top = 2.dp, bottom = 2.dp)
     ) {
         Text(
             text = text,
@@ -675,20 +680,24 @@ private fun FollowRemoveChip(text: String, onRemove: () -> Unit) {
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
-        Icon(
-            imageVector = Icons.Filled.Close,
-            contentDescription = stringResource(R.string.follows_remove_cd, text),
-            tint = cs.onSurfaceVariant,
+        Box(
             modifier = Modifier
-                .size(16.dp)
+                .size(28.dp)
                 .clip(CircleShape)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
+                    indication = androidx.compose.material3.ripple(),
                     onClick = onRemove
-                )
-                .padding(2.dp)
-        )
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Close,
+                contentDescription = stringResource(R.string.follows_remove_cd, text),
+                tint = cs.onSurfaceVariant,
+                modifier = Modifier.size(16.dp)
+            )
+        }
     }
 }
 

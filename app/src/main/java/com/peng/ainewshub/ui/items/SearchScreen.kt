@@ -4,12 +4,15 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -397,18 +400,26 @@ private fun SearchField(
         )
         if (text.isNotEmpty()) {
             Spacer(Modifier.width(6.dp))
-            Icon(
-                Icons.Filled.Clear,
-                contentDescription = stringResource(R.string.items_clear),
-                tint = cs.onSurfaceVariant,
+            // 清空触控目标:铺满 40dp 胶囊高度的方形命中区(此前仅图标本身 16dp 可点且无涟漪)
+            Box(
                 modifier = Modifier
-                    .size(16.dp)
+                    .fillMaxHeight()
+                    .aspectRatio(1f)
+                    .clip(CircleShape)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
+                        indication = androidx.compose.material3.ripple(),
                         onClick = onClear
-                    )
-            )
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Filled.Clear,
+                    contentDescription = stringResource(R.string.items_clear),
+                    tint = cs.onSurfaceVariant,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
         }
     }
 }
