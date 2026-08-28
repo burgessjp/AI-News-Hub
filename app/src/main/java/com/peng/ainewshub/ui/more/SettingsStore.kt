@@ -263,6 +263,41 @@ class SettingsStore(context: Context) {
         }
     }
 
+    // ===== 摘要源「已查看」指纹(摘要 Tab chips 未读圆点) =====
+
+    /**
+     * 摘要源已查看指纹流 —— source → 用户上次查看该源摘要页时的快照指纹
+     * (快照落盘时刻 fetchedAtMs)。chips 未读圆点的判定依据:
+     * 当前指纹 ≠ 已查看指纹 = 该源有新内容未查看 → 亮圆点;查看页面即写入
+     * 当前指纹,圆点熄灭;下一批新快照指纹变化 → 重新亮起。
+     *
+     * 存储格式:换行分隔的 "源key=毫秒" 行(同关注词的单字符串模式),
+     * 读取时容错跳过格式异常行。
+     */
+    val summarySeenFlow: Flow<Map<String, Long>> = dataStore.data.map { p ->
+        parseSummarySeen(p[KEY_SUMMARY_SEEN].orEmpty())
+    }
+
+    /** 记录「已查看某源的当前指纹」(查看即写入,同指纹幂等;圆点消隐用)。 */
+    suspend fun markSummarySeen(source: String, fingerprintMs: Long) {
+        if (source.isEmpty() || fingerprintMs <= 0) return
+        dataStore.edit { p ->
+            val old = parseSummarySeen(p[KEY_SUMMARY_SEEN].orEmpty())
+            p[KEY_SUMMARY_SEEN] = (old + (source to fingerprintMs))
+                .entries.joinToString("\n") { "${it.key}=${it.value}" }
+        }
+    }
+
+    /** 解析 "key=毫秒" 换行分隔存储,格式异常行容错跳过。 */
+    private fun parseSummarySeen(raw: String): Map<String, Long> =
+        raw.split('\n').mapNotNull { line ->
+            val idx = line.indexOf('=')
+            if (idx <= 0 || idx == line.lastIndex) return@mapNotNull null
+            val key = line.substring(0, idx).trim()
+            val ms = line.substring(idx + 1).trim().toLongOrNull() ?: return@mapNotNull null
+            if (key.isEmpty()) null else key to ms
+        }.toMap()
+
     /**
      * 挂起式读取数据源模式 —— 供 ViewModel 在 init 协程里取首帧真实值
      * (替代原构造期 runBlocking 同步读:那是主线程磁盘 I/O,拖慢冷启动)。
@@ -282,6 +317,7 @@ class SettingsStore(context: Context) {
         val KEY_SEARCH_HISTORY = stringPreferencesKey("search_history")
         val KEY_SOURCE_ORDER = stringPreferencesKey("source_order")
         val KEY_FOLLOWED_KEYWORDS = stringPreferencesKey("followed_keywords")
+        val KEY_SUMMARY_SEEN = stringPreferencesKey("summary_seen")
         val KEY_DAILY_NOTIFY = booleanPreferencesKey("daily_notify")
         val KEY_LAST_NOTIFIED_OVERVIEW_AT = longPreferencesKey("last_notified_overview_at")
         val KEY_LAST_NOTIFY_CHECK_AT = longPreferencesKey("last_notify_check_at")

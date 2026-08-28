@@ -18,6 +18,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -30,7 +31,8 @@ import com.peng.ainewshub.data.SummaryRepository
 import com.peng.ainewshub.ui.SummaryViewModel
 import com.peng.ainewshub.ui.UiState
 import com.peng.ainewshub.ui.components.AppTopBar
-import com.peng.ainewshub.ui.components.rememberReadUrls
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
 /**
@@ -125,12 +127,12 @@ fun SummaryScreen(
                 .padding(bottom = 16.dp)
         ) {
             // 顶部:数据来源提示 + 源名 chips 导航(可点跳页,当前页高亮);
-            // 未读源 chip 亮圆点(存在「可点 url 未进浏览历史」的条目),
-            // 点开条目返回后经浏览历史 Flow 响应式熄灭
-            val readUrls = rememberReadUrls()
-            val pages = remember(cards, states, readUrls) {
+            // 「新内容」圆点 = 该源当前快照指纹 ≠ 上次查看该源页时的指纹
+            // (详见 hasUnseenDigest),查看即熄灭、下一批新数据重新亮起
+            val seen by vm.seen.collectAsStateWithLifecycle()
+            val pages = remember(cards, states, seen) {
                 cards.map { spec ->
-                    SummaryHeaderPage(spec.title, hasUnreadSource(states[spec.source], readUrls))
+                    SummaryHeaderPage(spec.title, hasUnseenDigest(states[spec.source], seen[spec.source]))
                 }
             }
             SummaryHeaderRow(
@@ -138,6 +140,22 @@ fun SummaryScreen(
                 pages = pages,
                 onSelect = { i -> scope.launch { pagerState.animateScrollToPage(i) } }
             )
+            // 查看即已读:pager 停留页写入该源当前指纹(同指纹去重,不重复写盘)。
+            // combine states:停留后数据才从骨架到达(Success)时也补记,
+            // 否则用户正看着的页面圆点不灭
+            LaunchedEffect(cards) {
+                combine(
+                    snapshotFlow { pagerState.settledPage }.distinctUntilChanged(),
+                    vm.states
+                ) { page, _ -> page }.collect { page ->
+                    val spec = cards.getOrNull(page) ?: return@collect
+                    val fingerprint = (vm.states.value[spec.source] as? UiState.Success)
+                        ?.data?.fetchedAtMs ?: return@collect
+                    if (vm.seen.value[spec.source] != fingerprint) {
+                        vm.markSeen(spec.source, fingerprint)
+                    }
+                }
+            }
 
             // 内容 Pager:每页一个源的摘要(平铺无卡片),左右滑切源;
             // 下拉手势经 PullToRefreshBox 触发 vm.refresh()(纵向手势不与横向 Pager 冲突)

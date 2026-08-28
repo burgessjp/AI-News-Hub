@@ -53,6 +53,18 @@ class SummaryViewModel(application: Application) : AndroidViewModel(application)
     val sourceKeys: StateFlow<List<String>> = settingsStore.sourceOrderFlow
         .stateIn(viewModelScope, SharingStarted.Eagerly, SummaryRepository.SOURCE_KEYS)
 
+    /**
+     * 摘要源「已查看」指纹(source → 上次查看该源页时的快照落盘时刻),
+     * chips 未读圆点的消隐依据(见 SettingsStore.summarySeenFlow)。
+     */
+    val seen: StateFlow<Map<String, Long>> = settingsStore.summarySeenFlow
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+
+    /** 查看某源摘要页(点击 chip 跳页或滑动停留)即写入该源当前指纹,圆点熄灭。 */
+    fun markSeen(source: String, fingerprintMs: Long) {
+        viewModelScope.launch { settingsStore.markSummarySeen(source, fingerprintMs) }
+    }
+
     // 8 源各自独立状态,key = source(全集,顺序变化时不重拉)
     private val _states = MutableStateFlow<Map<String, UiState<SourceSummary>>>(emptyMap())
     val states: StateFlow<Map<String, UiState<SourceSummary>>> = _states.asStateFlow()

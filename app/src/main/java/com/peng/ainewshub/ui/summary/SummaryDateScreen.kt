@@ -17,7 +17,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -31,7 +30,6 @@ import com.peng.ainewshub.ui.SummaryArchiveViewModel
 import com.peng.ainewshub.ui.UiState
 import com.peng.ainewshub.ui.components.AppTopBar
 import com.peng.ainewshub.ui.components.AppTopBarDefaults
-import com.peng.ainewshub.ui.components.rememberReadUrls
 import kotlinx.coroutines.launch
 
 /**
@@ -83,16 +81,11 @@ fun SummaryDateScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // 未读圆点语义与摘要根 tab 一致:该源当日存在「可点 url 未进浏览历史」的条目
-            val readUrls = rememberReadUrls()
-            val pages = remember(cards, states, readUrls) {
-                cards.map { spec ->
-                    SummaryHeaderPage(spec.title, hasUnreadSource(states[spec.source], readUrls))
-                }
-            }
+            // 历史日期页回看的是往日内容,无「新内容未查看」语义(那是摘要 Tab
+            // 对当下批次的信号)——复用同一头行组件,圆点恒不亮
             SummaryHeaderRow(
                 currentPage = pagerState.currentPage,
-                pages = pages,
+                pages = cards.map { SummaryHeaderPage(it.title, false) },
                 hint = stringResource(R.string.summary_date_hint),
                 onSelect = { i -> scope.launch { pagerState.animateScrollToPage(i) } }
             )

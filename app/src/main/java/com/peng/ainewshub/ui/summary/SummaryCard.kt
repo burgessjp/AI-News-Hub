@@ -110,9 +110,9 @@ internal fun summaryCardSpecs(
  * chips 取代原圆点页指示器:圆点无语义,用户只能盲滑/盲点;源名 chip 让每页
  * 归属直接可见,点击即跳页。当前页 chip 为 primary 实底(其余 surfaceContainerHigh),
  * 颜色随切页 tween 过渡(Motion.SHORT);切页时自动横滚让当前 chip 进入可视区。
- * 带 [SummaryHeaderPage.hasUnread] 的 chip 尾部亮未读小圆点(今天哪个源有新东西
- * 一眼可辨;点开该源任一条目后经浏览历史 Flow 响应式熄灭),圆点槽位恒占位
- * 避免读/未读切换时 chip 宽度跳动。
+ * 带 [SummaryHeaderPage.hasUnread] 的 chip 尾部亮「新内容」小圆点(该源当前批次
+ * 尚未查看;点击 chip 或滑动到该源页即写入指纹熄灭,下一批新数据重新亮起),
+ * 圆点槽位恒占位避免亮灭切换时 chip 宽度跳动。
  */
 @Composable
 internal fun SummaryHeaderRow(
@@ -174,7 +174,8 @@ internal fun SummaryHeaderRow(
                             maxLines = 1
                         )
                         Spacer(Modifier.size(4.dp))
-                        // 未读小圆点:装饰性(文本已承载语义),槽位恒占位防宽度跳动
+                        // 「新内容未查看」小圆点:装饰性(文本已承载语义),
+                        // 槽位恒占位防宽度跳动
                         Box(
                             modifier = Modifier
                                 .size(6.dp)
@@ -194,21 +195,23 @@ internal fun SummaryHeaderRow(
     }
 }
 
-/** [SummaryHeaderRow] 的 chip 模型:标题 + 该源是否存在未读条目。 */
+/** [SummaryHeaderRow] 的 chip 模型:标题 + 该源是否有新内容未查看。 */
 internal data class SummaryHeaderPage(
     val title: String,
     val hasUnread: Boolean
 )
 
 /**
- * 源摘要未读判定(摘要根 tab 与历史摘要日期页共用):结构化条目中存在
- * 「可点 url 且未进浏览历史」的条目即未读。空 url 条目只读不可点、永远不算
- * 未读(否则无出口消化该圆点);加载中/失败/旧纯文本格式一律视为无未读。
+ * 源摘要「新内容未查看」判定(摘要 Tab chips 圆点):结构化条目非空,且当前
+ * 快照指纹(落盘时刻)≠ 用户上次查看该源页时记录的指纹 —— 查看页面即消隐
+ * (SummaryScreen 停留页写入指纹),下一批新快照指纹变化重新亮起;源断供
+ * 继承旧快照时指纹不变,不误亮。加载中/失败/旧纯文本格式一律不亮(无内容可看)。
  */
-internal fun hasUnreadSource(state: UiState<SourceSummary>?, readUrls: Set<String>): Boolean {
-    val structured = (state as? UiState.Success)?.data?.content as? SummaryContent.Structured
-        ?: return false
-    return structured.items.any { it.url.isNotBlank() && it.url !in readUrls }
+internal fun hasUnseenDigest(state: UiState<SourceSummary>?, seenFingerprint: Long?): Boolean {
+    val summary = (state as? UiState.Success)?.data ?: return false
+    val structured = summary.content as? SummaryContent.Structured ?: return false
+    if (structured.items.isEmpty()) return false
+    return seenFingerprint != summary.fetchedAtMs
 }
 
 /**
