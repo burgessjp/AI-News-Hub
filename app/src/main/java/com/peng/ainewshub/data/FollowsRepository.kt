@@ -149,10 +149,19 @@ class FollowsRepository {
 /**
  * 关键词匹配器 —— 纯函数、无状态:「我的关注」的过滤核心。
  *
- * 规则(v1 刻意保持简单):拉丁字母小写化后做 contains,中文直接子串包含;
- * 匹配文本 = 标题 + 摘要正文。命中任一关注词即收录;[selected] 非空时仅保留
- * 命中该词的条目(顶栏 chips 的单选过滤)。不做分词/同义词/语义匹配 ——
- * 价值验证后再考虑由流水线侧扩充同义词表。
+ * 规则(按关注词构成分两类):
+ *  - **含拉丁字母的词**(Claude / GPT-5 / AI…):小写化后做**词边界匹配**——
+ *    命中位置的前后邻字符不得是 ASCII 字母/数字。纯 contains 会让「AI」误命中
+ *    said / main / email 等英文单词的子串,短词误报严重。
+ *    边界判定**只认 ASCII 字母数字**(a-z/A-Z/0-9),不能用
+ *    [Character.isLetterOrDigit]——汉字也是 letter,会把「Claude 发布」里
+ *    Claude 与汉字相邻误判为非边界,反向破坏匹配。
+ *  - **不含拉丁字母的词**(中文/纯数字/符号…):维持直接子串包含,中文无分词
+ *    词界概念,子串即语义。
+ *
+ * 匹配文本 = 标题 + 摘要正文(统一小写化)。命中任一关注词即收录;[selected]
+ * 非空时仅保留命中该词的条目(顶栏 chips 的单选过滤)。不做分词/同义词/语义
+ * 匹配 —— 价值验证后再考虑由流水线侧扩充同义词表。
  */
 object FollowMatcher {
 
@@ -173,7 +182,7 @@ object FollowMatcher {
         val selectedNorm = selected?.trim()?.lowercase()?.takeIf { it.isNotEmpty() }
         return entries.mapNotNull { entry ->
             val text = (entry.title + " " + entry.desc).lowercase()
-            val matched = normalized.filter { text.contains(it.lowercase()) }
+            val matched = normalized.filter { matches(text, it.lowercase()) }
             when {
                 matched.isEmpty() -> null
                 selectedNorm != null && matched.none { it.lowercase() == selectedNorm } -> null
@@ -181,4 +190,37 @@ object FollowMatcher {
             }
         }
     }
+
+    /**
+     * 单个关注词对小写匹配文本的命中判定。
+     *
+     * 含拉丁字母 → [matchesOnWordBoundary];否则(中文/纯符号)→ 直接 contains。
+     * 调用方保证 [keyword] 已 trim + 小写化。
+     */
+    private fun matches(text: String, keyword: String): Boolean {
+        val hasLatin = keyword.any { it in 'a'..'z' || it in 'A'..'Z' }
+        return if (hasLatin) matchesOnWordBoundary(text, keyword) else text.contains(keyword)
+    }
+
+    /**
+     * 词边界匹配:遍历 [keyword] 在 [text] 中的每次出现,任一位置的左右邻字符
+     * 都不是 ASCII 字母/数字即命中(「AI」不再命中 said/main;「Claude」仍命中
+     * 「Claude 4」「(Claude)」「Claude发布」)。
+     */
+    private fun matchesOnWordBoundary(text: String, keyword: String): Boolean {
+        var from = 0
+        while (true) {
+            val at = text.indexOf(keyword, from)
+            if (at < 0) return false
+            val before = if (at > 0) text[at - 1] else ' '
+            val afterIdx = at + keyword.length
+            val after = if (afterIdx < text.length) text[afterIdx] else ' '
+            if (!isAsciiAlnum(before) && !isAsciiAlnum(after)) return true
+            from = at + 1
+        }
+    }
+
+    /** 是否 ASCII 字母/数字(词边界判定专用,汉字等其它字符一律视为边界)。 */
+    private fun isAsciiAlnum(c: Char): Boolean =
+        c in 'a'..'z' || c in 'A'..'Z' || c in '0'..'9'
 }
