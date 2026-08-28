@@ -50,7 +50,7 @@ news-hub-data 分支/
 ├── producthunt/                         ← 需 PRODUCT_HUNT_KEY;token 失效时可能指向旧日期
 │   └── 2026-07-15/
 │       └── 08-00-data.json
-├── rundown-ai/                          ← The Rundown AI newsletter 首页文章卡片墙(无 token)
+├── rundown-ai/                          ← The Rundown AI 文章列表(/articles 列表页,无 token)
 │   └── 2026-07-15/
 │       └── 08-00-data.json
 └── aihot-featured/                      ← AIHot 精选(第三方服务 aihot.virxact.com /items?mode=selected&take=20,公开 API,无 token)
@@ -101,7 +101,7 @@ news-hub-data 分支/
 
 `latest_overview` 是**今日总览**(流水线预生成的跨源综合分析,详见下文「今日总览 latest_overview」)。App 首页「总览」tab 直接读这个字段,不再端侧调 AI。
 
-`latest_audio` 是**语音速报预生成音频描述**(流水线 `tts_broadcast.py` 用 Qwen3-TTS 按当日总览预合成的单段全量 MP3,详见下文「语音速报音频」章节)。App「语音速报」优先流式播放该音频,描述缺失/批次滞后时回落系统 TTS。
+`latest_audio` 是**语音速报预生成音频描述**(流水线 `tts_broadcast.py` 用 Qwen3-TTS 按当日总览综述预合成的单段 MP3(仅 digest),详见下文「语音速报音频」章节)。App「语音速报」优先流式播放该音频,描述缺失/批次滞后时回落系统 TTS。
 
 按日期回看的数据走根级独立索引文件(不在 index.json 里,按需拉取):`history.json`(摘要历史,`{源名: {日期: relpath}}`,详见「按日期取历史快照」)与 `overview_history.json`(总览归档,`{日期: relpath}`,详见「历史总览归档」)。
 
@@ -487,17 +487,18 @@ Product Hunt 当日(Product of the Day 语义)按 upvote 排序的热门产品,�
 
 ### rundown-ai(The Rundown AI 近况 newsletter)
 
-The Rundown AI(beehiiv 托管的头部英文 AI 日更 newsletter)首页文章卡片墙,取首页全部(约 16 篇近况 newsletter)。每篇 1 张卡:主标题(主事件)+ PLUS 副标题(次要工具/技巧)+ 作者段 + 封面图。走 `https://www.therundown.ai/` 首页 jsoup HTML 抓取(`a[href^="/p/"]`),无 token、无 CF 挑战、robots.txt 允许。**列表页无文章日期**(日期只在详情页 JSON-LD),故快照不带 `pageDate`。
+The Rundown AI(beehiiv 托管的头部英文 AI 日更 newsletter)文章列表,抓 2026-08 改版后的主列表页 `https://www.therundown.ai/articles`(首页只剩 5 张精选卡,不再抓首页)。解析双路径:主路径从页面 `<script>` 的 RSC flight payload 提取全量文章数组(约 48 篇,含 publishDate/副标题/作者/封面);兜底解析 DOM 卡片 `a[href^="/articles/"]`(仅首屏约 8 张,无副标题无日期,`publishedAt` 为空串)。每篇:主标题(主事件)+ PLUS 副标题(次要工具/技巧)+ 作者段(压缩为「首作者, +N」)+ 封面图。无 token、无 CF 挑战,robots.txt 对 `/articles` 无限制。快照带真实发布时间(`publishedAt`);旧 `/p/<slug>` 链接 301 跳转仍可打开,历史快照不受影响。
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `rank` | int | 排名(1 起,由首页卡片顺序决定) |
 | `slug` | string | 文章 slug,用于拼 URL;同时作翻译状态 key |
-| `url` | string | 文章完整地址 `https://www.therundown.ai/p/<slug>` |
+| `url` | string | 文章完整地址 `https://www.therundown.ai/articles/<slug>`(旧 `/p/` 链接 301 仍可打开) |
 | `title` | string | 主标题(当日主事件) |
 | `subtitle` | string | PLUS 副标题(次要工具/技巧);可能为空 |
 | `authors` | string | 作者段,如 `Zach Mink, +4`(+4 表示还有 4 位合著者);原样展示 |
 | `coverUrl` | string | 封面图 URL(beehiiv cdn-cgi 图,排除作者头像);无则为空 |
+| `publishedAt` | string | 发布时刻,北京时间 `yyyy-MM-dd HH:mm`(RSC 主路径取 publishDate;DOM 兜底路径为空串;旧快照无此字段,消费端按可选字段处理。流水线总览时效判断优先用真实 publishedAt,旧快照回退抓取日期并标「抓取日期」) |
 
 ### aihot-featured(AIHot 精选 TOP20,第三方源)
 
