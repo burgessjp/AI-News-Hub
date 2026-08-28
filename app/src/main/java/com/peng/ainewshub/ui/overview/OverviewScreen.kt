@@ -43,6 +43,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -63,6 +64,7 @@ import com.peng.ainewshub.R
 import com.peng.ainewshub.data.BroadcastRepository
 import com.peng.ainewshub.data.OverviewDigest
 import com.peng.ainewshub.data.OverviewEntry
+import com.peng.ainewshub.data.PipelineSchedule
 import com.peng.ainewshub.data.SummaryRepository
 import com.peng.ainewshub.data.source.ArchiveHttpClient
 import com.peng.ainewshub.playback.TtsEntry
@@ -407,20 +409,26 @@ internal fun OverviewContent(
  * 渐变焦点从单条新闻收口到 AI 综合产物,对齐 Color.kt「渐变只用于 AI 特性」纪律)。
  *
  * 视觉:full-bleed [BrandGradient] 通栏(无圆角无描边),内容一律 onPrimary 系:
- * AutoAwesome 图标 + 「今日综述」label → digest 正文 → 「数据截至」时效 caption。
+ * AutoAwesome 图标 + 「今日综述」label → digest 正文 → 「数据截至 · 下一批」时效 caption。
  * 语言复用 [HotTopicsSection] 渐变标题栏(图标/标签 + onPrimary 文字)。
  *
- * 时效:归档每日跑一次批,首屏必须让用户知道数据新鲜度(原只在页脚,
- * 需滚完 10 条才可见);「数据截至」由本区独占展示,页脚不再重复。
+ * digest 折叠:长综述默认收 [DIGEST_COLLAPSED_LINES] 行,仅溢出时出现「展开/收起」
+ * (onTextLayout 检测,短综述不渲染按钮);折叠态为瞬态 remember —— push Web 页
+ * 返回后回落折叠(AnimatedContent 换页销毁页内 remember,项目无 SaveableStateHolder,
+ * 与「默认折叠」意图一致)。
  *
- * 渲染条件:digest 非空 → 渐变 Hero;digest 空但 dataFetchedAt > 0(旧归档无此字段)
- * → 退化为纯文本时效 caption(不占渐变块);两者都缺 → 不渲染。
+ * 时效:归档一天只更数批,首屏让用户知道两件事——数据新鲜度(数据截至)与下次
+ * 更新预期(下一批,批次唯一真相源 [PipelineSchedule]);「数据截至」由本区独占展示,
+ * 页脚不再重复。digest 空串但 dataFetchedAt > 0(旧归档)退化为纯文本时效 caption。
  */
 @Composable
 private fun OverviewLead(digest: OverviewDigest) {
     val cs = MaterialTheme.colorScheme
     val context = LocalContext.current
     if (digest.digest.isNotBlank()) {
+        var expanded by remember { mutableStateOf(false) }
+        // 折叠态检测溢出:仅在折叠布局回调里读 hasVisualOverflow,展开后不回写
+        var digestOverflowed by remember { mutableStateOf(false) }
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -446,15 +454,31 @@ private fun OverviewLead(digest: OverviewDigest) {
             Text(
                 text = digest.digest,
                 style = AppText.body,
-                color = cs.onPrimary
+                color = cs.onPrimary,
+                maxLines = if (expanded) Int.MAX_VALUE else DIGEST_COLLAPSED_LINES,
+                overflow = TextOverflow.Ellipsis,
+                onTextLayout = { if (!expanded) digestOverflowed = it.hasVisualOverflow }
             )
+            // 展开/收起:仅长综述渲染(短文无按钮);文案按钮 + onClickLabel 供读屏
+            if (digestOverflowed) {
+                val toggleLabel = stringResource(
+                    if (expanded) R.string.overview_digest_collapse else R.string.overview_digest_expand
+                )
+                Text(
+                    text = toggleLabel,
+                    style = AppText.caption,
+                    fontWeight = FontWeight.SemiBold,
+                    color = cs.onPrimary,
+                    modifier = Modifier
+                        .clip(MaterialTheme.shapes.small)
+                        .clickable(onClickLabel = toggleLabel) { expanded = !expanded }
+                        .padding(vertical = 2.dp)
+                )
+            }
             if (digest.dataFetchedAt > 0) {
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    text = stringResource(
-                        R.string.overview_data_until,
-                        formatFetchedAt(context, digest.dataFetchedAt)
-                    ),
+                    text = freshnessCaption(context, digest.dataFetchedAt),
                     style = AppText.caption,
                     color = cs.onPrimary.copy(alpha = AppAlpha.primaryEmphasis)
                 )
@@ -463,14 +487,31 @@ private fun OverviewLead(digest: OverviewDigest) {
     } else if (digest.dataFetchedAt > 0) {
         // 旧归档无 digest 字段:退化为纯文本时效 caption,不占渐变块
         Text(
-            text = stringResource(
-                R.string.overview_data_until,
-                formatFetchedAt(context, digest.dataFetchedAt)
-            ),
+            text = freshnessCaption(context, digest.dataFetchedAt),
             style = AppText.caption,
             color = cs.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)
         )
+    }
+}
+
+/** digest 折叠行数(展开后不限)。 */
+private const val DIGEST_COLLAPSED_LINES = 6
+
+/**
+ * 时效 caption:「数据截至 X · 下一批 Y」。下一批由批次唯一真相源
+ * [PipelineSchedule.nextBatchEpoch] 算出,按设备时区格式化(与「数据截至」
+ * 同口径:北京定义、本地显示);格式化失败退化为不含下一批的短句。
+ */
+private fun freshnessCaption(context: Context, fetchedAtMs: Long): String {
+    val fetchedAt = formatFetchedAt(context, fetchedAtMs)
+    val nextBatch = runCatching {
+        SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(PipelineSchedule.nextBatchEpoch()))
+    }.getOrDefault("")
+    return if (nextBatch.isNotEmpty()) {
+        context.getString(R.string.overview_freshness_caption, fetchedAt, nextBatch)
+    } else {
+        context.getString(R.string.overview_data_until, fetchedAt)
     }
 }
 

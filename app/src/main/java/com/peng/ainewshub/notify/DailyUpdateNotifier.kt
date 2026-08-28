@@ -19,12 +19,12 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.peng.ainewshub.MainActivity
 import com.peng.ainewshub.R
+import com.peng.ainewshub.data.PipelineSchedule
 import com.peng.ainewshub.data.source.ArchiveHttpClient
 import com.peng.ainewshub.ui.i18n.AppLocale
 import com.peng.ainewshub.ui.more.SettingsStore
 import kotlinx.coroutines.flow.first
 import java.util.Calendar
-import java.util.TimeZone
 import java.util.concurrent.TimeUnit
 
 /**
@@ -100,14 +100,13 @@ object DailyNotifyScheduler {
     private const val MAX_RETRY_ATTEMPTS = 2
     private val RETRY_DELAY_MS = TimeUnit.MINUTES.toMillis(40)
 
-    private val BEIJING: TimeZone = TimeZone.getTimeZone("Asia/Shanghai")
-
     /**
-     * 检查时刻表(北京时间,小时 to 分钟)—— 与流水线批次 08:00 / 18:00 / 22:00 一一对应,
-     * 各 +40 分钟余量(GitHub cron 漂移 + 抓取与 AI 生成耗时)。
-     * ⚠️ 流水线批次时间变更时必须同步改这里(AGENTS.md 有同样提醒)。
+     * 检查时刻表(北京时间,小时 to 分钟)—— 由 [PipelineSchedule.BATCH_SLOTS]
+     * 各 +40 分钟余量派生(GitHub cron 漂移 + 抓取与 AI 生成耗时)。
+     * ⚠️ 流水线批次时间变更只改 PipelineSchedule(批次唯一真相源),本表自动跟随
+     * (AGENTS.md / docs/agents/data-layer.md 有同样提醒)。
      */
-    private val CHECK_SLOTS = listOf(8 to 40, 18 to 40, 22 to 40)
+    private val CHECK_SLOTS = PipelineSchedule.BATCH_SLOTS.map { (h, m) -> h to m + 40 }
 
     /**
      * 设置页开关同步入口:开 → 从下一档开始续链;关 → 取消全部,链终止。
@@ -152,7 +151,7 @@ object DailyNotifyScheduler {
 
     /** 距下一个档位的毫秒数(今天档位已过 → 明天第一档)。 */
     private fun nextSlotDelayMillis(): Long {
-        val now = Calendar.getInstance(BEIJING)
+        val now = Calendar.getInstance(PipelineSchedule.BEIJING)
         for ((hour, minute) in CHECK_SLOTS) {
             val candidate = now.clone() as Calendar
             candidate.set(Calendar.HOUR_OF_DAY, hour)
@@ -173,8 +172,8 @@ object DailyNotifyScheduler {
     /** [epochMs] 是否落在今天(北京时间);epochMs <= 0(从未通知)恒为 false。 */
     fun isSameBeijingDay(epochMs: Long): Boolean {
         if (epochMs <= 0L) return false
-        val now = Calendar.getInstance(BEIJING)
-        val then = Calendar.getInstance(BEIJING).apply { timeInMillis = epochMs }
+        val now = Calendar.getInstance(PipelineSchedule.BEIJING)
+        val then = Calendar.getInstance(PipelineSchedule.BEIJING).apply { timeInMillis = epochMs }
         return now.get(Calendar.YEAR) == then.get(Calendar.YEAR) &&
             now.get(Calendar.DAY_OF_YEAR) == then.get(Calendar.DAY_OF_YEAR)
     }

@@ -14,10 +14,15 @@
     <string name="overview_breaking_reason_label">推荐理由</string>
     <!-- 首屏 digest Hero 标题(渐变块内 AutoAwesome 图标旁) -->
     <string name="overview_digest_title">今日综述</string>
+    <!-- 长综述折叠的展开/收起按钮(仅溢出时渲染) -->
+    <string name="overview_digest_expand">展开</string>
+    <string name="overview_digest_collapse">收起</string>
 
     <!-- 页脚:生成时间 / 数据截至 / 源计数 / 缺源标注(段间「 · 」为标点,两语言一致,留代码) -->
     <string name="overview_generated_at">生成于 %1$s</string>
     <string name="overview_data_until">数据截至 %1$s</string>
+    <!-- 首屏 Hero 时效 caption:新鲜度 + 下一批预期(下一批时刻由 PipelineSchedule 算) -->
+    <string name="overview_freshness_caption">数据截至 %1$s · 下一批 %2$s</string>
     <plurals name="overview_based_on_sources">
         <item quantity="other">基于 %1$d 源当日内容</item>
     </plurals>

@@ -24,9 +24,9 @@
     <string name="common_translate_config_missing">Set up the translation service in Settings → Translate first</string>
     <!-- Offline fallback: shown once when archive fetches fall back to disk data -->
     <string name="offline_banner">You\'re offline — showing cached data</string>
-    <!-- Pull-to-refresh found no new batch: archive updates a few times a day -->
-    <string name="refresh_no_new_batch">You\'re up to date · data generated at %1$s</string>
-    <string name="refresh_no_new_batch_plain">You\'re up to date</string>
+    <!-- Pull-to-refresh found no new batch: archive updates a few times a day; also sets expectation -->
+    <string name="refresh_no_new_batch">You\'re up to date · data generated at %1$s · next batch %2$s</string>
+    <string name="refresh_no_new_batch_plain">You\'re up to date · next batch %1$s</string>
     <!-- Source staleness: latest pointer hasn't advanced for >24h = fetches keep failing -->
     <string name="source_stale_warning">Data hasn\'t updated for %1$s — this source may be interrupted</string>
     <string name="source_stale_badge">No updates for %1$s</string>

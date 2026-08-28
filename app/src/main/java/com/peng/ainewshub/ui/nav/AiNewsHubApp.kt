@@ -50,6 +50,7 @@ import com.peng.ainewshub.data.AiUsageStore
 import com.peng.ainewshub.data.AppDatabase
 import com.peng.ainewshub.data.BrowseHistoryRepository
 import com.peng.ainewshub.data.FavoritesRepository
+import com.peng.ainewshub.data.PipelineSchedule
 import com.peng.ainewshub.data.SummaryRepository
 import com.peng.ainewshub.data.source.ArchiveHttpClient
 import com.peng.ainewshub.notify.DailyNotifyScheduler
@@ -297,11 +298,15 @@ internal fun AiNewsHubApp(
             val now = SystemClock.elapsedRealtime()
             if (now - lastShownAt >= 2_000L) {
                 lastShownAt = now
+                // 下一批时刻随事件现算(批次唯一真相源 PipelineSchedule;
+                // 北京定义、设备本地显示,与总览 Hero 的时效 caption 同口径)
+                val nextBatch = SimpleDateFormat("HH:mm", Locale.getDefault())
+                    .format(Date(PipelineSchedule.nextBatchEpoch()))
                 val message = if (dataAtMs > 0) {
                     val time = SimpleDateFormat(noNewBatchTimeFmt, Locale.getDefault()).format(Date(dataAtMs))
-                    String.format(noNewBatchText, time)
+                    String.format(noNewBatchText, time, nextBatch)
                 } else {
-                    noNewBatchPlain
+                    String.format(noNewBatchPlain, nextBatch)
                 }
                 noticeState.show(message, Icons.Rounded.CheckCircle, BATCH_NOTICE_DURATION_MS)
             }
