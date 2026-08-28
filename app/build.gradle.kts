@@ -35,9 +35,9 @@ android {
         applicationId = "com.peng.ainewshub"
         minSdk = 24
         targetSdk = 35
-        // 版本号默认 1.2.12(10212),发版时同步此兜底值;release.yml 从 tag 经 -PversionName/-PversionCode 注入
-        versionCode = (findProperty("versionCode") as? String)?.toIntOrNull() ?: 10212
-        versionName = findProperty("versionName") as? String ?: "1.2.12"
+        // 版本号默认 1.2.13(10213),发版时同步此兜底值;release.yml 从 tag 经 -PversionName/-PversionCode 注入
+        versionCode = (findProperty("versionCode") as? String)?.toIntOrNull() ?: 10213
+        versionName = findProperty("versionName") as? String ?: "1.2.13"
     }
 
     signingConfigs {
