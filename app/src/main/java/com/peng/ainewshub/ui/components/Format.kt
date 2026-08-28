@@ -75,7 +75,7 @@ fun weekdayLabel(context: Context, dayOfWeek: Int): String =
 
 /**
  * 归档日期(YYYY-MM-DD)→ 列表行日期标签:「今天/昨天/前天/M月d日 · 周X」。
- * 历史摘要与历史总览的日期列表行同规格(原 SummaryArchiveScreen 私有实现收口至此)。
+ * 历史回顾 hub 各段日期列表行同规格(SummaryArchiveList / OverviewArchiveList / TrendsArchiveList 共用)。
  * 解析失败原样返回日期串。
  */
 fun archiveDateLabel(context: Context, date: String): String {

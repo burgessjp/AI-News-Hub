@@ -94,7 +94,7 @@ fun DailyArchiveScreen(
                 )
                 is UiState.Success -> {
                     if (s.data.isEmpty()) {
-                        // 空数据空态:与 SummaryArchiveScreen 同语言,不再是一页纯白
+                        // 空数据空态:与历史回顾 hub 的摘要日期行同语言,不再是一页纯白
                         EmptyState(
                             title = stringResource(R.string.daily_archive_empty_title),
                             subtitle = stringResource(R.string.daily_archive_empty_subtitle),

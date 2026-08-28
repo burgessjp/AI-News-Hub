@@ -65,9 +65,8 @@ internal fun TabRoot(
             onOpenSources = { nav.push(Page.Sources) },
             onOpenBrowseHistory = { nav.push(Page.BrowseHistory) },
             onOpenFavorites = { nav.push(Page.Favorites) },
-            onOpenSummaryArchive = { nav.push(Page.SummaryArchive) },
-            onOpenOverviewArchive = { nav.push(Page.OverviewArchive) },
-            onOpenTrendsArchive = { nav.push(Page.TrendsArchive) },
+            // 历史回顾 hub(总览/摘要/热词三段合一;替代原三个独立历史入口)
+            onOpenHistoryHub = { nav.push(Page.HistoryHub) },
             onOpenSettings = { nav.push(Page.Settings) },
             onOpenAiService = { nav.push(Page.AiService) },
             onOpenAbout = { nav.push(Page.About) }

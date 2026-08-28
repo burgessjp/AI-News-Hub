@@ -20,10 +20,8 @@ import androidx.compose.material.icons.filled.Hub
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.SmartToy
-import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -55,7 +53,8 @@ import com.peng.ainewshub.ui.theme.AppText
  * 结构(自顶向下,简洁直入):
      *  - 信息源入口:点开 [SourcesScreen] 二级页(Hub 浏览区,8 个源全集,
      *    原内嵌在更多页的「浏览」组,现独立成页)
- *  - 历史组(tertiary 强调):历史摘要 / 浏览历史 / 收藏 —— 彩色图标块行
+ *  - 历史组(tertiary 强调):历史回顾(总览/摘要/热词三段 hub)/ 浏览历史 / 收藏
+ *    —— 彩色图标块行
  *  - 偏好组(secondary 强调):AI 服务 / 设置 / 关于 —— 浅灰图标块行
  *
  * 「AIHot 精选」原为首页独立根 tab,现收进 [SourcesScreen] 作为末位二级页(复用 FeaturedTab,
@@ -68,9 +67,8 @@ fun MoreScreen(
     onOpenSources: () -> Unit,
     onOpenBrowseHistory: () -> Unit,
     onOpenFavorites: () -> Unit,
-    onOpenSummaryArchive: () -> Unit,
-    onOpenOverviewArchive: () -> Unit,
-    onOpenTrendsArchive: () -> Unit,
+    // 历史回顾 hub(总览/摘要/热词三段合一;替代原三个独立历史入口)
+    onOpenHistoryHub: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenAiService: () -> Unit,
     onOpenAbout: () -> Unit
@@ -111,35 +109,16 @@ fun MoreScreen(
                 )
             }
 
-            // 历史组(tertiary 强调)—— 历史总览(按日期回看每日 AI 总览)/
-            // 历史热词(按日期回看每日热词榜)/ 历史摘要(按日期看各源归档摘要)/
+            // 历史组(tertiary 强调)—— 历史回顾(总览/摘要/热词按日期回看 hub,单入口)/
             // 浏览历史 / 收藏
             item { SectionHeader(stringResource(R.string.more_section_history), accent = MaterialTheme.colorScheme.tertiary) }
             item {
                 IconTileRow(
                     icon = Icons.Filled.AutoAwesome,
                     iconColor = IconAccent.Primary,
-                    title = stringResource(R.string.more_overview_archive_title),
-                    subtitle = stringResource(R.string.more_overview_archive_subtitle),
-                    onClick = onOpenOverviewArchive
-                )
-            }
-            item {
-                IconTileRow(
-                    icon = Icons.Filled.TrendingUp,
-                    iconColor = IconAccent.Primary,
-                    title = stringResource(R.string.more_trends_archive_title),
-                    subtitle = stringResource(R.string.more_trends_archive_subtitle),
-                    onClick = onOpenTrendsArchive
-                )
-            }
-            item {
-                IconTileRow(
-                    icon = Icons.Filled.CalendarMonth,
-                    iconColor = IconAccent.Primary,
-                    title = stringResource(R.string.more_summary_archive_title),
-                    subtitle = stringResource(R.string.more_summary_archive_subtitle),
-                    onClick = onOpenSummaryArchive
+                    title = stringResource(R.string.history_hub_title),
+                    subtitle = stringResource(R.string.more_history_hub_subtitle),
+                    onClick = onOpenHistoryHub
                 )
             }
             item {

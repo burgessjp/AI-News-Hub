@@ -73,17 +73,17 @@ internal sealed interface Page {
     data object BrowseHistory : Page
     /** 收藏(稍后读) —— WebView 顶栏星标的文章列表,从「更多」页进入。 */
     data object Favorites : Page
-    /** 历史摘要 —— 可选日期列表(归档 history 索引),从「更多」页进入。 */
-    data object SummaryArchive : Page
-    /** 历史摘要 —— 指定日期的全源摘要卡页(复用摘要卡片实现)。 */
+    /**
+     * 历史回顾 hub —— 总览/摘要/热词三段合一的按日期回看二级页(顶部分段切换,
+     * 复用三段各自的日期列表内容),从「更多」页进入;替代原三个独立历史入口
+     * (SummaryArchive/OverviewArchive/TrendsArchive)。
+     */
+    data object HistoryHub : Page
+    /** 历史摘要 —— 指定日期的全源摘要卡页(复用摘要卡片实现;从「历史回顾」hub 进入)。 */
     data class SummaryDate(val date: String) : Page
-    /** 历史总览 —— 可选日期列表(归档 overview_history 索引),从「更多」页进入。 */
-    data object OverviewArchive : Page
-    /** 历史总览 —— 指定日期的总览页(复用总览 Tab 内容实现)。 */
+    /** 历史总览 —— 指定日期的总览页(复用总览 Tab 内容实现;从「历史回顾」hub 进入)。 */
     data class OverviewDate(val date: String) : Page
-    /** 历史热词 —— 可选日期列表(归档 trends_history 索引),从「更多」页进入。 */
-    data object TrendsArchive : Page
-    /** 历史热词 —— 指定日期的热词榜页(复用趋势 Tab 内容实现)。 */
+    /** 历史热词 —— 指定日期的热词榜页(复用趋势 Tab 内容实现;从「历史回顾」hub 进入)。 */
     data class TrendsDate(val date: String) : Page
     /** 趋势词云 —— 近窗口期热词的词云全景页(趋势 Tab caption 行进入,纯 Canvas 无列表)。 */
     data object TrendsCloud : Page
@@ -121,12 +121,10 @@ internal fun Page.toBundle(): Bundle = Bundle().apply {
         is Page.Sources -> putString("t", "Sources")
         is Page.BrowseHistory -> putString("t", "BrowseHistory")
         is Page.Favorites -> putString("t", "Favorites")
-        is Page.SummaryArchive -> putString("t", "SummaryArchive")
         is Page.SummaryDate -> { putString("t", "SummaryDate"); putString("date", date) }
-        is Page.OverviewArchive -> putString("t", "OverviewArchive")
         is Page.OverviewDate -> { putString("t", "OverviewDate"); putString("date", date) }
-        is Page.TrendsArchive -> putString("t", "TrendsArchive")
         is Page.TrendsDate -> { putString("t", "TrendsDate"); putString("date", date) }
+        Page.HistoryHub -> putString("t", "HistoryHub")
         is Page.TrendsCloud -> putString("t", "TrendsCloud")
     }
 }
@@ -160,12 +158,10 @@ internal fun pageFromBundle(b: Bundle, webFallbackTitle: String): Page? {
         "Sources" -> Page.Sources
         "BrowseHistory" -> Page.BrowseHistory
         "Favorites" -> Page.Favorites
-        "SummaryArchive" -> Page.SummaryArchive
         "SummaryDate" -> b.getString("date")?.let { Page.SummaryDate(it) }
-        "OverviewArchive" -> Page.OverviewArchive
         "OverviewDate" -> b.getString("date")?.let { Page.OverviewDate(it) }
-        "TrendsArchive" -> Page.TrendsArchive
         "TrendsDate" -> b.getString("date")?.let { Page.TrendsDate(it) }
+        "HistoryHub" -> Page.HistoryHub
         "TrendsCloud" -> Page.TrendsCloud
         else -> null
     }

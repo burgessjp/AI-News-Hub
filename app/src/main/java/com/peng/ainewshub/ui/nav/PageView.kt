@@ -37,15 +37,13 @@ import com.peng.ainewshub.ui.more.AiServiceScreen
 import com.peng.ainewshub.ui.more.ChangelogScreen
 import com.peng.ainewshub.ui.more.FontChoice
 import com.peng.ainewshub.ui.more.FontScale
+import com.peng.ainewshub.ui.more.HistoryHubScreen
 import com.peng.ainewshub.ui.more.SettingsScreen
 import com.peng.ainewshub.ui.more.SettingsStore
 import com.peng.ainewshub.ui.more.SourcesScreen
 import com.peng.ainewshub.ui.more.ThemeMode
-import com.peng.ainewshub.ui.overview.OverviewArchiveScreen
 import com.peng.ainewshub.ui.overview.OverviewDateScreen
-import com.peng.ainewshub.ui.summary.SummaryArchiveScreen
 import com.peng.ainewshub.ui.summary.SummaryDateScreen
-import com.peng.ainewshub.ui.trends.TrendsArchiveScreen
 import com.peng.ainewshub.ui.trends.TrendsCloudScreen
 import com.peng.ainewshub.ui.trends.TrendsDateScreen
 import com.peng.ainewshub.ui.tabs.AllTab
@@ -324,39 +322,34 @@ internal fun PageView(
             onOpenUrl = { url, title, source -> onOpenUrl(url, title, source) },
             listState = listStates.forPage(page)
         )
-        // 历史摘要:日期列表(history 索引)→ 当日全源摘要卡页(复用摘要卡片)。
-        // 纯归档语义,不参与 SourceMode 切换;卡片无「查看完整列表」出口。
-        Page.SummaryArchive -> SummaryArchiveScreen(
-            onSelectDate = { nav.push(Page.SummaryDate(it)) },
+        // 历史回顾 hub:总览/摘要/热词三段日期列表(替代原三个独立历史入口),
+        // 顶部分段切换、段懒加载;点日期进对应详情页。单个上提 listState 由
+        // 当前段独占复用(切段即换列表滚回顶)。
+        Page.HistoryHub -> HistoryHubScreen(
+            onSelectOverviewDate = { nav.push(Page.OverviewDate(it)) },
+            onSelectSummaryDate = { nav.push(Page.SummaryDate(it)) },
+            onSelectTrendsDate = { nav.push(Page.TrendsDate(it)) },
             onBack = onBack,
             listState = listStates.forPage(page)
         )
+        // 历史摘要指定日期:当日全源摘要卡页(复用摘要卡片)。
+        // 纯归档语义,不参与 SourceMode 切换;卡片无「查看完整列表」出口。
         is Page.SummaryDate -> SummaryDateScreen(
             date = page.date,
             onBack = onBack,
             onOpenUrl = { url, title, source -> onOpenUrl(url, title, source) },
             pagerState = pagerStates.forPagePager(page)
         )
-        // 历史总览:日期列表(overview_history 索引)→ 当日总览页(复用总览内容)。
+        // 历史总览指定日期:当日总览页(复用总览内容)。
         // 纯归档语义;二级页无下拉刷新。
-        Page.OverviewArchive -> OverviewArchiveScreen(
-            onSelectDate = { nav.push(Page.OverviewDate(it)) },
-            onBack = onBack,
-            listState = listStates.forPage(page)
-        )
         is Page.OverviewDate -> OverviewDateScreen(
             date = page.date,
             onBack = onBack,
             onOpenUrl = { url, title, source -> onOpenUrl(url, title, source) },
             listState = listStates.forPage(page)
         )
-        // 历史热词:日期列表(trends_history 索引)→ 当日热词榜页(复用趋势内容)。
+        // 历史热词指定日期:当日热词榜页(复用趋势内容)。
         // 纯归档语义;二级页无下拉刷新。
-        Page.TrendsArchive -> TrendsArchiveScreen(
-            onSelectDate = { nav.push(Page.TrendsDate(it)) },
-            onBack = onBack,
-            listState = listStates.forPage(page)
-        )
         is Page.TrendsDate -> TrendsDateScreen(
             date = page.date,
             onBack = onBack,
