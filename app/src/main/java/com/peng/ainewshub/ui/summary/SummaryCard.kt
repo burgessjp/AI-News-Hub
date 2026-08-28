@@ -110,11 +110,14 @@ internal fun summaryCardSpecs(
  * chips 取代原圆点页指示器:圆点无语义,用户只能盲滑/盲点;源名 chip 让每页
  * 归属直接可见,点击即跳页。当前页 chip 为 primary 实底(其余 surfaceContainerHigh),
  * 颜色随切页 tween 过渡(Motion.SHORT);切页时自动横滚让当前 chip 进入可视区。
+ * 带 [SummaryHeaderPage.hasUnread] 的 chip 尾部亮未读小圆点(今天哪个源有新东西
+ * 一眼可辨;点开该源任一条目后经浏览历史 Flow 响应式熄灭),圆点槽位恒占位
+ * 避免读/未读切换时 chip 宽度跳动。
  */
 @Composable
 internal fun SummaryHeaderRow(
     currentPage: Int,
-    pageTitles: List<String>,
+    pages: List<SummaryHeaderPage>,
     hint: String = stringResource(R.string.summary_daily_hint),
     onSelect: (Int) -> Unit = {}
 ) {
@@ -134,7 +137,7 @@ internal fun SummaryHeaderRow(
         val chipsState = rememberLazyListState()
         // 切页(含手势滑动)后把当前 chip 滚进可视区:8 个源 chip 总宽超出屏宽
         LaunchedEffect(currentPage) {
-            if (currentPage in pageTitles.indices) chipsState.animateScrollToItem(currentPage)
+            if (currentPage in pages.indices) chipsState.animateScrollToItem(currentPage)
         }
         LazyRow(
             state = chipsState,
@@ -142,7 +145,7 @@ internal fun SummaryHeaderRow(
             contentPadding = PaddingValues(horizontal = 18.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            itemsIndexed(pageTitles) { i, title ->
+            itemsIndexed(pages) { i, page ->
                 val isCurrent = i == currentPage
                 val bg by animateColorAsState(
                     targetValue = if (isCurrent) cs.primary else cs.surfaceContainerHigh,
@@ -162,17 +165,50 @@ internal fun SummaryHeaderRow(
                         .selectable(selected = isCurrent, role = Role.Tab) { onSelect(i) }
                         .padding(horizontal = 12.dp, vertical = 8.dp)
                 ) {
-                    Text(
-                        text = title,
-                        style = AppText.caption,
-                        fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal,
-                        color = fg,
-                        maxLines = 1
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = page.title,
+                            style = AppText.caption,
+                            fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal,
+                            color = fg,
+                            maxLines = 1
+                        )
+                        Spacer(Modifier.size(4.dp))
+                        // 未读小圆点:装饰性(文本已承载语义),槽位恒占位防宽度跳动
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (page.hasUnread) {
+                                        if (isCurrent) cs.onPrimary else cs.primary
+                                    } else {
+                                        androidx.compose.ui.graphics.Color.Transparent
+                                    }
+                                )
+                        )
+                    }
                 }
             }
         }
     }
+}
+
+/** [SummaryHeaderRow] 的 chip 模型:标题 + 该源是否存在未读条目。 */
+internal data class SummaryHeaderPage(
+    val title: String,
+    val hasUnread: Boolean
+)
+
+/**
+ * 源摘要未读判定(摘要根 tab 与历史摘要日期页共用):结构化条目中存在
+ * 「可点 url 且未进浏览历史」的条目即未读。空 url 条目只读不可点、永远不算
+ * 未读(否则无出口消化该圆点);加载中/失败/旧纯文本格式一律视为无未读。
+ */
+internal fun hasUnreadSource(state: UiState<SourceSummary>?, readUrls: Set<String>): Boolean {
+    val structured = (state as? UiState.Success)?.data?.content as? SummaryContent.Structured
+        ?: return false
+    return structured.items.any { it.url.isNotBlank() && it.url !in readUrls }
 }
 
 /**

@@ -30,6 +30,7 @@ import com.peng.ainewshub.data.SummaryRepository
 import com.peng.ainewshub.ui.SummaryViewModel
 import com.peng.ainewshub.ui.UiState
 import com.peng.ainewshub.ui.components.AppTopBar
+import com.peng.ainewshub.ui.components.rememberReadUrls
 import kotlinx.coroutines.launch
 
 /**
@@ -123,10 +124,18 @@ fun SummaryScreen(
                 .navigationBarsPadding()
                 .padding(bottom = 16.dp)
         ) {
-            // 顶部:数据来源提示 + 源名 chips 导航(可点跳页,当前页高亮)
+            // 顶部:数据来源提示 + 源名 chips 导航(可点跳页,当前页高亮);
+            // 未读源 chip 亮圆点(存在「可点 url 未进浏览历史」的条目),
+            // 点开条目返回后经浏览历史 Flow 响应式熄灭
+            val readUrls = rememberReadUrls()
+            val pages = remember(cards, states, readUrls) {
+                cards.map { spec ->
+                    SummaryHeaderPage(spec.title, hasUnreadSource(states[spec.source], readUrls))
+                }
+            }
             SummaryHeaderRow(
                 currentPage = pagerState.currentPage,
-                pageTitles = cards.map { it.title },
+                pages = pages,
                 onSelect = { i -> scope.launch { pagerState.animateScrollToPage(i) } }
             )
 
