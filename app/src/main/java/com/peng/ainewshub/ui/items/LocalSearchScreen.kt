@@ -90,7 +90,10 @@ import kotlinx.coroutines.launch
  *  - 结果行:标题/摘要/来源,已读(打开 URL 命中浏览历史)标题弱化,点击直达内置 WebView
  *  - 查询为空时展示「搜索历史」(与联网搜索页共用同一份 —— 都是用户的搜索行为;
  *    热词发现区不出现在本页,那来自第三方 API)
+ *  - 带初始词进入(趋势词条「查看全部」/词云词条点击,见 Page.LocalSearch):
+ *    初始词首帧自动查询、**不落搜索历史**(历史只记用户主动搜索行为)
  *
+ * @param initialQuery 初始查询词(带词入口传入;默认空 = 总览顶栏手动进入)
  * @param onBack 返回回调
  * @param onOpenUrl 结果点击直达内置 WebView(source 标签传条目自身来源)
  * @param listState 滚动状态由 MainActivity 按 Page 持有:进 WebView 返回后保持位置
@@ -98,14 +101,16 @@ import kotlinx.coroutines.launch
 @OptIn(FlowPreview::class, ExperimentalLayoutApi::class)
 @Composable
 fun LocalSearchScreen(
+    initialQuery: String = "",
     onBack: () -> Unit,
     onOpenUrl: (String, String, String) -> Unit,
     listState: LazyListState
 ) {
-    var text by rememberSaveable { mutableStateOf("") }
+    var text by rememberSaveable { mutableStateOf(initialQuery) }
 
-    // 查询输入:150ms 防抖(索引小查询快,无需 300ms;仍避免每键一查)
-    var query by remember { mutableStateOf("") }
+    // 查询输入:150ms 防抖(索引小查询快,无需 300ms;仍避免每键一查);
+    // 初始词直接作为首个 query —— 首帧即出结果,防抖回写同值不触发重复查询
+    var query by remember { mutableStateOf(initialQuery.trim()) }
     LaunchedEffect(Unit) {
         snapshotFlow { text }
             .debounce(150)

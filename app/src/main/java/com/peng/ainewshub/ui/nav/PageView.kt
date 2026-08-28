@@ -175,7 +175,9 @@ internal fun PageView(
             onItemClick = onItemClick,
             listState = listStates.forPage(page)
         )
-        Page.LocalSearch -> LocalSearchScreen(
+        is Page.LocalSearch -> LocalSearchScreen(
+            // 带词进入(趋势/词云缝合入口):首帧自动查询;总览顶栏入口为空串
+            initialQuery = page.initialQuery,
             onBack = onBack,
             // 结果直达 WebView;source 标签传条目自身来源(见 LocalSearchScreen)
             onOpenUrl = { url, title, source -> onOpenUrl(url, title, source) },
@@ -362,7 +364,10 @@ internal fun PageView(
             listState = listStates.forPage(page)
         )
         // 趋势词云:读根级独立文件 trends_cloud.json(专用 VM),纯 Canvas 可视化页,
-        // 无列表滚动状态(不上提 listState)。
-        Page.TrendsCloud -> TrendsCloudScreen(onBack = onBack)
+        // 无列表滚动状态(不上提 listState);词条点击带词进本地搜索(查全部命中)。
+        Page.TrendsCloud -> TrendsCloudScreen(
+            onBack = onBack,
+            onOpenLocalSearch = { nav.push(Page.LocalSearch(it)) }
+        )
     }
 }

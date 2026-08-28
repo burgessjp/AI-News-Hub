@@ -23,6 +23,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.TrendingDown
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.outlined.HourglassEmpty
 import androidx.compose.material3.CircularProgressIndicator
@@ -76,7 +78,9 @@ import java.util.Locale
  *  - 顶部时效 caption:「近 N 天热词 · 数据截至 M月d日」(归档每日跑批,先交代新鲜度)
  *  - 热词榜平铺:[RankBadge] + 排名变化小字(较昨日:+N/-N/持平/新上榜)+ 热词 +
  *    命中统计 + 14 日 sparkline(Canvas 手绘,不引图表库)+ 涨跌箭头;行间 0.5dp 发丝线(缩进对齐文字列)
- *  - 点击词条整行展开 ≤3 条代表条目(浅底通栏带,标题点击经 openUrl 进内置 WebView)
+ *  - 点击词条整行展开 ≤3 条代表条目(浅底通栏带,标题点击经 openUrl 进内置 WebView);
+ *    展开区尾部动作行(仅根 tab):「+ 关注」一键订阅该词(经 TrendsViewModel 写
+ *    DataStore,结果走 FollowNotices 玻璃胶囊)+「查看全部命中 ›」带词进本地搜索
  *  - 页脚:生成时间
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -85,6 +89,8 @@ fun TrendsScreen(
     onOpenUrl: (url: String, title: String, source: String) -> Unit,
     // 词云二级页入口(TabRoot 分支内经 nav.push 构造;入口在 caption 行)
     onOpenCloud: () -> Unit,
+    // 带词进本地搜索(展开区「查看全部命中」;TabRoot 分支内经 nav.push 构造)
+    onOpenLocalSearch: (String) -> Unit,
     // 列表状态由 MainActivity 上提持有:切 tab / 进二级页返回后保持滚动位置
     listState: LazyListState,
     reselectSignal: Int = 0,
@@ -92,6 +98,8 @@ fun TrendsScreen(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val isRefreshing by vm.isRefreshing.collectAsStateWithLifecycle()
+    // 已关注词集合(小写):展开区「+ 关注」按钮的已关注态判定
+    val followedKeywords by vm.followedKeywords.collectAsStateWithLifecycle()
 
     // 重击当前 tab:滚回顶部 + 重读归档(命中 trends.json 2 分钟缓存零开销)。
     // lastHandled 防「重新进入组合就自动刷新」(同总览 tab 套路)。
@@ -148,7 +156,10 @@ fun TrendsScreen(
                         digest = s.digest,
                         listState = listState,
                         onOpenUrl = onOpenUrl,
-                        onOpenCloud = onOpenCloud
+                        onOpenCloud = onOpenCloud,
+                        onFollowKeyword = { vm.followKeyword(it) },
+                        onSearchTerm = onOpenLocalSearch,
+                        followedKeywords = followedKeywords
                     )
                 }
             }
@@ -196,6 +207,9 @@ private fun TrendsLoading() {
  * 空间);二级页为 false(无浮动底栏,不留底部预留)。
  * [onOpenCloud]:词云页入口,仅趋势根 tab 传入(caption 行右侧出现「词云 ›」
  * 链接);历史日期页保持 null 不显示入口。
+ * [onFollowKeyword] / [onSearchTerm] / [followedKeywords]:展开区尾部动作行
+ * (一键关注 + 带词查全部命中),仅趋势根 tab 传入;历史日期页保持默认 null /
+ * 空集 → 动作行整体不渲染。
  */
 @Composable
 internal fun TrendsContent(
@@ -203,6 +217,9 @@ internal fun TrendsContent(
     listState: LazyListState,
     onOpenUrl: (url: String, title: String, source: String) -> Unit,
     onOpenCloud: (() -> Unit)? = null,
+    onFollowKeyword: ((String) -> Unit)? = null,
+    onSearchTerm: ((String) -> Unit)? = null,
+    followedKeywords: Set<String> = emptySet(),
     bottomReserve: Boolean = true
 ) {
     val context = LocalContext.current
@@ -270,7 +287,10 @@ internal fun TrendsContent(
                     onToggle = {
                         expandedTerm = if (expandedTerm == keyword.term) null else keyword.term
                     },
-                    onOpenUrl = onOpenUrl
+                    onOpenUrl = onOpenUrl,
+                    onFollowKeyword = onFollowKeyword,
+                    onSearchTerm = onSearchTerm,
+                    followedKeywords = followedKeywords
                 )
                 if (index < keywords.lastIndex) {
                     HairlineDivider(startIndent = 54.dp)
@@ -304,7 +324,11 @@ private fun KeywordRow(
     keyword: TrendKeyword,
     expanded: Boolean,
     onToggle: () -> Unit,
-    onOpenUrl: (url: String, title: String, source: String) -> Unit
+    onOpenUrl: (url: String, title: String, source: String) -> Unit,
+    // 展开区动作穿线(可空语义见 TrendsContent;null → KeywordItems 不渲染动作行)
+    onFollowKeyword: ((String) -> Unit)?,
+    onSearchTerm: ((String) -> Unit)?,
+    followedKeywords: Set<String>
 ) {
     val cs = MaterialTheme.colorScheme
     Column {
@@ -353,7 +377,13 @@ private fun KeywordRow(
             TrendArrow(trend = keyword.trend)
         }
         if (expanded && keyword.items.isNotEmpty()) {
-            KeywordItems(keyword = keyword, onOpenUrl = onOpenUrl)
+            KeywordItems(
+                keyword = keyword,
+                onOpenUrl = onOpenUrl,
+                onFollowKeyword = onFollowKeyword,
+                onSearchTerm = onSearchTerm,
+                followedKeywords = followedKeywords
+            )
         }
     }
 }
@@ -449,11 +479,18 @@ private fun Sparkline(
     }
 }
 
-/** 展开的代表条目带:surfaceContainerLow 浅底通栏,标题点击进内置 WebView。 */
+/**
+ * 展开的代表条目带:surfaceContainerLow 浅底通栏,标题点击进内置 WebView。
+ * 尾部动作行(仅根 tab 传入回调时渲染):「+ 关注 / 已关注 ✓」一键订阅该词 +
+ * 「查看全部命中 ›」带词进本地搜索(代表条目只截 ≤3 条,全量命中在索引里)。
+ */
 @Composable
 private fun KeywordItems(
     keyword: TrendKeyword,
-    onOpenUrl: (url: String, title: String, source: String) -> Unit
+    onOpenUrl: (url: String, title: String, source: String) -> Unit,
+    onFollowKeyword: ((String) -> Unit)?,
+    onSearchTerm: ((String) -> Unit)?,
+    followedKeywords: Set<String>
 ) {
     val cs = MaterialTheme.colorScheme
     val context = LocalContext.current
@@ -490,6 +527,72 @@ private fun KeywordItems(
             }
             if (i < keyword.items.lastIndex) {
                 HairlineDivider()
+            }
+        }
+
+        // 尾部动作行:关注状态取 display 忽略大小写比对(与写入端去重口径一致);
+        // 已关注呈静态「已关注 ✓」不再可点(移除入口在关注页管理弹层)
+        val display = keyword.display.trim()
+        if ((onFollowKeyword != null && display.isNotEmpty()) || onSearchTerm != null) {
+            Spacer(Modifier.height(6.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(18.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                val followed = display.lowercase() in followedKeywords
+                if (onFollowKeyword != null && display.isNotEmpty()) {
+                    val followLabel = stringResource(R.string.trends_follow_action)
+                    Row(
+                        modifier = Modifier
+                            .clip(MaterialTheme.shapes.small)
+                            .then(
+                                if (followed) Modifier
+                                else Modifier.clickable(onClickLabel = followLabel) { onFollowKeyword(display) }
+                            )
+                            .padding(vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = if (followed) Icons.Filled.Check else Icons.Filled.Add,
+                            contentDescription = null,
+                            tint = if (followed) cs.onSurfaceVariant else cs.primary,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text = stringResource(
+                                if (followed) R.string.trends_followed_action else R.string.trends_follow_action
+                            ),
+                            style = AppText.caption,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (followed) cs.onSurfaceVariant else cs.primary
+                        )
+                    }
+                }
+                if (onSearchTerm != null) {
+                    val searchLabel = stringResource(R.string.trends_search_all)
+                    Row(
+                        modifier = Modifier
+                            .clip(MaterialTheme.shapes.small)
+                            .clickable(onClickLabel = searchLabel) { onSearchTerm(display) }
+                            .padding(vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = searchLabel,
+                            style = AppText.caption,
+                            fontWeight = FontWeight.SemiBold,
+                            color = cs.primary
+                        )
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = cs.primary,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                }
             }
         }
     }

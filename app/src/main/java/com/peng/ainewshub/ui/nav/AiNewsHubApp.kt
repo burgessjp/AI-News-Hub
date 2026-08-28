@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.WifiOff
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -62,6 +63,7 @@ import com.peng.ainewshub.ui.components.rememberNoticePillState
 import com.peng.ainewshub.ui.i18n.AppLanguage
 import com.peng.ainewshub.ui.i18n.AppLocale
 import com.peng.ainewshub.ui.RefreshNotices
+import com.peng.ainewshub.ui.FollowNotices
 import com.peng.ainewshub.ui.more.FontChoice
 import com.peng.ainewshub.ui.more.FontScale
 import com.peng.ainewshub.ui.more.SettingsStore
@@ -302,6 +304,27 @@ internal fun AiNewsHubApp(
                     noNewBatchPlain
                 }
                 noticeState.show(message, Icons.Rounded.CheckCircle, BATCH_NOTICE_DURATION_MS)
+            }
+        }
+    }
+
+    // 「已关注关键词」轻提示:趋势页展开区「+ 关注」的结果(成功 / 达上限)经
+    // FollowNotices 单例通道上报(TrendsViewModel 发起),与上面两条提示共用胶囊宿主。
+    val followAddedText = stringResource(R.string.trends_follow_added)
+    val followLimitText = stringResource(R.string.follows_limit_toast)
+    LaunchedEffect(Unit) {
+        FollowNotices.events.collect { event ->
+            when (event.outcome) {
+                FollowNotices.Outcome.Added -> noticeState.show(
+                    String.format(followAddedText, event.keyword),
+                    Icons.Rounded.CheckCircle,
+                    BATCH_NOTICE_DURATION_MS
+                )
+                FollowNotices.Outcome.Capped -> noticeState.show(
+                    followLimitText,
+                    Icons.Rounded.ErrorOutline,
+                    BATCH_NOTICE_DURATION_MS
+                )
             }
         }
     }

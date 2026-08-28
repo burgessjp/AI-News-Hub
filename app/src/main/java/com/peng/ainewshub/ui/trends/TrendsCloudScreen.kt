@@ -1,6 +1,7 @@
 package com.peng.ainewshub.ui.trends
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -34,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -78,13 +80,16 @@ import kotlin.math.sqrt
  *  - 字号统一从 [AppText] 六档(caption→titleHero)按名次加权分档派生(头部少、
  *    尾部多的金字塔分布),不出现散落 sp 字面量,且随设置页字号档位整体缩放。
  *
- * 词云词条不带代表条目(词云文件刻意轻量),词条不响应点击 —— 本页是纯
- * 全景可视化,阅读出口仍在趋势 Tab 榜单行(展开代表条目经 openUrl 进 WebView)。
+ * 词云词条不带代表条目(词云文件刻意轻量),点击词条带词进入本地搜索
+ * (查设备内索引的全部命中,阅读出口与趋势 Tab「查看全部命中」同一条路);
+ * 点击空白不动作 —— 本页仍是全景可视化,不是列表页。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TrendsCloudScreen(
     onBack: () -> Unit,
+    // 词条点击带词进本地搜索(PageView 分支内经 nav.push 构造)
+    onOpenLocalSearch: (String) -> Unit,
     vm: TrendsCloudViewModel = viewModel()
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -142,7 +147,11 @@ fun TrendsCloudScreen(
                         title = stringResource(R.string.trends_cloud_load_failed)
                     )
                 }
-                is UiState.Success -> TrendsCloudContent(digest = s.data, mode = mode)
+                is UiState.Success -> TrendsCloudContent(
+                    digest = s.data,
+                    mode = mode,
+                    onWordTap = onOpenLocalSearch
+                )
             }
         }
     }
@@ -173,7 +182,11 @@ private fun TrendsCloudLoading() {
 
 /** 词云内容:顶部时效 caption(与趋势 Tab 同词条)+ 词云画布 + 生成时间页脚。 */
 @Composable
-private fun TrendsCloudContent(digest: TrendsCloudDigest, mode: CloudLayoutMode) {
+private fun TrendsCloudContent(
+    digest: TrendsCloudDigest,
+    mode: CloudLayoutMode,
+    onWordTap: (String) -> Unit
+) {
     val context = LocalContext.current
     Column(modifier = Modifier.fillMaxSize()) {
         Text(
@@ -189,6 +202,7 @@ private fun TrendsCloudContent(digest: TrendsCloudDigest, mode: CloudLayoutMode)
         WordCloudCanvas(
             words = digest.words,
             mode = mode,
+            onWordTap = onWordTap,
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
@@ -211,11 +225,15 @@ private fun TrendsCloudContent(digest: TrendsCloudDigest, mode: CloudLayoutMode)
  * 词云画布:BoxWithConstraints 拿到可用像素尺寸后一次性算好全部落位
  * (remember 缓存,数据 / 布局模式 / 尺寸 / 字号档变化才重排),Canvas 只负责描画。
  * 两种布局模式共用字号分档与配色映射,仅排布引擎与绘制路径不同。
+ *
+ * [onWordTap]:点击词条回调(传展示形态 display),空白点击不动作;命中判定
+ * 螺旋用词 AABB(竖排词交换宽高),气泡用圆心距离。
  */
 @Composable
 private fun WordCloudCanvas(
     words: List<TrendCloudWord>,
     mode: CloudLayoutMode,
+    onWordTap: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     BoxWithConstraints(modifier = modifier) {
@@ -246,7 +264,21 @@ private fun WordCloudCanvas(
                     )
                 }
             }
-            Canvas(modifier = Modifier.fillMaxSize()) {
+            Canvas(modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(placed) {
+                    detectTapGestures { pos ->
+                        // 竖排词绕词心转了 90°,可视 AABB 宽高交换
+                        val hit = placed.firstOrNull { word ->
+                            val vertical = word.rotationDeg != 0f
+                            val halfW = (if (vertical) word.layout.size.height else word.layout.size.width) / 2f
+                            val halfH = (if (vertical) word.layout.size.width else word.layout.size.height) / 2f
+                            abs(pos.x - word.center.x) <= halfW && abs(pos.y - word.center.y) <= halfH
+                        }
+                        if (hit != null) onWordTap(hit.term)
+                    }
+                }
+            ) {
                 placed.forEach { word ->
                     val color = tierColors[word.tier][word.shade]
                     // 落位以词心记录,描画换算回左上角;竖排词绕词心转正
@@ -277,7 +309,17 @@ private fun WordCloudCanvas(
                     )
                 }
             }
-            Canvas(modifier = Modifier.fillMaxSize()) {
+            Canvas(modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(bubbles) {
+                    detectTapGestures { pos ->
+                        val hit = bubbles.firstOrNull { b ->
+                            hypot(pos.x - b.center.x, pos.y - b.center.y) <= b.radius
+                        }
+                        if (hit != null) onWordTap(hit.term)
+                    }
+                }
+            ) {
                 bubbles.forEach { b ->
                     val color = tierColors[b.tier][b.shade]
                     // 气泡底走分档色弱化档(徽章/药丸同款透明度),文字全透明压底,
@@ -305,22 +347,25 @@ private fun WordCloudCanvas(
 /**
  * 词云词条落位结果(螺旋模式):整词一次测量布局 + 词心位置 +
  * 旋转角(度;0 = 正立)+ 字号档与明暗变体序号(两者共同决定调色板取色)。
+ * [term] 为词条展示形态(display),点击命中回调用。
  */
 private data class PlacedCloudWord(
     val layout: TextLayoutResult,
     val center: Offset,
     val rotationDeg: Float,
     val tier: Int,
-    val shade: Int
+    val shade: Int,
+    val term: String
 )
 
-/** 气泡落位结果(圆形气泡模式):文字布局(字号可能已随整体缩放)+ 圆心 + 半径 + 字号档与明暗变体序号。 */
+/** 气泡落位结果(圆形气泡模式):文字布局(字号可能已随整体缩放)+ 圆心 + 半径 + 字号档与明暗变体序号。[term] 为点击命中回调用的展示形态。 */
 private data class PlacedBubbleWord(
     val layout: TextLayoutResult,
     val center: Offset,
     val radius: Float,
     val tier: Int,
-    val shade: Int
+    val shade: Int,
+    val term: String
 )
 
 /** 词云布局模式:螺旋散布(默认,词填满矩形画布)与圆形气泡(词入泡、泡堆成圆簇);新增形态在此扩展一枚即可接入顶栏切换。 */
@@ -406,7 +451,8 @@ private fun layoutSpiralCloud(
                     center = Offset(x, y),
                     rotationDeg = if (vertical) 90f else 0f,
                     tier = tier,
-                    shade = tierPlaced[tier] % 2
+                    shade = tierPlaced[tier] % 2,
+                    term = word.display
                 )
                 tierPlaced[tier]++
                 boxes += box
@@ -564,7 +610,8 @@ private fun layoutBubbleCloud(
             center = Offset(cx + b.x * s, cy + b.y * s),
             radius = b.r * s,
             tier = b.tier,
-            shade = b.shade
+            shade = b.shade,
+            term = b.display
         )
     }
 }

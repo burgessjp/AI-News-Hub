@@ -29,7 +29,7 @@ internal fun TabRoot(
         AppTab.Overview -> OverviewScreen(
             onOpenUrl = onOpenUrl,
             // 顶栏搜索图标 → 本地搜索独立页(查设备内索引,覆盖本 App 浏览过的 8 源数据)
-            onOpenSearch = { nav.push(Page.LocalSearch) },
+            onOpenSearch = { nav.push(Page.LocalSearch()) },
             listState = overviewListState,
             reselectSignal = reselectTick
         )
@@ -56,6 +56,8 @@ internal fun TabRoot(
         AppTab.Trends -> TrendsScreen(
             onOpenUrl = onOpenUrl,
             onOpenCloud = { nav.push(Page.TrendsCloud) },
+            // 展开区「查看全部命中」带词进本地搜索(查设备内索引的全部命中)
+            onOpenLocalSearch = { nav.push(Page.LocalSearch(it)) },
             listState = trendsListState,
             reselectSignal = reselectTick
         )

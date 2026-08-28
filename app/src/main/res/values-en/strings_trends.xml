@@ -48,4 +48,14 @@
     <string name="trends_trend_up_cd">Popularity rising</string>
     <string name="trends_trend_down_cd">Popularity falling</string>
     <string name="trends_trend_flat_cd">No change in popularity</string>
+
+    <!-- ===== Expanded-row action strip (Trends root tab only; hidden on history date pages) ===== -->
+    <!-- Follow this keyword (button label when not followed) -->
+    <string name="trends_follow_action">Follow</string>
+    <!-- Button label when already followed (static; unfollow lives in the Follows manage sheet) -->
+    <string name="trends_followed_action">Following</string>
+    <!-- Glass pill after following: %1$s=keyword display form -->
+    <string name="trends_follow_added">Following %1$s</string>
+    <!-- Open local search with this keyword (only 3 sample items are inline) -->
+    <string name="trends_search_all">All matches</string>
 </resources>

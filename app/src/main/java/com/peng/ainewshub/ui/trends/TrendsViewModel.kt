@@ -10,8 +10,11 @@ import com.peng.ainewshub.data.AppException
 import com.peng.ainewshub.data.TrendsDigest
 import com.peng.ainewshub.data.TrendsRepository
 import com.peng.ainewshub.data.source.ArchiveHttpClient
+import com.peng.ainewshub.ui.FollowNotices
 import com.peng.ainewshub.ui.RefreshNotices
 import com.peng.ainewshub.ui.i18n.localized
+import com.peng.ainewshub.ui.more.MAX_FOLLOWED_KEYWORDS
+import com.peng.ainewshub.ui.more.SettingsStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -42,11 +45,16 @@ sealed interface TrendsState {
  *  - [refresh]:下拉刷新,绕过缓存强制重读(流水线刚推送立即可见);
  *  - 重击 tab 走 [load] 即可。
  *
+ * 另承载展开区「+ 关注」缝合动作:[followedKeywords] 响应式收集关注词集合
+ * (小写;按钮已关注态判定),[followKeyword] 一键写入 DataStore(关注页
+ * followedKeywordsFlow 自动联动重算),结果经 [FollowNotices] 全局胶囊提示。
+ *
  * 加载中保留旧内容(Success 不回落 Loading),只亮下拉刷新指示。
  */
 class TrendsViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repo = TrendsRepository()
+    private val settingsStore = SettingsStore(application)
 
     private val _state = MutableStateFlow<TrendsState>(TrendsState.Loading)
     val state: StateFlow<TrendsState> = _state.asStateFlow()
@@ -55,8 +63,19 @@ class TrendsViewModel(application: Application) : AndroidViewModel(application) 
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
+    /** 已关注词集合(全小写;写入端去重是 ignoreCase、存量大小写不定,统一小写比对)。 */
+    private val _followedKeywords = MutableStateFlow<Set<String>>(emptySet())
+
+    /** 已关注词集合(小写):展开区「+ 关注」按钮的已关注态判定。 */
+    val followedKeywords: StateFlow<Set<String>> = _followedKeywords.asStateFlow()
+
     init {
         load()
+        viewModelScope.launch {
+            settingsStore.followedKeywordsFlow.collect { list ->
+                _followedKeywords.value = list.mapTo(mutableSetOf()) { it.lowercase() }
+            }
+        }
     }
 
     /** 自动加载:读归档 trends.json(命中 2 分钟缓存秒回)。 */
@@ -64,6 +83,32 @@ class TrendsViewModel(application: Application) : AndroidViewModel(application) 
 
     /** 下拉刷新:绕过 trends.json 2 分钟缓存强制重读。 */
     fun refresh() = run(true)
+
+    /**
+     * 展开区「+ 关注」:把热词(展示形态)写入关注词。
+     *
+     * 已关注静默(按钮本就呈已关注态);达上限经 [FollowNotices] 提示;
+     * 写入成功同样提示「已关注 X」。关注页经 followedKeywordsFlow 自动联动。
+     */
+    fun followKeyword(display: String) {
+        val keyword = display.trim()
+        if (keyword.isEmpty()) return
+        viewModelScope.launch {
+            val current = _followedKeywords.value
+            when {
+                keyword.lowercase() in current -> Unit // 已关注:无变化可告知
+                current.size >= MAX_FOLLOWED_KEYWORDS ->
+                    FollowNotices.notify(FollowNotices.Event(keyword, FollowNotices.Outcome.Capped))
+                else -> {
+                    val added = settingsStore.addFollowedKeyword(keyword)
+                    if (added) {
+                        FollowNotices.notify(FollowNotices.Event(keyword, FollowNotices.Outcome.Added))
+                    }
+                    // 写入失败静默:用户再点一次即可,不打断阅读
+                }
+            }
+        }
+    }
 
     private fun run(force: Boolean) {
         if (_isRefreshing.value) return

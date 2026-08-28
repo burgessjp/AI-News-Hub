@@ -48,4 +48,14 @@
     <string name="trends_trend_up_cd">热度上升</string>
     <string name="trends_trend_down_cd">热度下降</string>
     <string name="trends_trend_flat_cd">热度持平</string>
+
+    <!-- ===== 展开区尾部动作行(仅趋势根 tab;历史热词日期页不渲染) ===== -->
+    <!-- 一键关注该热词(未关注态按钮文字) -->
+    <string name="trends_follow_action">关注</string>
+    <!-- 已关注态按钮文字(静态,不可点;移除入口在关注页管理弹层) -->
+    <string name="trends_followed_action">已关注</string>
+    <!-- 关注成功玻璃胶囊:%1$s=热词展示形态 -->
+    <string name="trends_follow_added">已关注 %1$s</string>
+    <!-- 带词进本地搜索查全部命中(展开区代表条目只截 3 条) -->
+    <string name="trends_search_all">查看全部命中</string>
 </resources>
