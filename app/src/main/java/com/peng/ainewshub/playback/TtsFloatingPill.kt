@@ -89,7 +89,7 @@ private val PillDockBottomPadding = 16.dp + BottomBarPillHeight + PillDockGap
 /** 文本区(进度 + 标题)的最大宽度:限制药丸总宽,小屏不溢出。 */
 private val PillTextMaxWidth = 128.dp
 
-/** 药丸整体最大宽度兜底(文本 + 四个 36dp 按钮 + 内边距)。 */
+/** 药丸整体最大宽度兜底(文本 + 最多四个 36dp 按钮 + 内边距;单条队列只显播放/停止两个)。 */
 private val PillMaxWidth = 340.dp
 
 /** [Offset] 的 rememberSaveable Saver(屏幕绝对位置跨页面转场/进程死亡恢复)。 */

@@ -342,24 +342,31 @@ class TtsPlaybackService : Service() {
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                 )
             )
-        return NotificationCompat.Builder(this, CHANNEL_ID)
+        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_notify)
             .setContentTitle(localized.getString(R.string.tts_notification_title))
             .setContentText(text)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setContentIntent(contentIntent)
-            .addAction(control(ACTION_PREV, 1, R.drawable.ic_tts_prev, localized.getString(R.string.tts_action_prev)))
-            .addAction(
-                control(
-                    ACTION_PLAY_PAUSE, 2,
-                    if (paused) R.drawable.ic_tts_play else R.drawable.ic_tts_pause,
-                    localized.getString(if (paused) R.string.tts_action_play else R.string.tts_action_pause)
-                )
+        // 序号控制(上一条/下一条)只对多条队列有意义:单条形态(总览单段播报)
+        // 不加这两个 action —— 与浮窗「total > 1 才显上/下一条」同一口径,
+        // 上方正文文本的 playlist.size > 1 分支同理
+        if (playlist.size > 1) {
+            builder.addAction(control(ACTION_PREV, 1, R.drawable.ic_tts_prev, localized.getString(R.string.tts_action_prev)))
+        }
+        builder.addAction(
+            control(
+                ACTION_PLAY_PAUSE, 2,
+                if (paused) R.drawable.ic_tts_play else R.drawable.ic_tts_pause,
+                localized.getString(if (paused) R.string.tts_action_play else R.string.tts_action_pause)
             )
-            .addAction(control(ACTION_NEXT, 3, R.drawable.ic_tts_next, localized.getString(R.string.tts_action_next)))
-            .addAction(control(ACTION_STOP, 4, R.drawable.ic_tts_stop, localized.getString(R.string.tts_action_stop)))
-            .build()
+        )
+        if (playlist.size > 1) {
+            builder.addAction(control(ACTION_NEXT, 3, R.drawable.ic_tts_next, localized.getString(R.string.tts_action_next)))
+        }
+        builder.addAction(control(ACTION_STOP, 4, R.drawable.ic_tts_stop, localized.getString(R.string.tts_action_stop)))
+        return builder.build()
     }
 
     /** 懒建通知渠道(幂等);API 26 以下无渠道概念直接跳过。 */
