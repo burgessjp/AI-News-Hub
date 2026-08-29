@@ -17,7 +17,7 @@ import kotlinx.coroutines.launch
  * 历史摘要 ViewModel —— 「更多 → 历史摘要」两级页共用。
  *
  * 数据走 index.json 的 `history` 索引按日期寻址(见 [SummaryRepository]),
- * 纯归档语义,与全局 SourceMode 无关。
+ * 纯归档语义。
  *
  * 两级页各取一流:
      *  - [dates]:可选日期列表(全源 history 的日期并集,附当天有数据的源数);

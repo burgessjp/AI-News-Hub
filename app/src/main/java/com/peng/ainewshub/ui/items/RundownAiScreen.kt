@@ -40,7 +40,6 @@ import androidx.compose.ui.res.stringResource
 import com.peng.ainewshub.R
 import com.peng.ainewshub.data.AiConfig
 import com.peng.ainewshub.data.RundownAiArticle
-import com.peng.ainewshub.data.source.SourceMode
 import com.peng.ainewshub.ui.RundownAiViewModel
 import com.peng.ainewshub.ui.TranslationState
 import com.peng.ainewshub.ui.UiState
@@ -68,8 +67,7 @@ import com.peng.ainewshub.ui.theme.AppText
  *  - 加载中:shimmer 骨架;失败:错误态 + 重试;空:空状态;下拉刷新走 forceRefresh
  *  - 整体翻译:翻译开关开且配置就绪时,标题行出现「译」按钮,title+subtitle 合并一次翻译
  *
- * 双模式源:LIVE 走 [com.peng.ainewshub.data.RundownAiRepository](实时,带 4h 缓存),
- * ARCHIVE 走归档快照,由 ViewModel 按 SourceMode 切换。
+ * 数据恒走归档快照(gitcode),实时抓取路径已随 LIVE 模式删除。
  *
  * @param onBack 返回回调
  * @param onOpenUrl 点击文章打开内置 WebView
@@ -87,7 +85,6 @@ fun RundownAiScreen(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val lastRefreshAt by vm.lastRefreshAt.collectAsStateWithLifecycle()
-    val sourceMode by vm.sourceMode.collectAsStateWithLifecycle()
     val isRefreshing by vm.isRefreshing.collectAsStateWithLifecycle()
     val translationStates by vm.translationStates.collectAsStateWithLifecycle()
     val config by vm.configFlow.collectAsStateWithLifecycle(initialValue = AiConfig())
@@ -109,7 +106,7 @@ fun RundownAiScreen(
         snackbarHostState = snackbarHostState
     ) {
         val articles = (state as UiState.Success).data
-        updateTimeHeader(sourceMode, lastRefreshAt)
+        updateTimeHeader(lastRefreshAt)
         itemsIndexed(items = articles, key = { _, article -> article.slug }) { index, article ->
             ArticleRow(
                 item = article,

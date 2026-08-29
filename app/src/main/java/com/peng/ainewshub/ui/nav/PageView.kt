@@ -333,7 +333,7 @@ internal fun PageView(
             listState = listStates.forPage(page)
         )
         // 历史摘要指定日期:当日全源摘要卡页(复用摘要卡片)。
-        // 纯归档语义,不参与 SourceMode 切换;卡片无「查看完整列表」出口。
+        // 纯归档语义;卡片无「查看完整列表」出口。
         is Page.SummaryDate -> SummaryDateScreen(
             date = page.date,
             onBack = onBack,

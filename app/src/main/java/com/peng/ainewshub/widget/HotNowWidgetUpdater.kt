@@ -8,7 +8,7 @@ import com.peng.ainewshub.data.OverviewRepository
 /**
  * 「今日热点」小组件的取数与刷新入口。
  *
- * 数据永远只读归档 `latest_overview`(与总览页同源同语义,与 SourceMode 无关):
+ * 数据永远只读归档 `latest_overview`(与总览页同源同语义):
  * [OverviewRepository.loadDigest] 内部经 ArchiveHttpClient 读 index.json,
  * 自带 2 分钟内存缓存 —— App 刚浏览过总览时这里几乎零网络开销。
  *

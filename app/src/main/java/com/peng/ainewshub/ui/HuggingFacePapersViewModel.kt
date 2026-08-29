@@ -4,22 +4,19 @@ import androidx.lifecycle.viewModelScope
 import android.app.Application
 import com.peng.ainewshub.data.SourceListResult
 import com.peng.ainewshub.data.HuggingFacePaper
-import com.peng.ainewshub.data.HuggingFacePapersRepository
 import com.peng.ainewshub.data.source.HuggingFacePapersArchiveRepository
-import com.peng.ainewshub.data.source.HuggingFacePapersSource
-import com.peng.ainewshub.data.source.SourceMode
 import kotlinx.coroutines.flow.StateFlow
 
 /**
  * HuggingFace Trending Papers ViewModel。
  *
- * 继承 [SourceListViewModel]:sourceMode 订阅 / state / refresh / forceRefresh 等公共逻辑
- * 由基类统一。翻译逻辑由 [translateSupport] 委托(整体翻译 title+summary,以 paper.id 为 key)。
+ * 继承 [SourceListViewModel]:state / refresh / forceRefresh 等公共逻辑由基类统一,
+ * 数据恒走 gitcode 归档([HuggingFacePapersArchiveRepository])。翻译逻辑由
+ * [translateSupport] 委托(整体翻译 title+summary,以 paper.id 为 key)。
  */
 class HuggingFacePapersViewModel(application: Application) : SourceListViewModel<HuggingFacePaper>(application) {
 
-    private val liveRepo: HuggingFacePapersRepository = HuggingFacePapersRepository(cacheDir = application.cacheDir)
-    private val archiveRepo: HuggingFacePapersSource = HuggingFacePapersArchiveRepository()
+    private val archiveRepo = HuggingFacePapersArchiveRepository()
     private val translateSupport = TranslateSupport(application)
 
     val configFlow = translateSupport.configFlow
@@ -27,12 +24,9 @@ class HuggingFacePapersViewModel(application: Application) : SourceListViewModel
     /** 整体译文翻译状态(paperId → state)。 */
     val translationStates: StateFlow<Map<String, TranslationState>> = translateSupport.states
 
-    private fun currentRepo(): HuggingFacePapersSource =
-        if (sourceMode.value == SourceMode.ARCHIVE) archiveRepo else liveRepo
+    override suspend fun doFetch(): SourceListResult<HuggingFacePaper> = archiveRepo.fetch()
 
-    override suspend fun doFetch(): SourceListResult<HuggingFacePaper> = currentRepo().fetch()
-
-    override suspend fun doForceRefresh(): SourceListResult<HuggingFacePaper> = currentRepo().forceRefresh()
+    override suspend fun doForceRefresh(): SourceListResult<HuggingFacePaper> = archiveRepo.forceRefresh()
 
     /**
      * 翻译论文(title + summary 整体),列表页单按钮触发。

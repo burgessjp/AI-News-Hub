@@ -86,7 +86,6 @@ fun GitHubTrendingScreen(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val lastRefreshAt by vm.lastRefreshAt.collectAsStateWithLifecycle()
-    val sourceMode by vm.sourceMode.collectAsStateWithLifecycle()
     val isRefreshing by vm.isRefreshing.collectAsStateWithLifecycle()
     val descStates by vm.descStates.collectAsStateWithLifecycle()
     val config by vm.configFlow.collectAsStateWithLifecycle(initialValue = AiConfig())
@@ -107,7 +106,7 @@ fun GitHubTrendingScreen(
         snackbarHostState = snackbarHostState
     ) {
         val repos = (state as UiState.Success).data
-        updateTimeHeader(sourceMode, lastRefreshAt)
+        updateTimeHeader(lastRefreshAt)
         itemsIndexed(items = repos, key = { _, repo -> repo.url }) { index, repo ->
             TrendingRow(
                 repo = repo,

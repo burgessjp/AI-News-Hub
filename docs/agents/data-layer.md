@@ -4,11 +4,11 @@
 
 ## 取数模式
 
-- **取数模式恒定归档**（设置页「数据源」入口已移除）：5 个稳定源（HackerNews / GitHub Trending / stormzhang AI / HuggingFace Papers / The Rundown AI）固定走 ARCHIVE；底层 `SourceMode` 枚举与 LIVE 分支保留待恢复（`SettingsStore` 强制返回 `ARCHIVE`）。
+- **取数模式恒定归档**：5 个稳定源（HackerNews / GitHub Trending / stormzhang AI / HuggingFace Papers / The Rundown AI）固定读 gitcode 归档快照；原实时抓取路径（LIVE 双模式、jsoup 直抓、`SourceMode` 枚举）已于 2026-08-29 整体删除（决策记录见 docs/tech-roadmap.md），HTML 抓取全部由 `scripts/` 流水线承担。HN 评论树是唯一保留的实时路径（`HackerNewsRepository`，归档快照不含评论）。
 - **Product Hunt 只归档**（Developer Token 是服务端 secret 不进 APK，两种模式都走归档）。
 - 归档走 `ArchiveHttpClient`（gitcode **REST API raw 端点**，**不要**用 raw 直链——背后是 WAF 会 403）。
 - **归档断网兜底**：index / 快照 / 根级文件网络成功后 write-through 落盘（`ArchiveDiskCache`，`cacheDir/archives/`，64MB 上限最旧淘汰 + 读取 7 天时效，`App.onCreate` init 保证小组件等无 Activity 入口也能落盘）；**仅传输层失败（IOException：连不上/DNS/读超时）读盘兜底**，命中且未过期则置 `ArchiveHttpClient.offlineMode` 并返回旧数据（Repository/VM 签名零改动），UI 层每次离线事件弹一次性顶部胶囊提示（`NoticePill`，5 秒、恢复联网提前消失；下拉刷新无新批次为 2.5 秒对勾胶囊）；**HTTP 层错误（4xx/5xx/空响应）不兜底**，直接走 Error 态——服务端故障不得伪装成「离线」拿旧数据顶上。`fetchLatestOverview(networkOnly = true)` 为网络探测语义（跳过内存缓存与盘兜底、失败即抛），仅供每日通知 Worker 与冷启动弹窗用；未命中才走错误态。
-- **归档失败（盘上也无兜底）直接显示 Error 态，不回退实时**。
+- **归档失败（盘上也无兜底）直接显示 Error 态。**
 
 ## 四个内容 Tab 的数据语义
 
@@ -26,7 +26,7 @@
 
 ## 桌面小组件「今日热点」（widget/ 包，Glance）
 
-- 只读归档 `latest_overview`（与总览同源同语义，与 SourceMode 无关）。缓存为 App 级 SharedPreferences `hot_now_widget`（多小组件实例共享，刻意不用 Glance per-id 状态）。
+- 只读归档 `latest_overview`（与总览同源同语义）。缓存为 App 级 SharedPreferences `hot_now_widget`（多小组件实例共享，刻意不用 Glance per-id 状态）。
 - 刷新三路：系统 30min `updatePeriodMillis` / 头部按钮 `RefreshHotNowAction` / App 总览刷新成功联动（`HotNowWidgetUpdater.refreshFromApp`，同进程命中 ArchiveHttpClient 2 分钟缓存，零额外网络）。拉取失败保留旧数据不清空（小组件无错误交互入口）。
 - 配色直接取 `ui/theme/Color.kt` 设计令牌组 day/night `ColorProvider`（App 迷你版，不用壁纸动态色）；条目只展示排名 + 标题（+突发胶囊），来源/互动指标刻意不上小组件；Glance 1.1.1 不支持 res/font 自定义字体，层级靠字号 + 字重。
 - 视觉对齐 App 内「今日热点」卡（`HotTopicsSection`）：头部品牌渐变 Hero（`widget_header_gradient` day/night drawable，BrandGradient 同源）= 标题行 + 「今日综述」digest 正文（≤2 行截断，空串不渲染，与总览 Tab digest Hero 同构；digest 随 items 一同存入 `hot_now_widget` SharedPreferences 的 `digest` 键）+ 卡面色描边背景（`widget_bg` day/night drawable，surfaceContainerLow + 1dp outlineVariant 描边）；条目为迷你排名徽章（18dp，分档同 App RankBadge：1 名 tertiary 实心 / 2-3 tertiaryContainer / 其余 surfaceContainerHigh）+ Bold 标题，行间发丝线。改徽章分档/渐变色须与 `ui/components/RankBadge.kt`、`theme/Color.kt` 保持同步。

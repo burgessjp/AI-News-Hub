@@ -62,3 +62,16 @@ data class OpenAiAnthropicNews(
         }
     }
 }
+
+/**
+ * OpenAI x Anthropic 厂商动态拉取结果(带数据新鲜度),对齐 [ProductHuntResult]。
+ *
+ * @param fetchedAt 数据落盘时刻(归档快照的 fetched_at_ms)
+ * @param articles  厂商动态列表(最新 20 条,按发布时间倒序)
+ */
+data class OpenAiAnthropicNewsResult(
+    override val fetchedAt: Long,
+    val articles: List<OpenAiAnthropicNews>
+) : SourceListResult<OpenAiAnthropicNews> {
+    override val items: List<OpenAiAnthropicNews> get() = articles
+}

@@ -36,7 +36,6 @@ import androidx.compose.ui.res.stringResource
 import com.peng.ainewshub.R
 import com.peng.ainewshub.data.AiConfig
 import com.peng.ainewshub.data.OpenAiAnthropicNews
-import com.peng.ainewshub.data.source.SourceMode
 import com.peng.ainewshub.ui.OpenAiAnthropicNewsViewModel
 import com.peng.ainewshub.ui.TranslationState
 import com.peng.ainewshub.ui.UiState
@@ -64,8 +63,7 @@ import com.peng.ainewshub.ui.theme.AppText
  *  - 加载中:shimmer 骨架;失败:错误态 + 重试;空:空状态;下拉刷新走 forceRefresh
  *  - 整体翻译:翻译开关开且配置就绪时,标题行出现「译」按钮,title+summary 合并一次翻译
  *
- * 纯归档源:LIVE 与 ARCHIVE 都走归档快照(两家无稳定公开 API),由 ViewModel 按
- * SourceMode 切换(实际都走归档,sourceMode 仅影响顶栏角标)。
+ * 纯归档源(两家无稳定公开 API),数据恒走归档快照。
  *
  * @param onBack 返回回调
  * @param onOpenUrl 点击文章打开内置 WebView
@@ -83,7 +81,6 @@ fun OpenAiAnthropicNewsScreen(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val lastRefreshAt by vm.lastRefreshAt.collectAsStateWithLifecycle()
-    val sourceMode by vm.sourceMode.collectAsStateWithLifecycle()
     val isRefreshing by vm.isRefreshing.collectAsStateWithLifecycle()
     val translationStates by vm.translationStates.collectAsStateWithLifecycle()
     val config by vm.configFlow.collectAsStateWithLifecycle(initialValue = AiConfig())
@@ -105,7 +102,7 @@ fun OpenAiAnthropicNewsScreen(
         snackbarHostState = snackbarHostState
     ) {
         val articles = (state as UiState.Success).data
-        updateTimeHeader(sourceMode, lastRefreshAt)
+        updateTimeHeader(lastRefreshAt)
         itemsIndexed(items = articles, key = { _, article -> article.url }) { index, article ->
             ArticleRow(
                 item = article,

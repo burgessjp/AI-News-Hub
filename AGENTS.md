@@ -18,7 +18,7 @@
 ## 编码约定（与默认不同，务必遵守）
 
 - **注释用中文，代码/变量名用英文**（与存量代码一致）。
-- **不引入 Retrofit / Gson / Moshi**：网络一律 `OkHttpClient`，JSON 用内置 `org.json`，HTML 抓取用 jsoup。`OkHttpClient` 统一经 `data/HttpClients.kt` 的共享 base 派生（`base` 或 `base.newBuilder()`），不各自 `OkHttpClient.Builder().build()`。
+- **不引入 Retrofit / Gson / Moshi**：网络一律 `OkHttpClient`，JSON 用内置 `org.json`（App 端不做 HTML 抓取，抓取全部由流水线承担）。`OkHttpClient` 统一经 `data/HttpClients.kt` 的共享 base 派生（`base` 或 `base.newBuilder()`），不各自 `OkHttpClient.Builder().build()`。
 - **不用 Navigation Compose**（见「深入文档」导航篇），**无 DI 框架**：Repository 在 ViewModel / Composable 内直接构造。
 - 字号一律 `AppText.xxx`、透明度一律 `AppAlpha.xxx`、圆角一律 `MaterialTheme.shapes` 或 `CircleShape`、颜色只走 `colorScheme`——不散落 `.sp`/`.alpha`/hex 字面量（hex 仅两处集中例外：源品牌色 `ui/more/SourceBrandColors.kt`、词云调色板 `ui/trends/CloudWordColors.kt`）。列表排名/统计/章节条/骨架屏统一复用 `ui/components/` 现有组件，不新建私有拷贝。
 - **UI 文案一律走 string 资源，不写硬编码字面量**，新 feature 必须同步 `values/`（中文全集）+ `values-en/` 双语；语言切换机制与共用词条约定见「深入文档」i18n 篇。
@@ -31,7 +31,7 @@
 |---|---|---|
 | 导航 / 新增二级页 / WebView / 深链 | [docs/agents/navigation.md](docs/agents/navigation.md) | 新页三处同步、列表状态上提、`openUrl` 唯一入口、WebView 页 FADE 转场 |
 | 文案 / 双语资源 / 语言切换 | [docs/agents/i18n.md](docs/agents/i18n.md) | 双语同步、`AppLocale.kt` 单点机制、流水线内容恒中文 |
-| 数据源 / Repository / 小组件 / 通知 | [docs/agents/data-layer.md](docs/agents/data-layer.md) | 恒定归档不回退实时、归档禁 raw 直链（WAF）、`CHECK_SLOTS` 联动流水线批次、`SourceKeys.kt` 唯一真相源 |
+| 数据源 / Repository / 小组件 / 通知 | [docs/agents/data-layer.md](docs/agents/data-layer.md) | 恒定归档（实时路径已删除）、归档禁 raw 直链（WAF）、`CHECK_SLOTS` 联动流水线批次、`SourceKeys.kt` 唯一真相源 |
 | DataStore / Room / 缓存 | [docs/agents/persistence.md](docs/agents/persistence.md) | prefs 键清单、favorites 表迁移与清理红线 |
 | 单元测试 / fixture / Robolectric | [docs/agents/testing.md](docs/agents/testing.md) | 必测层清单、fixture 存放与裁剪、object 单例重置 |
 | `scripts/` 流水线 / CI/CD | [docs/agents/pipeline.md](docs/agents/pipeline.md) | 4 个必需环境变量、失败继承语义、日期统一北京时间 |

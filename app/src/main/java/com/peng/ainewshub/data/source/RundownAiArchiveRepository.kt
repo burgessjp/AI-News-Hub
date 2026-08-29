@@ -1,24 +1,23 @@
 package com.peng.ainewshub.data.source
 
 import com.peng.ainewshub.data.RundownAiArticle
+import com.peng.ainewshub.data.RundownAiResult
 import com.peng.ainewshub.data.SearchIndexRepository
 import com.peng.ainewshub.data.SourceKeys
 
 /**
- * The Rundown AI 的 gitcode 归档数据源实现。
+ * The Rundown AI 的 gitcode 归档数据源。
  *
- * 与 [RundownAiRepository](实时)并列,实现同一 [RundownAiSource] 接口。
- * 数据来自数据流水线([scripts/fetch_data.py] 每天 06:00/14:00 经首页 HTML 抓取归档)的快照。
- *
+ * 数据来自数据流水线([scripts/fetch_data.py] 经首页 HTML 抓取归档)的快照。
  * 字段映射对齐 docs/news-hub-data-usage.md 的 rundown-ai items 表
  * 与 [com.peng.ainewshub.data.RundownAiArticle.fromJson]。
  * 无缓存概念:fetch == forceRefresh。失败抛 RuntimeException 交由 VM 显示 Error。
  */
-class RundownAiArchiveRepository : RundownAiSource {
+class RundownAiArchiveRepository {
 
-    override suspend fun fetch(): RundownAiResult = load()
+    suspend fun fetch(): RundownAiResult = load()
 
-    override suspend fun forceRefresh(): RundownAiResult = load()
+    suspend fun forceRefresh(): RundownAiResult = load()
 
     private suspend fun load(): RundownAiResult {
         val (fetchedAt, articles) = ArchiveHttpClient.fetchItemsList(SourceKeys.RUNDOWN_AI) { obj, i ->

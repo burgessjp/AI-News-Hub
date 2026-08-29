@@ -6,7 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * HackerNews 模型解析回归([HackerNewsStory] fromJson / [HackerNewsStoriesCache] 往返)。
+ * HackerNews 模型解析回归([HackerNewsStory] fromJson)。
  */
 class HackerNewsModelsTest {
 
@@ -43,23 +43,5 @@ class HackerNewsModelsTest {
         assertEquals("https://news.ycombinator.com/item?id=7", story.targetUrl)
         assertEquals(0, story.score)
         assertEquals(emptyList<Long>(), story.kids)
-    }
-
-    @Test
-    fun `StoriesCache 序列化往返不丢字段`() {
-        val cache = HackerNewsStoriesCache(
-            fetchedAt = 1_787_972_486_201L,
-            stories = listOf(
-                HackerNewsStory(id = 1, title = "a", url = "https://a", kids = listOf(10, 20)),
-                HackerNewsStory(id = 2, title = "b")
-            )
-        )
-        val restored = HackerNewsStoriesCache.fromJson(cache.toJson())
-        assertEquals(cache, restored)
-    }
-
-    @Test
-    fun `StoriesCache 结构不符返回 null`() {
-        assertNull(HackerNewsStoriesCache.fromJson(JSONObject("""{"fetchedAt":1}""")))
     }
 }

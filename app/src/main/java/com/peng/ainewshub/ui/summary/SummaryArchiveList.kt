@@ -41,7 +41,7 @@ import com.peng.ainewshub.ui.theme.AppText
  * 点击某天进入该日的全源摘要卡页(SummaryDateScreen)。视觉:左栏相对日期 +
  * 周几,右栏当天有归档的源数,行间发丝线。
  *
- * 纯归档语义,与全局 SourceMode 无关(同摘要 Tab);history 每源仅保留最近
+ * 纯归档语义(同摘要 Tab);history 每源仅保留最近
  * 31 天,且功能上线前的日期不在索引内(见 docs/news-hub-data-usage.md)。
  */
 @Composable

@@ -80,7 +80,6 @@ fun HackerNewsScreen(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val lastRefreshAt by vm.lastRefreshAt.collectAsStateWithLifecycle()
-    val sourceMode by vm.sourceMode.collectAsStateWithLifecycle()
     val isRefreshing by vm.isRefreshing.collectAsStateWithLifecycle()
     val titleStates by vm.titleStates.collectAsStateWithLifecycle()
     val config by vm.configFlow.collectAsStateWithLifecycle(initialValue = AiConfig())
@@ -102,7 +101,7 @@ fun HackerNewsScreen(
         snackbarHostState = snackbarHostState
     ) {
         val stories = (state as UiState.Success).data
-        updateTimeHeader(sourceMode, lastRefreshAt)
+        updateTimeHeader(lastRefreshAt)
         itemsIndexed(items = stories, key = { _, story -> story.id }) { index, story ->
             HackerNewsRow(
                 rank = index + 1,

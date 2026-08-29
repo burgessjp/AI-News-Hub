@@ -78,10 +78,10 @@ private enum class SummarySource(val key: String, @StringRes val titleRes: Int) 
  * (gitcode CDN + [ArchiveHttpClient] 的 index.json 2 分钟 TTL),无需额外的本地缓存或锁。
  *
  * - 数据始终取自 gitcode 归档([ArchiveHttpClient] 每日快照),与全局
- *   [com.peng.ainewshub.data.source.SourceMode] 无关 —— 归档数据稳定、代表「今日」,
+ *   恒定走归档 —— 归档数据稳定、代表「今日」,
  *   适合做每日摘要;实时源波动大、用户可直接看列表。
  * - 「历史摘要」经 [summarizeOn] / [availableDates] 走 index.json 的 `history` 索引
- *   按日期寻址(流水线每源仅保留最近 31 天),同样与 SourceMode 无关。
+ *   按日期寻址(流水线每源仅保留最近 31 天)。
  * - 同时兼容三种形态:优先读结构化 `ai_summary_v2`,缺失则回退旧纯文本 `ai_summary`
  *   (仅历史快照);两者都缺失但快照 items 仍在(当天流水线 AI 调用失败 / 源不支持)时
  *   返回 [SummaryContent.Unavailable] 降级,UI 引导查看完整列表;连 items 都缺失才

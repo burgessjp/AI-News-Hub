@@ -18,7 +18,7 @@ import kotlinx.coroutines.launch
  *
  * 数据走根级独立索引 `trends_history.json` 按日期寻址(见 [TrendsRepository]),
  * 纯归档语义:热词榜由流水线逐批次落盘(trends/<date>/ 目录)并经一次性回填
- * 补齐历史日期,此处只读,与全局 SourceMode 无关。
+ * 补齐历史日期,此处只读。
  *
  * 两级页各取一流(同 [com.peng.ainewshub.ui.overview.OverviewArchiveViewModel] 套路):
  *  - [dates]:可选日期列表(索引键,倒序);

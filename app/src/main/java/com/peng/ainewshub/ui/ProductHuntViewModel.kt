@@ -5,21 +5,19 @@ import android.app.Application
 import com.peng.ainewshub.data.ProductHunt
 import com.peng.ainewshub.data.SourceListResult
 import com.peng.ainewshub.data.source.ProductHuntArchiveRepository
-import com.peng.ainewshub.data.source.ProductHuntSource
 import kotlinx.coroutines.flow.StateFlow
 
 /**
  * Product Hunt ViewModel。
  *
- * 继承 [SourceListViewModel]:sourceMode 订阅 / state / refresh / forceRefresh 等公共逻辑
- * 由基类统一。翻译逻辑由 [translateSupport] 委托(整体翻译 name+tagline,以 slug 为 key)。
- *
- * **只归档**:PH Developer Token 是服务端 secret 不进 APK,两种 SourceMode 都走归档。
- * [sourceMode] 仍订阅设置,仅为顶栏角标一致。
+ * 继承 [SourceListViewModel]:state / refresh / forceRefresh 等公共逻辑由基类统一,
+ * 数据恒走 gitcode 归档([ProductHuntArchiveRepository],PH Developer Token 是
+ * 服务端 secret 不进 APK)。翻译逻辑由 [translateSupport] 委托
+ * (整体翻译 name+tagline,以 slug 为 key)。
  */
 class ProductHuntViewModel(application: Application) : SourceListViewModel<ProductHunt>(application) {
 
-    private val archiveRepo: ProductHuntSource = ProductHuntArchiveRepository()
+    private val archiveRepo = ProductHuntArchiveRepository()
     private val translateSupport = TranslateSupport(application)
 
     val configFlow = translateSupport.configFlow

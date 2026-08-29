@@ -8,14 +8,13 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import com.peng.ainewshub.data.source.SourceMode
 import com.peng.ainewshub.ui.i18n.AppLanguage
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 /**
- * 显示偏好(主题模式 + 动态取色 + 字体族 + 字号档位 + 数据源模式 + 应用内语言)持久化;
+ * 显示偏好(主题模式 + 动态取色 + 字体族 + 字号档位 + 应用内语言)持久化;
  * 搜索历史([searchHistoryFlow],最近 10 条)与关注关键词([followedKeywordsFlow],
  * 最多 20 个)同存于此文件,与显示偏好语义轻绑定。
  *
@@ -23,8 +22,8 @@ import kotlinx.coroutines.flow.map
  * 即丢失回到默认。这里用独立 DataStore 文件 `display_prefs`(与 AI 服务配置
  * `ai_prefs` 分开,语义清晰)持久化,枚举按 [name] 存取。
  *
- * [sourceMode] 控制 Hub 4 个稳定源(HackerNews / GitHub Trending / stormzhang AI /
- * HuggingFace Papers)从实时抓取还是 gitcode 归档取数;设置页入口已移除,恒定 [SourceMode.ARCHIVE]。
+ * 历史遗留键 `source_mode`(实时/归档双模式)已随 LIVE 模式删除:存量用户
+ * 盘上该键的旧值成为不可读残留,无副作用,无需清理迁移。
  *
  * [sourceOrderFlow] 持久化用户在「信息源」页拖拽自定义的 8 源顺序(默认
  * [DEFAULT_SOURCE_ORDER]),摘要 Tab 跟随该顺序;关于页固定默认顺序不跟随。
@@ -49,7 +48,6 @@ class SettingsStore(context: Context) {
         val dynamicColor: Boolean = false,
         val fontChoice: FontChoice = FontChoice.System,
         val fontScale: FontScale = FontScale.Standard,
-        val sourceMode: SourceMode = SourceMode.ARCHIVE,
         val language: AppLanguage = AppLanguage.SYSTEM,
         val dailyNotify: Boolean = false
     )
@@ -63,9 +61,6 @@ class SettingsStore(context: Context) {
                 ?: FontChoice.System,
             fontScale = p[KEY_FONT_SCALE]?.let { name -> runCatching { FontScale.valueOf(name) }.getOrNull() }
                 ?: FontScale.Standard,
-            // 设置页「数据源」入口已移除,默认恒定走归档:忽略 DataStore 旧值,强制 ARCHIVE。
-            // (底层 LIVE 分支 / SourceMode 枚举 / fromStored 保留待恢复。)
-            sourceMode = SourceMode.ARCHIVE,
             language = p[KEY_LANGUAGE]?.let { name -> runCatching { AppLanguage.valueOf(name) }.getOrNull() }
                 ?: AppLanguage.SYSTEM,
             dailyNotify = p[KEY_DAILY_NOTIFY] ?: false
@@ -86,10 +81,6 @@ class SettingsStore(context: Context) {
 
     suspend fun updateFontScale(scale: FontScale) {
         dataStore.edit { it[KEY_FONT_SCALE] = scale.name }
-    }
-
-    suspend fun updateSourceMode(mode: SourceMode) {
-        dataStore.edit { it[KEY_SOURCE_MODE] = mode.name }
     }
 
     suspend fun updateLanguage(lang: AppLanguage) {
@@ -298,21 +289,11 @@ class SettingsStore(context: Context) {
             if (key.isEmpty()) null else key to ms
         }.toMap()
 
-    /**
-     * 挂起式读取数据源模式 —— 供 ViewModel 在 init 协程里取首帧真实值
-     * (替代原构造期 runBlocking 同步读:那是主线程磁盘 I/O,拖慢冷启动)。
-     * 读取失败(理论上不会,DataStore 容错)回退 [SourceMode.LIVE]。
-     */
-    suspend fun currentSourceMode(): SourceMode = runCatching {
-        prefsFlow.first().sourceMode
-    }.getOrDefault(SourceMode.ARCHIVE)
-
     private companion object {
         val KEY_THEME = stringPreferencesKey("theme_mode")
         val KEY_DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
         val KEY_FONT = stringPreferencesKey("font_choice")
         val KEY_FONT_SCALE = stringPreferencesKey("font_scale")
-        val KEY_SOURCE_MODE = stringPreferencesKey("source_mode")
         val KEY_LANGUAGE = stringPreferencesKey("language")
         val KEY_SEARCH_HISTORY = stringPreferencesKey("search_history")
         val KEY_SOURCE_ORDER = stringPreferencesKey("source_order")

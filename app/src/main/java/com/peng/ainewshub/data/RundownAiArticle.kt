@@ -13,10 +13,8 @@ import org.json.JSONObject
  * 每日 1 篇大综合,含 1 个主事件 + 1 个 PLUS 副标题(次要工具/技巧)。首页固定展示
  * 约 16 篇近况 newsletter 卡片,App 把每篇做成一张列表卡。
  *
- * 双模式源:实时([com.peng.ainewshub.data.RundownAiRepository],jsoup 直抓首页 HTML)
- * 与归档([com.peng.ainewshub.data.source.RundownAiArchiveRepository],读 gitcode 快照)
- * 都支持,由用户设置的 [com.peng.ainewshub.data.source.SourceMode] 决定走哪个。
- *
+ * 纯归档源:数据来自 [com.peng.ainewshub.data.source.RundownAiArchiveRepository]
+ * 读 gitcode 快照,App 端不直连 beehiiv。
  * 不加 @Parcelize:点击走 [url](beehiiv 文章页,内置 WebView),URL 是普通字符串,
  * 无需跨页面传整个对象(与 [StormzhangAiNews] 同套路)。
  *
@@ -63,4 +61,17 @@ data class RundownAiArticle(
             )
         }
     }
+}
+
+/**
+ * The Rundown AI 拉取结果(带数据新鲜度),对齐 [StormzhangAiNewsResult]。
+ *
+ * @param fetchedAt 数据落盘时刻(归档快照的 fetched_at_ms)
+ * @param articles  近况 newsletter 文章列表(首页约 16 篇)
+ */
+data class RundownAiResult(
+    override val fetchedAt: Long,
+    val articles: List<RundownAiArticle>
+) : SourceListResult<RundownAiArticle> {
+    override val items: List<RundownAiArticle> get() = articles
 }

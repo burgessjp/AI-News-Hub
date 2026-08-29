@@ -99,8 +99,6 @@
     <string name="language_en">English</string>
 
     <!-- ===== Enum display names ===== -->
-    <string name="source_mode_live">Live</string>
-    <string name="source_mode_archive">Gitcode Archive</string>
     <string name="provider_deepseek">DeepSeek</string>
     <string name="provider_zhipu_glm">Zhipu GLM</string>
     <string name="provider_custom">Custom</string>

@@ -106,8 +106,6 @@
     <string name="language_en">English</string>
 
     <!-- ===== 枚举展示名 ===== -->
-    <string name="source_mode_live">实时抓取</string>
-    <string name="source_mode_archive">Gitcode 归档</string>
     <string name="provider_deepseek">DeepSeek</string>
     <string name="provider_zhipu_glm">智谱 GLM</string>
     <string name="provider_custom">自定义</string>

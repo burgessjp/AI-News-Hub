@@ -87,7 +87,6 @@ fun HuggingFacePapersScreen(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val lastRefreshAt by vm.lastRefreshAt.collectAsStateWithLifecycle()
-    val sourceMode by vm.sourceMode.collectAsStateWithLifecycle()
     val isRefreshing by vm.isRefreshing.collectAsStateWithLifecycle()
     val translationStates by vm.translationStates.collectAsStateWithLifecycle()
     val config by vm.configFlow.collectAsStateWithLifecycle(initialValue = AiConfig())
@@ -109,7 +108,7 @@ fun HuggingFacePapersScreen(
         snackbarHostState = snackbarHostState
     ) {
         val papers = (state as UiState.Success).data
-        updateTimeHeader(sourceMode, lastRefreshAt)
+        updateTimeHeader(lastRefreshAt)
         itemsIndexed(items = papers, key = { _, paper -> paper.id }) { index, paper ->
             PaperRow(
                 item = paper,

@@ -18,7 +18,7 @@ import kotlinx.coroutines.launch
  *
  * 数据走 index.json 的 `overview_history` 索引按日期寻址(见 [OverviewRepository]),
  * 纯归档语义:总览由流水线逐批次归档(overview/<date>/ 目录)并经一次性回填补齐
- * 历史日期,此处只读,与全局 SourceMode 无关。
+ * 历史日期,此处只读。
  *
  * 两级页各取一流(同 [com.peng.ainewshub.ui.SummaryArchiveViewModel] 套路):
  *  - [dates]:可选日期列表(索引键,倒序);

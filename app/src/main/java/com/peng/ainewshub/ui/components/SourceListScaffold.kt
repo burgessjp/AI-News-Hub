@@ -24,7 +24,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.peng.ainewshub.R
-import com.peng.ainewshub.data.source.SourceMode
 import com.peng.ainewshub.ui.EmptyState
 import com.peng.ainewshub.ui.ErrorState
 import com.peng.ainewshub.ui.UiState
@@ -121,11 +120,11 @@ fun <T> SourceListScaffold(
 }
 
 /**
- * 列表顶部「上次刷新」时间头 item —— 各源列表 LazyColumn 的第一个 item。
- * 收口此前 7 处 `item { ListUpdateTimeHeader(sourceMode, fetchedAtMillis) }` 复制。
+ * 列表顶部「数据更新时间」头 item —— 各源列表 LazyColumn 的第一个 item。
+ * 收口此前 7 处 `item { ListUpdateTimeHeader(fetchedAtMillis) }` 复制。
  */
-fun LazyListScope.updateTimeHeader(sourceMode: SourceMode, fetchedAtMillis: Long?) {
-    item { ListUpdateTimeHeader(sourceMode, fetchedAtMillis) }
+fun LazyListScope.updateTimeHeader(fetchedAtMillis: Long?) {
+    item { ListUpdateTimeHeader(fetchedAtMillis) }
 }
 
 /**

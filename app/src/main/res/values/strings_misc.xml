@@ -45,7 +45,6 @@
     <!-- ===== 列表数据时间横幅 ===== -->
     <string name="list_update_archive_time">数据更新时间：%1$s</string>
     <string name="list_update_date_fmt">yyyy-MM-dd HH:mm:ss</string>
-    <string name="list_update_last_refresh">上次刷新 %1$s</string>
 
     <!-- ===== 历史日报入口(contentDescription) ===== -->
     <string name="archive_history_daily">历史日报</string>

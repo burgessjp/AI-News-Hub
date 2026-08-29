@@ -89,3 +89,16 @@ data class ProductHunt(
      */
     val targetUrl: String get() = url.ifBlank { website }
 }
+
+/**
+ * Product Hunt 拉取结果(带数据新鲜度),对齐 [HuggingFacePapersResult]。
+ *
+ * @param fetchedAt 数据落盘时刻(归档快照的 fetched_at_ms)
+ * @param products  当日热门产品列表
+ */
+data class ProductHuntResult(
+    override val fetchedAt: Long,
+    val products: List<ProductHunt>
+) : SourceListResult<ProductHunt> {
+    override val items: List<ProductHunt> get() = products
+}

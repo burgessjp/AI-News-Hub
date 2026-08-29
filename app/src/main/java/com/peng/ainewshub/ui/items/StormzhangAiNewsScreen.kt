@@ -73,7 +73,6 @@ fun StormzhangAiNewsScreen(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val lastRefreshAt by vm.lastRefreshAt.collectAsStateWithLifecycle()
-    val sourceMode by vm.sourceMode.collectAsStateWithLifecycle()
     val isRefreshing by vm.isRefreshing.collectAsStateWithLifecycle()
     val pageDate by vm.pageDate.collectAsStateWithLifecycle()
 
@@ -100,7 +99,7 @@ fun StormzhangAiNewsScreen(
         }
     ) {
         val news = (state as UiState.Success).data
-        updateTimeHeader(sourceMode, lastRefreshAt)
+        updateTimeHeader(lastRefreshAt)
         itemsIndexed(items = news, key = { _, item -> item.url }) { index, item ->
             // 已读 = 打开过的原文 URL 命中浏览历史(该源无标题,弱化中文摘要主文本)
             AiNewsRow(

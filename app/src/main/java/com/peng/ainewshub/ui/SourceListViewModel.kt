@@ -10,41 +10,32 @@ import com.peng.ainewshub.data.ShortContentException
 import com.peng.ainewshub.data.SourceListResult
 import com.peng.ainewshub.data.TranslationRepository
 import com.peng.ainewshub.data.source.ArchiveHttpClient
-import com.peng.ainewshub.data.source.SourceMode
 import com.peng.ainewshub.ui.i18n.localized
-import com.peng.ainewshub.ui.more.SettingsStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
  * 7 个源列表 ViewModel 的公共基类 —— 收敛此前逐字复制的样板:
- *  - sourceMode 订阅(SettingsStore.prefsFlow,init 首帧取真实值后首发加载)
  *  - state / lastRefreshAt / isRefreshing 三个 StateFlow
  *  - refresh()(走缓存,进入页面用)与 forceRefresh()(忽略缓存,下拉刷新用)的标准流程
  *  - 空结果 → NoData、失败 → toUiError、forceRefresh 失败保旧数据的统一处理
  *
  * 子类只需实现:
- *  - [doFetch] / [doForceRefresh]:调各自 Repository 的 fetch/forceRefresh,返回 [SourceListResult]
+ *  - [doFetch] / [doForceRefresh]:调各自归档 Repository 的 fetch/forceRefresh,
+ *    返回 [SourceListResult]
  *  - 可选重写 [onRefreshSuccess]:在刷新成功后更新源专属的额外状态(如 stormzhang 的 pageDate)
  *
- * 翻译逻辑不在此基类:接翻译的子类组合 [TranslateSupport] 委托(5 个源),
+ * 翻译逻辑不在此基类:接翻译的子类组合 [TranslateSupport] 委托(6 个源),
  * 不接翻译的子类(stormzhang)直接继承本类即可。
  *
  * @param T 列表元素类型(如 TrendingRepo / HackerNewsStory)
  */
 abstract class SourceListViewModel<T>(application: Application) : AndroidViewModel(application) {
-
-    protected val settingsStore = SettingsStore(application)
-
-    // 占位初值:init 协程首帧即纠正为真实设置(替代原构造期 runBlocking 同步读)
-    private val _sourceMode = MutableStateFlow(SourceMode.LIVE)
-    val sourceMode: StateFlow<SourceMode> = _sourceMode.asStateFlow()
 
     private val _state = MutableStateFlow<UiState<List<T>>>(UiState.Loading)
     val state: StateFlow<UiState<List<T>>> = _state.asStateFlow()
@@ -73,14 +64,7 @@ abstract class SourceListViewModel<T>(application: Application) : AndroidViewMod
     protected open fun onRefreshSuccess(result: SourceListResult<T>) {}
 
     init {
-        viewModelScope.launch {
-            // 先取首帧真实模式(挂起读,不占主线程),再首发加载,
-            // 避免 ARCHIVE 用户先按 LIVE 拉一次;随后持续订阅设置变更
-            // (设置页一改即更新,后续 refresh 自动用新源,不自动重抓)。
-            _sourceMode.value = settingsStore.currentSourceMode()
-            refresh()
-            settingsStore.prefsFlow.map { it.sourceMode }.collect { _sourceMode.value = it }
-        }
+        viewModelScope.launch { refresh() }
     }
 
     /** 进入页面加载(走缓存,命中则秒回不打网络)。 */

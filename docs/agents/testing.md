@@ -10,7 +10,7 @@
 
 ## 哪些层必须覆盖（按优先级）
 
-1. **数据解析器**：各模型 companion `fromJson` / jsoup `fromArticle`（HTML 片段按真实页面选择器构造，上游改版时这里是第一报警哨兵）；归档快照结构经 `ArchiveHttpClientTest` 端到端覆盖。
+1. **数据解析器**：各模型 companion `fromJson`（内联 JSON 样例，钉住 asClean 语义与主键缺失跳过规则）；归档快照结构经 `ArchiveHttpClientTest` 端到端覆盖。被测对象删除时其测试随之删除（例：LIVE 模式删除时 HtmlParsersTest 一并退场）。
 2. **纯逻辑**：`FollowMatcher`、`PipelineSchedule`、`AppException → UiState.Error` 映射等无依赖函数。
 3. **导航序列化契约**：`Page` Bundle 往返（`PageBundleTest` 有「页面类型全量覆盖护栏」——新增 Page 子类型必须同步补样例，护栏断言 `permittedSubclasses` 数量）。
 4. **取数骨架**：`ArchiveHttpClient` 的缓存/刷新/错误分野/磁盘兜底语义（MockWebServer + fixture）。

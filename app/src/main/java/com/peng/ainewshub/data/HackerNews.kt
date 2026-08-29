@@ -5,7 +5,6 @@ import androidx.compose.runtime.Immutable
 
 import android.os.Parcelable
 import kotlinx.parcelize.Parcelize
-import org.json.JSONArray
 import org.json.JSONObject
 
 /**
@@ -69,16 +68,13 @@ data class HackerNewsStory(
 }
 
 /**
- * HackerNews Top Stories 拉取结果(带数据新鲜度)。
+ * HackerNews Top Stories 拉取结果(带数据新鲜度),由归档 Repository 产出。
  *
- * [fetchedAt] 是这批 stories 实际从网络落盘的时刻(System.currentTimeMillis()):
- *  - 命中缓存秒回 → 是缓存写入时刻(可能已过去若干分钟,正是「上次刷新时间」)
- *  - 走网络刷新 → 是刚才
+ * [fetchedAt] 是归档快照顶层的 fetched_at_ms(数据落盘时刻),UI 据此在列表头
+ * 显示「数据更新时间」——用户关心的是「这份数据有多旧」,而非「ViewModel
+ * 何刻拿到数据」。
  *
- * UI 据此在顶栏显示「上次刷新 N 分钟前」,与 30 分钟缓存策略语义一致:
- * 用户关心的是「这份数据有多旧」,而非「ViewModel 何刻拿到数据」。
- *
- * @param fetchedAt 数据落盘时刻(缓存写入或刚抓取)
+ * @param fetchedAt 数据落盘时刻(快照 fetched_at_ms)
  * @param stories   story 列表(已排序,按下标即排名)
  */
 data class HackerNewsTopStories(
@@ -86,56 +82,6 @@ data class HackerNewsTopStories(
     val stories: List<HackerNewsStory>
 ) : SourceListResult<HackerNewsStory> {
     override val items: List<HackerNewsStory> get() = stories
-}
-
-/**
- * HackerNews Top Stories 列表缓存条目。
- *
- * 持久化为 cacheDir 下的 JSON 文件,带写入时刻 [fetchedAt],用于计算是否过期。
- * 读取时按 30 分钟([HackerNewsRepository.CACHE_TTL_MS])判断新鲜度;
- * 网络失败时回退到过期数据兜底(有总比报错强)。
- *
- * @param fetchedAt 缓存写入时刻(System.currentTimeMillis())
- * @param stories   story 列表(已排序,按下标即排名)
- */
-data class HackerNewsStoriesCache(
-    val fetchedAt: Long,
-    val stories: List<HackerNewsStory>
-) {
-    /** 序列化为可写入文件的 JSON(`{ fetchedAt, stories: [...] }`)。 */
-    fun toJson(): JSONObject {
-        val arr = JSONArray().apply {
-            stories.forEach { put(JSONObject().apply {
-                put("id", it.id)
-                put("title", it.title)
-                put("url", it.url)
-                put("by", it.by)
-                put("score", it.score)
-                put("descendants", it.descendants)
-                put("time", it.time)
-                put("kids", JSONArray().apply { it.kids.forEach { k -> put(k) } })
-            }) }
-        }
-        return JSONObject().apply {
-            put("fetchedAt", fetchedAt)
-            put("stories", arr)
-        }
-    }
-
-    companion object {
-        /** 从文件 JSON 反序列化;结构不符返回 null(调用方视为无缓存)。 */
-        fun fromJson(json: JSONObject): HackerNewsStoriesCache? = runCatching {
-            val arr = json.optJSONArray("stories") ?: return null
-            val stories = (0 until arr.length()).mapNotNull { i ->
-                val o = arr.optJSONObject(i) ?: return@mapNotNull null
-                HackerNewsStory.fromJson(o)
-            }
-            HackerNewsStoriesCache(
-                fetchedAt = json.optLong("fetchedAt", 0L),
-                stories = stories
-            )
-        }.getOrNull()
-    }
 }
 
 /**

@@ -42,7 +42,6 @@
     <!-- ===== List data-time banner ===== -->
     <string name="list_update_archive_time">Data updated: %1$s</string>
     <string name="list_update_date_fmt">yyyy-MM-dd HH:mm:ss</string>
-    <string name="list_update_last_refresh">Last refreshed %1$s</string>
 
     <!-- ===== Daily archive entry (contentDescription) ===== -->
     <string name="archive_history_daily">Daily Archive</string>

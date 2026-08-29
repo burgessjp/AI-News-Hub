@@ -93,7 +93,6 @@ internal val ossDeps = listOf(
     OssDep("Jetpack Compose & Material 3", "Apache-2.0", "https://developer.android.com/jetpack/compose"),
     OssDep("Kotlin Coroutines", "Apache-2.0", "https://github.com/Kotlin/kotlinx.coroutines"),
     OssDep("OkHttp", "Apache-2.0", "https://square.github.io/okhttp/"),
-    OssDep("jsoup", "MIT", "https://jsoup.org"),
     OssDep("Coil", "Apache-2.0", "https://coil-kt.org"),
     OssDep("Room", "Apache-2.0", "https://developer.android.com/jetpack/androidx/releases/room"),
     OssDep("Reorderable", "Apache-2.0", "https://github.com/burnoutcrew/reorderable"),

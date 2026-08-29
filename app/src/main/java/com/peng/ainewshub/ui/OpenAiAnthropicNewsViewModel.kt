@@ -5,21 +5,19 @@ import android.app.Application
 import com.peng.ainewshub.data.OpenAiAnthropicNews
 import com.peng.ainewshub.data.SourceListResult
 import com.peng.ainewshub.data.source.OpenAiAnthropicNewsArchiveRepository
-import com.peng.ainewshub.data.source.OpenAiAnthropicNewsSource
 import kotlinx.coroutines.flow.StateFlow
 
 /**
  * OpenAI x Anthropic 厂商动态 ViewModel。
  *
- * 继承 [SourceListViewModel]:sourceMode 订阅 / state / refresh / forceRefresh 等公共逻辑
- * 由基类统一。翻译逻辑由 [translateSupport] 委托(整体翻译 title+summary,以 url 为 key)。
- *
- * **只归档**:两家均无稳定公开 API(Anthropic 无官方 RSS),两种 SourceMode 都走归档。
- * [sourceMode] 仍订阅设置,仅为顶栏角标一致。
+ * 继承 [SourceListViewModel]:state / refresh / forceRefresh 等公共逻辑由基类统一,
+ * 数据恒走 gitcode 归档([OpenAiAnthropicNewsArchiveRepository],两家均无稳定公开
+ * API,App 端不直连)。翻译逻辑由 [translateSupport] 委托
+ * (整体翻译 title+summary,以 url 为 key)。
  */
 class OpenAiAnthropicNewsViewModel(application: Application) : SourceListViewModel<OpenAiAnthropicNews>(application) {
 
-    private val archiveRepo: OpenAiAnthropicNewsSource = OpenAiAnthropicNewsArchiveRepository()
+    private val archiveRepo = OpenAiAnthropicNewsArchiveRepository()
     private val translateSupport = TranslateSupport(application)
 
     val configFlow = translateSupport.configFlow

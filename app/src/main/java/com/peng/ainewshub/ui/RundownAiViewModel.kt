@@ -3,23 +3,20 @@ package com.peng.ainewshub.ui
 import androidx.lifecycle.viewModelScope
 import android.app.Application
 import com.peng.ainewshub.data.RundownAiArticle
-import com.peng.ainewshub.data.RundownAiRepository
 import com.peng.ainewshub.data.SourceListResult
 import com.peng.ainewshub.data.source.RundownAiArchiveRepository
-import com.peng.ainewshub.data.source.RundownAiSource
-import com.peng.ainewshub.data.source.SourceMode
 import kotlinx.coroutines.flow.StateFlow
 
 /**
  * The Rundown AI ViewModel。
  *
- * 继承 [SourceListViewModel]:sourceMode 订阅 / state / refresh / forceRefresh 等公共逻辑
- * 由基类统一。翻译逻辑由 [translateSupport] 委托(整体翻译 title+subtitle,以 slug 为 key)。
+ * 继承 [SourceListViewModel]:state / refresh / forceRefresh 等公共逻辑由基类统一,
+ * 数据恒走 gitcode 归档([RundownAiArchiveRepository])。翻译逻辑由 [translateSupport]
+ * 委托(整体翻译 title+subtitle,以 slug 为 key)。
  */
 class RundownAiViewModel(application: Application) : SourceListViewModel<RundownAiArticle>(application) {
 
-    private val liveRepo: RundownAiRepository = RundownAiRepository(cacheDir = application.cacheDir)
-    private val archiveRepo: RundownAiSource = RundownAiArchiveRepository()
+    private val archiveRepo = RundownAiArchiveRepository()
     private val translateSupport = TranslateSupport(application)
 
     val configFlow = translateSupport.configFlow
@@ -27,12 +24,9 @@ class RundownAiViewModel(application: Application) : SourceListViewModel<Rundown
     /** 整体译文翻译状态(slug → state)。 */
     val translationStates: StateFlow<Map<String, TranslationState>> = translateSupport.states
 
-    private fun currentRepo(): RundownAiSource =
-        if (sourceMode.value == SourceMode.ARCHIVE) archiveRepo else liveRepo
+    override suspend fun doFetch(): SourceListResult<RundownAiArticle> = archiveRepo.fetch()
 
-    override suspend fun doFetch(): SourceListResult<RundownAiArticle> = currentRepo().fetch()
-
-    override suspend fun doForceRefresh(): SourceListResult<RundownAiArticle> = currentRepo().forceRefresh()
+    override suspend fun doForceRefresh(): SourceListResult<RundownAiArticle> = archiveRepo.forceRefresh()
 
     /**
      * 翻译文章(title + subtitle 整体),列表页单按钮触发。

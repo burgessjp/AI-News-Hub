@@ -42,7 +42,6 @@ import coil.compose.AsyncImage
 import com.peng.ainewshub.R
 import com.peng.ainewshub.data.AiConfig
 import com.peng.ainewshub.data.ProductHunt
-import com.peng.ainewshub.data.source.SourceMode
 import com.peng.ainewshub.ui.ProductHuntViewModel
 import com.peng.ainewshub.ui.TranslationState
 import com.peng.ainewshub.ui.UiState
@@ -72,7 +71,7 @@ import com.peng.ainewshub.ui.theme.AppText
  *  - 加载中:shimmer 骨架;失败:错误态 + 重试;空:空状态;下拉刷新走 forceRefresh
  *  - 整体翻译:翻译开关开且配置就绪时,标题行出现「译」按钮,name+tagline 合并一次翻译
  *
- * 注:Product Hunt 只走归档(Developer Token 不进 APK),两种 SourceMode 都读归档快照。
+ * 数据恒走归档快照(PH Developer Token 是服务端 secret,不进 APK)。
  *
  * @param onBack 返回回调
  * @param onOpenUrl 点击产品打开内置 WebView
@@ -90,7 +89,6 @@ fun ProductHuntScreen(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val lastRefreshAt by vm.lastRefreshAt.collectAsStateWithLifecycle()
-    val sourceMode by vm.sourceMode.collectAsStateWithLifecycle()
     val isRefreshing by vm.isRefreshing.collectAsStateWithLifecycle()
     val translationStates by vm.translationStates.collectAsStateWithLifecycle()
     val config by vm.configFlow.collectAsStateWithLifecycle(initialValue = AiConfig())
@@ -112,7 +110,7 @@ fun ProductHuntScreen(
         snackbarHostState = snackbarHostState
     ) {
         val products = (state as UiState.Success).data
-        updateTimeHeader(sourceMode, lastRefreshAt)
+        updateTimeHeader(lastRefreshAt)
         itemsIndexed(items = products, key = { _, p -> p.id }) { index, product ->
             ProductRow(
                 item = product,
