@@ -11,7 +11,7 @@ name: Fetch Hub Data
 # 22:00 批对 Product Hunt 无时机约束:「Product of the Day」每天 PT 00:01(夏令时
 # UTC 07:01/北京 15:01,冬令时 UTC 08:01/北京 16:01)上线,北京 22:00(UTC 14:00)
 # 跑时 PH API 日级聚合早已覆盖当日榜单。postedAfter 恒用 PT 当日 0 点(见
-# scripts/fetch_data.py 的 _ph_today_pt_start,勿改回 UTC 边界——北京 08:00 批
+# scripts/sources/producthunt.py 的 _ph_today_pt_start,勿改回 UTC 边界——北京 08:00 批
 # = UTC 00:00 整会拿空)。
 #
 # 失败策略(对齐 scripts/fetch_data.py):单源失败 3 次重试后被跳过,成功源照常提交;

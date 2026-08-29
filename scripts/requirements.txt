@@ -1,6 +1,6 @@
-# 数据抓取脚本依赖(fetch_data.py)
+# 数据抓取脚本依赖(fetch_data.py 编排层 + scripts/sources/ 各源抓取器)
 # 与 scripts/gen_icon.py 不同 —— 后者只用 PIL/NumPy 跑本地图像生成;
-# 本脚本需要 requests 做 HTTP,beautifulsoup4 解析 HTML(对齐 App 端 jsoup)。
+# 抓取需要 requests 做 HTTP,beautifulsoup4 解析 HTML(对齐 App 端 jsoup)。
 requests>=2.31
 beautifulsoup4>=4.12
 # lxml:bs4 的 "xml" 解析器由它提供(openai-anthropic-news 源的 OpenAI RSS 子源使用);

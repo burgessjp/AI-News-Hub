@@ -1,27 +1,31 @@
-"""fetch_data.py 纯函数回归(零网络零落盘)。
+"""各源抓取器的纯函数回归(零网络零落盘)。
 
-覆盖:parse_count / rundown 三件套(RSC 提取、RSC→items、DOM 兜底)/
-厂商新闻日期解析四件套 / 索引结构清洗 / _retain_recent 历史合并矩阵。
+覆盖:parse_count(sources/github_trending)/ rundown 三件套(sources/rundown_ai:
+RSC 提取、RSC→items、DOM 兜底)/ 厂商新闻日期解析四件套(sources/openai_anthropic_news)/
+索引结构清洗 / _retain_recent 历史合并矩阵(仍在 fetch_data 的索引层)。
 _retain_recent 是 history.json 与 overview_history.json 继承语义的唯一实现点,
 矩阵钉死后拆分阶段不许漂移。
 """
 
 import fetch_data as fd
+from sources import github_trending as gh
+from sources import openai_anthropic_news as vendor
+from sources import rundown_ai as rundown
 
 
 # ===== parse_count =====
 
 def test_parse_count_逗号千分位与空白():
-    assert fd.parse_count("64,846") == 64846
-    assert fd.parse_count(" 12 ") == 12
-    assert fd.parse_count("") == 0
-    assert fd.parse_count(None) == 0
+    assert gh.parse_count("64,846") == 64846
+    assert gh.parse_count(" 12 ") == 12
+    assert gh.parse_count("") == 0
+    assert gh.parse_count(None) == 0
 
 
 def test_parse_count_非纯数字归零():
-    assert fd.parse_count("1,234 stars") == 0
-    assert fd.parse_count("-5") == 0
-    assert fd.parse_count("12.5") == 0
+    assert gh.parse_count("1,234 stars") == 0
+    assert gh.parse_count("-5") == 0
+    assert gh.parse_count("12.5") == 0
 
 
 # ===== rundown:RSC flight payload 提取 =====
@@ -45,21 +49,21 @@ RSC_HTML = (
 
 
 def test_extract_rundown_rsc_多段合并保留字典项():
-    articles = fd._extract_rundown_rsc_articles(RSC_HTML)
+    articles = rundown._extract_rundown_rsc_articles(RSC_HTML)
     slugs = [a["slug"] for a in articles]
     # 三段各 1 篇,合并为 3(去重发生在 items_from_rsc,提取层不去重)
     assert slugs == ["first-post", "second-post", "first-post"]
 
 
 def test_extract_rundown_rsc_无锚点或坏段返回空():
-    assert fd._extract_rundown_rsc_articles("<html>无 payload</html>") == []
+    assert rundown._extract_rundown_rsc_articles("<html>无 payload</html>") == []
     # 括号不配平的段被跳过,不抛错
     bad = 'x \\"articles\\":[{\\"slug\\":\\"unterminated\\"'
-    assert fd._extract_rundown_rsc_articles(bad) == []
+    assert rundown._extract_rundown_rsc_articles(bad) == []
 
 
 def test_rundown_items_from_rsc_去重_plus_剥离_时区换算():
-    items = fd._rundown_items_from_rsc(RSC_HTML)
+    items = rundown._rundown_items_from_rsc(RSC_HTML)
     assert len(items) == 2  # 重复 slug 的第三段被去重
 
     first = items[0]
@@ -79,12 +83,12 @@ def test_rundown_items_from_rsc_去重_plus_剥离_时区换算():
 
 
 def test_rundown_authors_str_压成首作者加_n():
-    assert fd._rundown_authors_str(["Zach Mink"]) == "Zach Mink"
-    assert fd._rundown_authors_str(["Zach Mink", "A", "B", "C"]) == "Zach Mink, +3"
-    assert fd._rundown_authors_str([]) == ""
-    assert fd._rundown_authors_str(["  ", "Ann"]) == "Ann"  # 空白名被滤掉
-    assert fd._rundown_authors_str("not-a-list") == "not-a-list"  # 非数组原样
-    assert fd._rundown_authors_str(123) == ""
+    assert rundown._rundown_authors_str(["Zach Mink"]) == "Zach Mink"
+    assert rundown._rundown_authors_str(["Zach Mink", "A", "B", "C"]) == "Zach Mink, +3"
+    assert rundown._rundown_authors_str([]) == ""
+    assert rundown._rundown_authors_str(["  ", "Ann"]) == "Ann"  # 空白名被滤掉
+    assert rundown._rundown_authors_str("not-a-list") == "not-a-list"  # 非数组原样
+    assert rundown._rundown_authors_str(123) == ""
 
 
 # ===== rundown:DOM 兜底 =====
@@ -103,7 +107,7 @@ def test_rundown_items_from_dom_卡片字段与去重():
         '<a href="/articles/no-title"><span>无 h3 标题跳过</span></a>'
         '<a href="https://elsewhere.com/x"><h3>非本站链接跳过</h3></a>'
     )
-    items = fd._rundown_items_from_dom(BeautifulSoup(html, "lxml"))
+    items = rundown._rundown_items_from_dom(BeautifulSoup(html, "lxml"))
     assert len(items) == 1
     item = items[0]
     assert item["slug"] == "dom-post"
@@ -118,23 +122,23 @@ def test_rundown_items_from_dom_卡片字段与去重():
 # ===== 厂商新闻日期解析 =====
 
 def test_anthropic_date_to_iso_缩写月():
-    assert fd._anthropic_date_to_iso("Jul 22, 2026") == "2026-07-22"
-    assert fd._anthropic_date_to_iso("Dec 1, 2025") == "2025-12-01"
-    assert fd._anthropic_date_to_iso("22/07/2026") == ""
-    assert fd._anthropic_date_to_iso("") == ""
+    assert vendor._anthropic_date_to_iso("Jul 22, 2026") == "2026-07-22"
+    assert vendor._anthropic_date_to_iso("Dec 1, 2025") == "2025-12-01"
+    assert vendor._anthropic_date_to_iso("22/07/2026") == ""
+    assert vendor._anthropic_date_to_iso("") == ""
 
 
 def test_claude_date_to_iso_缩写月与全月名():
-    assert fd._claude_date_to_iso("Jul 24, 2026") == "2026-07-24"
-    assert fd._claude_date_to_iso("June 18, 2026") == "2026-06-18"
-    assert fd._claude_date_to_iso("Frob 1, 2026") == ""
+    assert vendor._claude_date_to_iso("Jul 24, 2026") == "2026-07-24"
+    assert vendor._claude_date_to_iso("June 18, 2026") == "2026-06-18"
+    assert vendor._claude_date_to_iso("Frob 1, 2026") == ""
 
 
 def test_parse_engineering_date_两级回退():
-    assert fd._parse_engineering_date("Jul 22, 2026") == "2026-07-22"
-    assert fd._parse_engineering_date("2026-05-25") == "2026-05-25"  # ISO 直通
-    assert fd._parse_engineering_date("") == ""
-    assert fd._parse_engineering_date("3 days ago") == ""
+    assert vendor._parse_engineering_date("Jul 22, 2026") == "2026-07-22"
+    assert vendor._parse_engineering_date("2026-05-25") == "2026-05-25"  # ISO 直通
+    assert vendor._parse_engineering_date("") == ""
+    assert vendor._parse_engineering_date("3 days ago") == ""
 
 
 # ===== 上游索引结构清洗(拉到的旧索引可能是任意 JSON) =====
