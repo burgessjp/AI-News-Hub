@@ -39,13 +39,17 @@
 
 ## 截图
 
-| 总览 | 趋势 | 摘要 | 信息源 | HackerNews |
-|:---:|:---:|:---:|:---:|:---:|
-| <img src="docs/screenshots/01-overview.png" width="160" alt="总览"> | <img src="docs/screenshots/02-trends.png" width="160" alt="趋势"> | <img src="docs/screenshots/03-summary.png" width="160" alt="摘要"> | <img src="docs/screenshots/04-sources.png" width="160" alt="信息源"> | <img src="docs/screenshots/05-hackernews.png" width="160" alt="HackerNews"> |
+| 总览 | 摘要 | 关注 | 趋势 |
+|:---:|:---:|:---:|:---:|
+| <img src="docs/screenshots/01-overview.png" width="160" alt="总览"> | <img src="docs/screenshots/03-summary.png" width="160" alt="摘要"> | <img src="docs/screenshots/11-follows.png" width="160" alt="关注"> | <img src="docs/screenshots/02-trends.png" width="160" alt="趋势"> |
 
-| GitHub Trending | OpenAI × Anthropic | The Rundown AI | 网页 | 设置 |
-|:---:|:---:|:---:|:---:|:---:|
-| <img src="docs/screenshots/06-github-trending.png" width="160" alt="GitHub Trending"> | <img src="docs/screenshots/07-openai-anthropic.png" width="160" alt="OpenAI × Anthropic"> | <img src="docs/screenshots/08-the-rundown-ai.png" width="160" alt="The Rundown AI"> | <img src="docs/screenshots/09-webview.png" width="160" alt="网页"> | <img src="docs/screenshots/10-settings.png" width="160" alt="设置"> |
+| 信息源 | HackerNews | GitHub Trending | OpenAI × Anthropic |
+|:---:|:---:|:---:|:---:|
+| <img src="docs/screenshots/04-sources.png" width="160" alt="信息源"> | <img src="docs/screenshots/05-hackernews.png" width="160" alt="HackerNews"> | <img src="docs/screenshots/06-github-trending.png" width="160" alt="GitHub Trending"> | <img src="docs/screenshots/07-openai-anthropic.png" width="160" alt="OpenAI × Anthropic"> |
+
+| The Rundown AI | 网页 | 词云 | 设置 |
+|:---:|:---:|:---:|:---:|
+| <img src="docs/screenshots/08-the-rundown-ai.png" width="160" alt="The Rundown AI"> | <img src="docs/screenshots/09-webview.png" width="160" alt="网页"> | <img src="docs/screenshots/12-wordcloud.png" width="160" alt="词云"> | <img src="docs/screenshots/10-settings.png" width="160" alt="设置"> |
 
 ---
 
