@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import com.peng.ainewshub.R
 import com.peng.ainewshub.ui.components.AppTopBar
 import com.peng.ainewshub.ui.components.AppTopBarDefaults
+import com.peng.ainewshub.data.source.DEFAULT_SOURCE_ORDER
 
 /**
  * 关于 · 数据来源二级页 —— 从关于页「资源」组进入。

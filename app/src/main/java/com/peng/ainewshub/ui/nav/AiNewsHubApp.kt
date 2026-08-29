@@ -28,14 +28,14 @@ import androidx.compose.material.icons.outlined.WifiOff
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,14 +44,14 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.peng.ainewshub.R
-import com.peng.ainewshub.data.AiConfig
-import com.peng.ainewshub.data.AiConfigStore
-import com.peng.ainewshub.data.AiUsageStore
-import com.peng.ainewshub.data.AppDatabase
-import com.peng.ainewshub.data.BrowseHistoryRepository
-import com.peng.ainewshub.data.FavoritesRepository
+import com.peng.ainewshub.data.prefs.AiConfig
+import com.peng.ainewshub.data.prefs.AiConfigStore
+import com.peng.ainewshub.data.prefs.AiUsageStore
+import com.peng.ainewshub.data.db.AppDatabase
+import com.peng.ainewshub.data.repo.BrowseHistoryRepository
+import com.peng.ainewshub.data.repo.FavoritesRepository
 import com.peng.ainewshub.data.PipelineSchedule
-import com.peng.ainewshub.data.SummaryRepository
+import com.peng.ainewshub.data.repo.SummaryRepository
 import com.peng.ainewshub.data.source.ArchiveHttpClient
 import com.peng.ainewshub.notify.DailyNotifyScheduler
 import com.peng.ainewshub.playback.TtsFloatingPill
@@ -61,14 +61,10 @@ import com.peng.ainewshub.ui.components.AppBottomBar
 import com.peng.ainewshub.ui.components.AppTab
 import com.peng.ainewshub.ui.components.NoticePillHost
 import com.peng.ainewshub.ui.components.rememberNoticePillState
-import com.peng.ainewshub.ui.i18n.AppLanguage
+import com.peng.ainewshub.data.prefs.AppLanguage
 import com.peng.ainewshub.ui.i18n.AppLocale
 import com.peng.ainewshub.ui.RefreshNotices
 import com.peng.ainewshub.ui.FollowNotices
-import com.peng.ainewshub.ui.more.FontChoice
-import com.peng.ainewshub.ui.more.FontScale
-import com.peng.ainewshub.ui.more.SettingsStore
-import com.peng.ainewshub.ui.more.ThemeMode
 import com.peng.ainewshub.ui.theme.AiNewsHubTheme
 import com.peng.ainewshub.widget.HotNowWidgetUpdater
 import kotlinx.coroutines.NonCancellable
@@ -77,6 +73,11 @@ import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.peng.ainewshub.data.prefs.FontChoice
+import com.peng.ainewshub.data.prefs.FontScale
+import com.peng.ainewshub.data.prefs.SettingsStore
+import com.peng.ainewshub.data.prefs.ThemeMode
+import com.peng.ainewshub.ui.more.fontFamily
 
 /** 浅色系统栏 scrim(与 AndroidX enableEdgeToEdge 默认值一致)。ARGB 32 位带符号整数。 */
 private val LIGHT_SCRIM = 0xE6FFFFFF.toInt()

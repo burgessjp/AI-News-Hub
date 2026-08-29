@@ -43,14 +43,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -65,17 +65,17 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.peng.ainewshub.R
-import com.peng.ainewshub.data.HotTopic
-import com.peng.ainewshub.data.NewsItem
-import com.peng.ainewshub.data.NewsRepository
+import com.peng.ainewshub.data.model.HotTopic
+import com.peng.ainewshub.data.model.NewsItem
+import com.peng.ainewshub.data.repo.NewsRepository
 import com.peng.ainewshub.ui.EmptyState
 import com.peng.ainewshub.ui.LoadingState
 import com.peng.ainewshub.ui.NewsCard
 import com.peng.ainewshub.ui.ItemsViewModel
 import com.peng.ainewshub.ui.UiState
 import com.peng.ainewshub.ui.components.SectionHeader
-import com.peng.ainewshub.ui.more.SettingsStore
 import kotlinx.coroutines.launch
+import com.peng.ainewshub.data.prefs.SettingsStore
 
 /**
  * 搜索屏幕:独立的搜索栏 + 复用 ItemsViewModel 的 query 筛选。

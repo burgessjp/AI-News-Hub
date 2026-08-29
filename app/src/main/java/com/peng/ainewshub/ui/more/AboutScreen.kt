@@ -33,12 +33,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -49,8 +49,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.peng.ainewshub.R
-import com.peng.ainewshub.data.UpdateChecker
-import com.peng.ainewshub.data.UpdateDownloader
+import com.peng.ainewshub.data.net.UpdateChecker
+import com.peng.ainewshub.data.net.UpdateDownloader
 import com.peng.ainewshub.ui.components.AppCard
 import com.peng.ainewshub.ui.components.AppTopBar
 import com.peng.ainewshub.ui.components.AppTopBarDefaults
@@ -61,6 +61,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.io.File
+import com.peng.ainewshub.data.source.DEFAULT_SOURCE_ORDER
 
 /**
  * 关于页 —— 居中品牌头 + 两组入口。

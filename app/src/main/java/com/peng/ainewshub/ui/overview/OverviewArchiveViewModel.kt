@@ -3,8 +3,8 @@ package com.peng.ainewshub.ui.overview
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.peng.ainewshub.data.OverviewDigest
-import com.peng.ainewshub.data.OverviewRepository
+import com.peng.ainewshub.data.repo.OverviewDigest
+import com.peng.ainewshub.data.repo.OverviewRepository
 import com.peng.ainewshub.ui.UiState
 import com.peng.ainewshub.ui.i18n.localized
 import com.peng.ainewshub.ui.toUiError

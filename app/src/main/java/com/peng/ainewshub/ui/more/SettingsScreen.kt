@@ -7,7 +7,6 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -29,14 +28,14 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -46,53 +45,70 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.peng.ainewshub.R
-import com.peng.ainewshub.data.BrowseHistoryRepository
+import com.peng.ainewshub.data.repo.BrowseHistoryRepository
 import com.peng.ainewshub.data.CacheManager
+import com.peng.ainewshub.data.prefs.AppLanguage
+import com.peng.ainewshub.data.prefs.FontChoice
+import com.peng.ainewshub.data.prefs.FontScale
+import com.peng.ainewshub.data.prefs.ThemeMode
 import kotlinx.coroutines.launch
 import com.peng.ainewshub.ui.components.AppTopBar
 import com.peng.ainewshub.ui.components.AppTopBarDefaults
 import com.peng.ainewshub.ui.components.SegmentedOptionRow
 import com.peng.ainewshub.ui.components.SectionHeader
 import com.peng.ainewshub.ui.components.SettingsRow
-import com.peng.ainewshub.ui.i18n.AppLanguage
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.peng.ainewshub.data.prefs.SettingsStore
 
 /**
- * 主题模式 —— 由 [com.peng.ainewshub.ui.nav.AiNewsHubApp] 持有,设置页通过回调修改。
+ * 主题模式 —— 枚举纯值在 [com.peng.ainewshub.data.prefs.ThemeMode](data 层,持久化词汇),
+ * 此处仅挂展示映射;由 com.peng.ainewshub.ui.nav.AiNewsHubApp 持有,设置页通过回调修改。
  */
-enum class ThemeMode(@StringRes val labelRes: Int) {
-    System(R.string.settings_theme_system),
-    Light(R.string.settings_theme_light),
-    Dark(R.string.settings_theme_dark)
-}
+@get:StringRes
+val ThemeMode.labelRes: Int
+    get() = when (this) {
+        ThemeMode.System -> R.string.settings_theme_system
+        ThemeMode.Light -> R.string.settings_theme_light
+        ThemeMode.Dark -> R.string.settings_theme_dark
+    }
 
 /**
- * 字体族 —— 同样提升到 [com.peng.ainewshub.ui.nav.AiNewsHubApp]。
+ * 字体族 —— 枚举纯值在 [com.peng.ainewshub.data.prefs.FontChoice],此处挂展示映射。
  *
  * 仅用 Compose 内置 FontFamily,无需引入外部字体资源:
  *  - System: 系统默认字体
  *  - Serif:  衬线体(阅读向)
  *  - Mono:   等宽体(代码/技术向)
  */
-enum class FontChoice(@StringRes val labelRes: Int, val fontFamily: FontFamily) {
-    System(R.string.settings_font_default, FontFamily.Default),
-    Serif(R.string.settings_font_serif, FontFamily.Serif),
-    Mono(R.string.settings_font_mono, FontFamily.Monospace)
-}
+@get:StringRes
+val FontChoice.labelRes: Int
+    get() = when (this) {
+        FontChoice.System -> R.string.settings_font_default
+        FontChoice.Serif -> R.string.settings_font_serif
+        FontChoice.Mono -> R.string.settings_font_mono
+    }
+
+/** 字体族的 Compose FontFamily(展示映射;枚举纯值在 data.prefs)。 */
+val FontChoice.fontFamily: FontFamily
+    get() = when (this) {
+        FontChoice.System -> FontFamily.Default
+        FontChoice.Serif -> FontFamily.Serif
+        FontChoice.Mono -> FontFamily.Monospace
+    }
 
 /**
- * 字号档位 —— 整体缩放语义字号层 AppTextStyles(见 ui/theme/AppText.kt)。
- *
- * 只缩放 AppText 档位的 fontSize/lineHeight;MD3 typography 不动,
- * 避免 TopAppBar/Chip 等组件内部布局错位。
+ * 字号档位 —— 枚举纯值(含 scale)在 [com.peng.ainewshub.data.prefs.FontScale],
+ * 此处挂文案映射;整体缩放语义字号层 AppTextStyles(见 ui/theme/AppText.kt)。
  */
-enum class FontScale(@StringRes val labelRes: Int, val scale: Float) {
-    Compact(R.string.settings_font_scale_compact, 0.9f),
-    Standard(R.string.settings_font_scale_standard, 1.0f),
-    Large(R.string.settings_font_scale_large, 1.15f)
-}
+@get:StringRes
+val FontScale.labelRes: Int
+    get() = when (this) {
+        FontScale.Compact -> R.string.settings_font_scale_compact
+        FontScale.Standard -> R.string.settings_font_scale_standard
+        FontScale.Large -> R.string.settings_font_scale_large
+    }
 
 /**
  * 设置页。
@@ -101,14 +117,13 @@ enum class FontScale(@StringRes val labelRes: Int, val scale: Float) {
  * 行图标用彩色图标块([SettingsRow] 的 iconAccent,与「更多」页 IconTileRow 同语言)。
  *  - 外观:主题模式三选一(系统/亮/暗)+ 动态取色开关(Material You,Android 12+)
  *  - 字体:字体族三选一(默认/衬线/等宽)+ 字号三档(紧凑/标准/大号)
- *  - 数据源:Hub 4 源从实时抓取还是 gitcode 归档取数,横向二段式
  *  - 语言:跟随系统 / 简体中文 / English,切换后 Activity 重建生效(见 ui/i18n/AppLocale)
  *  - 通知:每日更新通知开关(WorkManager 本地调度,API 33+ 打开时请求运行时权限)
  *  - 缓存:一键清理网页缓存/Cookie/图片缓存/搜索历史等可恢复数据;
  *    翻译缓存与浏览历史为保护性勾选项,默认保留
  *
  * AI 服务配置与用量统计已拆到独立二级页 [AiServiceScreen](「更多」→「AI 服务」入口)。
- * 数据源模式与主题/字体同存于 display_prefs([com.peng.ainewshub.ui.more.SettingsStore])。
+ * 主题/字体同存于 display_prefs([com.peng.ainewshub.data.prefs.SettingsStore])。
  */
 @Composable
 fun SettingsScreen(

@@ -5,10 +5,9 @@ import android.app.Application
 import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.peng.ainewshub.data.SourceSummary
-import com.peng.ainewshub.data.SummaryRepository
+import com.peng.ainewshub.data.repo.SourceSummary
+import com.peng.ainewshub.data.repo.SummaryRepository
 import com.peng.ainewshub.data.source.ArchiveHttpClient
-import com.peng.ainewshub.ui.more.SettingsStore
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,6 +16,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import com.peng.ainewshub.data.prefs.SettingsStore
 
 /**
  * AI 摘要 ViewModel —— 聚合 8 个归档源的 AI 中文摘要。
@@ -28,7 +28,7 @@ import kotlinx.coroutines.launch
  * (一个源失败不拖累其余)。`states` 以全集 key 初始化一次拉满,顺序变化时不重拉。
  *
  * **源顺序跟随用户**:[sourceKeys] 取自 [SettingsStore.sourceOrderFlow](用户在「信息源」
- * 页拖拽自定义,默认 [com.peng.ainewshub.ui.more.DEFAULT_SOURCE_ORDER]);UI 据此决定
+ * 页拖拽自定义,默认 [com.peng.ainewshub.data.source.DEFAULT_SOURCE_ORDER]);UI 据此决定
  * PagerState pageCount 与卡片渲染顺序。数据全集不变,仅展示顺序变 —— 改顺序后即时生效、无需重拉。
  *
  * 触发时机:

@@ -84,14 +84,14 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -112,16 +112,15 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
 import com.peng.ainewshub.R
-import com.peng.ainewshub.data.AiConfig
-import com.peng.ainewshub.data.BrowseHistoryRepository
-import com.peng.ainewshub.data.FavoritesRepository
-import com.peng.ainewshub.data.TranslationRepository
+import com.peng.ainewshub.data.prefs.AiConfig
+import com.peng.ainewshub.data.repo.BrowseHistoryRepository
+import com.peng.ainewshub.data.repo.FavoritesRepository
+import com.peng.ainewshub.data.repo.TranslationRepository
 import com.peng.ainewshub.ui.ErrorState
 import com.peng.ainewshub.ui.LoadingState
 import com.peng.ainewshub.ui.anim.Motion
 import com.peng.ainewshub.ui.components.AppTopBar
 import com.peng.ainewshub.ui.components.AppTopBarDefaults
-import com.peng.ainewshub.ui.more.FontScale
 import com.peng.ainewshub.ui.theme.AppText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -129,6 +128,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
+import com.peng.ainewshub.data.prefs.FontScale
 
 /**
  * 内置 WebView 屏幕 — 不跳出 App。

@@ -8,6 +8,9 @@ import coil.annotation.ExperimentalCoilApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import com.peng.ainewshub.data.repo.BrowseHistoryRepository
+import com.peng.ainewshub.data.repo.TRANSLATION_CACHE_FILE
+import com.peng.ainewshub.data.prefs.SettingsStore
 
 /**
  * 缓存统一清理入口 —— 集中处理 App 所有「可安全清理」的本地数据。
@@ -52,7 +55,7 @@ object CacheManager {
     suspend fun clear(
         context: Context,
         browseHistoryRepository: BrowseHistoryRepository,
-        settingsStore: com.peng.ainewshub.ui.more.SettingsStore,
+        settingsStore: SettingsStore,
         includeTranslations: Boolean = false,
         includeBrowseHistory: Boolean = false
     ) {

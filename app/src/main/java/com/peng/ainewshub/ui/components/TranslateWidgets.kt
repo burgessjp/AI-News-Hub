@@ -13,7 +13,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
@@ -22,6 +21,7 @@ import com.peng.ainewshub.R
 import com.peng.ainewshub.ui.TranslationState
 import com.peng.ainewshub.ui.theme.AppAlpha
 import com.peng.ainewshub.ui.theme.AppText
+import androidx.compose.ui.layout.layout
 
 /**
  * 翻译相关复用组件 —— 内联「译」按钮 + 译文文本。

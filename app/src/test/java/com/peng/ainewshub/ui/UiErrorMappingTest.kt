@@ -1,7 +1,7 @@
 package com.peng.ainewshub.ui
 
 import com.peng.ainewshub.data.AppException
-import com.peng.ainewshub.data.ShortContentException
+import com.peng.ainewshub.data.repo.ShortContentException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test

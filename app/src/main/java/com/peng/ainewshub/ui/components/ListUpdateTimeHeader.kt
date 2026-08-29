@@ -13,7 +13,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.peng.ainewshub.R
-import com.peng.ainewshub.data.SourceFreshness
+import com.peng.ainewshub.data.source.SourceFreshness
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale

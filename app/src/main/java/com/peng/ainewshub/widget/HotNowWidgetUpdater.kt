@@ -3,7 +3,7 @@ package com.peng.ainewshub.widget
 import android.content.Context
 import android.util.Log
 import androidx.glance.appwidget.updateAll
-import com.peng.ainewshub.data.OverviewRepository
+import com.peng.ainewshub.data.repo.OverviewRepository
 
 /**
  * 「今日热点」小组件的取数与刷新入口。

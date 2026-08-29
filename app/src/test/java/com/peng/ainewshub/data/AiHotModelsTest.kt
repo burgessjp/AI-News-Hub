@@ -5,6 +5,9 @@ import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
+import com.peng.ainewshub.data.model.HotTopic
+import com.peng.ainewshub.data.model.NewsCategory
+import com.peng.ainewshub.data.model.NewsItem
 
 /**
  * aihot API 模型解析回归([NewsItem] / [HotTopic] companion fromJson)。

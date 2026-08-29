@@ -43,14 +43,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -65,19 +65,19 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.peng.ainewshub.R
-import com.peng.ainewshub.data.SearchIndexRepository
-import com.peng.ainewshub.data.SearchItemEntity
+import com.peng.ainewshub.data.repo.SearchIndexRepository
+import com.peng.ainewshub.data.db.SearchItemEntity
 import com.peng.ainewshub.ui.EmptyState
 import com.peng.ainewshub.ui.components.SectionHeader
 import com.peng.ainewshub.ui.components.rememberReadUrls
-import com.peng.ainewshub.ui.more.DEFAULT_SOURCE_ORDER
-import com.peng.ainewshub.ui.more.SettingsStore
 import com.peng.ainewshub.ui.more.sourceMeta
 import com.peng.ainewshub.ui.theme.AppAlpha
 import com.peng.ainewshub.ui.theme.AppText
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.launch
+import com.peng.ainewshub.data.prefs.SettingsStore
+import com.peng.ainewshub.data.source.DEFAULT_SOURCE_ORDER
 
 /**
  * 本地搜索页(独立二级页,总览顶栏进入)—— 查设备内 Room 索引,只覆盖本 App

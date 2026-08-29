@@ -4,6 +4,9 @@ import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
+import com.peng.ainewshub.data.model.OpenAiAnthropicNews
+import com.peng.ainewshub.data.model.ProductHunt
+import com.peng.ainewshub.data.model.RundownAiArticle
 
 /**
  * 三个归档源条目解析器回归([ProductHunt] / [RundownAiArticle] / [OpenAiAnthropicNews])。

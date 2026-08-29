@@ -74,7 +74,7 @@ internal fun parseChangelog(text: String): List<ChangelogVersion> {
                 val entry = line.removePrefix("- ").trim()
                 if (entry.isNotEmpty()) currentSection?.addEntry(entry)
             }
-            else -> Unit // 文件头、空行、正文段落（如 1.0.0 的「首个公开发布版本。」）忽略
+            else -> Unit // 文件头、空行、正文段落（如 1.0 的「首个公开发布版本。」）忽略
         }
     }
     closeVersion()

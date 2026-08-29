@@ -1,8 +1,8 @@
 package com.peng.ainewshub.ui.webview
 
 import android.webkit.WebView
-import com.peng.ainewshub.data.AiConfig
-import com.peng.ainewshub.data.TranslationRepository
+import com.peng.ainewshub.data.prefs.AiConfig
+import com.peng.ainewshub.data.repo.TranslationRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.supervisorScope
@@ -178,7 +178,7 @@ suspend fun extractBlockTexts(webView: WebView): List<String>? {
  * 每批 [TRANSLATE_BATCH] 块并发,批间经 [onBatch] 回传当前完整结果数组,
  * 调用方据此渐进刷新翻译弹层,用户能看到逐段出译文。
  *
- * 跳过策略:空白块、仓库判定的过短内容([com.peng.ainewshub.data.ShortContentException]
+ * 跳过策略:空白块、仓库判定的过短内容([com.peng.ainewshub.data.repo.ShortContentException]
  * 等失败)以及总字符超过 [MAX_TRANSLATE_CHARS] 之后的块,一律保留原文(结果为 null)。
  *
  * @param onBatch 每批完成后的回调:(当前结果数组, 已处理块数, 待翻译总块数)

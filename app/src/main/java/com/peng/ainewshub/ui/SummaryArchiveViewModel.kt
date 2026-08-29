@@ -4,8 +4,8 @@ import com.peng.ainewshub.ui.i18n.localized
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.peng.ainewshub.data.SourceSummary
-import com.peng.ainewshub.data.SummaryRepository
+import com.peng.ainewshub.data.repo.SourceSummary
+import com.peng.ainewshub.data.repo.SummaryRepository
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow

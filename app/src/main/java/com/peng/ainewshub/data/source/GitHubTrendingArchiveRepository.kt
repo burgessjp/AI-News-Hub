@@ -1,9 +1,9 @@
 package com.peng.ainewshub.data.source
 
-import com.peng.ainewshub.data.SearchIndexRepository
-import com.peng.ainewshub.data.SourceKeys
-import com.peng.ainewshub.data.TrendingRepo
-import com.peng.ainewshub.data.TrendingResult
+import com.peng.ainewshub.data.repo.SearchIndexRepository
+import com.peng.ainewshub.data.source.SourceKeys
+import com.peng.ainewshub.data.model.TrendingRepo
+import com.peng.ainewshub.data.model.TrendingResult
 
 /**
  * GitHub Trending 的 [gitcode 归档]数据源。

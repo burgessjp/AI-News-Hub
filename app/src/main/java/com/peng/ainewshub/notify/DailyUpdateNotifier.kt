@@ -22,10 +22,10 @@ import com.peng.ainewshub.R
 import com.peng.ainewshub.data.PipelineSchedule
 import com.peng.ainewshub.data.source.ArchiveHttpClient
 import com.peng.ainewshub.ui.i18n.AppLocale
-import com.peng.ainewshub.ui.more.SettingsStore
 import kotlinx.coroutines.flow.first
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
+import com.peng.ainewshub.data.prefs.SettingsStore
 
 /**
  * 每日更新通知 —— 流水线新批次数据就绪后给用户发一条本地通知,点击直达 App(默认总览 tab)。

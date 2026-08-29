@@ -19,11 +19,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -34,8 +34,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.ui.res.stringResource
 import com.peng.ainewshub.R
-import com.peng.ainewshub.data.AiConfig
-import com.peng.ainewshub.data.OpenAiAnthropicNews
+import com.peng.ainewshub.data.prefs.AiConfig
+import com.peng.ainewshub.data.model.OpenAiAnthropicNews
 import com.peng.ainewshub.ui.OpenAiAnthropicNewsViewModel
 import com.peng.ainewshub.ui.TranslationState
 import com.peng.ainewshub.ui.UiState

@@ -6,18 +6,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.res.stringResource
 import com.peng.ainewshub.R
-import com.peng.ainewshub.data.AiConfig
-import com.peng.ainewshub.data.AiConfigStore
-import com.peng.ainewshub.data.AiUsageStore
-import com.peng.ainewshub.data.BrowseHistoryRepository
-import com.peng.ainewshub.data.FavoritesRepository
-import com.peng.ainewshub.data.NewsItem
-import com.peng.ainewshub.data.SourceKeys
+import com.peng.ainewshub.data.prefs.AiConfig
+import com.peng.ainewshub.data.prefs.AiConfigStore
+import com.peng.ainewshub.data.prefs.AiUsageStore
+import com.peng.ainewshub.data.repo.BrowseHistoryRepository
+import com.peng.ainewshub.data.repo.FavoritesRepository
+import com.peng.ainewshub.data.model.NewsItem
+import com.peng.ainewshub.data.source.SourceKeys
 import com.peng.ainewshub.ui.NewsDetailScreen
 import com.peng.ainewshub.ui.daily.DailyArchiveScreen
 import com.peng.ainewshub.ui.daily.DailyDateScreen
 import com.peng.ainewshub.ui.daily.DailyScreen
-import com.peng.ainewshub.ui.i18n.AppLanguage
+import com.peng.ainewshub.data.prefs.AppLanguage
 import com.peng.ainewshub.ui.items.BrowseHistoryScreen
 import com.peng.ainewshub.ui.items.FavoritesScreen
 import com.peng.ainewshub.ui.items.GitHubTrendingScreen
@@ -35,13 +35,9 @@ import com.peng.ainewshub.ui.more.AboutScreen
 import com.peng.ainewshub.ui.more.AboutSourcesScreen
 import com.peng.ainewshub.ui.more.AiServiceScreen
 import com.peng.ainewshub.ui.more.ChangelogScreen
-import com.peng.ainewshub.ui.more.FontChoice
-import com.peng.ainewshub.ui.more.FontScale
 import com.peng.ainewshub.ui.more.HistoryHubScreen
 import com.peng.ainewshub.ui.more.SettingsScreen
-import com.peng.ainewshub.ui.more.SettingsStore
 import com.peng.ainewshub.ui.more.SourcesScreen
-import com.peng.ainewshub.ui.more.ThemeMode
 import com.peng.ainewshub.ui.overview.OverviewDateScreen
 import com.peng.ainewshub.ui.summary.SummaryDateScreen
 import com.peng.ainewshub.ui.trends.TrendsCloudScreen
@@ -50,6 +46,10 @@ import com.peng.ainewshub.ui.tabs.AllTab
 import com.peng.ainewshub.ui.tabs.FeaturedTab
 import com.peng.ainewshub.ui.webview.WebViewScreen
 import kotlinx.coroutines.launch
+import com.peng.ainewshub.data.prefs.FontChoice
+import com.peng.ainewshub.data.prefs.FontScale
+import com.peng.ainewshub.data.prefs.SettingsStore
+import com.peng.ainewshub.data.prefs.ThemeMode
 
 /**
  * 二级页共用环境:stores/repos 与全局 AI 配置,由 AiNewsHubApp 构造一次下传,

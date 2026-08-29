@@ -3,6 +3,8 @@ package com.peng.ainewshub.data
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.peng.ainewshub.data.repo.FollowCorpusEntry
+import com.peng.ainewshub.data.repo.FollowMatcher
 
 /**
  * [FollowMatcher] 关键词匹配规则回归 —— 「我的关注」过滤核心,规则细节见被测类 KDoc。

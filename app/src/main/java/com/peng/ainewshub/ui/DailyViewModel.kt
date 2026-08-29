@@ -3,9 +3,9 @@ package com.peng.ainewshub.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.peng.ainewshub.data.DailyReport
-import com.peng.ainewshub.data.DailySummary
-import com.peng.ainewshub.data.NewsRepository
+import com.peng.ainewshub.data.model.DailyReport
+import com.peng.ainewshub.data.model.DailySummary
+import com.peng.ainewshub.data.repo.NewsRepository
 import com.peng.ainewshub.ui.i18n.localized
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

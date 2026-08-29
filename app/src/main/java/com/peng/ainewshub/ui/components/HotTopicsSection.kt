@@ -14,8 +14,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,7 +27,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.peng.ainewshub.R
-import com.peng.ainewshub.data.HotTopic
+import com.peng.ainewshub.data.model.HotTopic
 import com.peng.ainewshub.ui.HotTopicsViewModel
 import com.peng.ainewshub.ui.UiState
 import androidx.lifecycle.viewmodel.compose.viewModel

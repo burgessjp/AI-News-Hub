@@ -36,14 +36,14 @@ import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberSwipeToDismissBoxState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,8 +58,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import android.content.Context
 import com.peng.ainewshub.R
-import com.peng.ainewshub.data.FavoriteEntity
-import com.peng.ainewshub.data.FavoritesRepository
+import com.peng.ainewshub.data.db.FavoriteEntity
+import com.peng.ainewshub.data.repo.FavoritesRepository
 import com.peng.ainewshub.ui.EmptyState
 import com.peng.ainewshub.ui.FavoritesViewModel
 import com.peng.ainewshub.ui.components.AppTopBar

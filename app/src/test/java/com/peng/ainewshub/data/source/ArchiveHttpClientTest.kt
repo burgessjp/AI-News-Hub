@@ -57,7 +57,7 @@ class ArchiveHttpClientTest {
     }
 
     /** 断网模拟:指向必然连接拒绝的本地端口,传输层失败即 IOException(与真实断网同语义)。 */
-    private val deadBaseUrl = "http://127.0.0.1:1${pathPrefix.trimEnd('/')}"
+    private val deadBaseUrl = "http://127.0.1:1${pathPrefix.trimEnd('/')}"
 
     private lateinit var server: MockWebServer
     private lateinit var dispatcher: FixtureDispatcher

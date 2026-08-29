@@ -5,7 +5,7 @@ import android.os.SystemClock
 import android.util.Log
 import com.peng.ainewshub.R
 import com.peng.ainewshub.data.AppException
-import com.peng.ainewshub.data.ShortContentException
+import com.peng.ainewshub.data.repo.ShortContentException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import java.io.IOException

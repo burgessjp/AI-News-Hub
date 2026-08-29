@@ -4,21 +4,21 @@ import android.app.Application
 import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.peng.ainewshub.data.FollowCorpus
-import com.peng.ainewshub.data.FollowFeedItem
-import com.peng.ainewshub.data.FollowMatcher
-import com.peng.ainewshub.data.FollowsRepository
-import com.peng.ainewshub.data.TrendsRepository
+import com.peng.ainewshub.data.repo.FollowCorpus
+import com.peng.ainewshub.data.repo.FollowFeedItem
+import com.peng.ainewshub.data.repo.FollowMatcher
+import com.peng.ainewshub.data.repo.FollowsRepository
+import com.peng.ainewshub.data.repo.TrendsRepository
 import com.peng.ainewshub.ui.ensureMinRefreshSpin
 import com.peng.ainewshub.ui.UiState
 import com.peng.ainewshub.ui.i18n.localized
-import com.peng.ainewshub.ui.more.SettingsStore
 import com.peng.ainewshub.ui.toUiError
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import com.peng.ainewshub.data.prefs.SettingsStore
 
 /**
  * 「我的关注」页 UI 模型 —— 过滤结果 + 关键词/推荐词等页面态的快照。

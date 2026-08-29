@@ -1,17 +1,16 @@
 package com.peng.ainewshub.data.source
 
-import com.peng.ainewshub.data.ProductHunt
-import com.peng.ainewshub.data.ProductHuntResult
-import com.peng.ainewshub.data.SearchIndexRepository
-import com.peng.ainewshub.data.SourceKeys
-import org.json.JSONObject
+import com.peng.ainewshub.data.model.ProductHunt
+import com.peng.ainewshub.data.model.ProductHuntResult
+import com.peng.ainewshub.data.repo.SearchIndexRepository
+import com.peng.ainewshub.data.source.SourceKeys
 
 /**
  * Product Hunt 的 [gitcode 归档]数据源。
  *
  * 数据来自数据流水线([scripts/fetch_data.py] 经 PH GraphQL 抓取归档,Developer
  * Token 是服务端 secret 不进 APK)的快照。字段映射对齐 docs/news-hub-data-usage.md
- * 的 producthunt items 表与 [com.peng.ainewshub.data.ProductHunt.fromJson]。
+ * 的 producthunt items 表与 [com.peng.ainewshub.data.model.ProductHunt.fromJson]。
  * 无缓存概念:fetch == forceRefresh。失败抛 RuntimeException 交由 VM 显示 Error。
  */
 class ProductHuntArchiveRepository {

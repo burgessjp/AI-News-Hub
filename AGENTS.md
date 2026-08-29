@@ -18,7 +18,7 @@
 ## 编码约定（与默认不同，务必遵守）
 
 - **注释用中文，代码/变量名用英文**（与存量代码一致）。
-- **不引入 Retrofit / Gson / Moshi**：网络一律 `OkHttpClient`，JSON 用内置 `org.json`（App 端不做 HTML 抓取，抓取全部由流水线承担）。`OkHttpClient` 统一经 `data/HttpClients.kt` 的共享 base 派生（`base` 或 `base.newBuilder()`），不各自 `OkHttpClient.Builder().build()`。
+- **不引入 Retrofit / Gson / Moshi**：网络一律 `OkHttpClient`，JSON 用内置 `org.json`（App 端不做 HTML 抓取，抓取全部由流水线承担）。`OkHttpClient` 统一经 `data/net/HttpClients.kt` 的共享 base 派生（`base` 或 `base.newBuilder()`），不各自 `OkHttpClient.Builder().build()`。
 - **不用 Navigation Compose**（见「深入文档」导航篇），**无 DI 框架**：Repository 在 ViewModel / Composable 内直接构造。
 - 字号一律 `AppText.xxx`、透明度一律 `AppAlpha.xxx`、圆角一律 `MaterialTheme.shapes` 或 `CircleShape`、颜色只走 `colorScheme`——不散落 `.sp`/`.alpha`/hex 字面量（hex 仅两处集中例外：源品牌色 `ui/more/SourceBrandColors.kt`、词云调色板 `ui/trends/CloudWordColors.kt`）。列表排名/统计/章节条/骨架屏统一复用 `ui/components/` 现有组件，不新建私有拷贝。
 - **UI 文案一律走 string 资源，不写硬编码字面量**，新 feature 必须同步 `values/`（中文全集）+ `values-en/` 双语；语言切换机制与共用词条约定见「深入文档」i18n 篇。

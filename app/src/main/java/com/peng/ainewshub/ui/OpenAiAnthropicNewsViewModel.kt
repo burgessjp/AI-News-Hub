@@ -2,8 +2,8 @@ package com.peng.ainewshub.ui
 
 import androidx.lifecycle.viewModelScope
 import android.app.Application
-import com.peng.ainewshub.data.OpenAiAnthropicNews
-import com.peng.ainewshub.data.SourceListResult
+import com.peng.ainewshub.data.model.OpenAiAnthropicNews
+import com.peng.ainewshub.data.model.SourceListResult
 import com.peng.ainewshub.data.source.OpenAiAnthropicNewsArchiveRepository
 import kotlinx.coroutines.flow.StateFlow
 

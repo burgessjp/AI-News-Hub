@@ -1,9 +1,9 @@
 package com.peng.ainewshub.ui
 
 import android.app.Application
-import com.peng.ainewshub.data.SourceListResult
-import com.peng.ainewshub.data.StormzhangAiNews
-import com.peng.ainewshub.data.StormzhangAiNewsResult
+import com.peng.ainewshub.data.model.SourceListResult
+import com.peng.ainewshub.data.model.StormzhangAiNews
+import com.peng.ainewshub.data.model.StormzhangAiNewsResult
 import com.peng.ainewshub.data.source.StormzhangAiNewsArchiveRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

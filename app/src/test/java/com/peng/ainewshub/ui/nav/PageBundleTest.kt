@@ -1,13 +1,12 @@
 package com.peng.ainewshub.ui.nav
 
 import android.os.Bundle
-import com.peng.ainewshub.data.HackerNewsStory
-import com.peng.ainewshub.data.NewsItem
+import com.peng.ainewshub.data.model.HackerNewsStory
+import com.peng.ainewshub.data.model.NewsItem
 import com.peng.ainewshub.ui.anim.PageNavStyle
 import com.peng.ainewshub.ui.components.AppTab
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner

@@ -3,11 +3,11 @@ package com.peng.ainewshub.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.peng.ainewshub.data.Mode
-import com.peng.ainewshub.data.NewsCategory
-import com.peng.ainewshub.data.NewsItem
-import com.peng.ainewshub.data.NewsPage
-import com.peng.ainewshub.data.NewsRepository
+import com.peng.ainewshub.data.model.Mode
+import com.peng.ainewshub.data.model.NewsCategory
+import com.peng.ainewshub.data.model.NewsItem
+import com.peng.ainewshub.data.repo.NewsPage
+import com.peng.ainewshub.data.repo.NewsRepository
 import com.peng.ainewshub.ui.i18n.localized
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview

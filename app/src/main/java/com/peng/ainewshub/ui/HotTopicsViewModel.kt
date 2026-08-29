@@ -4,8 +4,8 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.peng.ainewshub.R
-import com.peng.ainewshub.data.HotTopic
-import com.peng.ainewshub.data.NewsRepository
+import com.peng.ainewshub.data.model.HotTopic
+import com.peng.ainewshub.data.repo.NewsRepository
 import com.peng.ainewshub.ui.i18n.localized
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

@@ -17,8 +17,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.peng.ainewshub.R
-import com.peng.ainewshub.data.Mode
-import com.peng.ainewshub.data.NewsItem
+import com.peng.ainewshub.data.model.Mode
+import com.peng.ainewshub.data.model.NewsItem
 import com.peng.ainewshub.ui.ItemsViewModel
 import com.peng.ainewshub.ui.components.AppTopBar
 import com.peng.ainewshub.ui.components.AppTopBarDefaults

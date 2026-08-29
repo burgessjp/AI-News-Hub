@@ -46,7 +46,7 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import com.peng.ainewshub.MainActivity
 import com.peng.ainewshub.R
-import com.peng.ainewshub.data.SummaryRepository
+import com.peng.ainewshub.data.repo.SummaryRepository
 import com.peng.ainewshub.ui.i18n.AppLocale
 import com.peng.ainewshub.ui.theme.DarkErrorContainer
 import com.peng.ainewshub.ui.theme.DarkOnBackground
@@ -56,7 +56,6 @@ import com.peng.ainewshub.ui.theme.DarkOnPrimaryContainer
 import com.peng.ainewshub.ui.theme.DarkOnSurfaceVariant
 import com.peng.ainewshub.ui.theme.DarkOnTertiary
 import com.peng.ainewshub.ui.theme.DarkOnTertiaryContainer
-import com.peng.ainewshub.ui.theme.DarkPrimary
 import com.peng.ainewshub.ui.theme.DarkPrimaryContainer
 import com.peng.ainewshub.ui.theme.DarkSurfaceContainerHigh
 import com.peng.ainewshub.ui.theme.DarkTertiary
@@ -97,7 +96,7 @@ import java.util.Locale
  *    Bold 标题,行间发丝线;breaking 胶囊与标题「内联」(测量断行,见 [splitAroundCapsule]);
  *    来源(源名/品牌色)与互动指标刻意不上小组件 —— 桌面场景只留「什么新闻、有多急」。
  * 配色取 ui/theme/Color.kt 顶层令牌组 day/night ColorProvider,不用 GlanceTheme 的壁纸动态色。
- * 字体:Glance 1.1.1 不支持 res/font 自定义字体,层级靠字号 + 字重(Normal/Medium/Bold)建立。
+ * 字体:Glance 1.1 不支持 res/font 自定义字体,层级靠字号 + 字重(Normal/Medium/Bold)建立。
  */
 class HotNowWidget : GlanceAppWidget() {
 

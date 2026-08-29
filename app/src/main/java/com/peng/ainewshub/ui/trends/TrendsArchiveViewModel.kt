@@ -3,8 +3,8 @@ package com.peng.ainewshub.ui.trends
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.peng.ainewshub.data.TrendsDigest
-import com.peng.ainewshub.data.TrendsRepository
+import com.peng.ainewshub.data.repo.TrendsDigest
+import com.peng.ainewshub.data.repo.TrendsRepository
 import com.peng.ainewshub.ui.UiState
 import com.peng.ainewshub.ui.i18n.localized
 import com.peng.ainewshub.ui.toUiError

@@ -5,10 +5,10 @@ import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.peng.ainewshub.R
-import com.peng.ainewshub.data.AiConfigStore
-import com.peng.ainewshub.data.ShortContentException
-import com.peng.ainewshub.data.SourceListResult
-import com.peng.ainewshub.data.TranslationRepository
+import com.peng.ainewshub.data.prefs.AiConfigStore
+import com.peng.ainewshub.data.repo.ShortContentException
+import com.peng.ainewshub.data.model.SourceListResult
+import com.peng.ainewshub.data.repo.TranslationRepository
 import com.peng.ainewshub.data.source.ArchiveHttpClient
 import com.peng.ainewshub.ui.i18n.localized
 import kotlinx.coroutines.flow.MutableStateFlow

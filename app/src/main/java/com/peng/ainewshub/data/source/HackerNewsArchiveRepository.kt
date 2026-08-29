@@ -1,9 +1,9 @@
 package com.peng.ainewshub.data.source
 
-import com.peng.ainewshub.data.HackerNewsStory
-import com.peng.ainewshub.data.HackerNewsTopStories
-import com.peng.ainewshub.data.SearchIndexRepository
-import com.peng.ainewshub.data.SourceKeys
+import com.peng.ainewshub.data.model.HackerNewsStory
+import com.peng.ainewshub.data.model.HackerNewsTopStories
+import com.peng.ainewshub.data.repo.SearchIndexRepository
+import com.peng.ainewshub.data.source.SourceKeys
 
 /**
  * HackerNews 的 [gitcode 归档]数据源。

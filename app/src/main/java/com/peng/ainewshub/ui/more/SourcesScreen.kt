@@ -16,12 +16,12 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,7 +31,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.peng.ainewshub.R
-import com.peng.ainewshub.data.SourceFreshness
+import com.peng.ainewshub.data.source.SourceFreshness
 import com.peng.ainewshub.ui.components.AppTopBar
 import com.peng.ainewshub.ui.components.AppTopBarDefaults
 import com.peng.ainewshub.ui.theme.AppText
@@ -39,6 +39,7 @@ import kotlinx.coroutines.launch
 import org.burnoutcrew.reorderable.ReorderableItem
 import org.burnoutcrew.reorderable.detectReorderAfterLongPress
 import org.burnoutcrew.reorderable.rememberReorderableLazyListState
+import com.peng.ainewshub.data.prefs.SettingsStore
 import org.burnoutcrew.reorderable.reorderable
 
 /**
@@ -56,7 +57,7 @@ import org.burnoutcrew.reorderable.reorderable
 @Composable
 fun SourcesScreen(
     onBack: () -> Unit,
-    /** 点击源行回调,key 来自 [com.peng.ainewshub.data.SourceKeys](如 "hackernews")。 */
+    /** 点击源行回调,key 来自 [com.peng.ainewshub.data.source.SourceKeys](如 "hackernews")。 */
     onOpen: (String) -> Unit
 ) {
     val context = LocalContext.current

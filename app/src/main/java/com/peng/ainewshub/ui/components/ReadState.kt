@@ -4,8 +4,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.peng.ainewshub.data.AppDatabase
-import com.peng.ainewshub.data.BrowseHistoryRepository
+import com.peng.ainewshub.data.db.AppDatabase
+import com.peng.ainewshub.data.repo.BrowseHistoryRepository
 
 /**
  * 已读 URL 集合(全 App 共用)—— 浏览历史(openUrl 唯一入口记录)驱动列表

@@ -3,14 +3,14 @@ package com.peng.ainewshub.ui.nav
 import android.os.Bundle
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.pager.PagerState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
-import com.peng.ainewshub.data.SummaryRepository
+import com.peng.ainewshub.data.repo.SummaryRepository
 import com.peng.ainewshub.ui.components.AppTab
 
 /**

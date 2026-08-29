@@ -46,14 +46,14 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.ripple
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -68,9 +68,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.peng.ainewshub.R
-import com.peng.ainewshub.data.FollowFeedItem
-import com.peng.ainewshub.data.FollowsRepository
-import com.peng.ainewshub.data.SummaryRepository
+import com.peng.ainewshub.data.repo.FollowFeedItem
+import com.peng.ainewshub.data.repo.FollowsRepository
+import com.peng.ainewshub.data.repo.SummaryRepository
 import com.peng.ainewshub.ui.EmptyState
 import com.peng.ainewshub.ui.ErrorState
 import com.peng.ainewshub.ui.UiState
@@ -80,18 +80,18 @@ import com.peng.ainewshub.ui.components.BrandWordmark
 import com.peng.ainewshub.ui.components.RankRowSkeletonList
 import com.peng.ainewshub.ui.components.SectionHeader
 import com.peng.ainewshub.ui.components.rememberReadUrls
-import com.peng.ainewshub.ui.more.MAX_FOLLOWED_KEYWORDS
 import com.peng.ainewshub.ui.theme.AppAlpha
 import com.peng.ainewshub.ui.theme.AppText
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.peng.ainewshub.data.prefs.MAX_FOLLOWED_KEYWORDS
 
 /**
  * 「关注」tab 根屏(底栏第 3 个根 tab)—— 关键词订阅的命中流。
  * 原为趋势页顶栏图标进入的二级页(Page.Follows),现升为根 tab。
  *
- * 语料为当日总览 Top10 + 8 源结构化摘要(见 [com.peng.ainewshub.data.FollowsRepository]),
+ * 语料为当日总览 Top10 + 8 源结构化摘要(见 [com.peng.ainewshub.data.repo.FollowsRepository]),
  * 过滤在 [FollowsViewModel] 内完成;本页只渲染三种形态:
  *  - **onboarding**:还没有关注词 → 引导 + 今日热词推荐一键添加;
  *  - **命中流**:关键词 chips(点选单词过滤/再点恢复)+ 命中条目列表 + 页脚时效标注;

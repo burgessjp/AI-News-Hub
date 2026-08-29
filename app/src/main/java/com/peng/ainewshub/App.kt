@@ -1,7 +1,7 @@
 package com.peng.ainewshub
 
 import android.app.Application
-import com.peng.ainewshub.data.SearchIndexRepository
+import com.peng.ainewshub.data.repo.SearchIndexRepository
 import com.peng.ainewshub.data.source.ArchiveDiskCache
 
 /**

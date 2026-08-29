@@ -1,16 +1,16 @@
 package com.peng.ainewshub.data.source
 
-import com.peng.ainewshub.data.OpenAiAnthropicNews
-import com.peng.ainewshub.data.OpenAiAnthropicNewsResult
-import com.peng.ainewshub.data.SearchIndexRepository
-import com.peng.ainewshub.data.SourceKeys
+import com.peng.ainewshub.data.model.OpenAiAnthropicNews
+import com.peng.ainewshub.data.model.OpenAiAnthropicNewsResult
+import com.peng.ainewshub.data.repo.SearchIndexRepository
+import com.peng.ainewshub.data.source.SourceKeys
 
 /**
  * OpenAI x Anthropic 厂商动态的 [gitcode 归档]数据源。
  *
  * 数据来自数据流水线([scripts/fetch_data.py] 抓 OpenAI RSS + Anthropic HTML
  * 合并归档,两家均无稳定公开 API,App 端不直连)的快照。
- * 字段映射对齐 [com.peng.ainewshub.data.OpenAiAnthropicNews.fromJson]。
+ * 字段映射对齐 [com.peng.ainewshub.data.model.OpenAiAnthropicNews.fromJson]。
  * 无缓存概念:fetch == forceRefresh。失败抛 RuntimeException 交由 VM 显示 Error。
  */
 class OpenAiAnthropicNewsArchiveRepository {

@@ -1,10 +1,9 @@
 package com.peng.ainewshub.data.source
 
-import com.peng.ainewshub.data.HuggingFacePaper
-import com.peng.ainewshub.data.HuggingFacePapersResult
-import com.peng.ainewshub.data.SearchIndexRepository
-import com.peng.ainewshub.data.SourceKeys
-import org.json.JSONObject
+import com.peng.ainewshub.data.model.HuggingFacePaper
+import com.peng.ainewshub.data.model.HuggingFacePapersResult
+import com.peng.ainewshub.data.repo.SearchIndexRepository
+import com.peng.ainewshub.data.source.SourceKeys
 
 /**
  * HuggingFace Trending Papers 的 [gitcode 归档]数据源。

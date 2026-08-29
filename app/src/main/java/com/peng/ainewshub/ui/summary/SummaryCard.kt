@@ -32,9 +32,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,11 +50,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.peng.ainewshub.R
-import com.peng.ainewshub.data.SourceFreshness
-import com.peng.ainewshub.data.SourceKeys
-import com.peng.ainewshub.data.SourceSummary
-import com.peng.ainewshub.data.SummaryContent
-import com.peng.ainewshub.data.SummaryItem
+import com.peng.ainewshub.data.source.SourceFreshness
+import com.peng.ainewshub.data.source.SourceKeys
+import com.peng.ainewshub.data.repo.SourceSummary
+import com.peng.ainewshub.data.repo.SummaryContent
+import com.peng.ainewshub.data.repo.SummaryItem
 import com.peng.ainewshub.ui.ErrorKind
 import com.peng.ainewshub.ui.UiState
 import com.peng.ainewshub.ui.anim.Motion

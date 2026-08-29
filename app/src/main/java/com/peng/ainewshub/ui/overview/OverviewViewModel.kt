@@ -7,8 +7,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.peng.ainewshub.R
 import com.peng.ainewshub.data.AppException
-import com.peng.ainewshub.data.OverviewDigest
-import com.peng.ainewshub.data.OverviewRepository
+import com.peng.ainewshub.data.repo.OverviewDigest
+import com.peng.ainewshub.data.repo.OverviewRepository
 import com.peng.ainewshub.data.source.ArchiveHttpClient
 import com.peng.ainewshub.ui.ensureMinRefreshSpin
 import com.peng.ainewshub.ui.RefreshNotices

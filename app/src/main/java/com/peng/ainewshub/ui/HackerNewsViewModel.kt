@@ -2,8 +2,8 @@ package com.peng.ainewshub.ui
 
 import androidx.lifecycle.viewModelScope
 import android.app.Application
-import com.peng.ainewshub.data.HackerNewsStory
-import com.peng.ainewshub.data.SourceListResult
+import com.peng.ainewshub.data.model.HackerNewsStory
+import com.peng.ainewshub.data.model.SourceListResult
 import com.peng.ainewshub.data.source.HackerNewsArchiveRepository
 import kotlinx.coroutines.flow.StateFlow
 

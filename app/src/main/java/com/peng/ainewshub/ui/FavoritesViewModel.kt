@@ -3,8 +3,8 @@ package com.peng.ainewshub.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.peng.ainewshub.data.FavoriteEntity
-import com.peng.ainewshub.data.FavoritesRepository
+import com.peng.ainewshub.data.db.FavoriteEntity
+import com.peng.ainewshub.data.repo.FavoritesRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted

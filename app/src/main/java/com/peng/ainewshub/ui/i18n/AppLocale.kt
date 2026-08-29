@@ -3,13 +3,11 @@ package com.peng.ainewshub.ui.i18n
 import android.app.Activity
 import android.content.Context
 import android.content.res.Configuration
-import com.peng.ainewshub.ui.more.SettingsStore
+import com.peng.ainewshub.data.prefs.AppLanguage
+import com.peng.ainewshub.data.prefs.SettingsStore
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import java.util.Locale
-
-/** 应用内语言 —— 设置页「语言」三选项;按 [name] 持久化于 display_prefs 的 language 键。 */
-enum class AppLanguage { SYSTEM, ZH_CN, EN }
 
 /**
  * 应用内语言切换单点。

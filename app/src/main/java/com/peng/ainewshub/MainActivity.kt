@@ -6,8 +6,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import com.peng.ainewshub.ui.components.AppTab
 import com.peng.ainewshub.ui.i18n.AppLocale
 import com.peng.ainewshub.ui.nav.AiNewsHubApp

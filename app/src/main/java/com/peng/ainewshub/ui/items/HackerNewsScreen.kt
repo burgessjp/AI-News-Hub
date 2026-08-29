@@ -19,11 +19,11 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.SpanStyle
@@ -34,8 +34,8 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.peng.ainewshub.data.HackerNewsStory
-import com.peng.ainewshub.data.AiConfig
+import com.peng.ainewshub.data.model.HackerNewsStory
+import com.peng.ainewshub.data.prefs.AiConfig
 import com.peng.ainewshub.ui.HackerNewsViewModel
 import com.peng.ainewshub.ui.TranslationState
 import com.peng.ainewshub.ui.UiState

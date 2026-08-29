@@ -1,10 +1,13 @@
 package com.peng.ainewshub.ui.nav
 
 import android.os.Bundle
-import com.peng.ainewshub.data.HackerNewsStory
-import com.peng.ainewshub.data.NewsItem
+import com.peng.ainewshub.data.model.HackerNewsStory
+import com.peng.ainewshub.data.model.NewsItem
 import com.peng.ainewshub.ui.anim.PageNavStyle
 import com.peng.ainewshub.ui.components.AppTab
+import com.peng.ainewshub.data.model.OpenAiAnthropicNews
+import com.peng.ainewshub.data.model.ProductHunt
+import com.peng.ainewshub.data.model.StormzhangAiNews
 
 /**
  * 二级页 —— 各 tab 共用的 push 页面类型。

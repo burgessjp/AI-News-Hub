@@ -2,8 +2,8 @@ package com.peng.ainewshub.data
 
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Test
+import com.peng.ainewshub.data.model.HackerNewsStory
 
 /**
  * HackerNews 模型解析回归([HackerNewsStory] fromJson)。

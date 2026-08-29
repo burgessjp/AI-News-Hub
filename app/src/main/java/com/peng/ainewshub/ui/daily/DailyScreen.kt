@@ -30,8 +30,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,10 +44,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.peng.ainewshub.R
-import com.peng.ainewshub.data.DailyEntry
-import com.peng.ainewshub.data.DailyReport
-import com.peng.ainewshub.data.Flash
-import com.peng.ainewshub.data.NewsItem
+import com.peng.ainewshub.data.model.DailyEntry
+import com.peng.ainewshub.data.model.DailyReport
+import com.peng.ainewshub.data.model.Flash
+import com.peng.ainewshub.data.model.NewsItem
 import com.peng.ainewshub.ui.ErrorState
 import com.peng.ainewshub.ui.UiState
 import com.peng.ainewshub.ui.DailyViewModel

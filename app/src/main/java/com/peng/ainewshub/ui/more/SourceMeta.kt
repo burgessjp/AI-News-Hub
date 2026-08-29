@@ -13,7 +13,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import com.peng.ainewshub.R
-import com.peng.ainewshub.data.SourceKeys
+import com.peng.ainewshub.data.source.SourceKeys
 
 /**
  * Hub 八源元数据单点定义 —— 信息源页 / 摘要 Tab / 关于页三处的源顺序、图标、标题、
@@ -24,8 +24,8 @@ import com.peng.ainewshub.data.SourceKeys
  *   → HuggingFace Papers → Product Hunt → The Rundown AI → AIHot 精选 → stormzhang AI。
  *   此为全 App 默认顺序,信息源页可拖拽自定义(持久化于 [SettingsStore.sourceOrderFlow]),
  *   摘要 Tab 跟随用户顺序,关于页固定用此默认顺序。
- * - **源 key**:字面量集中定义于 [com.peng.ainewshub.data.SourceKeys](data 层),
- *   与归档源 key(见 [com.peng.ainewshub.data.SummaryRepository])完全一致,
+ * - **源 key**:字面量集中定义于 [com.peng.ainewshub.data.source.SourceKeys](data 层),
+ *   与归档源 key(见 [com.peng.ainewshub.data.repo.SummaryRepository])完全一致,
  *   摘要 Tab / PagerState pageCount 均按 key 列表驱动。
  * - **品牌色**:[brand] 复用 [SourceBrand](颜色收口仍归 SourceBrandColors.kt,本文件只引用)。
  */
@@ -81,20 +81,3 @@ fun sourceMeta(key: String): SourceMeta = when (key) {
     )
     else -> error("未知源 key: $key")
 }
-
-/**
- * 全 App 默认源顺序(8 源)。
- *
- * 用户在「信息源」页拖拽后的自定义顺序持久化于 [SettingsStore.sourceOrderFlow],
- * 读取时会以本常量为兜底(只保留已知 key + 补全缺失 key 到末尾)。
- */
-val DEFAULT_SOURCE_ORDER: List<String> = listOf(
-    SourceKeys.HACKERNEWS,
-    SourceKeys.GITHUB_TRENDING,
-    SourceKeys.OPENAI_ANTHROPIC_NEWS,
-    SourceKeys.HUGGINGFACE_PAPERS,
-    SourceKeys.PRODUCTHUNT,
-    SourceKeys.RUNDOWN_AI,
-    SourceKeys.AIHOT_FEATURED,
-    SourceKeys.STORMZHANG_AI
-)
