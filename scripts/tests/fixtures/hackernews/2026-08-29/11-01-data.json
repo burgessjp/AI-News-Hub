@@ -1,0 +1,44 @@
+{
+  "source": "hackernews",
+  "fetched_at": "2026-08-29T11:01:26+0800",
+  "fetched_at_ms": 1787972486201,
+  "count": 2,
+  "items": [
+    {
+      "id": 49485267,
+      "title": "Boot a Virtual iPhone via Apple's Virtualization.framework",
+      "url": "https://github.com/Lakr233/vphone-cli",
+      "by": "hentrep",
+      "score": 115,
+      "descendants": 38,
+      "time": 1787958141,
+      "time_iso": "2026-08-28T23:02:21Z",
+      "discussion_url": "https://news.ycombinator.com/item?id=49485267",
+      "target_url": "https://github.com/Lakr233/vphone-cli"
+    },
+    {
+      "id": 49485452,
+      "title": "9th Circuit sides with states in Kalshi gambling fight",
+      "url": "https://azmirror.com/2026/08/28/9th-circuit-sides-with-states-in-kalshi-gambling-fight-potentially-reviving-arizonas-prosecution/",
+      "by": "hungryhobbit",
+      "score": 69,
+      "descendants": 32,
+      "time": 1787959942,
+      "time_iso": "2026-08-28T23:32:22Z",
+      "discussion_url": "https://news.ycombinator.com/item?id=49485452",
+      "target_url": "https://azmirror.com/2026/08/28/9th-circuit-sides-with-states-in-kalshi-gambling-fight-potentially-reviving-arizonas-prosecution/"
+    }
+  ],
+  "ai_summary_v2": [
+    {
+      "title": "Htmx 4.0 发布，为后端驱动 UI 带来新特性",
+      "desc": "Htmx 4.0 正式发布，这是这个流行的、以 HTML 属性驱动 AJAX 交互的库的一次重大版本更新。新版本带来了性能改进、更完善的扩展 API 以及对现代 Web 标准的更好支持，引发了开发者社区关于其与前端框架对比的广泛讨论。",
+      "url": "https://four.htmx.org/announcements/2026-08-28-htmx-4.0.0-is-released"
+    },
+    {
+      "title": "GUI 应完全支持键盘驱动，引发开发者热议",
+      "desc": "一篇观点文章主张所有图形用户界面都应支持完整的键盘操作，以提高效率和可访问性。该观点在 Hacker News 上获得大量支持，开发者们分享了各自在工具和操作系统中的键盘驱动工作流，并讨论了实现这一目标的挑战与最佳实践。",
+      "url": "https://ckardaris.com/blog/2026/08/28/keyboard-driven-guis.html"
+    }
+  ]
+}

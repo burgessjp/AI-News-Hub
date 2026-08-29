@@ -1,0 +1,5 @@
+# 流水线测试专用依赖(不进生产运行环境,见 docs/agents/testing.md)。
+# 本地:scripts/.venv/bin/pip install -r scripts/requirements-dev.txt
+# CI:build.yml 的 pipeline-tests job 与 requirements.txt 一并安装。
+pytest>=8
+requests-mock>=1.12

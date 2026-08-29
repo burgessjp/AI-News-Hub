@@ -34,3 +34,28 @@ jobs:
 
       - name: Build debug APK
         run: ./gradlew assembleDebug
+
+  # 流水线脚本回归(fetch 继承语义等,见 docs/agents/pipeline.md「测试」)。
+  # 刻意放 build.yml 而非 fetch-data.yml:每日批跑的是 main HEAD,push/PR 时已在此
+  # 测过;测试失败不该 forfeiture 当天的数据推送。
+  pipeline-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+          cache: pip
+          cache-dependency-path: |
+            scripts/requirements.txt
+            scripts/requirements-dev.txt
+
+      - name: Install dependencies
+        run: pip install -r scripts/requirements.txt -r scripts/requirements-dev.txt
+
+      - name: Run pipeline unit tests
+        run: pytest scripts
