@@ -5,6 +5,7 @@ import android.os.SystemClock
 import android.util.Log
 import com.peng.ainewshub.R
 import com.peng.ainewshub.data.AppException
+import com.peng.ainewshub.data.diagnostics.DiagnosticsLog
 import com.peng.ainewshub.data.repo.ShortContentException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
@@ -37,11 +38,13 @@ enum class ErrorKind {
  * - 友好文案根据异常类型决定,经 [context] 按当前语言取词(调用方传
  *   `context.localized()` 或局部化的 Composable context,用户看不到任何技术词);
  * - 原始诊断 message(如 "HTTP 404"、"index.json 无 latest 字段")写进 logcat,
- *   开发者调试不损失信息;
+ *   开发者调试不损失信息;同时喂给 [DiagnosticsLog] 环形记录,
+ *   供 设置 → 诊断信息 用户主动导出(零遥测);
  * - [ShortContentException] 不在本函数处理(走 TOO_SHORT 短路)。
  */
 fun Throwable.toUiError(context: Context): UiState.Error {
     Log.w("UiError", "原始诊断: ${message ?: "(no message)"}", this)
+    DiagnosticsLog.record(this)
     return when (this) {
         is AppException.NoData       -> UiState.Error(context.getString(R.string.error_no_data), ErrorKind.NoData)
         is AppException.Network      -> UiState.Error(context.getString(R.string.error_network), ErrorKind.Network)

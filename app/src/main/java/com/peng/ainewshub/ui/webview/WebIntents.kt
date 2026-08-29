@@ -6,20 +6,15 @@ import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import com.peng.ainewshub.R
+import com.peng.ainewshub.ui.components.shareText
 
 /**
  * WebView 的系统交互出口 —— 分享与外部 App 唤起。
  */
 
-/** 系统分享:把当前页 URL 作为纯文本交给系统分享面板。 */
-internal fun shareUrl(context: Context, title: String, url: String) {
-    val intent = Intent(Intent.ACTION_SEND).apply {
-        type = "text/plain"
-        putExtra(Intent.EXTRA_SUBJECT, title)
-        putExtra(Intent.EXTRA_TEXT, url)
-    }
-    context.startActivity(Intent.createChooser(intent, context.getString(R.string.common_share)))
-}
+/** 系统分享:把当前页 URL 作为纯文本交给系统分享面板(通用出口见 ui/components/ShareText.kt)。 */
+internal fun shareUrl(context: Context, title: String, url: String) =
+    shareText(context, title, url)
 
 /**
  * 唤起外部 App —— 处理网页发起的非 http(s) 协议链接。

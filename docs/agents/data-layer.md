@@ -4,7 +4,7 @@
 
 ## 取数模式
 
-- **data 层包结构**（2026-08-29 重组）：`data/model`（模型 + 各源 Result）、`data/repo`（领域 Repository）、`data/db`（Room）、`data/net`（OkHttp/AI 客户端/更新检查）、`data/prefs`（SettingsStore/AiConfig/AiUsage + 持久化枚举 ThemeMode/FontChoice/FontScale/AppLanguage）、`data/source`（gitcode 归档体系 + SourceKeys/SourceFreshness）；`data/` 根仅留跨切面（AppException/PipelineSchedule/CacheManager/JsonExt/HtmlUtil）。持久化枚举的展示映射（labelRes/fontFamily）在 `ui/more/SettingsScreen.kt`。
+- **data 层包结构**（2026-08-29 重组）：`data/model`（模型 + 各源 Result）、`data/repo`（领域 Repository）、`data/db`（Room）、`data/net`（OkHttp/AI 客户端/更新检查）、`data/prefs`（SettingsStore/AiConfig/AiUsage + 持久化枚举 ThemeMode/FontChoice/FontScale/AppLanguage）、`data/source`（gitcode 归档体系 + SourceKeys/SourceFreshness）、`data/diagnostics`（本地诊断，见下文专节）；`data/` 根仅留跨切面（AppException/PipelineSchedule/CacheManager/JsonExt/HtmlUtil）。持久化枚举的展示映射（labelRes/fontFamily）在 `ui/more/SettingsScreen.kt`。
 - **取数模式恒定归档**：5 个稳定源（HackerNews / GitHub Trending / stormzhang AI / HuggingFace Papers / The Rundown AI）固定读 gitcode 归档快照；原实时抓取路径（LIVE 双模式、jsoup 直抓、`SourceMode` 枚举）已于 2026-08-29 整体删除（决策记录见 docs/tech-roadmap.md），HTML 抓取全部由 `scripts/` 流水线承担。HN 评论树是唯一保留的实时路径（`HackerNewsRepository`，归档快照不含评论）。
 - **Product Hunt 只归档**（Developer Token 是服务端 secret 不进 APK，两种模式都走归档）。
 - 归档走 `ArchiveHttpClient`（gitcode **REST API raw 端点**，**不要**用 raw 直链——背后是 WAF 会 403）。
@@ -46,6 +46,15 @@
 - 8 源（HackerNews / GitHub Trending / OpenAI×Anthropic / HuggingFace Papers / Product Hunt / The Rundown AI / AIHot 精选 / stormzhang AI）的 **key 字面量集中于 `data/source/SourceKeys.kt`**（全 App 唯一真相源，归档 Repository / 摘要 Repository / UI 跳转分发 / 强调色 when 分支一律引用其常量，不写裸字符串，杜绝 key 漂移静默断裂）。
 - **UI 元数据**（icon / 品牌色 / 标题 / 副标题 / URL）集中于 `ui/more/SourceMeta.kt` 的 `sourceMeta(key)`，`DEFAULT_SOURCE_ORDER` 为默认顺序。信息源页 / 摘要 Tab / 关于页三处都从 `sourceMeta(key)` 派生，不再各自硬编码。
 - 用户在「信息源」页长按拖拽自定义顺序（reorderable 库），持久化于 `display_prefs` 的 `source_order` 键；**摘要 Tab 跟随用户顺序**（`SummaryViewModel.sourceKeys` 读 `SettingsStore.sourceOrderFlow`），**关于页固定默认顺序**。
+
+## 本地诊断（data/diagnostics/，零遥测）
+
+崩溃可见性方案：**纯本地收集 + 用户主动导出**，不接任何崩溃上报 SDK、不自动上传任何数据（安全红线：报告不含用户密钥/AI key）。两个组件，均在 `App.onCreate` 初始化（CrashMarker 最先安装）：
+
+- **`CrashMarker`**：垫在默认 UncaughtExceptionHandler 链上的一层，崩溃时**同步**写 `filesDir/last_crash.txt`（时间戳 + 线程名 + 截断 16KB 的栈），写完委托 previous handler 保系统崩溃流程。只留最近一次（新崩溃覆盖）。选 filesDir 而非 cacheDir——「清理缓存」整删 cacheDir，诊断数据必须存活。ANR 不在覆盖范围（明确不支持）。改它前注意：崩溃时进程将死，**不能改走协程**，一切 runCatching 兜底。
+- **`DiagnosticsLog`**：错误环形记录（容量 20，`filesDir/diagnostics/recent_errors.json`，org.json）+ 报告组装。**唯一喂入点是 `ui/UiState.kt` 的 `toUiError` 统一漏斗**（16 个 ViewModel 出口全覆盖）；`AppException.NoData` 例行空态不记；数据层静默 runCatching 吞掉的失败有意不记（补日志是另一课题）。`record` 为同步入口（漏斗非 suspend），内部丢到自有 IO 协程落盘；测试用 `awaitWrites` 排空（先 join 再取锁，纯空锁排队有调度竞态）。报告 `buildReport` 恒中文（受众是开发者，与流水线内容恒中文同理），含版本/设备/系统/语言/离线态/最近崩溃/最近错误；纯拼装拆在顶层 `formatReport` 供 JVM 直测。
+
+UI 出口在 设置 → 诊断信息（`SettingsScreen` 末 section + ModalBottomSheet，复制/分享/清除；复制与分享经 `ui/components/ShareText.kt` 通用助手，`WebIntents.shareUrl` 同源委托）。
 
 ## 其他
 

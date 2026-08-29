@@ -53,6 +53,13 @@
     <string name="settings_clear_data_include_history">Also clear browsing history</string>
     <string name="settings_clear_action">Clear</string>
 
+    <!-- ===== Diagnostics (local export from Settings; report body is Chinese-only, see data/diagnostics/) ===== -->
+    <string name="settings_section_diagnostics">Diagnostics</string>
+    <string name="settings_diagnostics_title">Diagnostics</string>
+    <string name="settings_diagnostics_subtitle">Copy or share the local report for feedback</string>
+    <string name="diagnostics_btn_clear">Clear</string>
+    <string name="diagnostics_privacy_note">Generated on this device only; contains no keys and never uploads</string>
+
     <!-- ===== About screen (AboutScreen + AboutSourcesScreen + AboutOssScreen) ===== -->
     <string name="about_title">About</string>
     <string name="about_slogan">A curated daily AI news aggregator</string>

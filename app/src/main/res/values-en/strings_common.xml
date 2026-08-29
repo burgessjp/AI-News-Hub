@@ -18,6 +18,8 @@
     <string name="common_empty_today">Nothing here today</string>
     <string name="common_no_result">No matching results</string>
     <string name="common_share">Share</string>
+    <string name="common_copy">Copy</string>
+    <string name="common_copied">Copied</string>
     <string name="common_go_settings">Open Settings</string>
     <string name="common_back_to_top">Back to top</string>
     <string name="common_all_loaded">Everything loaded</string>

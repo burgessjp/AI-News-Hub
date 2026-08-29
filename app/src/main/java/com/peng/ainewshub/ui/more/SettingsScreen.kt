@@ -10,24 +10,38 @@ import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.Composable
@@ -45,6 +59,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.peng.ainewshub.R
+import com.peng.ainewshub.data.diagnostics.DiagnosticsLog
 import com.peng.ainewshub.data.repo.BrowseHistoryRepository
 import com.peng.ainewshub.data.CacheManager
 import com.peng.ainewshub.data.prefs.AppLanguage
@@ -54,9 +69,12 @@ import com.peng.ainewshub.data.prefs.ThemeMode
 import kotlinx.coroutines.launch
 import com.peng.ainewshub.ui.components.AppTopBar
 import com.peng.ainewshub.ui.components.AppTopBarDefaults
+import com.peng.ainewshub.ui.components.copyToClipboard
 import com.peng.ainewshub.ui.components.SegmentedOptionRow
 import com.peng.ainewshub.ui.components.SectionHeader
 import com.peng.ainewshub.ui.components.SettingsRow
+import com.peng.ainewshub.ui.components.shareText
+import com.peng.ainewshub.ui.theme.AppText
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -121,6 +139,8 @@ val FontScale.labelRes: Int
  *  - 通知:每日更新通知开关(WorkManager 本地调度,API 33+ 打开时请求运行时权限)
  *  - 缓存:一键清理网页缓存/Cookie/图片缓存/搜索历史等可恢复数据;
  *    翻译缓存与浏览历史为保护性勾选项,默认保留
+ *  - 诊断:本地诊断报告(最近一次崩溃 + 最近 20 条错误 + 环境信息),
+ *    仅本机生成,复制/分享给开发者排查,不自动上传任何数据
  *
  * AI 服务配置与用量统计已拆到独立二级页 [AiServiceScreen](「更多」→「AI 服务」入口)。
  * 主题/字体同存于 display_prefs([com.peng.ainewshub.data.prefs.SettingsStore])。
@@ -264,6 +284,10 @@ fun SettingsScreen(
             item {
                 CacheSection(cacheSizeBytes = cacheSizeBytes, onClearCache = onClearCache)
             }
+
+            // 诊断 section —— 零遥测的排障出口:崩溃标记 + 错误环形记录,仅本机生成,用户主动导出
+            item { SectionHeader(stringResource(R.string.settings_section_diagnostics)) }
+            item { DiagnosticsSection() }
         }
     }
 }
@@ -445,6 +469,106 @@ private fun ClearOptionRow(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+        }
+    }
+}
+
+/**
+ * 诊断区块:入口行 + 报告弹层。
+ *
+ * 报告由 [DiagnosticsLog.buildReport] 组装(内容恒中文,受众是开发者,见其 KDoc),
+ * 弹层提供 复制 / 分享 / 清除 三个动作;报告文本等宽字体、可选中、可滚动,
+ * 顶部附隐私说明(仅本机生成、不含密钥、不上传)。
+ */
+@Composable
+private fun DiagnosticsSection() {
+    var showSheet by rememberSaveable { mutableStateOf(false) }
+    SettingsRow(
+        icon = Icons.Filled.BugReport,
+        iconAccent = MaterialTheme.colorScheme.secondary,
+        title = stringResource(R.string.settings_diagnostics_title),
+        subtitle = stringResource(R.string.settings_diagnostics_subtitle),
+        showDivider = false,
+        onClick = { showSheet = true }
+    )
+    if (showSheet) DiagnosticsSheet(onDismiss = { showSheet = false })
+}
+
+/** 诊断报告弹层:半屏(对齐关于页更新弹层样式),报告就绪前显示进度指示。 */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DiagnosticsSheet(onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var report by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) { report = DiagnosticsLog.buildReport(context) }
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 16.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.settings_diagnostics_title),
+                style = AppText.titleSection,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = stringResource(R.string.diagnostics_privacy_note),
+                style = AppText.caption,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+            Spacer(Modifier.height(12.dp))
+            val text = report
+            if (text == null) {
+                CircularProgressIndicator(
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .padding(vertical = 32.dp)
+                )
+            } else {
+                SelectionContainer {
+                    Text(
+                        text = text,
+                        style = AppText.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                        modifier = Modifier
+                            .heightIn(max = 400.dp)
+                            .verticalScroll(rememberScrollState())
+                    )
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Button(
+                    onClick = { copyToClipboard(context, report.orEmpty()) },
+                    modifier = Modifier.weight(1f)
+                ) { Text(stringResource(R.string.common_copy)) }
+                Spacer(Modifier.width(12.dp))
+                OutlinedButton(
+                    onClick = {
+                        shareText(
+                            context,
+                            context.getString(R.string.settings_diagnostics_title),
+                            report.orEmpty()
+                        )
+                    },
+                    modifier = Modifier.weight(1f)
+                ) { Text(stringResource(R.string.common_share)) }
+                Spacer(Modifier.width(12.dp))
+                // 清除走 error 色文字按钮(不可逆动作,对齐「清理」确认钮范式)
+                TextButton(onClick = {
+                    scope.launch {
+                        DiagnosticsLog.clear()
+                        report = DiagnosticsLog.buildReport(context)
+                    }
+                }) { Text(stringResource(R.string.diagnostics_btn_clear), color = MaterialTheme.colorScheme.error) }
             }
         }
     }

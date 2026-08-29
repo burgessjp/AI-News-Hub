@@ -30,6 +30,8 @@
     <string name="common_empty_today">今日暂无内容</string>
     <string name="common_no_result">未找到相关内容</string>
     <string name="common_share">分享</string>
+    <string name="common_copy">复制</string>
+    <string name="common_copied">已复制</string>
     <string name="common_go_settings">去设置</string>
     <string name="common_back_to_top">返回顶部</string>
     <string name="common_all_loaded">已加载全部</string>
