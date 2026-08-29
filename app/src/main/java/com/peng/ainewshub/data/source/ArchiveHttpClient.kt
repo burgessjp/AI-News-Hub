@@ -64,26 +64,22 @@ object ArchiveHttpClient {
      *   <API_BASE>/index.json?ref=news-hub-data          ← 读 index
      *   <API_BASE>/<source>/<date>/<time>-data.json?ref=news-hub-data  ← 读快照
      */
-    private const val API_BASE =
+    private const val DEFAULT_API_BASE =
         "https://api.gitcode.com/api/v5/repos/peng1818/AI-News-Hub-Data/raw"
+
+    /**
+     * 当前生效的 API 基址:生产恒为 [DEFAULT_API_BASE];单测经 [reconfigureForTest]
+     * 指向本地 MockWebServer。因可变,根级文件 URL 不再 const 预拼接,统一经
+     * [rootUrl] 按需拼出。
+     */
+    @Volatile
+    private var apiBase: String = DEFAULT_API_BASE
 
     /** 分支名(API 用 ref 查询参数指定)。 */
     private const val REF = "news-hub-data"
 
-    private const val INDEX_URL = "$API_BASE/index.json?ref=$REF"
-
-    /** 根级独立历史索引(拆出 index.json,内容与原内联字段同构)。 */
-    private const val HISTORY_URL = "$API_BASE/history.json?ref=$REF"
-    private const val OVERVIEW_HISTORY_URL = "$API_BASE/overview_history.json?ref=$REF"
-
-    /** 根级独立趋势文件(拆出 index.json,内容与原内联 latest_trends 字段同构)。 */
-    private const val TRENDS_URL = "$API_BASE/trends.json?ref=$REF"
-
-    /** 根级独立趋势词云文件(专用数据文件,「趋势词云」页按需拉取)。 */
-    private const val TRENDS_CLOUD_URL = "$API_BASE/trends_cloud.json?ref=$REF"
-
-    /** 根级独立趋势历史索引(拆出 index.json,历史热词按日期寻址)。 */
-    private const val TRENDS_HISTORY_URL = "$API_BASE/trends_history.json?ref=$REF"
+    /** 根级文件(index / 历史索引 / 趋势)的完整 URL。 */
+    private fun rootUrl(fileName: String) = "$apiBase/$fileName?ref=$REF"
 
     /** index.json 内存缓存有效期:2 分钟(index 实际几小时才更新一次,短 TTL 足够)。 */
     private const val INDEX_TTL_MS = 2L * 60 * 1000
@@ -138,6 +134,24 @@ object ArchiveHttpClient {
     /** 公开只读离线状态。 */
     val offlineMode: StateFlow<Boolean> = _offlineMode.asStateFlow()
 
+    /**
+     * 单测专用:把 API 基址指向测试服务器(如 MockWebServer)并整体重置内存态,
+     * 保证 object 单例跨用例无残留。生产代码不得调用;各用例在 @Before 中先调本方法。
+     */
+    internal fun reconfigureForTest(baseUrl: String) {
+        apiBase = baseUrl
+        indexCache = null
+        indexCacheAt = 0L
+        snapshotCache.clear()
+        snapshotLocks.clear()
+        historyFileFetcher.clearForTest()
+        overviewHistoryFileFetcher.clearForTest()
+        trendsHistoryFileFetcher.clearForTest()
+        trendsFileFetcher.clearForTest()
+        trendsCloudFileFetcher.clearForTest()
+        _offlineMode.value = false
+    }
+
     // ===== 快照路径缓存 + 同 URL in-flight 去重 =====
     // 快照内容按路径不可变(见 SNAPSHOT_CACHE_LIMIT 注释),缓存命中即零网络。
     // 不同源/不同路径互不阻塞,保持 8 源并发加载;同 URL 并发经 per-key Mutex 去重。
@@ -152,19 +166,19 @@ object ArchiveHttpClient {
     // 拆出 index.json 的历史索引与趋势:更新节奏与 index 相同(每批次),复用同款
     // 2 分钟 TTL + Mutex 并发去重;仅对应页面按需拉取,单文件持有单实例。
 
-    private val historyFileFetcher = CachedFileJson("history.json", HISTORY_URL, "读取历史索引失败")
+    private val historyFileFetcher = CachedFileJson("history.json", "history.json", "读取历史索引失败")
     private val overviewHistoryFileFetcher =
-        CachedFileJson("overview_history.json", OVERVIEW_HISTORY_URL, "读取总览历史索引失败")
+        CachedFileJson("overview_history.json", "overview_history.json", "读取总览历史索引失败")
     private val trendsHistoryFileFetcher =
-        CachedFileJson("trends_history.json", TRENDS_HISTORY_URL, "读取热词历史索引失败")
+        CachedFileJson("trends_history.json", "trends_history.json", "读取热词历史索引失败")
 
     // trends.json 由 write_trends「成功才写」,生成失败的批次会暂缺文件(下次自愈),
     // 404 是正常暂态 → absentAsNull 返回 null(UI 走 NoData 空态);history 两索引
     // 由流水线无条件恒写,404 属异常,应抛错走错误态。trends_cloud.json 与 trends.json
     // 同批生成、同为「成功才写」语义(词云文件写入失败仅告警,热词榜不受影响)。
-    private val trendsFileFetcher = CachedFileJson("trends.json", TRENDS_URL, "读取趋势数据失败", absentAsNull = true)
+    private val trendsFileFetcher = CachedFileJson("trends.json", "trends.json", "读取趋势数据失败", absentAsNull = true)
     private val trendsCloudFileFetcher =
-        CachedFileJson("trends_cloud.json", TRENDS_CLOUD_URL, "读取趋势词云失败", absentAsNull = true)
+        CachedFileJson("trends_cloud.json", "trends_cloud.json", "读取趋势词云失败", absentAsNull = true)
 
     /**
      * 根级独立文件的单实例缓存拉取器(history / overview_history / trends 用)。
@@ -172,7 +186,8 @@ object ArchiveHttpClient {
      * 机制与 fetchIndex 同款:Mutex 串行化 + [INDEX_TTL_MS] 短 TTL 缓存(各文件与
      * index 同批次更新,节奏一致);[force] 语义也与 fetchIndex 一致 —— 绕过 TTL
      * 强制打网络,但保留 [FORCE_FETCH_DEDUP_MS] 锁内去重窗口(趋势 Tab 下拉刷新用;
-     * 历史页无下拉刷新,恒走默认 false)。
+     * 历史页无下拉刷新,恒走默认 false)。URL 持 [fileName] 按需经 [rootUrl] 拼出
+     * (基址运行时可变,见 [reconfigureForTest])。
      *
      * [absentAsNull]:true 时文件 404(尚未生成)返回 null 而非抛错(NoData 语义);
      * false 时 404 与其它失败一样抛 [AppException.Network](错误态语义)。
@@ -180,7 +195,7 @@ object ArchiveHttpClient {
      */
     private class CachedFileJson(
         private val cacheKey: String,
-        private val url: String,
+        private val fileName: String,
         private val hint: String,
         private val absentAsNull: Boolean = false
     ) {
@@ -195,11 +210,17 @@ object ArchiveHttpClient {
             if (c != null && System.currentTimeMillis() - cachedAt < freshWithin) {
                 return@withLock c
             }
-            val parsed = fetchJsonWithDiskFallback(cacheKey, url, hint, tolerateMissing = absentAsNull)
+            val parsed = fetchJsonWithDiskFallback(cacheKey, rootUrl(fileName), hint, tolerateMissing = absentAsNull)
                 ?: return@withLock null
             cached = parsed
             cachedAt = System.currentTimeMillis()
             parsed
+        }
+
+        /** 清空内存缓存(仅 [reconfigureForTest] 使用)。 */
+        fun clearForTest() {
+            cached = null
+            cachedAt = 0L
         }
     }
 
@@ -227,7 +248,7 @@ object ArchiveHttpClient {
         // 2) 走网络刷新(仅一次,并发其余调用在此等待后复用结果;传输层失败读盘兜底)
         //    tolerateMissing=false 时不会返回 null,elvis 仅为类型兜底
         val parsed = fetchJsonWithDiskFallback(
-            "index.json", INDEX_URL, "读取归档索引失败",
+            "index.json", rootUrl("index.json"), "读取归档索引失败",
             allowDiskFallback = allowDiskFallback
         )
             ?: throw AppException.ServerError()
@@ -334,7 +355,7 @@ object ArchiveHttpClient {
      * @param relPath 仓库根相对路径,即 latest_audio.file(如
      *                `audio/2026-08-22/broadcast.mp3`)
      */
-    fun audioUrl(relPath: String): String = "$API_BASE/$relPath?ref=$REF"
+    fun audioUrl(relPath: String): String = "$apiBase/$relPath?ref=$REF"
 
     /**
      * 拉根级独立文件 `trends.json`(跨源热词趋势榜,流水线 trend_keywords.py 在
@@ -444,7 +465,7 @@ object ArchiveHttpClient {
             // 二次检查:等锁期间可能已被同 URL 的并发请求拉完
             snapshotCache[cacheKey]
                 ?: withContext(Dispatchers.IO) {
-                    val snapshotUrl = "$API_BASE/$source/$relPath?ref=$REF"
+                    val snapshotUrl = "$apiBase/$source/$relPath?ref=$REF"
                     val snapshot = fetchJsonWithDiskFallback(cacheKey, snapshotUrl, "读取归档快照失败")
                         ?: throw AppException.NoData()
 

@@ -1,0 +1,49 @@
+{
+ "updated_at": "2026-08-29T11:01:26+0800",
+ "updated_at_ms": 1787972486201,
+ "latest": {
+  "hackernews": "2026-08-29/11-01-data.json",
+  "github-trending": "2026-08-29/11-01-data.json",
+  "stormzhang-ai": "2026-08-29/11-01-data.json",
+  "huggingface-papers": "2026-08-29/11-01-data.json",
+  "producthunt": "2026-08-29/11-01-data.json",
+  "rundown-ai": "2026-08-29/11-01-data.json",
+  "aihot-featured": "2026-08-29/11-01-data.json",
+  "openai-anthropic-news": "2026-08-29/11-01-data.json"
+ },
+ "latest_overview": {
+  "generatedAt": 1787972486201,
+  "dataFetchedAt": 1787972486201,
+  "missingSources": [],
+  "digest": "今日主线集中在AI安全与合规：OpenAI终止与Cursor合作、Anthropic被黑名单裁定违法、Claude自主训练模型缓解对齐失败等事件密集爆发，同时腾讯混元Hy4、GLM-5.3等开源模型发布。开发者需关注AI治理风险与开源模型多元化趋势。",
+  "items": [
+   {
+    "source": "aihot-featured",
+    "title": "Anthropic 让 Claude 自主训练模型以缓解对齐失败",
+    "url": "https://aihot.virxact.com/items/cmtd83hb4018fro667i1tbc34",
+    "metrics": "权重 78 · Anthropic：Research（发表成果 · 网页）",
+    "comment": "Claude自主训练缓解对齐失败，安全研究新范式，或成行业标配。",
+    "breaking": true,
+    "breakingReason": "Anthropic官方研究+AIHot精选，权重78，8-29发布，多家报道。"
+   },
+   {
+    "source": "aihot-featured",
+    "title": "联邦法官裁定特朗普政府将 Anthropic 列入黑名单违法",
+    "url": "https://aihot.virxact.com/items/cmtdbbfo6018arobxq8t77h9x",
+    "metrics": "权重 71 · Ars Technica：AI（RSS）",
+    "comment": "法院裁定黑名单违法，AI监管受挫，企业合规风险需重估。",
+    "breaking": true,
+    "breakingReason": "AIHot权重71+stormzhang报道，8-29，法律裁决影响深远。"
+   }
+  ]
+ },
+ "latest_audio": {
+  "generatedAt": 1787972486201,
+  "voice": "serena",
+  "model": "qwen3-tts-0.6b-customvoice",
+  "file": "audio/2026-08-29/broadcast.mp3",
+  "title": "今日速报",
+  "durationMs": 25920,
+  "bytes": 156044
+ }
+}

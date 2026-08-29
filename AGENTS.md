@@ -7,12 +7,13 @@
 ## 构建
 
 ```bash
-./gradlew assembleDebug        # 日常验证手段（项目无单测、无 lint）
+./gradlew testDebugUnitTest    # 单测（改解析器/纯逻辑/导航序列化必跑，约定见「深入文档」测试篇）
+./gradlew assembleDebug        # 日常编译验证（无 lint、无仪器测试）
 ./gradlew installDebug         # 安装到设备
 ./gradlew assembleRelease      # 需签名配置，见「安全红线」
 ```
 
-**没有单元测试、没有 lint**（`app/src` 下只有 `main`）。改动后至少跑 `assembleDebug` 确认编译通过，再真机手测。工具链版本一律以 `gradle/libs.versions.toml` 为准，不在此重复。
+**无仪器测试、无 lint**（`app/src` 下为 `main` + `test`）。改动后至少跑 `testDebugUnitTest` + `assembleDebug` 确认通过，再真机手测。工具链版本一律以 `gradle/libs.versions.toml` 为准，不在此重复。
 
 ## 编码约定（与默认不同，务必遵守）
 
@@ -32,6 +33,7 @@
 | 文案 / 双语资源 / 语言切换 | [docs/agents/i18n.md](docs/agents/i18n.md) | 双语同步、`AppLocale.kt` 单点机制、流水线内容恒中文 |
 | 数据源 / Repository / 小组件 / 通知 | [docs/agents/data-layer.md](docs/agents/data-layer.md) | 恒定归档不回退实时、归档禁 raw 直链（WAF）、`CHECK_SLOTS` 联动流水线批次、`SourceKeys.kt` 唯一真相源 |
 | DataStore / Room / 缓存 | [docs/agents/persistence.md](docs/agents/persistence.md) | prefs 键清单、favorites 表迁移与清理红线 |
+| 单元测试 / fixture / Robolectric | [docs/agents/testing.md](docs/agents/testing.md) | 必测层清单、fixture 存放与裁剪、object 单例重置 |
 | `scripts/` 流水线 / CI/CD | [docs/agents/pipeline.md](docs/agents/pipeline.md) | 4 个必需环境变量、失败继承语义、日期统一北京时间 |
 
 ## 提交规范

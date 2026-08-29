@@ -83,6 +83,18 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+
+    testOptions {
+        unitTests {
+            // Robolectric 需要读取资源/资产(R.string、assets 下的 readability.js 等)
+            isIncludeAndroidResources = true
+        }
+    }
+}
+
+// Room schema 导出:自 v5 起提交 app/schemas/,是后续迁移测试(MigrationTestHelper)的前提
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 dependencies {
@@ -111,4 +123,10 @@ dependencies {
     implementation(libs.androidx.glance.material3)
 
     implementation(libs.androidx.work.runtime.ktx)
+
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.mockwebserver)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.org.json)
 }

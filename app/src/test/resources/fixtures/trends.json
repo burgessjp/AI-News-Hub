@@ -1,0 +1,86 @@
+{
+ "generatedAt": 1787972551700,
+ "windowDays": 14,
+ "days": [
+  "2026-08-16",
+  "2026-08-17",
+  "2026-08-18",
+  "2026-08-19",
+  "2026-08-20",
+  "2026-08-21",
+  "2026-08-22",
+  "2026-08-23",
+  "2026-08-24",
+  "2026-08-25",
+  "2026-08-26",
+  "2026-08-27",
+  "2026-08-28",
+  "2026-08-29"
+ ],
+ "keywords": [
+  {
+   "term": "agent",
+   "display": "AI Agent",
+   "total": 508,
+   "daysActive": 14,
+   "daily": [
+    32,
+    30,
+    26,
+    38,
+    42,
+    37,
+    35,
+    29,
+    33,
+    36,
+    42,
+    42,
+    43,
+    43
+   ],
+   "trend": "flat",
+   "items": [
+    {
+     "title": "研究论文提出在开放式多智能体环境中实现自主数学发现的方法，AI 代理通过探索与协作自主发现新数学概念与定理。",
+     "url": "https://arxiv.org/abs/2608.23691",
+     "source": "stormzhang-ai",
+     "date": "2026-08-29"
+    }
+   ],
+   "rankChange": 0
+  },
+  {
+   "term": "openai",
+   "display": "OpenAI",
+   "total": 129,
+   "daysActive": 14,
+   "daily": [
+    7,
+    7,
+    12,
+    11,
+    4,
+    3,
+    4,
+    4,
+    4,
+    12,
+    17,
+    12,
+    14,
+    18
+   ],
+   "trend": "up",
+   "items": [
+    {
+     "title": "研究人员在 Excel 和 PowerPoint 文件中发现了 OpenAI 为 ChatGPT 构建的隐藏任务系统。这些文件可携带指令，让 ChatGPT 执行特定操作，引发对提示词注入风险的担忧。",
+     "url": "https://www.reddit.com/r/OpenAI/comments/1w108mr/new_openai_built_a_hidden_task_system_for_chatgpt/",
+     "source": "stormzhang-ai",
+     "date": "2026-08-29"
+    }
+   ],
+   "rankChange": 0
+  }
+ ]
+}

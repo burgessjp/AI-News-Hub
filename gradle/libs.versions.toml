@@ -15,6 +15,11 @@ ksp = "2.0.21-1.0.28"
 reorderable = "0.9.6"
 glance = "1.1.1"
 workmanager = "2.10.0"
+# 单测专用(不进 APK):见 docs/agents/testing.md
+junit = "4.13.2"
+coroutinesTest = "1.9.0"
+robolectric = "4.14.1"
+orgJson = "20240303"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -37,6 +42,12 @@ reorderable = { group = "org.burnoutcrew.composereorderable", name = "reorderabl
 androidx-glance-appwidget = { group = "androidx.glance", name = "glance-appwidget", version.ref = "glance" }
 androidx-glance-material3 = { group = "androidx.glance", name = "glance-material3", version.ref = "glance" }
 androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "workmanager" }
+junit = { group = "junit", name = "junit", version.ref = "junit" }
+kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutinesTest" }
+mockwebserver = { group = "com.squareup.okhttp3", name = "mockwebserver", version.ref = "okhttp" }
+robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
+# 纯 JVM 用例的 org.json 实现(替代 android.jar 桩;Robolectric 用例走 android-all 自带实现)
+org-json = { group = "org.json", name = "json", version.ref = "orgJson" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -1,0 +1,80 @@
+{
+ "source": "github-trending",
+ "fetched_at": "2026-08-29T11:01:26+0800",
+ "fetched_at_ms": 1787972486201,
+ "count": 5,
+ "items": [
+  {
+   "rank": 1,
+   "owner": "tt-a1i",
+   "name": "archify",
+   "url": "https://github.com/tt-a1i/archify",
+   "description": "Agent skill for beautiful, verifiable architecture, workflow, sequence, data-flow, and lifecycle diagrams—self-contained HTML with motion and crisp export.",
+   "language": "JavaScript",
+   "languageColor": "#f1e05a",
+   "totalStars": 27786,
+   "forks": 1759,
+   "starsToday": 4562
+  },
+  {
+   "rank": 2,
+   "owner": "K-Dense-AI",
+   "name": "scientific-agent-skills",
+   "url": "https://github.com/K-Dense-AI/scientific-agent-skills",
+   "description": "Turn any AI agent into an AI Scientist. The #1 Agent Skills library for science, used by 175,000+ scientists worldwide. 163 ready-to-use validated skills plus 100+ scientific databases covering biology, chemistry, medicine, and drug discovery. Compatible with Cursor, Claude Code, Codex, Pi, Antigravity, and the open Agent Skills standard.",
+   "language": "Python",
+   "languageColor": "#3572A5",
+   "totalStars": 36720,
+   "forks": 3491,
+   "starsToday": 720
+  },
+  {
+   "rank": 3,
+   "owner": "anthropics",
+   "name": "claude-plugins-official",
+   "url": "https://github.com/anthropics/claude-plugins-official",
+   "description": "Official, Anthropic-managed directory of high quality Claude Code Plugins.",
+   "language": "Python",
+   "languageColor": "#3572A5",
+   "totalStars": 35064,
+   "forks": 3937,
+   "starsToday": 457
+  },
+  {
+   "rank": 4,
+   "owner": "bilawalsidhu",
+   "name": "gods-eye-view",
+   "url": "https://github.com/bilawalsidhu/gods-eye-view",
+   "description": "A spy satellite simulator in your browser, except the data is real. Live open source spatial intelligence on a photorealistic 3D globe.",
+   "language": "JavaScript",
+   "languageColor": "#f1e05a",
+   "totalStars": 11194,
+   "forks": 2271,
+   "starsToday": 3829
+  },
+  {
+   "rank": 5,
+   "owner": "abhigyanpatwari",
+   "name": "GitNexus",
+   "url": "https://github.com/abhigyanpatwari/GitNexus",
+   "description": "GitNexus: The Zero-Server Code Intelligence Engine - GitNexus is a client-side knowledge graph creator that runs entirely in your browser. Drop in a git repository (Github, Gitlab, Azure, Local) or ZIP file, and get an interactive knowledge graph with a built in Graph RAG Agent. Perfect for code exploration",
+   "language": "TypeScript",
+   "languageColor": "#3178c6",
+   "totalStars": 46176,
+   "forks": 5103,
+   "starsToday": 202
+  }
+ ],
+ "ai_summary_v2": [
+  {
+   "title": "tt-a1i/archify（一键生成可验证架构图的 Agent 技能）",
+   "desc": "为 AI 代理提供生成架构、工作流、时序、数据流和生命周期图的能力，输出自带动效且可导出的自包含 HTML。今日新增 4562 星，说明开发者对可视化架构文档与 AI 协作的需求正在爆发。",
+   "url": "https://github.com/tt-a1i/archify"
+  },
+  {
+   "title": "bilawalsidhu/gods-eye-view（浏览器中的实时卫星影像模拟器）",
+   "desc": "在逼真的 3D 地球上展示真实开源空间数据，让用户像间谍卫星一样俯瞰全球。今日新增 3829 星，热度极高，适合地理信息爱好者、教育演示和空间智能研究。",
+   "url": "https://github.com/bilawalsidhu/gods-eye-view"
+  }
+ ]
+}
