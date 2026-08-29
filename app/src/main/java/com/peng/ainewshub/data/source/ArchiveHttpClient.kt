@@ -1,261 +1,111 @@
 package com.peng.ainewshub.data.source
 
 import com.peng.ainewshub.data.AppException
-import com.peng.ainewshub.data.net.HttpClients
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import okhttp3.Cookie
-import okhttp3.CookieJar
-import okhttp3.HttpUrl
-import okhttp3.Request
 import org.json.JSONObject
-import java.io.IOException
-import androidx.compose.runtime.getValue
-import java.util.concurrent.ConcurrentHashMap
 
 /**
- * gitcode 归档数据 HTTP 客户端 —— 各 Archive Repository / SummaryRepository / OverviewRepository 共用。
+ * gitcode 归档数据 HTTP 客户端(门面) —— 各 Archive Repository / SummaryRepository /
+ * OverviewRepository / TrendsRepository / BroadcastRepository 共用的唯一入口。
  *
  * 数据仓库:https://gitcode.com/peng1818/AI-News-Hub-Data
  * 分支:news-hub-data
- * 端点:gitcode 官方 REST API 的 raw 文件接口(见 [API_BASE])
  *
  * 取数流程(对齐 docs/news-hub-data-usage.md):
  *  1. GET `index.json?ref=news-hub-data` → 读 `latest.<source>` 拿最新快照路径
  *     (index 只含即时字段:updated_at / latest / latest_overview / latest_audio)
- *  2. 拼 `<API_BASE>/<source>/<相对路径>?ref=news-hub-data` GET 该快照 JSON
+ *  2. 拼 `<source>/<相对路径>?ref=news-hub-data` GET 该快照 JSON
  *  3. 解析顶层 `fetched_at_ms` 与 `items[]`,交由各 Repository 做字段映射
  *  4. 按需另拉根级独立文件:趋势 `trends.json`(趋势 Tab)与历史索引
  *     `history.json`(历史摘要)/ `overview_history.json`(历史总览)——均已拆出
  *     index.json,不随保留期增长,未用到对应页面的 tab 不必下载
  *
- * 缓存与刷新:index.json 有 2 分钟内存缓存(多源并发去重,见 fetchIndex);快照本体
- * 按路径缓存(内容不可变,见 fetchSnapshot)+ 同 URL in-flight 去重,重进 tab 不重复下载。
- * 手动刷新(根 Tab 下拉)经 force=true 绕过 index 缓存,保证流水线刚推送时立即可见
- * (锁内秒级去重窗口把同一波并发 force 收敛为 1 次网络);自动加载/重击 tab 走缓存
- * (2 分钟外自然失效)。
+ * 内部组件(2026-08-29 拆分,公共 API 保持逐字不变):
+ *  - [ArchiveEndpoints]:端点拼接与基址唯一可变点(单测指向 MockWebServer)
+ *  - [ArchiveFetcher]:网络 + 磁盘兜底骨架 + [offlineMode] 离线状态
+ *  - [ArchiveJsonCache]:index 与根级文件的 TTL 缓存 + Mutex 并发去重
+ *  - [ArchiveSnapshotCache]:快照路径缓存 + 同 URL in-flight 去重
+ *
+ * 缓存与刷新:index 与各根级文件有 2 分钟内存缓存(多源并发去重);快照本体按路径
+ * 缓存(内容不可变)。手动刷新(根 Tab 下拉)经 force=true 绕过 TTL,锁内秒级
+ * 去重窗口把同一波并发 force 收敛为 1 次网络请求;自动加载/重击 tab 走缓存。
+ * 断网兜底:仅传输层失败读盘([ArchiveDiskCache],7 天时效,write-through 落盘),
+ * HTTP 层错误不兜底直接走 Error 态 —— 盘上旧数据不能冒充最新数据。
  * 任一步失败(HTTP 错误 / index 无该源 / items 为空)抛 RuntimeException,
- * 交由 ViewModel 显示 Error 态(归档模式明确提示,不回退实时)。
- *
- * 断网兜底:index / 快照 / 根级文件网络成功后均 write-through 落盘
- * ([ArchiveDiskCache],cacheDir/archives/);传输层失败(IOException:连不上/DNS/
- * 读超时)时先读盘,命中且未超 7 天时效则置 [offlineMode] 为 true 并返回盘上
- * 旧数据(各 Repository 签名零改动),未命中才照常抛错。HTTP 层错误(4xx/5xx/
- * 空响应)是服务端已应答,不兜底、直接走 Error 态 —— 盘上旧数据不能冒充最新
- * 数据。列表页自带的「数据更新时间」头可让用户感知数据新旧。
- *
- * 走 gitcode 官方 REST API(api.gitcode.com/api/v5/.../raw/)而非 raw 直链:
- * raw.gitcode.com 背后是华为云 WAF,部分网络环境(数据中心/特定地区 IP)被拦 403;
- * 官方 API 走独立服务,公开仓库匿名可读,稳定性更好(实测连发无 403)。
- *
- * 客户端配置对齐 App 其余 Repository:connect 15s / read 20s / 跟随重定向。
- * cookieJar 保留:API 端也可能下发会话 cookie,带上无害且降低潜在限流概率。
+ * 交由 ViewModel 显示 Error 态。
  */
 object ArchiveHttpClient {
 
-    /**
-     * gitcode 官方 API 的 raw 文件端点根(分支 news-hub-data)。
-     * 完整 URL 形如:
-     *   <API_BASE>/index.json?ref=news-hub-data          ← 读 index
-     *   <API_BASE>/<source>/<date>/<time>-data.json?ref=news-hub-data  ← 读快照
-     */
-    private const val DEFAULT_API_BASE =
-        "https://api.gitcode.com/api/v5/repos/peng1818/AI-News-Hub-Data/raw"
+    private val indexCache = ArchiveJsonCache(
+        fetcher = ArchiveFetcher,
+        cacheKey = "index.json",
+        url = { ArchiveEndpoints.rootUrl("index.json") },
+        hint = "读取归档索引失败"
+    )
 
-    /**
-     * 当前生效的 API 基址:生产恒为 [DEFAULT_API_BASE];单测经 [reconfigureForTest]
-     * 指向本地 MockWebServer。因可变,根级文件 URL 不再 const 预拼接,统一经
-     * [rootUrl] 按需拼出。
-     */
-    @Volatile
-    private var apiBase: String = DEFAULT_API_BASE
+    /** 根级独立历史索引(拆出 index.json,内容与原内联字段同构)。 */
+    private val historyFileCache = ArchiveJsonCache(
+        fetcher = ArchiveFetcher,
+        cacheKey = "history.json",
+        url = { ArchiveEndpoints.rootUrl("history.json") },
+        hint = "读取历史索引失败"
+    )
 
-    /** 分支名(API 用 ref 查询参数指定)。 */
-    private const val REF = "news-hub-data"
+    private val overviewHistoryFileCache = ArchiveJsonCache(
+        fetcher = ArchiveFetcher,
+        cacheKey = "overview_history.json",
+        url = { ArchiveEndpoints.rootUrl("overview_history.json") },
+        hint = "读取总览历史索引失败"
+    )
 
-    /** 根级文件(index / 历史索引 / 趋势)的完整 URL。 */
-    private fun rootUrl(fileName: String) = "$apiBase/$fileName?ref=$REF"
+    private val trendsHistoryFileCache = ArchiveJsonCache(
+        fetcher = ArchiveFetcher,
+        cacheKey = "trends_history.json",
+        url = { ArchiveEndpoints.rootUrl("trends_history.json") },
+        hint = "读取热词历史索引失败"
+    )
 
-    /** index.json 内存缓存有效期:2 分钟(index 实际几小时才更新一次,短 TTL 足够)。 */
-    private const val INDEX_TTL_MS = 2L * 60 * 1000
+    // trends.json 由 write_trends「成功才写」,生成失败的批次会暂缺文件(下次自愈),
+    // 404 是正常暂态 → absentAsNull 返回 null(UI 走 NoData 空态);history 两索引
+    // 由流水线无条件恒写,404 属异常,应抛错走错误态。trends_cloud.json 与 trends.json
+    // 同批生成、同为「成功才写」语义(词云文件写入失败仅告警,热词榜不受影响)。
+    private val trendsFileCache = ArchiveJsonCache(
+        fetcher = ArchiveFetcher,
+        cacheKey = "trends.json",
+        url = { ArchiveEndpoints.rootUrl("trends.json") },
+        hint = "读取趋势数据失败",
+        absentAsNull = true
+    )
 
-    /**
-     * force 请求的锁内去重窗口:摘要页下拉刷新对 8 个源并发 force,在 Mutex 上排队;
-     * 首个请求打完网络后,等待者在此窗口内直接复用刚刷新的 index,不再逐个真打
-     * (否则一次下拉 = 串行下载 8 次 index.json)。窗口只需覆盖「首个完成 → 等待者
-     * 依次获锁醒来」的毫秒级间隙,2s 已很宽裕 —— 不能放宽,否则用户进 tab 后几秒内
-     * 的手动下拉刷新会被吞掉(瞬间返回旧缓存,刷新形同未触发)。
-     */
-    private const val FORCE_FETCH_DEDUP_MS = 2_000L
+    private val trendsCloudFileCache = ArchiveJsonCache(
+        fetcher = ArchiveFetcher,
+        cacheKey = "trends_cloud.json",
+        url = { ArchiveEndpoints.rootUrl("trends_cloud.json") },
+        hint = "读取趋势词云失败",
+        absentAsNull = true
+    )
 
-    /**
-     * 快照内存缓存条数上限:覆盖 latest 8 源 + 一页历史摘要(8+8)。
-     * 快照内容按路径不可变(路径含日期+时间,流水线只追加不覆写),无需 TTL;
-     * 超限时淘汰任意一条,仅作内存容量护栏(非严格 LRU,单条数百 KB 级)。
-     */
-    private const val SNAPSHOT_CACHE_LIMIT = 16
+    private val snapshotCache = ArchiveSnapshotCache(ArchiveFetcher)
 
-    private val client by lazy {
-        // 共享 base 派生:连接池/线程池与全 App 复用,仅覆盖 cookieJar
-        HttpClients.base.newBuilder()
-            // gitcode raw 背后是华为云 WAF,会下发 HWWAFSESID 等会话 cookie;不带 cookie
-            // 的裸请求容易被 WAF 判为可疑流量返回 403。配 cookieJar 让客户端像浏览器一样
-            // 记住并回传会话 cookie,降低被拦概率。内存存储(进程级,随 App 生命周期)。
-            .cookieJar(InMemoryCookieJar())
-            .build()
-    }
-
-    // ===== index.json 并发去重 + 短 TTL 缓存 =====
-    // 4 个归档源同时加载时,各自都要先读 index.json 拿最新路径。若无去重,会发 4 次
-    // 完全相同的 index 请求(文档明确建议「不要高频轮询」)。这里用 Mutex + 内存缓存:
-    //  1. 命中未过期缓存 → 直接复用,不打网络(4 个源共享一份)
-    //  2. 否则进 Mutex,串行化网络刷新(并发调用只触发 1 次真实请求,其余等待复用)
-    // 对齐 App 现有实时 Repository 的 Mutex.withLock 套路。TTL 2 分钟(index 几小时才更新一次)。
-
-    /** index.json 缓存:解析后的 JSON + 落盘时刻(毫秒)。null 表示无缓存。 */
-    private var indexCache: JSONObject? = null
-    private var indexCacheAt: Long = 0L
-
-    /** 串行化 index 刷新,避免并发重复打网络。 */
-    private val indexMutex = Mutex()
-
-    /**
-     * 离线兜底状态(进程内):true = 最近一次取数走了盘上旧数据(网络失败但兜底命中)。
-     * 任一请求网络成功后复位为 false。UI(AiNewsHubApp)订阅它在离线切换时提示用户
-     * 「正在展示缓存数据」。进程级内存态,不做持久化。
-     */
-    private val _offlineMode = MutableStateFlow(false)
-
-    /** 公开只读离线状态。 */
-    val offlineMode: StateFlow<Boolean> = _offlineMode.asStateFlow()
+    /** 公开只读离线状态(UI 订阅,断网切换时提示「正在展示缓存数据」)。 */
+    val offlineMode: StateFlow<Boolean> get() = ArchiveFetcher.offlineMode
 
     /**
      * 单测专用:把 API 基址指向测试服务器(如 MockWebServer)并整体重置内存态,
      * 保证 object 单例跨用例无残留。生产代码不得调用;各用例在 @Before 中先调本方法。
      */
     internal fun reconfigureForTest(baseUrl: String) {
-        apiBase = baseUrl
-        indexCache = null
-        indexCacheAt = 0L
-        snapshotCache.clear()
-        snapshotLocks.clear()
-        historyFileFetcher.clearForTest()
-        overviewHistoryFileFetcher.clearForTest()
-        trendsHistoryFileFetcher.clearForTest()
-        trendsFileFetcher.clearForTest()
-        trendsCloudFileFetcher.clearForTest()
-        _offlineMode.value = false
-    }
-
-    // ===== 快照路径缓存 + 同 URL in-flight 去重 =====
-    // 快照内容按路径不可变(见 SNAPSHOT_CACHE_LIMIT 注释),缓存命中即零网络。
-    // 不同源/不同路径互不阻塞,保持 8 源并发加载;同 URL 并发经 per-key Mutex 去重。
-
-    /** 快照缓存:source/relPath → 解析后的 JSON(只读共享)。 */
-    private val snapshotCache = ConcurrentHashMap<String, JSONObject>()
-
-    /** in-flight 去重锁:同 URL 并发只打 1 次网络,其余等锁后复用缓存。 */
-    private val snapshotLocks = ConcurrentHashMap<String, Mutex>()
-
-    // ===== 根级独立索引/内容文件(history.json / overview_history.json / trends.json / trends_history.json)=====
-    // 拆出 index.json 的历史索引与趋势:更新节奏与 index 相同(每批次),复用同款
-    // 2 分钟 TTL + Mutex 并发去重;仅对应页面按需拉取,单文件持有单实例。
-
-    private val historyFileFetcher = CachedFileJson("history.json", "history.json", "读取历史索引失败")
-    private val overviewHistoryFileFetcher =
-        CachedFileJson("overview_history.json", "overview_history.json", "读取总览历史索引失败")
-    private val trendsHistoryFileFetcher =
-        CachedFileJson("trends_history.json", "trends_history.json", "读取热词历史索引失败")
-
-    // trends.json 由 write_trends「成功才写」,生成失败的批次会暂缺文件(下次自愈),
-    // 404 是正常暂态 → absentAsNull 返回 null(UI 走 NoData 空态);history 两索引
-    // 由流水线无条件恒写,404 属异常,应抛错走错误态。trends_cloud.json 与 trends.json
-    // 同批生成、同为「成功才写」语义(词云文件写入失败仅告警,热词榜不受影响)。
-    private val trendsFileFetcher = CachedFileJson("trends.json", "trends.json", "读取趋势数据失败", absentAsNull = true)
-    private val trendsCloudFileFetcher =
-        CachedFileJson("trends_cloud.json", "trends_cloud.json", "读取趋势词云失败", absentAsNull = true)
-
-    /**
-     * 根级独立文件的单实例缓存拉取器(history / overview_history / trends 用)。
-     *
-     * 机制与 fetchIndex 同款:Mutex 串行化 + [INDEX_TTL_MS] 短 TTL 缓存(各文件与
-     * index 同批次更新,节奏一致);[force] 语义也与 fetchIndex 一致 —— 绕过 TTL
-     * 强制打网络,但保留 [FORCE_FETCH_DEDUP_MS] 锁内去重窗口(趋势 Tab 下拉刷新用;
-     * 历史页无下拉刷新,恒走默认 false)。URL 持 [fileName] 按需经 [rootUrl] 拼出
-     * (基址运行时可变,见 [reconfigureForTest])。
-     *
-     * [absentAsNull]:true 时文件 404(尚未生成)返回 null 而非抛错(NoData 语义);
-     * false 时 404 与其它失败一样抛 [AppException.Network](错误态语义)。
-     * 网络失败时经 [fetchJsonWithDiskFallback] 读盘兜底(同 index / 快照)。
-     */
-    private class CachedFileJson(
-        private val cacheKey: String,
-        private val fileName: String,
-        private val hint: String,
-        private val absentAsNull: Boolean = false
-    ) {
-
-        private val mutex = Mutex()
-        private var cached: JSONObject? = null
-        private var cachedAt: Long = 0L
-
-        suspend fun fetch(force: Boolean = false): JSONObject? = mutex.withLock {
-            val c = cached
-            val freshWithin = if (force) FORCE_FETCH_DEDUP_MS else INDEX_TTL_MS
-            if (c != null && System.currentTimeMillis() - cachedAt < freshWithin) {
-                return@withLock c
-            }
-            val parsed = fetchJsonWithDiskFallback(cacheKey, rootUrl(fileName), hint, tolerateMissing = absentAsNull)
-                ?: return@withLock null
-            cached = parsed
-            cachedAt = System.currentTimeMillis()
-            parsed
-        }
-
-        /** 清空内存缓存(仅 [reconfigureForTest] 使用)。 */
-        fun clearForTest() {
-            cached = null
-            cachedAt = 0L
-        }
-    }
-
-    /**
-     * 拉 index.json(带 2 分钟缓存 + 并发去重)。
-     *
-     * @param force true 时绕过 TTL 强制打网络(手动刷新路径);并发去重的 Mutex 仍生效,
-     *              且锁内做短窗口二次校验 —— 排队等锁期间 index 已被首个 force 刷新过
-     *              则直接复用,同一波并发 force 收敛为 1 次网络请求
-     * @param allowDiskFallback false(networkOnly 探测,见 [fetchLatestOverview])时:
-     *              跳过内存缓存早退(缓存里可能混有断网时读盘写入的旧 index),传输层
-     *              失败也不读盘兜底,保证「要么真实网络数据、要么失败」
-     * @return 解析后的 index JSON;读取或解析失败抛 RuntimeException
-     */
-    private suspend fun fetchIndex(force: Boolean = false, allowDiskFallback: Boolean = true): JSONObject = indexMutex.withLock {
-        // 1) 命中缓存:非 force 看 2 分钟 TTL;force 只看秒级去重窗口
-        //    (等待锁期间已被刷新 → 复用,不重复打网络)。networkOnly 探测完全跳过。
-        if (allowDiskFallback) {
-            val cached = indexCache
-            val freshWithin = if (force) FORCE_FETCH_DEDUP_MS else INDEX_TTL_MS
-            if (cached != null && System.currentTimeMillis() - indexCacheAt < freshWithin) {
-                return@withLock cached
-            }
-        }
-        // 2) 走网络刷新(仅一次,并发其余调用在此等待后复用结果;传输层失败读盘兜底)
-        //    tolerateMissing=false 时不会返回 null,elvis 仅为类型兜底
-        val parsed = fetchJsonWithDiskFallback(
-            "index.json", rootUrl("index.json"), "读取归档索引失败",
-            allowDiskFallback = allowDiskFallback
-        )
-            ?: throw AppException.ServerError()
-        indexCache = parsed
-        indexCacheAt = System.currentTimeMillis()
-        parsed
+        ArchiveEndpoints.resetForTest()
+        ArchiveEndpoints.apiBase = baseUrl
+        indexCache.clearForTest()
+        historyFileCache.clearForTest()
+        overviewHistoryFileCache.clearForTest()
+        trendsHistoryFileCache.clearForTest()
+        trendsFileCache.clearForTest()
+        trendsCloudFileCache.clearForTest()
+        snapshotCache.clearForTest()
     }
 
     /**
@@ -265,7 +115,7 @@ object ArchiveHttpClient {
      * @return 该源最新快照的 JSON 对象;index 无该源或快照缺失抛 RuntimeException
      */
     suspend fun fetchLatestSnapshot(source: String, force: Boolean = false): JSONObject = withContext(Dispatchers.IO) {
-        // 1) 读 index.json(带 2 分钟缓存 + 并发去重,force 绕过 TTL,见 fetchIndex)拿最新路径
+        // 1) 读 index.json(带缓存 + 并发去重,force 绕过 TTL)拿最新路径
         val index = fetchIndex(force)
         val latest = index.optJSONObject("latest")
             ?: throw AppException.ServerError()
@@ -308,9 +158,9 @@ object ArchiveHttpClient {
     }
 
     /**
-     * 读 index.json 的 latest 指针表(与快照共享 2 分钟缓存),返回 source → 相对路径。
-     * 供 OverviewRepository 计算数据指纹(路径含日期+时间,数据更新即变化)——只读指针,
-     * 不拉快照本体。index 无 latest 字段时返回空 map。
+     * 读 index.json 的 latest 指针表(与快照共享缓存),返回 source → 相对路径。
+     * 供 SourceFreshness 计算各源数据指纹(路径含日期+时间,数据更新即变化)
+     * ——只读指针,不拉快照本体。index 无 latest 字段时返回空 map。
      */
     suspend fun fetchLatestPaths(): Map<String, String> = withContext(Dispatchers.IO) {
         val index = fetchIndex()
@@ -325,17 +175,18 @@ object ArchiveHttpClient {
 
     /**
      * 读 index.json 顶层的 `latest_overview` 字段(今日总览,流水线预生成的跨源综合分析)。
-     * 与 latest/history 共享 2 分钟缓存。字段缺失或无 items 时返回 null
+     * 与 latest/history 共享缓存。字段缺失或无 items 时返回 null
      * (语义:今日总览尚未生成,UI 走 NoData 态)。OverviewRepository 据此反序列化为 OverviewDigest。
      *
-     * @param force true 绕过 2 分钟缓存(手动刷新路径)
+     * @param force true 绕过缓存(手动刷新路径)
      * @param networkOnly true 时为「网络探测」语义(每日更新 Worker / 冷启动新数据弹窗):
      *        跳过内存缓存与磁盘兜底,必须真实打网络,传输层/HTTP/解析失败一律抛 ——
      *        调用方拿失败当信号(档内补查/放弃弹窗),绝不能把盘上旧数据当成新批次。
      *        总览 Tab / 小组件等展示路径不要传(需要断网兜底)。
      */
     suspend fun fetchLatestOverview(force: Boolean = false, networkOnly: Boolean = false): JSONObject? = withContext(Dispatchers.IO) {
-        fetchIndex(force, allowDiskFallback = !networkOnly).optJSONObject("latest_overview")?.takeIf { it.has("items") }
+        fetchIndex(force, allowDiskFallback = !networkOnly).optJSONObject("latest_overview")
+            ?.takeIf { it.has("items") }
     }
 
     /**
@@ -350,13 +201,13 @@ object ArchiveHttpClient {
     }
 
     /**
-     * 预生成音频文件的 CDN 直读 URL(与 [fetchSnapshot] 的 REST API raw 端点同拼法;
+     * 预生成音频文件的直读 URL(与快照的 REST API raw 端点同拼法;
      * 播放走 MediaPlayer 流式拉取,不经本客户端的 JSON 解析链路)。
      *
      * @param relPath 仓库根相对路径,即 latest_audio.file(如
      *                `audio/2026-08-22/broadcast.mp3`)
      */
-    fun audioUrl(relPath: String): String = "$apiBase/$relPath?ref=$REF"
+    fun audioUrl(relPath: String): String = ArchiveEndpoints.rootUrl(relPath.removePrefix("/"))
 
     /**
      * 拉根级独立文件 `trends.json`(跨源热词趋势榜,流水线 trend_keywords.py 在
@@ -367,34 +218,34 @@ object ArchiveHttpClient {
      * 返回 null;文件存在但无 keywords 同样返回 null(语义均为「趋势尚未生成」,
      * UI 走 NoData 空态)。其余网络/解析失败照常抛错(UI 错误态)。
      *
-     * @param force true 绕过缓存(趋势 Tab 下拉刷新;锁内秒级去重窗口与 fetchIndex 同款)
+     * @param force true 绕过缓存(趋势 Tab 下拉刷新;锁内秒级去重窗口同 index)
      */
     suspend fun fetchLatestTrends(force: Boolean = false): JSONObject? = withContext(Dispatchers.IO) {
-        trendsFileFetcher.fetch(force)?.takeIf { it.has("keywords") }
+        trendsFileCache.fetch(force)?.takeIf { it.has("keywords") }
     }
 
     /**
      * 拉根级独立文件 `trends_cloud.json`(趋势词云,流水线 trend_keywords.py 与
      * trends.json 同批生成的纯统计词云候选;专用数据文件,不进按日归档)。
-     * 独立 2 分钟缓存 + 并发去重,与 index / trends 互不影响——未进词云页不下载。
+     * 独立缓存 + 并发去重,与 index / trends 互不影响——未进词云页不下载。
      *
      * 与 [fetchLatestTrends] 同款「成功才写」语义:404(尚未生成)或无 words 数组
      * 返回 null(UI 走 NoData 空态);其余网络/解析失败照常抛错(UI 错误态)。
      */
     suspend fun fetchTrendsCloud(): JSONObject? = withContext(Dispatchers.IO) {
-        trendsCloudFileFetcher.fetch()?.takeIf { it.has("words") }
+        trendsCloudFileCache.fetch()?.takeIf { it.has("words") }
     }
 
     /**
      * 读根级独立索引文件 `history.json`(拆出 index.json,历史摘要按日期寻址用)。
-     * 自带 2 分钟缓存 + 并发去重,与 index 互不影响(未进历史页的 tab 不下载本文件)。
+     * 自带缓存 + 并发去重,与 index 互不影响(未进历史页的 tab 不下载本文件)。
      *
      * @return source → (date → 相对源目录的快照路径);由流水线每次运行时合并写入,
      * 每源仅保留最近 31 天且自 2026-07-18 起;文件存在但为空对象时返回空 map(UI 空态)。
      * 本文件由流水线无条件恒写,404/拉取失败属异常 → 抛错(UI 错误态)
      */
     suspend fun fetchHistory(): Map<String, Map<String, String>> = withContext(Dispatchers.IO) {
-        val history = historyFileFetcher.fetch() ?: throw AppException.Network()
+        val history = historyFileCache.fetch() ?: throw AppException.Network()
         val result = mutableMapOf<String, Map<String, String>>()
         history.keys().forEach { source ->
             val dates = history.optJSONObject(source) ?: return@forEach
@@ -410,7 +261,7 @@ object ArchiveHttpClient {
 
     /**
      * 读根级独立索引文件 `overview_history.json`(拆出 index.json,历史总览按日期寻址)。
-     * 自带 2 分钟缓存 + 并发去重。
+     * 自带缓存 + 并发去重。
      *
      * @return date → 相对 overview/ 目录的归档文件路径(形如 `2026-08-15/11-49-data.json`,
      *         取当日最后一次批次)。由流水线每次运行时合并写入,仅保留最近 90 天;
@@ -418,7 +269,7 @@ object ArchiveHttpClient {
      *         404/拉取失败属异常 → 抛错(UI 错误态)
      */
     suspend fun fetchOverviewHistory(): Map<String, String> = withContext(Dispatchers.IO) {
-        val history = overviewHistoryFileFetcher.fetch() ?: throw AppException.Network()
+        val history = overviewHistoryFileCache.fetch() ?: throw AppException.Network()
         val result = mutableMapOf<String, String>()
         history.keys().forEach { date ->
             val rel = history.optString(date)
@@ -429,7 +280,7 @@ object ArchiveHttpClient {
 
     /**
      * 读根级独立索引文件 `trends_history.json`(拆出 index.json,历史热词按日期寻址)。
-     * 自带 2 分钟缓存 + 并发去重。
+     * 自带缓存 + 并发去重。
      *
      * @return date → 相对 trends/ 目录的归档文件路径(形如 `2026-08-15/18-00-data.json`,
      *         取当日最后一次批次)。由流水线逐批次合并写入,仅保留最近 90 天;
@@ -437,7 +288,7 @@ object ArchiveHttpClient {
      *         404/拉取失败属异常 → 抛错(UI 错误态)
      */
     suspend fun fetchTrendsHistory(): Map<String, String> = withContext(Dispatchers.IO) {
-        val history = trendsHistoryFileFetcher.fetch() ?: throw AppException.Network()
+        val history = trendsHistoryFileCache.fetch() ?: throw AppException.Network()
         val result = mutableMapOf<String, String>()
         history.keys().forEach { date ->
             val rel = history.optString(date)
@@ -448,8 +299,8 @@ object ArchiveHttpClient {
 
     /**
      * 按相对路径拉归档文件,返回解析后的顶层 JSON(历史日期寻址入口)。
-     * 带 source/relPath 路径缓存(内容不可变)与同 URL in-flight 去重:2 分钟内重进
-     * tab / 历史日期页来回翻不再重复下载同一归档。
+     * 带路径缓存(内容不可变)与同 URL in-flight 去重:重进 tab / 历史日期页
+     * 来回翻不再重复下载同一归档。
      *
      * @param source 目录标识(源目录 / `overview` / `trends`)
      * @param relPath 相对该目录的归档文件路径(形如 `2026-07-19/10-12-data.json`,
@@ -458,149 +309,14 @@ object ArchiveHttpClient {
      *                `keywords`(字段缺失或为空视为无数据,抛 [AppException.NoData])
      * @return 该归档文件的 JSON 对象
      */
-    suspend fun fetchSnapshot(source: String, relPath: String, arrayField: String = "items"): JSONObject {
-        val cacheKey = "$source/$relPath"
-        snapshotCache[cacheKey]?.let { return it }
-        val lock = snapshotLocks.computeIfAbsent(cacheKey) { Mutex() }
-        val snapshot = lock.withLock {
-            // 二次检查:等锁期间可能已被同 URL 的并发请求拉完
-            snapshotCache[cacheKey]
-                ?: withContext(Dispatchers.IO) {
-                    val snapshotUrl = "$apiBase/$source/$relPath?ref=$REF"
-                    val snapshot = fetchJsonWithDiskFallback(cacheKey, snapshotUrl, "读取归档快照失败")
-                        ?: throw AppException.NoData()
-
-                    // 顶级内容数组为空视为无数据(失败不缓存,下次重试)
-                    val arr = snapshot.optJSONArray(arrayField)
-                    if (arr == null || arr.length() == 0) {
-                        throw AppException.NoData()
-                    }
-                    snapshot
-                }.also {
-                    snapshotCache[cacheKey] = it
-                    if (snapshotCache.size > SNAPSHOT_CACHE_LIMIT) {
-                        snapshotCache.keys.firstOrNull()?.let { eldest -> snapshotCache.remove(eldest) }
-                    }
-                }
-        }
-        // 清掉 in-flight 锁:已拿引用的等待者仍会正常获锁并命中二次检查;
-        // 后续新调用要么命中缓存,要么建新锁,均无死锁
-        snapshotLocks.remove(cacheKey)
-        return snapshot
-    }
+    suspend fun fetchSnapshot(source: String, relPath: String, arrayField: String = "items"): JSONObject =
+        snapshotCache.fetch(source, relPath, arrayField)
 
     /**
-     * 网络取 JSON + 磁盘兜底的统一骨架(fetchIndex / fetchSnapshot / 根级独立文件共用):
-     *  1. 网络成功 → 解析 → write-through 落盘(静默失败)→ 复位 [offlineMode]
-     *  2. 传输层失败([IOException]:连不上/DNS/读超时)→ 读盘兜底:命中且未过期
-     *     ([ArchiveDiskCache] 7 天 TTL)则置 [offlineMode] 为 true 并返回盘上旧数据;
-     *     未命中或盘上数据损坏则抛回原异常(走原错误态)
-     *  3. [tolerateMissing] 语义不变:404 返回 null,不落盘也不兜底(「成功才写」的
-     *     文件尚未生成时盘上本就不会有)
-     *
-     * 不兜底的失败:HTTP 层错误(非 2xx、空响应,服务端已应答)抛 [AppException.Network]、
-     * 解析失败抛 [AppException.ServerError] —— 服务端故障不能伪装成「离线」拿旧数据
-     * 顶上,须如实走 Error 态。
-     *
-     * [allowDiskFallback] 为 false(通知自查/冷启动弹窗的 networkOnly 探测)时:
-     * 传输层失败也不读盘,直接抛 —— 调用方拿「失败」当信号走补查/放弃,绝不把盘上
-     * 旧数据当成新批次。
-     *
-     * @param cacheKey 磁盘缓存键(与内存缓存同键:index.json / source/relPath / 根级文件名)
+     * 拉 index.json(带缓存与并发去重;force/networkOnly 语义见 [ArchiveJsonCache.fetch])。
+     * tolerateMissing=false 时不会返回 null,elvis 仅为类型兜底。
      */
-    private suspend fun fetchJsonWithDiskFallback(
-        cacheKey: String,
-        url: String,
-        hint: String,
-        tolerateMissing: Boolean = false,
-        allowDiskFallback: Boolean = true
-    ): JSONObject? {
-        val text = try {
-            getRaw(url, hint, tolerateMissing) ?: return null
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: IOException) {
-            // 传输层失败(连不上):读盘兜底(盘上是上次网络成功时落下的旧数据);
-            // networkOnly 探测不兜底,失败即抛
-            if (!allowDiskFallback) throw e
-            val disk = withContext(Dispatchers.IO) { ArchiveDiskCache.read(cacheKey) }
-                ?: throw e
-            return runCatching { JSONObject(disk) }
-                .map { parsed -> parsed.also { _offlineMode.value = true } }
-                .getOrElse { throw e }
-        }
-        // AppException(HTTP 错误/空响应)与其他非预期异常不捕获,直接向上抛
-        val parsed = runCatching { JSONObject(text) }
-            .getOrElse { throw AppException.ServerError() }
-        withContext(Dispatchers.IO) { ArchiveDiskCache.write(cacheKey, text) }
-        _offlineMode.value = false
-        return parsed
-    }
-
-    /**
-     * GET 一个 URL,返回响应正文;非 2xx 或空响应抛 [AppException.Network]。
-     * [hint] 仅用于日志诊断(toUiError 会把原始异常记入 logcat)。
-     *
-     * [tolerateMissing] 为 true 时 404 → null(语义:文件尚未生成,调用方走 NoData;
-     * 仅 trends.json 的「成功才写」暂态语义用),其余非 2xx 照常抛错。
-     *
-     * suspend 自管 [Dispatchers.IO]:所有调用方(含 [fetchIndex] 的 Mutex 锁内)
-     * 均无需再外层切 IO,与 [HttpClients.get] 行为一致。
-     */
-    private suspend fun getRaw(
-        url: String,
-        @Suppress("UNUSED_PARAMETER") hint: String,
-        tolerateMissing: Boolean = false
-    ): String? = withContext(Dispatchers.IO) {
-        val req = Request.Builder()
-            .url(url)
-            .header("User-Agent", HttpClients.DEFAULT_BROWSER_UA)
-            .header("Accept", "application/json,text/plain,*/*")
-            .build()
-        client.newCall(req).execute().use { resp ->
-            when {
-                resp.code == 404 && tolerateMissing -> null
-                !resp.isSuccessful -> throw AppException.Network()
-                else -> resp.body?.string()?.takeIf { it.isNotBlank() }
-                    ?: throw AppException.Network()
-            }
-        }
-    }
-}
-
-/**
- * 进程级内存 CookieJar —— 记住 gitcode WAF 下发的会话 cookie 并在后续请求回传。
- *
- * 仅用于 [ArchiveHttpClient](gitcode raw 域名),进程内单实例,App 退出即清空。
- * 实现极简:不做过期清理(cookie 量极小,WAF 会话 cookie 短命),用 ConcurrentHashMap
- * 保证多源并发请求时的线程安全。
- *
- * 不持久化:cookie 仅用于降低 WAF 拦截概率,无登录态意义,无需跨进程保留。
- */
-private class InMemoryCookieJar : CookieJar {
-
-    private val store: MutableMap<String, MutableList<Cookie>> = ConcurrentHashMap()
-
-    override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
-        if (cookies.isEmpty()) return
-        val list = store.getOrPut(url.host) { mutableListOf() }
-        synchronized(list) {
-            // 同名 cookie 替换(更新值/有效期),新增的追加
-            for (c in cookies) {
-                list.removeAll { it.name == c.name }
-                list.add(c)
-            }
-        }
-    }
-
-    override fun loadForRequest(url: HttpUrl): List<Cookie> {
-        val list = store[url.host] ?: return emptyList()
-        return synchronized(list) {
-            // 过滤掉已过期 cookie,顺带清理
-            val now = System.currentTimeMillis()
-            list.filter { it.expiresAt > now }.also { valid ->
-                if (valid.size != list.size) list.retainAll(valid)
-            }
-        }
-    }
+    private suspend fun fetchIndex(force: Boolean = false, allowDiskFallback: Boolean = true): JSONObject =
+        indexCache.fetch(force, allowDiskFallback)
+            ?: throw AppException.ServerError()
 }
