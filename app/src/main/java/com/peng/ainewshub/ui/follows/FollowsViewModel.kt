@@ -9,12 +9,11 @@ import com.peng.ainewshub.data.FollowFeedItem
 import com.peng.ainewshub.data.FollowMatcher
 import com.peng.ainewshub.data.FollowsRepository
 import com.peng.ainewshub.data.TrendsRepository
+import com.peng.ainewshub.ui.ensureMinRefreshSpin
 import com.peng.ainewshub.ui.UiState
 import com.peng.ainewshub.ui.i18n.localized
 import com.peng.ainewshub.ui.more.SettingsStore
 import com.peng.ainewshub.ui.toUiError
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -115,14 +114,7 @@ class FollowsViewModel(application: Application) : AndroidViewModel(application)
                     }
             } finally {
                 // 复位前保证最小转一档(缓存命中时刷新瞬间完成,指示器会卡展示态)
-                val remaining = MIN_REFRESH_SPIN_MS - (SystemClock.elapsedRealtime() - startedAt)
-                if (remaining > 0) {
-                    try {
-                        delay(remaining)
-                    } catch (_: CancellationException) {
-                        // VM 已销毁,复位无意义
-                    }
-                }
+                ensureMinRefreshSpin(startedAt)
                 _isRefreshing.value = false
             }
         }
@@ -177,9 +169,6 @@ class FollowsViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private companion object {
-        /** 下拉刷新指示器最小展示时长(兜缓存命中的瞬间完成,同 SummaryViewModel)。 */
-        const val MIN_REFRESH_SPIN_MS = 600L
-
         /** 推荐词数量(趋势热词取前 N 个展示形态)。 */
         const val SUGGESTION_COUNT = 10
     }

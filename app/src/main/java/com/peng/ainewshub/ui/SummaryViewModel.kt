@@ -9,10 +9,8 @@ import com.peng.ainewshub.data.SourceSummary
 import com.peng.ainewshub.data.SummaryRepository
 import com.peng.ainewshub.data.source.ArchiveHttpClient
 import com.peng.ainewshub.ui.more.SettingsStore
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -126,22 +124,10 @@ class SummaryViewModel(application: Application) : AndroidViewModel(application)
                 // 复位前保证最小转一档:index 去重窗口 + 快照路径缓存双双命中时刷新会
                 // 瞬间完成(如 2 秒内连拉两次),isRefreshing 同帧 true→false 会让
                 // PullToRefreshBox 指示器卡在展示态不收起
-                val remaining = MIN_REFRESH_SPIN_MS - (SystemClock.elapsedRealtime() - startedAt)
-                if (remaining > 0) {
-                    try {
-                        delay(remaining)
-                    } catch (_: CancellationException) {
-                        // VM 已销毁,复位无意义
-                    }
-                }
+                ensureMinRefreshSpin(startedAt)
                 _isRefreshing.value = false
             }
         }
-    }
-
-    private companion object {
-        /** 下拉刷新指示器最小展示时长(正常网络刷新远超此值,只兜瞬间完成的缓存命中)。 */
-        const val MIN_REFRESH_SPIN_MS = 600L
     }
 
     /** 各源批次指纹快照:source → 快照落盘时刻(非 Success 的源为 null)。 */

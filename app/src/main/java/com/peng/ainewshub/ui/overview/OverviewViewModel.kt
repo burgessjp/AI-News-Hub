@@ -10,11 +10,10 @@ import com.peng.ainewshub.data.AppException
 import com.peng.ainewshub.data.OverviewDigest
 import com.peng.ainewshub.data.OverviewRepository
 import com.peng.ainewshub.data.source.ArchiveHttpClient
+import com.peng.ainewshub.ui.ensureMinRefreshSpin
 import com.peng.ainewshub.ui.RefreshNotices
 import com.peng.ainewshub.ui.i18n.localized
 import com.peng.ainewshub.widget.HotNowWidgetUpdater
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -104,21 +103,9 @@ class OverviewViewModel(application: Application) : AndroidViewModel(application
                 // finally 复位:非预期异常(JSON OOM 等)也不能让刷新态永久卡 true。
                 // 复位前保证最小转一档:命中 force 去重窗口时刷新会瞬间完成,isRefreshing
                 // 同帧 true→false 会让 PullToRefreshBox 指示器卡在展示态不收起
-                val remaining = MIN_REFRESH_SPIN_MS - (SystemClock.elapsedRealtime() - startedAt)
-                if (remaining > 0) {
-                    try {
-                        delay(remaining)
-                    } catch (_: CancellationException) {
-                        // VM 已销毁,复位无意义
-                    }
-                }
+                ensureMinRefreshSpin(startedAt)
                 _isRefreshing.value = false
             }
         }
-    }
-
-    private companion object {
-        /** 下拉刷新指示器最小展示时长(正常网络刷新远超此值,只兜瞬间完成的缓存命中)。 */
-        const val MIN_REFRESH_SPIN_MS = 600L
     }
 }

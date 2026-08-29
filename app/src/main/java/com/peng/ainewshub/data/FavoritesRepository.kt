@@ -65,13 +65,4 @@ class FavoritesRepository(private val dao: FavoriteDao) {
 
     /** 收藏总数流(hasMore 判断 / 清空按钮显隐)。 */
     fun observeCount(): Flow<Int> = dao.observeCount()
-
-    private fun isRecordable(url: String): Boolean {
-        if (url.isBlank()) return false
-        val scheme = runCatching { Uri.parse(url).scheme?.lowercase() }.getOrNull()
-        return scheme == "http" || scheme == "https"
-    }
-
-    private fun hostOf(url: String): String =
-        runCatching { Uri.parse(url).host ?: url }.getOrDefault(url)
 }

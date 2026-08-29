@@ -1,10 +1,13 @@
 package com.peng.ainewshub.ui
 
 import android.content.Context
+import android.os.SystemClock
 import android.util.Log
 import com.peng.ainewshub.R
 import com.peng.ainewshub.data.AppException
 import com.peng.ainewshub.data.ShortContentException
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import java.io.IOException
 
 /** 通用 UI 状态密封接口,所有屏幕共用。 */
@@ -50,5 +53,28 @@ fun Throwable.toUiError(context: Context): UiState.Error {
         // OkHttp/IO 层抛出的连接失败、超时、SSL 异常等,统一归 Network
         is IOException               -> UiState.Error(context.getString(R.string.error_network), ErrorKind.Network)
         else                         -> UiState.Error(context.getString(R.string.error_unknown), ErrorKind.Unknown)
+    }
+}
+
+/**
+ * 下拉刷新指示器最小展示时长(正常网络刷新远超此值,只兜瞬间完成的缓存命中)。
+ * 此前在 5 个 ViewModel 里逐字重复,现收口于此。
+ */
+const val MIN_REFRESH_SPIN_MS = 600L
+
+/**
+ * 阻塞到「最小转圈时长」用满才返回:PullToRefreshBox 的指示器若同帧 true→false
+ * 会卡在展示态不收起,各 ViewModel 的 forceRefresh 在 finally 复位 isRefreshing
+ * 之前调用本函数兜底。入参为刷新开始时刻(SystemClock.elapsedRealtime 口径)。
+ * VM 已销毁(协程被取消)时直接返回,复位已无意义。
+ */
+suspend fun ensureMinRefreshSpin(startedAtElapsed: Long) {
+    val remaining = MIN_REFRESH_SPIN_MS - (SystemClock.elapsedRealtime() - startedAtElapsed)
+    if (remaining > 0) {
+        try {
+            delay(remaining)
+        } catch (_: CancellationException) {
+            // VM 已销毁,复位无意义
+        }
     }
 }

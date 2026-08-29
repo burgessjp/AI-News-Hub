@@ -1,5 +1,7 @@
 package com.peng.ainewshub.data
 
+import org.json.JSONArray
+
 /**
  * JSON 解析通用扩展助手。
  *
@@ -16,3 +18,11 @@ package com.peng.ainewshub.data
  * - 正常字符串 → 原样返回(保留两端空格由调用方决定是否 trim)
  */
 fun String?.asClean(): String? = this?.takeIf { it.isNotBlank() && it != "null" }
+
+/**
+ * JSON 字符串数组 → 非空字符串列表(null 数组返回空表,成员过滤空白)。
+ * 此前在 OverviewRepository / TrendsRepository 各有一份私有拷贝,现收口于此。
+ */
+fun JSONArray?.asStringList(): List<String> =
+    if (this == null) emptyList()
+    else (0 until length()).map { optString(it) }.filter { it.isNotBlank() }

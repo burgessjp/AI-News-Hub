@@ -157,7 +157,7 @@ class TrendsRepository {
 
     /** 反序列化 trends JSON 为 [TrendsDigest]。keywords 为空视为数据无效抛 [AppException.NoData]。 */
     private suspend fun parseTrends(json: JSONObject): TrendsDigest = withContext(Dispatchers.IO) {
-        val days = readStringList(json.optJSONArray("days"))
+        val days = json.optJSONArray("days").asStringList()
         val keywords = parseKeywords(json.optJSONArray("keywords"), days)
         if (keywords.isEmpty()) throw AppException.NoData()
         TrendsDigest(
@@ -189,7 +189,7 @@ class TrendsRepository {
             words = words,
             generatedAt = json.optLong("generatedAt", 0L),
             windowDays = json.optInt("windowDays", 1),
-            days = readStringList(json.optJSONArray("days"))
+            days = json.optJSONArray("days").asStringList()
         )
     }
 
@@ -245,10 +245,5 @@ class TrendsRepository {
                 date = o.optString("date")
             ).takeIf { it.title.isNotBlank() && it.url.isNotBlank() }
         }
-    }
-
-    private fun readStringList(arr: JSONArray?): List<String> {
-        if (arr == null) return emptyList()
-        return (0 until arr.length()).map { arr.optString(it) }.filter { it.isNotBlank() }
     }
 }

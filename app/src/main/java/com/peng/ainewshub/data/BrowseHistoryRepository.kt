@@ -105,13 +105,18 @@ class BrowseHistoryRepository(private val dao: BrowseHistoryDao) {
      * 打开文章返回列表后弱化即时生效;删除单条历史 = 恢复未读。
      */
     fun observeReadUrls(): Flow<Set<String>> = dao.observeAllUrls().map { it.toSet() }
-
-    private fun isRecordable(url: String): Boolean {
-        if (url.isBlank()) return false
-        val scheme = runCatching { Uri.parse(url).scheme?.lowercase() }.getOrNull()
-        return scheme == "http" || scheme == "https"
-    }
-
-    private fun hostOf(url: String): String =
-        runCatching { Uri.parse(url).host ?: url }.getOrDefault(url)
 }
+
+/**
+ * URL 是否可入库记录:非空且 scheme 为 http/https(过滤 about:blank、javascript: 等脏值)。
+ * 浏览历史与收藏共用,此前两个 Repository 各有一份私有拷贝,现收口于此。
+ */
+internal fun isRecordable(url: String): Boolean {
+    if (url.isBlank()) return false
+    val scheme = runCatching { Uri.parse(url).scheme?.lowercase() }.getOrNull()
+    return scheme == "http" || scheme == "https"
+}
+
+/** URL 的 host(解析失败或无 host 时原样返回,供收藏/历史的域名列展示)。 */
+internal fun hostOf(url: String): String =
+    runCatching { Uri.parse(url).host ?: url }.getOrDefault(url)

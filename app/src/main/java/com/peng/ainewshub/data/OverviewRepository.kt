@@ -121,7 +121,7 @@ class OverviewRepository {
             generatedAt = json.optLong("generatedAt", 0L),
             dataFetchedAt = json.optLong("dataFetchedAt", 0L),
             digest = json.optString("digest").orEmpty().trim(),
-            missingSources = readStringList(json.optJSONArray("missingSources"))
+            missingSources = json.optJSONArray("missingSources").asStringList()
         )
     }
 
@@ -140,10 +140,5 @@ class OverviewRepository {
                 breakingReason = o.optString("breakingReason")
             ).takeIf { it.title.isNotBlank() && it.url.isNotBlank() }
         }
-    }
-
-    private fun readStringList(arr: JSONArray?): List<String> {
-        if (arr == null) return emptyList()
-        return (0 until arr.length()).map { arr.optString(it) }.filter { it.isNotBlank() }
     }
 }

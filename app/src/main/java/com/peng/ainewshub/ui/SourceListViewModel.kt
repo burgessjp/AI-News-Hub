@@ -11,8 +11,6 @@ import com.peng.ainewshub.data.SourceListResult
 import com.peng.ainewshub.data.TranslationRepository
 import com.peng.ainewshub.data.source.ArchiveHttpClient
 import com.peng.ainewshub.ui.i18n.localized
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -111,14 +109,7 @@ abstract class SourceListViewModel<T>(application: Application) : AndroidViewMod
                 // 复位前保证最小转一档:归档模式下 forceRefresh 命中快照缓存会瞬间完成,
                 // isRefreshing 同帧 true→false 会让 PullToRefreshBox 指示器卡在展示态不收起
                 // (与 Overview/Trends/Summary 三个 VM 的 MIN_REFRESH_SPIN_MS 同款兜底)。
-                val remaining = MIN_REFRESH_SPIN_MS - (SystemClock.elapsedRealtime() - startedAt)
-                if (remaining > 0) {
-                    try {
-                        delay(remaining)
-                    } catch (_: CancellationException) {
-                        // VM 已销毁,复位无意义
-                    }
-                }
+                ensureMinRefreshSpin(startedAt)
                 _isRefreshing.value = false
             }
         }
@@ -137,11 +128,6 @@ abstract class SourceListViewModel<T>(application: Application) : AndroidViewMod
             }
         _lastRefreshAt.value = result.fetchedAt
         onRefreshSuccess(result)
-    }
-
-    private companion object {
-        /** 下拉刷新指示器最小展示时长(正常网络刷新远超此值,只兜瞬间完成的缓存命中)。 */
-        const val MIN_REFRESH_SPIN_MS = 600L
     }
 }
 
