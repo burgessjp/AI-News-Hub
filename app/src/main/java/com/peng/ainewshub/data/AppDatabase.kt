@@ -21,11 +21,18 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  *    流回填的站内阅读页条目(schema 不变,仅 DELETE,见 [MIGRATION_3_4])。
  *  - v5:browse_history 加 progress 列(阅读进度 0-100,仅 ADD COLUMN,
  *    旧数据默认 0 = 无进度,行为不变,见 [MIGRATION_4_5])。
+ *
+ * 自 v5 起:迁移链 1→5 完整,**移除 fallbackToDestructiveMigration**(用户
+ * 浏览历史/收藏是真实数据,不允许任何未覆盖路径静默清库;命中未迁移路径会
+ * 抛 IllegalStateException 崩溃暴露问题,而不是无声丢数据)。同时开启
+ * schema 导出(app/schemas/,由 KSP room.schemaLocation 配置),自 v5 起
+ * 的 schema 入库,后续版本可用 MigrationTestHelper 做迁移回归 —— v1-v4 的
+ * schema 未导出无法追溯,历史迁移链只能靠升级真机验证。
  */
 @Database(
     entities = [BrowseHistoryEntity::class, FavoriteEntity::class, SearchItemEntity::class],
     version = 5,
-    exportSchema = false
+    exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
 
@@ -102,7 +109,6 @@ abstract class AppDatabase : RoomDatabase() {
                     "ainewshub.db"
                 )
                     .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
-                    .fallbackToDestructiveMigration()
                     .build()
                     .also { instance = it }
             }
