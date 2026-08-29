@@ -1,28 +1,17 @@
 package com.peng.ainewshub.ui.webview
 
-import android.Manifest
 import android.annotation.SuppressLint
-import android.app.DownloadManager
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.graphics.Bitmap
-import android.util.Log
 import android.net.Uri
-import android.os.Build
-import android.os.Environment
-import android.util.Base64
 import android.view.View
-import android.webkit.JavascriptInterface
-import android.webkit.MimeTypeMap
-import android.webkit.URLUtil
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
-import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
@@ -35,51 +24,36 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.automirrored.outlined.ArrowForward
-import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.StarBorder
-import androidx.compose.material.icons.outlined.Translate
-import androidx.compose.material.icons.outlined.WebAsset
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -96,7 +70,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -104,13 +77,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.webkit.WebSettingsCompat
-import androidx.webkit.WebViewFeature
 import com.peng.ainewshub.R
 import com.peng.ainewshub.data.prefs.AiConfig
 import com.peng.ainewshub.data.repo.BrowseHistoryRepository
@@ -151,6 +121,11 @@ import com.peng.ainewshub.data.prefs.FontScale
  *  - 网页发起的文件下载:HTTP(S) 走 DownloadManager;blob:/data: URL 解码后写文件
  *  - 网页深色模式(算法深色,优先用网页自带的深色主题)
  *  - 字号跟随「设置 → 字号档位」(settings.textZoom)
+ *
+ * 2026-08-29 拆分:下载链路(DownloadsHelper.kt)、系统交互(WebIntents.kt)、
+ * 实例配置(WebViewConfig.kt)、底部工具栏与进度条(WebBars.kt)、翻译弹层
+ * (TranslateSheet.kt)已移至同包独立文件;本文件保留主组合函数、WebView 装配
+ * (两个 Client + 滚动/长按/下载监听)、顶栏、弹窗与「继续上次阅读」chip。
  */
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
@@ -966,634 +941,6 @@ private sealed interface LongPressTarget {
 
     data class Image(override val url: String) : LongPressTarget
     data class Link(override val url: String) : LongPressTarget
-}
-
-/**
- * 翻译弹层 —— 原文/译文平铺对照列表(高信息密度)。
- *
- * [ModalBottomSheet] 半屏起步(skipPartiallyExpanded=false),可手势拖拽到全屏、
- * 拖下关闭。每段平铺:原文在上(主色 [cs.onSurface])、译文在下(次要色
- * [cs.onSurfaceVariant]),靠颜色区分层次不靠卡片,密度高、阅读连贯。译文未到时
- * 不占位,到达后在原文下方追加。翻译中头部展示线性进度条,完成态列表末尾给
- * 「翻译完成」收尾提示。
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun TranslateSheet(
-    originals: List<String>,
-    results: List<String?>?,
-    progress: Pair<Int, Int>?,
-    translating: Boolean,
-    onCancelTranslate: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    val cs = MaterialTheme.colorScheme
-    // 全屏展开:跳过半屏态,直接展开到全屏
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState
-    ) {
-        // 头部:图标 + 标题 + 进度/取消
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.Translate,
-                contentDescription = null,
-                tint = cs.primary,
-                modifier = Modifier.size(22.dp)
-            )
-            Spacer(modifier = Modifier.width(10.dp))
-            Text(
-                text = stringResource(R.string.webview_translate_sheet_title),
-                style = AppText.titleItem,
-                color = cs.onSurface
-            )
-            Spacer(modifier = Modifier.weight(1f))
-            if (translating && progress != null) {
-                Text(
-                    text = stringResource(R.string.webview_translate_progress, progress.first, progress.second),
-                    style = AppText.caption,
-                    color = cs.onSurfaceVariant
-                )
-            }
-            if (translating) {
-                Spacer(modifier = Modifier.width(4.dp))
-                TextButton(onClick = onCancelTranslate) { Text(stringResource(R.string.common_cancel)) }
-            }
-        }
-        // 头部进度条:翻译中展示确定性进度;无轨道细线,与顶栏加载条同语言
-        val progressFraction = if (translating && progress != null && progress.second > 0) {
-            progress.first.toFloat() / progress.second
-        } else null
-        if (progressFraction != null) {
-            Spacer(modifier = Modifier.height(6.dp))
-            LinearProgressIndicator(
-                progress = { progressFraction },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp)
-                    .height(2.dp),
-                color = cs.primary,
-                trackColor = Color.Transparent,
-                strokeCap = StrokeCap.Round
-            )
-        }
-        Spacer(modifier = Modifier.height(6.dp))
-        // 空白块(空段落等)不参与展示
-        val blocks = remember(originals) { originals.indices.filter { originals[it].isNotBlank() } }
-        // 翻译完成判定:非翻译中、有结果、且有至少一条译文
-        val finished = !translating && results != null && results.any { it != null }
-        LazyColumn(modifier = Modifier.fillMaxWidth()) {
-            items(blocks.size) { position ->
-                val index = blocks[position]
-                val original = originals[index]
-                val translated = results?.getOrNull(index)
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 8.dp)
-                ) {
-                    // 原文(在上):主色,信息主体
-                    Text(
-                        text = original,
-                        style = AppText.body,
-                        color = cs.onSurface
-                    )
-                    // 译文(在下):左侧 primary 色细条做视觉锚点 + 弱化色文字,
-                    // 靠色条明确区分译文与原文(单靠 onSurfaceVariant 与 onSurface 差别太小)
-                    if (translated != null) {
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(IntrinsicSize.Min)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .width(3.dp)
-                                    .fillMaxHeight()
-                                    .background(cs.primary, RoundedCornerShape(2.dp))
-                            )
-                            Text(
-                                text = translated,
-                                style = AppText.body,
-                                color = cs.onSurfaceVariant,
-                                modifier = Modifier.padding(start = 8.dp)
-                            )
-                        }
-                    }
-                }
-            }
-            // 完成态收尾:居中 check + 「翻译完成」
-            if (finished) {
-                item {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.CheckCircle,
-                            contentDescription = null,
-                            tint = cs.primary,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = stringResource(R.string.webview_translate_done),
-                            style = AppText.caption,
-                            color = cs.primary
-                        )
-                    }
-                }
-            }
-            item {
-                Spacer(
-                    modifier = Modifier
-                        .navigationBarsPadding()
-                        .height(16.dp)
-                )
-            }
-        }
-    }
-}
-
-/**
- * 顶部加载进度条 —— Safari/Chrome 风格的细线进度。
- *
- * 与默认 [LinearProgressIndicator] 的差异:
- *  1. 更细(2dp),贴顶精致,不抢视觉
- *  2. 无背景轨道(trackColor = transparent),加载区是干净的细线,
- *     不再铺满整条灰轨显得笨重
- *  3. [AnimatedVisibility] 包裹,加载完成时平滑淡出,而非硬切消失
- *
- * @param loading  是否加载中(控制显隐)
- * @param progress 0f..1f 加载进度
- */
-@Composable
-private fun TopProgressBar(
-    loading: Boolean,
-    progress: () -> Float
-) {
-    AnimatedVisibility(
-        visible = loading,
-        enter = fadeIn(tween(Motion.SHORT)),
-        exit = fadeOut(tween(Motion.MEDIUM))
-    ) {
-        LinearProgressIndicator(
-            progress = progress,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(2.dp),
-            color = MaterialTheme.colorScheme.primary,
-            trackColor = Color.Transparent,
-            strokeCap = StrokeCap.Round,
-            gapSize = 0.dp,
-            drawStopIndicator = {}
-        )
-    }
-}
-
-/** 待下载文件参数。被 DownloadListener 产出,经权限流程后交给 [enqueueDownload]。 */
-private data class DownloadParams(
-    val url: String,
-    val userAgent: String?,
-    val contentDisposition: String?,
-    val mimetype: String?
-)
-
-/**
- * 处理网页发起的下载。
- *
- * API ≥ 29:scoped storage 下写公共「下载」目录无需权限,直接入队。
- * API < 29:需 WRITE_EXTERNAL_STORAGE;未授权时发起请求并暂存任务,授权回调里入队。
- */
-private fun handleDownload(
-    context: Context,
-    params: DownloadParams,
-    launcher: androidx.activity.compose.ManagedActivityResultLauncher<String, Boolean>,
-    onPending: (DownloadParams) -> Unit
-) {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-        enqueueDownload(context, params)
-        return
-    }
-    val granted = ContextCompat.checkSelfPermission(
-        context, Manifest.permission.WRITE_EXTERNAL_STORAGE
-    ) == PackageManager.PERMISSION_GRANTED
-    if (granted) {
-        enqueueDownload(context, params)
-    } else {
-        onPending(params)
-        launcher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-    }
-}
-
-/** 把下载任务交给系统 DownloadManager,文件存到公共「下载」目录。 */
-private fun enqueueDownload(context: Context, params: DownloadParams) {
-    val filename = guessDownloadName(context, params.url, params.contentDisposition, params.mimetype)
-    try {
-        val request = DownloadManager.Request(Uri.parse(params.url)).apply {
-            setMimeType(params.mimetype)
-            params.userAgent?.let { addRequestHeader("User-Agent", it) }
-            // 通知栏可见 & 下载完成后提示
-            setNotificationVisibility(
-                DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED
-            )
-            setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, filename)
-            setTitle(filename)
-        }
-        val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as? DownloadManager
-        if (dm == null) {
-            Toast.makeText(context, context.getString(R.string.webview_toast_download_manager_unavailable), Toast.LENGTH_SHORT).show()
-            return
-        }
-        dm.enqueue(request)
-        Toast.makeText(context, context.getString(R.string.webview_toast_download_started, filename), Toast.LENGTH_SHORT).show()
-    } catch (e: Exception) {
-        // 兜底:非法 URI / 权限 / 路径等任何异常都不再让 App 崩溃
-        Log.w("Download", "下载失败", e)
-        Toast.makeText(context, context.getString(R.string.webview_toast_download_failed), Toast.LENGTH_SHORT).show()
-    }
-}
-
-/**
- * 下载 blob: URL —— DownloadManager 不认 blob,注入 JS 把 blob 读成 base64,
- * 经 BlobSaver 接口回传后解码写入文件。
- */
-private fun downloadBlob(
-    webView: WebView,
-    context: Context,
-    blobUrl: String,
-    contentDisposition: String?,
-    mimetype: String?
-) {
-    val filename = guessDownloadName(context, blobUrl, contentDisposition, mimetype)
-    // 块级作用域函数不能用 JS 关键字做变量名,这里用 fn
-    val fn = filename.replace("'", "\\'")
-    val mt = (mimetype ?: "application/octet-stream").replace("'", "\\'")
-    // blobUrl 来自网页,需同样转义单引号(与 fn/mt 一致),防 JS 字面量注入
-    val du = blobUrl.replace("'", "\\'")
-    // 用 fetch 拿到 blob 后转 base64 回传原生,避开 DownloadManager 对 blob 的限制
-    val js = """
-    (function(){
-      try {
-        fetch('$du').then(function(r){return r.blob();}).then(function(b){
-          var fr = new FileReader();
-          fr.onload = function(){
-            var data = fr.result.split(',')[1];
-            AndroidBlobSaver.save('$fn', '$mt', data);
-          };
-          fr.readAsDataURL(b);
-        }).catch(function(e){
-          AndroidBlobSaver.save('$fn', '$mt', null);
-        });
-      } catch(e) {
-        AndroidBlobSaver.save('$fn', '$mt', null);
-      }
-    })();
-    """.trimIndent()
-    webView.evaluateJavascript(js, null)
-    Toast.makeText(context, context.getString(R.string.webview_toast_saving_file), Toast.LENGTH_SHORT).show()
-}
-
-/**
- * 下载 data: URL(canvas 导出图片的常见形态)。仅处理 base64 形态,
- * 解码后走与 blob 相同的写文件路径;非 base64 的 data: 提示不支持。
- */
-private suspend fun saveDataUrl(context: Context, url: String) {
-    // data:[<mime>][;base64],<data>
-    val comma = url.indexOf(',')
-    val meta = if (comma > 5) url.substring(5, comma) else ""
-    if (comma < 0 || !meta.contains(";base64")) {
-        Toast.makeText(context, context.getString(R.string.webview_toast_download_unsupported), Toast.LENGTH_SHORT).show()
-        return
-    }
-    val mime = meta.substringBefore(';').ifBlank { "application/octet-stream" }
-    val ext = MimeTypeMap.getSingleton().getExtensionFromMimeType(mime) ?: "bin"
-    // 文件名按类型区分:image/* → "下载图片",其余 → "下载文件"(文案随界面语言)
-    val base = context.getString(
-        if (mime.startsWith("image/")) R.string.webview_download_image_name
-        else R.string.webview_download_file_name
-    )
-    saveBlob(context, "$base.$ext", mime, url.substring(comma + 1))
-}
-
-/**
- * 推断下载文件名。blob: URL 没有文件名信息,按 mimetype 生成"下载图片.<ext>"。
- */
-private fun guessDownloadName(
-    context: Context,
-    url: String,
-    contentDisposition: String?,
-    mimetype: String?
-): String {
-    if (!url.startsWith("blob:", ignoreCase = true)) {
-        return URLUtil.guessFileName(url, contentDisposition, mimetype)
-    }
-    // blob: 无法从 URL 取扩展名,按 mime 推断
-    val ext = MimeTypeMap.getSingleton()
-        .getExtensionFromMimeType(mimetype) ?: "bin"
-    // 文件名按类型区分:image/* → "下载图片",其余 → "下载文件"(文案随界面语言)
-    val base = context.getString(
-        if (mimetype?.startsWith("image/") == true) R.string.webview_download_image_name
-        else R.string.webview_download_file_name
-    )
-    return "$base.$ext"
-}
-
-/**
- * 把 base64 数据写入公共「下载」目录(blob / data: 下载共用)。
- *
- * - API ≥ 29:scoped storage 下不能直接写公共目录,改用 MediaStore(Downloads)。
- * - API < 29:走传统 File 路径 + MediaScanner 扫描。
- *
- * [data] 为 null 表示网页侧 fetch 失败 —— 提示后返回,不写空文件。
- * 挂起函数:Base64 解码与写盘在 IO 线程执行(canvas 导出图常见 1-5MB,主线程做
- * 会超帧预算甚至 ANR);须从主线程协程调用 —— 结果 Toast 留在调用方上下文(主线程)。
- */
-private suspend fun saveBlob(context: Context, filename: String, mimetype: String?, data: String?) {
-    if (data.isNullOrEmpty()) {
-        Toast.makeText(context, context.getString(R.string.webview_toast_download_no_data), Toast.LENGTH_SHORT).show()
-        return
-    }
-    val outcome = withContext(Dispatchers.IO) {
-        try {
-            val bytes = Base64.decode(data, Base64.DEFAULT)
-            val displayName = filename.ifBlank { context.getString(R.string.webview_download_fallback_name) }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                // API 29+:MediaStore 写入公共 Downloads,无需任何存储权限
-                val resolver = context.contentResolver
-                val collection = android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI
-                val values = android.content.ContentValues().apply {
-                    put(android.provider.MediaStore.Downloads.DISPLAY_NAME, displayName)
-                    mimetype?.let { put(android.provider.MediaStore.Downloads.MIME_TYPE, it) }
-                }
-                val uri = resolver.insert(collection, values)
-                    ?: return@withContext BlobSaveOutcome.CreateFailed
-                resolver.openOutputStream(uri)?.use { it.write(bytes) }
-            } else {
-                // API < 29:传统公共目录 File 写入
-                val downloads = Environment.getExternalStoragePublicDirectory(
-                    Environment.DIRECTORY_DOWNLOADS
-                )
-                if (!downloads.exists()) downloads.mkdirs()
-                val file = java.io.File(downloads, displayName)
-                java.io.FileOutputStream(file).use { it.write(bytes) }
-                // 扫描媒体,使文件立刻在相册/文件 App 中可见
-                android.media.MediaScannerConnection.scanFile(
-                    context, arrayOf(file.absolutePath), arrayOf(mimetype ?: "*/*"), null
-                )
-            }
-            BlobSaveOutcome.Saved(displayName)
-        } catch (e: Exception) {
-            Log.w("Save", "保存失败", e)
-            BlobSaveOutcome.Failed
-        }
-    }
-    val msg = when (outcome) {
-        is BlobSaveOutcome.Saved -> context.getString(R.string.webview_toast_saved, outcome.displayName)
-        BlobSaveOutcome.CreateFailed -> context.getString(R.string.webview_toast_save_create_failed)
-        BlobSaveOutcome.Failed -> context.getString(R.string.webview_toast_save_failed)
-    }
-    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-}
-
-/** [saveBlob] 的落盘结果:成功携带展示名;失败区分「建 MediaStore 记录失败」与「其他异常」。 */
-private sealed interface BlobSaveOutcome {
-    data class Saved(val displayName: String) : BlobSaveOutcome
-    data object CreateFailed : BlobSaveOutcome
-    data object Failed : BlobSaveOutcome
-}
-
-/**
- * 注入给网页的 JS 桥接对象 —— 把从 blob 读出的 base64 数据回传原生。
- *
- * @param onSave 回调: (文件名, mimetype, base64数据或null)
- */
-private class BlobSaver(
-    private val context: Context,
-    private val onSave: (filename: String, mimetype: String?, data: String?) -> Unit
-) {
-    // @JavascriptInterface 跑在 WebView JavaBridge 线程(无 Looper),
-    // 回调链里有 Toast,必须切主线程,否则抛 "Can't toast on a thread that has not called Looper.prepare()"
-    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
-
-    @JavascriptInterface
-    fun save(filename: String, mimetype: String?, data: String?) {
-        mainHandler.post { onSave(filename, mimetype.takeIf { !it.isNullOrBlank() }, data) }
-    }
-}
-
-/** 系统分享:把当前页 URL 作为纯文本交给系统分享面板。 */
-private fun shareUrl(context: Context, title: String, url: String) {
-    val intent = Intent(Intent.ACTION_SEND).apply {
-        type = "text/plain"
-        putExtra(Intent.EXTRA_SUBJECT, title)
-        putExtra(Intent.EXTRA_TEXT, url)
-    }
-    context.startActivity(Intent.createChooser(intent, context.getString(R.string.common_share)))
-}
-
-/**
- * 唤起外部 App —— 处理网页发起的非 http(s) 协议链接。
- *
- * 分两类:
- *  - intent:// URI:按 Chrome 规范解析 Intent。优先解析其中的 fallback URL
- *    (S.browser_fallback_url),目标 App 不存在时用它(通常跳应用市场/网页)。
- *  - 普通自定义 scheme(weixin://、mailto:、tel:…):直接构造 ACTION_VIEW 唤起。
- *
- * 任何无法解析 / 无 App 接收的异常都用 Toast 提示,绝不崩溃。
- */
-private fun handleExternalUri(context: Context, uri: Uri) {
-    val scheme = uri.scheme?.lowercase()
-    try {
-        if (scheme == "intent") {
-            // Chrome intent:// 规范 —— Intent.parseUri 解析,带 fallback URL
-            val intent = Intent.parseUri(uri.toString(), Intent.URI_INTENT_SCHEME)
-                .addCategory(Intent.CATEGORY_BROWSABLE)
-            // 目标 App 未安装时,优先用网页声明的 fallback URL
-            val fallback = intent.getStringExtra("browser_fallback_url")
-            // fallback 仅允许 http(s):防止恶意页面用 file:///、content:// 作 fallback 泄漏本地文件
-            val fallbackScheme = fallback?.let { runCatching { Uri.parse(it).scheme?.lowercase() }.getOrNull() }
-            if (intent.resolveActivity(context.packageManager) != null) {
-                context.startActivity(intent)
-            } else if (!fallback.isNullOrBlank() &&
-                (fallbackScheme == "http" || fallbackScheme == "https")
-            ) {
-                // 仅 http(s) 网址,交给系统浏览器/市场打开
-                context.startActivity(
-                    Intent(Intent.ACTION_VIEW, Uri.parse(fallback))
-                        .addCategory(Intent.CATEGORY_BROWSABLE)
-                )
-            } else {
-                Toast.makeText(context, context.getString(R.string.webview_toast_no_app_for_link), Toast.LENGTH_SHORT).show()
-            }
-        } else {
-            // weixin://、mailto:、tel:、sms: 等普通自定义 scheme
-            context.startActivity(
-                Intent(Intent.ACTION_VIEW, uri).addCategory(Intent.CATEGORY_BROWSABLE)
-            )
-        }
-    } catch (e: android.content.ActivityNotFoundException) {
-        Toast.makeText(context, context.getString(R.string.webview_toast_no_app_for_link), Toast.LENGTH_SHORT).show()
-    } catch (e: Exception) {
-        Toast.makeText(context, context.getString(R.string.webview_toast_open_link_failed), Toast.LENGTH_SHORT).show()
-    }
-}
-
-/** 应用网页深色模式:优先用网页自带深色主题,无则算法深色(自动转深)。 */
-private fun applyDarkTheme(settings: WebSettings, darkTheme: Boolean) {
-    if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
-        WebSettingsCompat.setAlgorithmicDarkeningAllowed(settings, darkTheme)
-    }
-}
-
-@SuppressLint("SetJavaScriptEnabled")
-private fun WebView.configureWebSettings(darkTheme: Boolean, fontScale: FontScale) {
-    layoutParams = android.view.ViewGroup.LayoutParams(
-        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-        android.view.ViewGroup.LayoutParams.MATCH_PARENT
-    )
-    settings.apply {
-        javaScriptEnabled = true          // AI HOT 站内页是 Next.js,需要 JS
-        domStorageEnabled = true
-        loadWithOverviewMode = true
-        useWideViewPort = true
-        setSupportZoom(true)
-        builtInZoomControls = true
-        displayZoomControls = false
-        cacheMode = WebSettings.LOAD_DEFAULT
-        // 字号跟随「设置 → 字号档位」(100=标准)
-        textZoom = (fontScale.scale * 100).roundToInt()
-        // 安全加固:显式关闭文件/内容访问(默认 false,此处声明防后续误开)
-        allowFileAccess = false          // 禁止 file:// 内容访问
-        allowContentAccess = false       // 禁止 content:// 访问(本 App 无需)
-        mediaPlaybackRequiresUserGesture = true  // 禁止页面自动播放音视频
-        // UA 以系统 WebView 自带 UA 为基础(版本随 WebView 自动更新,不再硬编码老化),
-        // 去掉 "; wv" 与 "Version/4.0" 标记伪装成移动版 Chrome —— 部分站点
-        // (如 Google 登录)会拒绝原生 WebView UA
-        userAgentString = WebSettings.getDefaultUserAgent(context)
-            .replace("; wv", "")
-            .replace(Regex("Version/\\d+(\\.\\d+)*\\s+"), "")
-    }
-    applyDarkTheme(settings, darkTheme)
-}
-
-/**
- * WebView 底部工具栏 —— 高频导航操作(后退/前进/阅读模式/分享)提为一级操作,
- * 不再藏在「更多」菜单里(对齐浏览器惯例);阅读模式按 [readerActive] 切换进出。
- * 视频全屏时由调用方整体隐藏。
- */
-@Composable
-private fun WebBottomBar(
-    canGoBack: Boolean,
-    canGoForward: Boolean,
-    readerActive: Boolean,
-    readerLoading: Boolean,
-    translateEnabled: Boolean,
-    translateActive: Boolean,
-    onBack: () -> Unit,
-    onForward: () -> Unit,
-    onToggleReader: () -> Unit,
-    onTranslate: () -> Unit,
-    onShare: () -> Unit
-) {
-    val cs = MaterialTheme.colorScheme
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(cs.surface)
-            .navigationBarsPadding()
-    ) {
-        // 顶部发丝线,与网页内容区分隔
-        Spacer(
-            Modifier
-                .fillMaxWidth()
-                .height(0.5.dp)
-                .background(cs.outlineVariant)
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            WebBarItem(
-                icon = Icons.AutoMirrored.Outlined.ArrowBack,
-                label = stringResource(R.string.webview_bar_back),
-                enabled = canGoBack,
-                onClick = onBack,
-                modifier = Modifier.weight(1f)
-            )
-            WebBarItem(
-                icon = Icons.AutoMirrored.Outlined.ArrowForward,
-                label = stringResource(R.string.webview_bar_forward),
-                enabled = canGoForward,
-                onClick = onForward,
-                modifier = Modifier.weight(1f)
-            )
-            WebBarItem(
-                icon = if (readerActive) Icons.Outlined.WebAsset else Icons.AutoMirrored.Outlined.MenuBook,
-                label = stringResource(
-                    if (readerActive) R.string.webview_bar_exit_reader else R.string.webview_bar_reader
-                ),
-                enabled = !readerLoading,
-                onClick = onToggleReader,
-                modifier = Modifier.weight(1f)
-            )
-            // 翻译:阅读模式下可用;翻译中或已有结果时图标高亮表示已激活
-            WebBarItem(
-                icon = Icons.Outlined.Translate,
-                label = stringResource(R.string.webview_bar_translate),
-                enabled = readerActive && translateEnabled,
-                highlight = translateActive,
-                onClick = onTranslate,
-                modifier = Modifier.weight(1f)
-            )
-            WebBarItem(
-                icon = Icons.Outlined.Share,
-                label = stringResource(R.string.common_share),
-                enabled = true,
-                onClick = onShare,
-                modifier = Modifier.weight(1f)
-            )
-        }
-    }
-}
-
-/** 底部工具栏单项:图标 + 小字标签,触摸区 ≥48dp;禁用态用 outline 色压低。 */
-@Composable
-private fun WebBarItem(
-    icon: ImageVector,
-    label: String,
-    enabled: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    highlight: Boolean = false
-) {
-    // 高亮(已激活)用 primary 色,否则用常规禁用/可用色
-    val color = when {
-        highlight -> MaterialTheme.colorScheme.primary
-        enabled -> MaterialTheme.colorScheme.onSurfaceVariant
-        else -> MaterialTheme.colorScheme.outline
-    }
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-        modifier = modifier
-            .clickable(enabled = enabled, onClick = onClick)
-            .heightIn(min = 48.dp)
-            .padding(vertical = 6.dp)
-    ) {
-        Icon(icon, contentDescription = label, tint = color, modifier = Modifier.size(20.dp))
-        Text(text = label, style = AppText.caption, color = color)
-    }
 }
 
 // ===== 阅读进度(「继续上次阅读」)常量 =====
