@@ -8,6 +8,7 @@
 - **取数模式恒定归档**：5 个稳定源（HackerNews / GitHub Trending / stormzhang AI / HuggingFace Papers / The Rundown AI）固定读 gitcode 归档快照；原实时抓取路径（LIVE 双模式、jsoup 直抓、`SourceMode` 枚举）已于 2026-08-29 整体删除（决策记录见 docs/tech-roadmap.md），HTML 抓取全部由 `scripts/` 流水线承担。HN 评论树是唯一保留的实时路径（`HackerNewsRepository`，归档快照不含评论）。
 - **Product Hunt 只归档**（Developer Token 是服务端 secret 不进 APK，两种模式都走归档）。
 - 归档走 `ArchiveHttpClient`（gitcode **REST API raw 端点**，**不要**用 raw 直链——背后是 WAF 会 403）。
+- 7 个归档源列表二级页 Repository 的 `fetch()` 走 index 2 分钟缓存、`forceRefresh()` 经 `fetchItemsList(force=true)` 绕过 TTL 强制重读 index（下拉刷新，与 4 个根 Tab 语义对齐）；快照本体按路径不可变，无 force 语义（index 强刷拿到新路径自然换缓存键）。
 - **归档断网兜底**：index / 快照 / 根级文件网络成功后 write-through 落盘（`ArchiveDiskCache`，`cacheDir/archives/`，64MB 上限最旧淘汰 + 读取 7 天时效，`App.onCreate` init 保证小组件等无 Activity 入口也能落盘）；**仅传输层失败（IOException：连不上/DNS/读超时）读盘兜底**，命中且未过期则置 `ArchiveHttpClient.offlineMode` 并返回旧数据（Repository/VM 签名零改动），UI 层每次离线事件弹一次性顶部胶囊提示（`NoticePill`，5 秒、恢复联网提前消失；下拉刷新无新批次为 2.5 秒对勾胶囊）；**HTTP 层错误（4xx/5xx/空响应）不兜底**，直接走 Error 态——服务端故障不得伪装成「离线」拿旧数据顶上。`fetchLatestOverview(networkOnly = true)` 为网络探测语义（跳过内存缓存与盘兜底、失败即抛），仅供每日通知 Worker 与冷启动弹窗用；未命中才走错误态。
 - **归档失败（盘上也无兜底）直接显示 Error 态。**
 

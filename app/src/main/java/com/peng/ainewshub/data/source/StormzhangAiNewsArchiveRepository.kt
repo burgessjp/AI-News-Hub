@@ -11,17 +11,18 @@ import com.peng.ainewshub.data.model.StormzhangAiNewsResult
  *
  * 数据来自数据流水线归档的快照。字段映射对齐 docs/news-hub-data-usage.md 的
  * stormzhang-ai items 表;顶层 pageDate(页面声明的资讯日期)一并取回,
- * 填入 [StormzhangAiNewsResult.pageDate]。无缓存概念:fetch == forceRefresh。
- * 失败抛 RuntimeException 交由 VM 显示 Error。
+ * 填入 [StormzhangAiNewsResult.pageDate]。缓存语义:fetch() 走 index 2 分钟缓存,
+ * forceRefresh() 绕过 TTL 强制重读 index(源列表二级页下拉刷新);快照本体按路径
+ * 不可变,无需 force。失败抛 RuntimeException 交由 VM 显示 Error。
  */
 class StormzhangAiNewsArchiveRepository {
 
     suspend fun fetch(): StormzhangAiNewsResult = load()
 
-    suspend fun forceRefresh(): StormzhangAiNewsResult = load()
+    suspend fun forceRefresh(): StormzhangAiNewsResult = load(true)
 
-    private suspend fun load(): StormzhangAiNewsResult {
-        val snapshot = ArchiveHttpClient.fetchLatestSnapshot(SourceKeys.STORMZHANG_AI)
+    private suspend fun load(force: Boolean = false): StormzhangAiNewsResult {
+        val snapshot = ArchiveHttpClient.fetchLatestSnapshot(SourceKeys.STORMZHANG_AI, force)
         val fetchedAt = snapshot.optLong("fetched_at_ms", System.currentTimeMillis())
         val pageDate = snapshot.optString("pageDate")
         val items = snapshot.optJSONArray("items")

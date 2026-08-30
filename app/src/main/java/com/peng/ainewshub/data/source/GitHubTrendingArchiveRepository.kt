@@ -9,17 +9,18 @@ import com.peng.ainewshub.data.model.TrendingResult
  * GitHub Trending 的 [gitcode 归档]数据源。
  *
  * 数据来自数据流水线归档的快照。字段映射对齐 docs/news-hub-data-usage.md 的
- * github-trending items 表。无缓存概念:fetch == forceRefresh。
+ * github-trending items 表。缓存语义:fetch() 走 index 2 分钟缓存,forceRefresh()
+ * 绕过 TTL 强制重读 index(源列表二级页下拉刷新);快照本体按路径不可变,无需 force。
  * 失败抛 RuntimeException 交由 VM 显示 Error。
  */
 class GitHubTrendingArchiveRepository {
 
     suspend fun fetch(): TrendingResult = load()
 
-    suspend fun forceRefresh(): TrendingResult = load()
+    suspend fun forceRefresh(): TrendingResult = load(true)
 
-    private suspend fun load(): TrendingResult {
-        val (fetchedAt, repos) = ArchiveHttpClient.fetchItemsList(SourceKeys.GITHUB_TRENDING) { obj, i ->
+    private suspend fun load(force: Boolean = false): TrendingResult {
+        val (fetchedAt, repos) = ArchiveHttpClient.fetchItemsList(SourceKeys.GITHUB_TRENDING, force = force) { obj, i ->
             TrendingRepo(
                 rank = obj.optInt("rank", i + 1),
                 owner = obj.optString("owner"),

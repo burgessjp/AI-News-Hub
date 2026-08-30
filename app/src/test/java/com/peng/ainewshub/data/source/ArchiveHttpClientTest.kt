@@ -130,6 +130,20 @@ class ArchiveHttpClientTest {
         assertFalse(ArchiveHttpClient.offlineMode.value)
     }
 
+    @Test
+    fun `fetchItemsList force 透传绕过 TTL 真实重打 index`() = runBlocking {
+        ArchiveHttpClient.fetchItemsList("hackernews") { obj, _ ->
+            obj.optString("title").takeIf { it.isNotBlank() }
+        }
+        Thread.sleep(2_100) // 越过 FORCE_FETCH_DEDUP_MS(2s),TTL 2 分钟内 force 也须重打
+        ArchiveHttpClient.fetchItemsList("hackernews", force = true) { obj, _ ->
+            obj.optString("title").takeIf { it.isNotBlank() }
+        }
+        // index 真打两次;快照路径不变命中路径缓存,仅 1 次快照请求
+        assertEquals(2, indexHits())
+        assertEquals(3, dispatcher.hits.size)
+    }
+
     // ===== 3. 错误分野与兜底 =====
 
     @Test

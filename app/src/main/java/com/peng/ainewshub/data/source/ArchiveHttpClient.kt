@@ -29,8 +29,8 @@ import org.json.JSONObject
  *  - [ArchiveSnapshotCache]:快照路径缓存 + 同 URL in-flight 去重
  *
  * 缓存与刷新:index 与各根级文件有 2 分钟内存缓存(多源并发去重);快照本体按路径
- * 缓存(内容不可变)。手动刷新(根 Tab 下拉)经 force=true 绕过 TTL,锁内秒级
- * 去重窗口把同一波并发 force 收敛为 1 次网络请求;自动加载/重击 tab 走缓存。
+ * 缓存(内容不可变)。手动刷新(根 Tab 与源列表二级页下拉)经 force=true 绕过 TTL,
+ * 锁内秒级去重窗口把同一波并发 force 收敛为 1 次网络请求;自动加载/重击 tab 走缓存。
  * 断网兜底:仅传输层失败读盘([ArchiveDiskCache],7 天时效,write-through 落盘),
  * HTTP 层错误不兜底直接走 Error 态 —— 盘上旧数据不能冒充最新数据。
  * 任一步失败(HTTP 错误 / index 无该源 / items 为空)抛 RuntimeException,
@@ -137,15 +137,18 @@ object ArchiveHttpClient {
      *  4. 映射后为空(全被过滤)抛 [AppException.NoData]
      *
      * @param source 源标识(目录名 / index latest 键)
+     * @param force true 绕过 index 2 分钟 TTL 强制重读(源列表二级页下拉刷新);
+     *               快照本体按路径不可变,路径不变时仍命中快照缓存
      * @param mapper (items[i] 的 JSON, 索引 i) → 领域对象;返回 null 跳过该条。
      *               索引从 0 起,供 fallbackRank = i+1 等场景使用
      * @return (数据落盘时刻, 领域对象列表)
      */
     suspend fun <T> fetchItemsList(
         source: String,
+        force: Boolean = false,
         mapper: (org.json.JSONObject, Int) -> T?
     ): Pair<Long, List<T>> = withContext(Dispatchers.IO) {
-        val snapshot = fetchLatestSnapshot(source)
+        val snapshot = fetchLatestSnapshot(source, force)
         val fetchedAt = snapshot.optLong("fetched_at_ms", System.currentTimeMillis())
         val items = snapshot.optJSONArray("items")
             ?: throw AppException.NoData()
