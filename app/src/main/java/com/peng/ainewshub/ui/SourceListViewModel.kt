@@ -11,6 +11,7 @@ import com.peng.ainewshub.data.model.SourceListResult
 import com.peng.ainewshub.data.repo.TranslationRepository
 import com.peng.ainewshub.data.source.ArchiveHttpClient
 import com.peng.ainewshub.ui.i18n.localized
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -62,7 +63,11 @@ abstract class SourceListViewModel<T>(application: Application) : AndroidViewMod
     protected open fun onRefreshSuccess(result: SourceListResult<T>) {}
 
     init {
-        viewModelScope.launch { refresh() }
+        // 首次加载须避开 viewModelScope(Main.immediate)的内联执行:基类 init 运行时
+        // 子类字段(archiveRepo 等)尚未初始化,内联跑到 doFetch 会读到 null 抛 NPE,
+        // 首次进页面即「加载失败」。显式指定非 immediate 的 Main 把协程体排到构造
+        // 完成之后(VM 均在主线程 viewModel() 工厂中构造,派发必晚于构造返回)。
+        viewModelScope.launch(Dispatchers.Main) { refresh() }
     }
 
     /** 进入页面加载(走缓存,命中则秒回不打网络)。 */
