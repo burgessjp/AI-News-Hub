@@ -5,10 +5,9 @@ AI News Hub 总览页 wordmark(Logo 字标)生成器。
 设计:品牌「光环 + 核」图形(icon.svg 同源)+ Inter 字体的 "AI NEWS HUB" 字标
   - 左侧开口能量环 + 发光核,环描边走双色渐变(classic: Future Blue → Intelligence Purple)
   - "AI" 二字 Bold + 同款渐变;"NEWS HUB" Medium + 宽字距,随深/浅主题的中性色
-  - 渐变与中性色全部引用 @color,深/浅主题自适应,
-    与 Compose 侧 BrandGradient(primary→secondary)同套色值
-  - mono 皮肤(黑白灰阶原型风)另出两份:渐变/文字换灰阶,与 ui/theme/Color.kt
-    的 MonoLight/MonoDarkColors 同套色值
+  - 色值集中写在下方 VARIANTS 表:classic 渐变与 Compose 侧 BrandGradient
+    (primary→secondary)同套色值;mono 皮肤(黑白原型风)渐变尾色为字标专属
+    装饰中灰 —— 不随色板 secondary(它兼任底栏选中墨色,比字标需要的更深),
 
 输出(入库资源,重新运行即重新生成):
   - app/src/main/res/drawable/ic_wordmark.xml             classic 浅色变体
@@ -80,13 +79,13 @@ VARIANTS = {
     ),
     ("mono", "light"): dict(
         name="ic_wordmark_mono",
-        gradient=("#000000", "#6B6B6B"),                       # MonoLight primary → secondary
+        gradient=("#000000", "#6B6B6B"),                       # 墨黑 → 装饰中灰(字标专属,不随色板 secondary)
         text="#141414",                                        # MonoLight onSurface
         dot=((0.0, "#FFFFFF"), (0.55, "#8A8A8A"), (1.0, "#000000")),
     ),
     ("mono", "dark"): dict(
         name="ic_wordmark_mono_dark",
-        gradient=("#F5F5F5", "#C6C6C6"),                       # MonoDark primary → secondary
+        gradient=("#F5F5F5", "#C6C6C6"),                       # 纸白 → 装饰中灰(同上)
         text="#F1F1F1",                                        # MonoDark onSurface
         dot=((0.0, "#FFFFFF"), (0.55, "#8A8A8A"), (1.0, "#000000")),
     ),
