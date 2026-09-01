@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -33,6 +34,8 @@ import androidx.compose.ui.unit.dp
 import com.peng.ainewshub.R
 import com.peng.ainewshub.data.repo.ShortContentException
 import com.peng.ainewshub.data.prefs.AiConfigStore
+import com.peng.ainewshub.data.prefs.SettingsStore
+import com.peng.ainewshub.data.prefs.ThemeMode
 import com.peng.ainewshub.data.repo.TranslationRepository
 import com.peng.ainewshub.ui.i18n.AppLocale
 import com.peng.ainewshub.ui.toUiError
@@ -40,6 +43,7 @@ import com.peng.ainewshub.ui.theme.AiNewsHubTheme
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 /**
  * 系统选中菜单「译」的落地 Activity。
@@ -65,6 +69,9 @@ class TranslateSelectionActivity : ComponentActivity() {
         if (text.isNullOrBlank()) { finish(); return }
 
         val configStore = AiConfigStore(applicationContext)
+        // 显示偏好(主题模式/皮肤)一次性读取:本 Activity 弹出即用即走,
+        // 无需订阅 Flow;与主入口同规则解析 ThemeMode(System 回系统深浅)
+        val prefs = runBlocking { SettingsStore(applicationContext).prefsFlow.first() }
 
         // 开关关闭时根本不构建 UI:系统菜单项无法运行时动态隐藏,
         // 这里在 setContent 前拦截——Toast 提示后直接关闭,连 Sheet 都不渲染。
@@ -80,7 +87,14 @@ class TranslateSelectionActivity : ComponentActivity() {
                 return@launch
             }
             setContent {
-                AiNewsHubTheme {
+                AiNewsHubTheme(
+                    darkTheme = when (prefs.themeMode) {
+                        ThemeMode.System -> isSystemInDarkTheme()
+                        ThemeMode.Light -> false
+                        ThemeMode.Dark -> true
+                    },
+                    skin = prefs.skin
+                ) {
                     TranslateSheet(
                         text = text,
                         onDismiss = { finish() }

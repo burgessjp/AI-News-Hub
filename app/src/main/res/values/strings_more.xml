@@ -35,9 +35,13 @@
     <string name="settings_theme_system">跟随系统</string>
     <string name="settings_theme_light">亮色</string>
     <string name="settings_theme_dark">暗色</string>
+    <string name="settings_skin">皮肤</string>
+    <string name="skin_default">默认</string>
+    <string name="skin_mono">黑白</string>
     <string name="settings_dynamic_color">动态取色</string>
     <string name="settings_dynamic_color_subtitle">跟随壁纸生成配色,覆盖品牌色</string>
     <string name="settings_dynamic_color_unsupported">需 Android 12 及以上</string>
+    <string name="settings_dynamic_color_skin_active">皮肤配色生效中,动态取色暂不可用</string>
     <string name="settings_section_font">字体</string>
     <string name="settings_font_family">字体族</string>
     <string name="settings_font_default">默认</string>

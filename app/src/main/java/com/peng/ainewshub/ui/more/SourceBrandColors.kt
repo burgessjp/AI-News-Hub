@@ -1,11 +1,11 @@
 package com.peng.ainewshub.ui.more
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
 import com.peng.ainewshub.data.model.OpenAiAnthropicNews
 import com.peng.ainewshub.data.model.ProductHunt
+import com.peng.ainewshub.ui.theme.LocalAppDarkTheme
 
 /**
  * Hub 九源品牌色 —— 更多页「浏览」组 48dp 图标块的固定品牌配色。
@@ -38,9 +38,9 @@ object SourceBrand {
     /** HackerNews —— 品牌橙 #FF6600 + 白图标(还原 HN 标识观感)。 */
     val HackerNews = SourceBrandColors(container = Color(0xFFFF6600), icon = Color.White)
 
-    /** GitHub —— 浅色模式深块白图标;深色模式反转为浅块深图标。 */
+    /** GitHub —— 浅色模式深块白图标;深色模式反转为浅块深图标(明暗跟随用户 ThemeMode)。 */
     val GitHub: SourceBrandColors
-        @Composable get() = if (isSystemInDarkTheme()) {
+        @Composable get() = if (LocalAppDarkTheme.current) {
             SourceBrandColors(container = GitHubContainerNight, icon = Color(0xFF24292F))
         } else {
             SourceBrandColors(container = GitHubContainerDay, icon = Color.White)

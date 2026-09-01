@@ -1,8 +1,10 @@
 package com.peng.ainewshub.ui.trends
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import com.peng.ainewshub.data.prefs.AppSkin
+import com.peng.ainewshub.ui.theme.LocalAppDarkTheme
+import com.peng.ainewshub.ui.theme.LocalAppSkin
 
 /**
  * 趋势词云专用调色板 —— 词云页(螺旋 / 圆形气泡两种形态)词条的固定配色。
@@ -15,6 +17,12 @@ import androidx.compose.ui.graphics.Color
  * 配色结构:六个字号档各一个色相(蓝 / 橙 / 绿 / 紫 / 玫红 / 青灰,大词→小词,
  * 与 App 品牌蓝同族起头),每档两个明暗变体按落位序号交替 —— 同档有家族感
  * 又不呆板;浅色模式用深饱和色、深色模式用浅亮色,各自保证 surface 上对比度。
+ *
+ * 黑白皮肤(Mono)另有灰阶色表:去色相、靠明度阶梯保档位区分(头档最深/最亮 →
+ * 尾档最浅/最暗),与皮肤观感一致。
+ *
+ * 深浅判断读 [LocalAppDarkTheme](用户 ThemeMode 解析结果)而非 isSystemInDarkTheme():
+ * 用户强制浅/深色时系统 uiMode 与界面不一致,跟随后者才不与 colorScheme 错配。
  */
 
 /** 浅色模式色表:[字号档][明暗变体]。 */
@@ -37,7 +45,35 @@ private val CloudPaletteNight = listOf(
     listOf(Color(0xFF93A5B9), Color(0xFFAFBECE))   // 青灰
 )
 
-/** 词云词条配色表(6 字号档 × 2 明暗变体):词条按 [tier][shade] 取色,随深浅色模式切换。 */
+/** 黑白皮肤 · 浅色色表:深灰阶梯(头档近黑 → 尾档中灰),白底上保对比。 */
+private val CloudPaletteMonoDay = listOf(
+    listOf(Color(0xFF15151A), Color(0xFF242429)),  // 近黑 —— 头部大词
+    listOf(Color(0xFF2C2C32), Color(0xFF38383E)),
+    listOf(Color(0xFF414148), Color(0xFF4B4B52)),
+    listOf(Color(0xFF505057), Color(0xFF58585F)),
+    listOf(Color(0xFF5C5C63), Color(0xFF64646B)),
+    listOf(Color(0xFF66666D), Color(0xFF6E6E75))   // 中灰 —— 最小词
+)
+
+/** 黑白皮肤 · 深色色表:浅灰阶梯(头档纸白 → 尾档中浅灰),黑底上保对比。 */
+private val CloudPaletteMonoNight = listOf(
+    listOf(Color(0xFFF2F2F5), Color(0xFFE4E4E8)),  // 纸白 —— 头部大词
+    listOf(Color(0xFFD8D8DC), Color(0xFFCCCCD1)),
+    listOf(Color(0xFFC0C0C6), Color(0xFFB5B5BB)),
+    listOf(Color(0xFFABABB2), Color(0xFFA1A1A8)),
+    listOf(Color(0xFF97979E), Color(0xFF8E8E95)),
+    listOf(Color(0xFF86868D), Color(0xFF7E7E85))   // 中浅灰 —— 最小词
+)
+
+/**
+ * 词云词条配色表(6 字号档 × 2 明暗变体):词条按 [tier][shade] 取色,
+ * 随用户主题模式 + 皮肤切换(黑白皮肤用灰阶色表)。
+ */
 @Composable
-fun cloudTierColors(): List<List<Color>> =
-    if (isSystemInDarkTheme()) CloudPaletteNight else CloudPaletteDay
+fun cloudTierColors(): List<List<Color>> {
+    val dark = LocalAppDarkTheme.current
+    return when (LocalAppSkin.current) {
+        AppSkin.Classic -> if (dark) CloudPaletteNight else CloudPaletteDay
+        AppSkin.Mono -> if (dark) CloudPaletteMonoNight else CloudPaletteMonoDay
+    }
+}

@@ -15,6 +15,16 @@ enum class ThemeMode {
 }
 
 /**
+ * 皮肤(配色方案)—— 设置页「皮肤」选项,按 [name] 持久化于 display_prefs 的 skin 键。
+ * Classic = 品牌蓝紫色板(默认);Mono = 黑白灰阶原型风,明暗仍跟随 [ThemeMode]
+ * (浅色白底黑字 / 深色黑底白字,两套灰阶板见 ui/theme/Color.kt)。
+ * 皮肤优先于动态取色:非 Classic 时壁纸派生色让位(见 ui/theme/Theme.kt)。
+ */
+enum class AppSkin {
+    Classic, Mono
+}
+
+/**
  * 字体族(系统默认 / 衬线 / 等宽),按 [name] 持久化。
  * 仅用 Compose 内置 FontFamily,无需引入外部字体资源。
  */

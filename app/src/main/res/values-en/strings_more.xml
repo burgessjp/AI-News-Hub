@@ -31,9 +31,13 @@
     <string name="settings_theme_system">Follow system</string>
     <string name="settings_theme_light">Light</string>
     <string name="settings_theme_dark">Dark</string>
+    <string name="settings_skin">Skin</string>
+    <string name="skin_default">Default</string>
+    <string name="skin_mono">Mono</string>
     <string name="settings_dynamic_color">Dynamic color</string>
     <string name="settings_dynamic_color_subtitle">Derive colors from your wallpaper, overriding brand colors</string>
     <string name="settings_dynamic_color_unsupported">Requires Android 12 or later</string>
+    <string name="settings_dynamic_color_skin_active">Unavailable while a skin is active</string>
     <string name="settings_section_font">Font</string>
     <string name="settings_font_family">Font family</string>
     <string name="settings_font_default">Default</string>

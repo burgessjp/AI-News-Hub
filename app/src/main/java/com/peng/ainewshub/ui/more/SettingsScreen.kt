@@ -63,6 +63,7 @@ import com.peng.ainewshub.data.diagnostics.DiagnosticsLog
 import com.peng.ainewshub.data.repo.BrowseHistoryRepository
 import com.peng.ainewshub.data.CacheManager
 import com.peng.ainewshub.data.prefs.AppLanguage
+import com.peng.ainewshub.data.prefs.AppSkin
 import com.peng.ainewshub.data.prefs.FontChoice
 import com.peng.ainewshub.data.prefs.FontScale
 import com.peng.ainewshub.data.prefs.ThemeMode
@@ -90,6 +91,18 @@ val ThemeMode.labelRes: Int
         ThemeMode.System -> R.string.settings_theme_system
         ThemeMode.Light -> R.string.settings_theme_light
         ThemeMode.Dark -> R.string.settings_theme_dark
+    }
+
+/**
+ * 皮肤(配色方案)—— 枚举纯值在 [com.peng.ainewshub.data.prefs.AppSkin](data 层,
+ * 持久化词汇),此处仅挂展示映射;由 com.peng.ainewshub.ui.nav.AiNewsHubApp 持有,
+ * 设置页通过回调修改。Mono 明暗仍跟随 ThemeMode,且优先于动态取色。
+ */
+@get:StringRes
+val AppSkin.labelRes: Int
+    get() = when (this) {
+        AppSkin.Classic -> R.string.skin_default
+        AppSkin.Mono -> R.string.skin_mono
     }
 
 /**
@@ -133,7 +146,8 @@ val FontScale.labelRes: Int
  *
  * 视觉与主列表页同构:章节条 + 扁平行;选择器为轨道式 [SegmentedOptionRow],
  * 行图标用彩色图标块([SettingsRow] 的 iconAccent,与「更多」页 IconTileRow 同语言)。
- *  - 外观:主题模式三选一(系统/亮/暗)+ 动态取色开关(Material You,Android 12+)
+ *  - 外观:主题模式三选一(系统/亮/暗)+ 皮肤两选一(默认/黑白,优先于动态取色)
+ *    + 动态取色开关(Material You,Android 12+,非默认皮肤下置灰让位)
  *  - 字体:字体族三选一(默认/衬线/等宽)+ 字号三档(紧凑/标准/大号)
  *  - 语言:跟随系统 / 简体中文 / English,切换后 Activity 重建生效(见 ui/i18n/AppLocale)
  *  - 通知:每日更新通知开关(WorkManager 本地调度,API 33+ 打开时请求运行时权限)
@@ -149,6 +163,8 @@ val FontScale.labelRes: Int
 fun SettingsScreen(
     themeMode: ThemeMode,
     onSelectTheme: (ThemeMode) -> Unit,
+    skin: AppSkin,
+    onSelectSkin: (AppSkin) -> Unit,
     dynamicColor: Boolean,
     onToggleDynamicColor: (Boolean) -> Unit,
     fontChoice: FontChoice,
@@ -178,6 +194,7 @@ fun SettingsScreen(
     }
 
     val themeOptions = ThemeMode.entries.map { stringResource(it.labelRes) }
+    val skinOptions = AppSkin.entries.map { stringResource(it.labelRes) }
     val fontOptions = FontChoice.entries.map { stringResource(it.labelRes) }
     val fontScaleOptions = FontScale.entries.map { stringResource(it.labelRes) }
 
@@ -199,7 +216,7 @@ fun SettingsScreen(
             modifier = Modifier.padding(padding),
             contentPadding = PaddingValues(bottom = 24.dp)
         ) {
-            // 外观 section —— 主题三段式(轨道式)+ 动态取色开关
+            // 外观 section —— 主题三段式(轨道式)+ 皮肤两段式 + 动态取色开关
             item { SectionHeader(stringResource(R.string.settings_section_appearance)) }
             item {
                 SegmentedOptionRow(
@@ -210,18 +227,34 @@ fun SettingsScreen(
                 )
             }
             item {
-                // Material You 动态取色:壁纸派生色,覆盖品牌双色板;Android 12+ 才可用
+                // 皮肤(配色方案):Mono 黑白灰阶原型风,明暗仍跟随上方主题模式
+                GroupLabel(stringResource(R.string.settings_skin))
+                SegmentedOptionRow(
+                    options = skinOptions,
+                    selectedIndex = skin.ordinal,
+                    onSelect = { idx -> onSelectSkin(AppSkin.entries[idx]) },
+                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 4.dp)
+                )
+            }
+            item {
+                // Material You 动态取色:壁纸派生色,覆盖品牌双色板;Android 12+ 才可用。
+                // 皮肤优先于动态取色:非默认皮肤下开关置灰让位(Theme.kt 同规则忽略该开关)
                 val dynamicSupported = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
+                val dynamicAvailable = dynamicSupported && skin == AppSkin.Classic
                 SettingsRow(
                     icon = Icons.Filled.Palette,
                     iconAccent = MaterialTheme.colorScheme.secondary,
                     title = stringResource(R.string.settings_dynamic_color),
-                    subtitle = if (dynamicSupported) stringResource(R.string.settings_dynamic_color_subtitle) else stringResource(R.string.settings_dynamic_color_unsupported),
+                    subtitle = when {
+                        !dynamicSupported -> stringResource(R.string.settings_dynamic_color_unsupported)
+                        !dynamicAvailable -> stringResource(R.string.settings_dynamic_color_skin_active)
+                        else -> stringResource(R.string.settings_dynamic_color_subtitle)
+                    },
                     showDivider = false,
                     trailing = {
                         Switch(
-                            checked = dynamicColor && dynamicSupported,
-                            enabled = dynamicSupported,
+                            checked = dynamicColor && dynamicAvailable,
+                            enabled = dynamicAvailable,
                             onCheckedChange = { onToggleDynamicColor(it) }
                         )
                     },

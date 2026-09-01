@@ -46,6 +46,7 @@ class SettingsStore(context: Context) {
 
     data class DisplayPrefs(
         val themeMode: ThemeMode = ThemeMode.System,
+        val skin: AppSkin = AppSkin.Classic,
         val dynamicColor: Boolean = false,
         val fontChoice: FontChoice = FontChoice.System,
         val fontScale: FontScale = FontScale.Standard,
@@ -57,6 +58,8 @@ class SettingsStore(context: Context) {
         DisplayPrefs(
             themeMode = p[KEY_THEME]?.let { name -> runCatching { ThemeMode.valueOf(name) }.getOrNull() }
                 ?: ThemeMode.System,
+            skin = p[KEY_SKIN]?.let { name -> runCatching { AppSkin.valueOf(name) }.getOrNull() }
+                ?: AppSkin.Classic,
             dynamicColor = p[KEY_DYNAMIC_COLOR] ?: false,
             fontChoice = p[KEY_FONT]?.let { name -> runCatching { FontChoice.valueOf(name) }.getOrNull() }
                 ?: FontChoice.System,
@@ -70,6 +73,10 @@ class SettingsStore(context: Context) {
 
     suspend fun updateTheme(mode: ThemeMode) {
         dataStore.edit { it[KEY_THEME] = mode.name }
+    }
+
+    suspend fun updateSkin(skin: AppSkin) {
+        dataStore.edit { it[KEY_SKIN] = skin.name }
     }
 
     suspend fun updateDynamicColor(enabled: Boolean) {
@@ -292,6 +299,7 @@ class SettingsStore(context: Context) {
 
     private companion object {
         val KEY_THEME = stringPreferencesKey("theme_mode")
+        val KEY_SKIN = stringPreferencesKey("skin")
         val KEY_DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
         val KEY_FONT = stringPreferencesKey("font_choice")
         val KEY_FONT_SCALE = stringPreferencesKey("font_scale")

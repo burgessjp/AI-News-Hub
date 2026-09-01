@@ -73,6 +73,7 @@ import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.peng.ainewshub.data.prefs.AppSkin
 import com.peng.ainewshub.data.prefs.FontChoice
 import com.peng.ainewshub.data.prefs.FontScale
 import com.peng.ainewshub.data.prefs.SettingsStore
@@ -154,6 +155,7 @@ internal fun AiNewsHubApp(
         initialValue = AiConfig()
     )
     val onSelectTheme: (ThemeMode) -> Unit = { scope.launch { settingsStore.updateTheme(it) } }
+    val onSelectSkin: (AppSkin) -> Unit = { scope.launch { settingsStore.updateSkin(it) } }
     val onToggleDynamicColor: (Boolean) -> Unit = { scope.launch { settingsStore.updateDynamicColor(it) } }
     val onSelectFont: (FontChoice) -> Unit = { scope.launch { settingsStore.updateFont(it) } }
     val onSelectFontScale: (FontScale) -> Unit = { scope.launch { settingsStore.updateFontScale(it) } }
@@ -423,6 +425,7 @@ internal fun AiNewsHubApp(
     val displayControls = DisplayControls(
         prefs = displayPrefs,
         onSelectTheme = onSelectTheme,
+        onSelectSkin = onSelectSkin,
         onToggleDynamicColor = onToggleDynamicColor,
         onSelectFont = onSelectFont,
         onSelectFontScale = onSelectFontScale,
@@ -438,6 +441,7 @@ internal fun AiNewsHubApp(
     AiNewsHubTheme(
         darkTheme = darkTheme,
         dynamicColor = dynamicColor,
+        skin = displayPrefs.skin,
         fontFamily = if (fontChoice == FontChoice.System) null else fontChoice.fontFamily,
         fontScale = fontScale.scale
     ) {

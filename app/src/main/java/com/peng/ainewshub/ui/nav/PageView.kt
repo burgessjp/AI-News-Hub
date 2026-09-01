@@ -18,6 +18,7 @@ import com.peng.ainewshub.ui.daily.DailyArchiveScreen
 import com.peng.ainewshub.ui.daily.DailyDateScreen
 import com.peng.ainewshub.ui.daily.DailyScreen
 import com.peng.ainewshub.data.prefs.AppLanguage
+import com.peng.ainewshub.data.prefs.AppSkin
 import com.peng.ainewshub.ui.items.BrowseHistoryScreen
 import com.peng.ainewshub.ui.items.FavoritesScreen
 import com.peng.ainewshub.ui.items.GitHubTrendingScreen
@@ -74,6 +75,7 @@ internal class PageEnv(
 internal class DisplayControls(
     val prefs: SettingsStore.DisplayPrefs,
     val onSelectTheme: (ThemeMode) -> Unit,
+    val onSelectSkin: (AppSkin) -> Unit,
     val onToggleDynamicColor: (Boolean) -> Unit,
     val onSelectFont: (FontChoice) -> Unit,
     val onSelectFontScale: (FontScale) -> Unit,
@@ -184,6 +186,8 @@ internal fun PageView(
         Page.Settings -> SettingsScreen(
             themeMode = display.prefs.themeMode,
             onSelectTheme = display.onSelectTheme,
+            skin = display.prefs.skin,
+            onSelectSkin = display.onSelectSkin,
             dynamicColor = display.prefs.dynamicColor,
             onToggleDynamicColor = display.onToggleDynamicColor,
             fontChoice = display.prefs.fontChoice,
