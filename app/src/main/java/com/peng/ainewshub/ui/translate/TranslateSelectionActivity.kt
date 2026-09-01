@@ -43,7 +43,6 @@ import com.peng.ainewshub.ui.theme.AiNewsHubTheme
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 
 /**
  * 系统选中菜单「译」的落地 Activity。
@@ -69,12 +68,12 @@ class TranslateSelectionActivity : ComponentActivity() {
         if (text.isNullOrBlank()) { finish(); return }
 
         val configStore = AiConfigStore(applicationContext)
-        // 显示偏好(主题模式/皮肤)一次性读取:本 Activity 弹出即用即走,
-        // 无需订阅 Flow;与主入口同规则解析 ThemeMode(System 回系统深浅)
-        val prefs = runBlocking { SettingsStore(applicationContext).prefsFlow.first() }
 
         // 开关关闭时根本不构建 UI:系统菜单项无法运行时动态隐藏,
         // 这里在 setContent 前拦截——Toast 提示后直接关闭,连 Sheet 都不渲染。
+        // 显示偏好(主题模式/皮肤)同样在协程内一次性挂起读取(本 Activity 弹出
+        // 即用即走,无需订阅 Flow),避免主线程同步磁盘 I/O;ThemeMode 解析
+        // 与主入口同规则(System 回系统深浅)。
         lifecycleScope.launch {
             val enabled = configStore.configFlow.first().translateEnabled
             if (!enabled) {
@@ -86,6 +85,7 @@ class TranslateSelectionActivity : ComponentActivity() {
                 finish()
                 return@launch
             }
+            val prefs = SettingsStore(applicationContext).prefsFlow.first()
             setContent {
                 AiNewsHubTheme(
                     darkTheme = when (prefs.themeMode) {
