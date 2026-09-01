@@ -24,4 +24,4 @@ AI_NEWS_HUB_AI_BASE_URL / AI_NEWS_HUB_AI_MODEL / AI_NEWS_HUB_AI_API_KEY / GITCOD
 
 ## CI/CD
 
-`.github/workflows/`：`build.yml`（PR 跑 `assembleDebug` + 并行 `pipeline-tests` job 跑流水线 pytest）/ `release.yml`（`v*` tag 发版，从 secrets 还原 keystore，versionName/versionCode 从 tag 注入）/ `fetch-data.yml`（每日定时跑数据流水线；语音速报**零 Python 依赖**——引擎克隆/cmake 构建/GGUF 下载全由 `tts_broadcast.py` 按需自举，`actions/cache` 缓存整个 `third_party/tts-engine`（源码 + build 二进制 + ≈1.2GB GGUF，key 绑 `QWENTTS_REF` pin SHA；脚本按二进制/GGUF 文件级判在位，缓存缺啥补啥，无目录级恢复陷阱）；timeout 50 分钟 = 25（抓取+AI+推送）+ TTS 阶段墙钟硬上限 20 + 冷缓存自举余量）。
+`.github/workflows/`：`build.yml`（PR 跑 `assembleDebug` + 并行 `pipeline-tests` job 跑流水线 pytest）/ `release.yml`（`v*` tag 发版，从 secrets 还原 keystore，versionName/versionCode 从 tag 注入；Release body 从 CHANGELOG.md 提取对应版本节而非 GitHub 自动生成摘要——App 更新弹窗解析此 body 展示「本次更新了什么」，CHANGELOG.md 仍是唯一真相源）/ `fetch-data.yml`（每日定时跑数据流水线；语音速报**零 Python 依赖**——引擎克隆/cmake 构建/GGUF 下载全由 `tts_broadcast.py` 按需自举，`actions/cache` 缓存整个 `third_party/tts-engine`（源码 + build 二进制 + ≈1.2GB GGUF，key 绑 `QWENTTS_REF` pin SHA；脚本按二进制/GGUF 文件级判在位，缓存缺啥补啥，无目录级恢复陷阱）；timeout 50 分钟 = 25（抓取+AI+推送）+ TTS 阶段墙钟硬上限 20 + 冷缓存自举余量）。

@@ -60,9 +60,26 @@ jobs:
         id: version
         run: echo "name=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
 
+      - name: Extract changelog section
+        # Release body = CHANGELOG.md 对应版本节(单一真相源):App 更新弹窗解析
+        # 此 body 展示「本次更新了什么」。弃用 generate_release_notes(PR 列表式
+        # 自动摘要,对用户无信息量);提取不到时 body 留空,App 侧优雅降级
+        run: |
+          VN="${GITHUB_REF_NAME#v}"
+          BODY=$(awk -v ver="$VN" '
+            $0 ~ "^## \\[" ver "\\]" { found = 1; next }
+            found && /^## / { exit }
+            found { print }
+          ' CHANGELOG.md)
+          {
+            echo "changelog_body<<CHANGELOG_EOF"
+            echo "$BODY"
+            echo "CHANGELOG_EOF"
+          } >> "$GITHUB_ENV"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           name: ${{ steps.version.outputs.name }}
-          generate_release_notes: true
+          body: ${{ env.changelog_body }}
           files: app/build/outputs/apk/release/app-release.apk

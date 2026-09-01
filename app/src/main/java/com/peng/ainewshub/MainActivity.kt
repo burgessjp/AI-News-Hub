@@ -2,12 +2,16 @@ package com.peng.ainewshub
 
 import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
+import com.peng.ainewshub.data.net.UpdateDownloadService
+import com.peng.ainewshub.data.net.UpdateDownloadState
+import com.peng.ainewshub.data.net.UpdateDownloader
 import com.peng.ainewshub.ui.components.AppTab
 import com.peng.ainewshub.ui.i18n.AppLocale
 import com.peng.ainewshub.ui.nav.AiNewsHubApp
@@ -22,6 +26,13 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_OPEN_URL = "com.peng.ainewshub.extra.OPEN_URL"
         const val EXTRA_OPEN_URL_TITLE = "com.peng.ainewshub.extra.OPEN_URL_TITLE"
         const val EXTRA_OPEN_URL_SOURCE = "com.peng.ainewshub.extra.OPEN_URL_SOURCE"
+
+        /**
+         * Intent extra:更新「下载完成,点击安装」通知的 contentIntent 直连本 Activity
+         * (Android 12+ 禁止通知经 service/receiver trampoline 拉起 Activity),见
+         * [installPendingUpdate]。
+         */
+        const val EXTRA_INSTALL_UPDATE = "com.peng.ainewshub.extra.INSTALL_UPDATE"
     }
 
     /** 外部深链目标(ainewshub:// scheme,解析见 [deepLink])。 */
@@ -60,6 +71,7 @@ class MainActivity : ComponentActivity() {
                 openSettingsRequest = true
             }
             applyDeepLinks(intent)
+            installPendingUpdate(intent)
         }
         setContent {
             AiNewsHubApp(
@@ -77,6 +89,32 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         applyDeepLinks(intent)
+        installPendingUpdate(intent)
+    }
+
+    /**
+     * 消费「更新下载完成,点击安装」通知([EXTRA_INSTALL_UPDATE],contentIntent 直连
+     * 本 Activity):拉起系统安装器安装后台下载好的 APK。与关于页弹窗内点「安装」
+     * 同一通路 —— 需「安装未知应用」授权时 Toast 提示并跳系统设置。
+     *
+     * APK 落 cacheDir 可能已被系统低存储回收:文件不在即复位下载状态并提示重下,
+     * 不带着失效路径去拉安装器。
+     */
+    private fun installPendingUpdate(intent: Intent) {
+        if (!intent.getBooleanExtra(EXTRA_INSTALL_UPDATE, false)) return
+        val apk = (UpdateDownloadService.state.value as? UpdateDownloadState.Done)?.apk
+        if (apk == null || !apk.exists()) {
+            UpdateDownloadService.invalidateDone()
+            Toast.makeText(this, R.string.about_update_download_invalidated, Toast.LENGTH_LONG).show()
+            return
+        }
+        when (UpdateDownloader.install(this, apk)) {
+            UpdateDownloader.InstallState.NeedPermission -> {
+                Toast.makeText(this, R.string.about_update_install_hint, Toast.LENGTH_LONG).show()
+                UpdateDownloader.requestInstallPermission(this)
+            }
+            UpdateDownloader.InstallState.Started -> Unit
+        }
     }
 
     /**

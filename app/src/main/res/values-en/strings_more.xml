@@ -84,15 +84,21 @@
     <string name="about_update_checking">Checking…</string>
     <string name="about_update_up_to_date">Up to date</string>
     <string name="about_update_available_title">New version v%1$s available</string>
-    <!-- In-dialog install flow (data/UpdateDownloader.kt): download → progress → install, web page as fallback -->
+    <!-- In-dialog install flow (data/net): foreground-service background download → notification progress → tap to install, web page as fallback -->
     <string name="about_update_download">Download APK</string>
     <string name="about_update_downloading">Downloading…</string>
     <string name="about_update_downloading_percent">Downloading… %1$d%%</string>
     <string name="about_update_download_done">Download complete. Ready to install</string>
     <string name="about_update_download_failed">Download failed. Try again, or open the release page to download manually</string>
+    <string name="about_update_download_invalidated">The downloaded APK is gone. Please download it again</string>
     <string name="about_update_install">Install</string>
     <string name="about_update_install_hint">Allow this app to install unknown apps in system settings first, then return and tap Install</string>
     <string name="about_update_web_fallback">Open release page</string>
+    <!-- Background download notifications (data/net/UpdateDownloadService.kt): progress + tap-to-install on completion -->
+    <string name="update_notification_channel_name">App update</string>
+    <string name="update_notification_downloading">Downloading v%1$s</string>
+    <string name="update_notification_done_title">Update ready to install</string>
+    <string name="update_notification_done_text">Tap to install</string>
     <!-- "View changelog" entry in the new-version dialog (opens the changelog screen) -->
     <string name="changelog_view">View changelog</string>
 

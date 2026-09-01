@@ -13,6 +13,9 @@
          (targetSdk 34+ 强制),见 playback/TtsPlaybackService.kt -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <!-- 更新后台下载前台服务:dataSync 类型(targetSdk 34+ 强制),
+         见 data/net/UpdateDownloadService.kt -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
     <!-- 网页唤起外部 App:Android 11+ 需声明 <queries> 才能 resolveActivity
          判断目标 App 是否存在(intent:// 及普通自定义 scheme)。 -->
@@ -111,6 +114,14 @@
             android:name=".playback.TtsPlaybackService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
+
+        <!-- 更新后台下载前台服务(通知栏进度 + 完成点击安装):
+             仅前台 UI 点击启动(exported=false);dataSync 类型为
+             targetSdk 34+ 强制声明,配套权限见上方 uses-permission 注释 -->
+        <service
+            android:name=".data.net.UpdateDownloadService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
 
         <!-- 系统选中菜单「译」:声明 PROCESS_TEXT 后,系统 ActionMode 自动把 label「译」
              作为菜单项加入;点击时通过 EXTRA_PROCESS_TEXT 传入选中文本。

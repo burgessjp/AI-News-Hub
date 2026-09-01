@@ -21,11 +21,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.peng.ainewshub.R
 import com.peng.ainewshub.ui.EmptyState
@@ -109,7 +104,8 @@ fun ChangelogScreen(
 }
 
 /**
- * 单个版本块：章节条（版本号 + 右侧日期/「当前」徽章）→ 分类小标签 → 条目列表。
+ * 单个版本块：章节条（版本号 + 右侧日期/「当前」徽章）→ 分类小节（共享渲染
+ * [ChangelogSections]，见 ChangelogBlocks.kt）。
  */
 @Composable
 private fun VersionBlock(version: ChangelogVersion, isCurrent: Boolean) {
@@ -132,23 +128,7 @@ private fun VersionBlock(version: ChangelogVersion, isCurrent: Boolean) {
             }
         }
     )
-    version.sections.forEach { section ->
-        Text(
-            text = localizedCategory(section.category),
-            style = AppText.bodySmall,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(start = 18.dp, top = 10.dp, bottom = 4.dp)
-        )
-        section.entries.forEach { entry ->
-            Text(
-                text = renderBoldLine(entry),
-                style = AppText.body,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 18.dp, vertical = 4.dp)
-            )
-        }
-    }
+    ChangelogSections(version.sections, Modifier.padding(horizontal = 18.dp))
 }
 
 /** 「当前」徽章 —— primaryContainer 实底胶囊，标记当前安装版本。 */
@@ -164,41 +144,5 @@ private fun CurrentBadge() {
             color = MaterialTheme.colorScheme.onPrimaryContainer,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
         )
-    }
-}
-
-/** 分类名 → 双语词条映射；未收录的分类（如未来新增的节名）原样显示。 */
-private fun categoryRes(category: String): Int? = when (category) {
-    "新增" -> R.string.changelog_category_added
-    "修复" -> R.string.changelog_category_fixed
-    "改进" -> R.string.changelog_category_improved
-    "核心功能" -> R.string.changelog_category_core
-    "数据流水线" -> R.string.changelog_category_pipeline
-    "工程化" -> R.string.changelog_category_engineering
-    else -> null
-}
-
-@Composable
-private fun localizedCategory(category: String): String =
-    categoryRes(category)?.let { stringResource(it) } ?: category
-
-/** 加粗段 `**...**` 匹配（非贪婪，不允许内部换行）；进程一份，不随行重建。 */
-private val BOLD_SEGMENT_REGEX = Regex("\\*\\*(.+?)\\*\\*")
-
-/**
- * 把单条日志解析为 [AnnotatedString]：`**标题** — 说明` 的加粗段渲染 SemiBold。
- * 与摘要卡（SummaryCard.renderRichLine）同一私有实现模式，按屏幕各留一份。
- */
-private fun renderBoldLine(line: String): AnnotatedString {
-    if (!line.contains("**")) return AnnotatedString(line)
-    val boldStyle = SpanStyle(fontWeight = FontWeight.SemiBold)
-    return buildAnnotatedString {
-        var lastEnd = 0
-        for (m in BOLD_SEGMENT_REGEX.findAll(line)) {
-            if (m.range.first > lastEnd) append(line.substring(lastEnd, m.range.first))
-            withStyle(boldStyle) { append(m.groupValues[1]) }
-            lastEnd = m.range.last + 1
-        }
-        if (lastEnd < line.length) append(line.substring(lastEnd))
     }
 }

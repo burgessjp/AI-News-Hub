@@ -10,10 +10,13 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Notes
@@ -48,8 +51,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.peng.ainewshub.R
 import com.peng.ainewshub.data.net.UpdateChecker
+import com.peng.ainewshub.data.net.UpdateDownloadService
+import com.peng.ainewshub.data.net.UpdateDownloadState
 import com.peng.ainewshub.data.net.UpdateDownloader
 import com.peng.ainewshub.ui.components.AppCard
 import com.peng.ainewshub.ui.components.AppTopBar
@@ -57,8 +63,6 @@ import com.peng.ainewshub.ui.components.AppTopBarDefaults
 import com.peng.ainewshub.ui.components.SectionHeader
 import com.peng.ainewshub.ui.components.SettingsRow
 import com.peng.ainewshub.ui.theme.AppText
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.io.File
 import com.peng.ainewshub.data.source.DEFAULT_SOURCE_ORDER
@@ -100,9 +104,9 @@ fun AboutScreen(
     // 「项目源码」行标题在非 Composable 的 onClick 回调里也要用(onOpenUrl 记录标题),提前取出
     val projectSourceTitle = stringResource(R.string.about_project_source_title)
 
-    // 检查更新:手动查 GitHub Releases 最新 tag 与本地 versionName 比较(见 UpdateChecker)。
-    // 失败静默视为「已是最新」;命中新版本弹窗内直接下载 APK 并拉起系统安装器
-    // (见 UpdateDownloader),失败才兜底回 Release 网页。
+    // 检查更新:手动查 GitHub Releases 与本地 versionName 比较(见 UpdateChecker)。
+    // 失败静默视为「已是最新」;命中新版本弹窗展示更新说明,下载交前台服务后台进行
+    // (见 UpdateDownloadService),无 APK 资产或下载失败才兜底回 Release 网页。
     val scope = rememberCoroutineScope()
     var updateChecking by remember { mutableStateOf(false) }
     var updateUpToDate by remember { mutableStateOf(false) }
@@ -119,17 +123,11 @@ fun AboutScreen(
         }
     }
 
-    // 弹窗内直装状态机:下载中(进度,null 为不确定进度)→ 完成(已下载文件)/失败 → 安装。
-    // 进程重建丢失状态时回退到「待下载」重来即可,APK 落缓存目录会先清旧再写,无残留问题
-    //
-    // downloading 必须是独立可观察状态,不能由 Job.isActive 派生:下载结束时只写
-    // downloadedApk/downloadFailed,而弹窗 when 在「下载中」分支短路、从未读过这两个
-    // 状态 → 不订阅也就不重组,界面会永远停在「下载中 100%」,安装/重试按钮永不出现
-    var downloadJob by remember { mutableStateOf<Job?>(null) }
-    var downloading by remember { mutableStateOf(false) }
-    var downloadProgress by remember { mutableStateOf<Float?>(null) }
-    var downloadFailed by remember { mutableStateOf(false) }
-    var downloadedApk by remember { mutableStateOf<File?>(null) }
+    // 弹窗内直装状态机由前台服务 [UpdateDownloadService] 承载(本次改造核心):
+    // 下载不再挂在页面组合作用域上 —— 关弹窗 / 离开关于页 / App 退后台均继续,
+    // 进度常驻通知栏;此处只订阅进程级状态,重进关于页弹窗按状态恢复。
+    // 进程重建丢失状态时回退「待下载」重来即可,APK 落缓存目录会先清旧再写,无残留问题
+    val downloadState by UpdateDownloadService.state.collectAsStateWithLifecycle()
 
     fun startDownload(info: UpdateChecker.UpdateInfo) {
         // Release 未挂 APK 资产(异常情况):直接回网页兜底
@@ -138,24 +136,7 @@ fun AboutScreen(
             onOpenUrl(info.releaseUrl, updatePageTitle)
             return
         }
-        downloadFailed = false
-        downloadedApk = null
-        downloadProgress = null
-        downloading = true
-        downloadJob = scope.launch {
-            try {
-                downloadedApk = UpdateDownloader.download(context, url, info.version) { read, total ->
-                    downloadProgress = if (total > 0) read.toFloat() / total else null
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (_: Exception) {
-                downloadFailed = true
-            } finally {
-                // 结束(成功/失败/取消)统一翻牌,驱动弹窗离开「下载中」分支
-                downloading = false
-            }
-        }
+        UpdateDownloadService.start(context, url, info.version)
     }
 
     fun install(apk: File) {
@@ -265,13 +246,15 @@ fun AboutScreen(
         }
     }
 
-    // 发现新版本弹窗:状态机驱动 —— 待下载(版本号 + 说明截断)→ 下载中(进度条)→
-    // 完成(「安装」)/ 失败(重试 + 网页兜底)。底部半屏样式(对齐 OnboardingSheet):
-    // 主操作为全宽按钮(按状态切换),次操作收为下方居中文字按钮;始终保留
-    // 「查看更新日志」与「忽略」,下载中「忽略」兼作取消
+    // 发现新版本弹窗:标题 → 「本次更新了什么」常显块 → 下载状态区(进度/失败/
+    // 完成)→ 主操作 + 次操作。下载中可关弹窗(前台服务承载,后台继续);「忽略」
+    // 只关弹窗不取消下载。底部半屏样式(对齐 OnboardingSheet):主操作为全宽按钮
+    // (按状态切换),次操作收为下方居中文字按钮
     updateInfo?.let { info ->
+        // 本弹窗版本的下载状态:服务里残留的是其它版本(重查出的新版本)时按空闲处理
+        val dState = downloadState.forVersion(info.version)
         ModalBottomSheet(
-            onDismissRequest = { if (!downloading) updateInfo = null },
+            onDismissRequest = { updateInfo = null },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         ) {
             Column(
@@ -286,9 +269,15 @@ fun AboutScreen(
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(Modifier.height(16.dp))
-                when {
-                    downloading -> {
-                        val progress = downloadProgress
+                // 本次更新了什么:任何下载状态都常显(不因进度/失败/完成被顶掉),
+                // 跨版本更新时逐版本展示;高度封顶内滚防撑爆半屏
+                if (info.notes.isNotEmpty()) {
+                    UpdateNotesBlock(notes = info.notes)
+                    Spacer(Modifier.height(16.dp))
+                }
+                when (dState) {
+                    is UpdateDownloadState.Downloading -> {
+                        val progress = dState.progress
                         if (progress != null) {
                             LinearProgressIndicator(
                                 progress = { progress },
@@ -313,49 +302,38 @@ fun AboutScreen(
                             )
                         }
                     }
-                    downloadFailed -> Text(
+                    is UpdateDownloadState.Failed -> Text(
                         text = stringResource(R.string.about_update_download_failed),
                         style = AppText.bodySmall,
                         color = MaterialTheme.colorScheme.error
                     )
-                    downloadedApk != null -> Text(
+                    is UpdateDownloadState.Done -> Text(
                         text = stringResource(R.string.about_update_download_done),
                         style = AppText.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    else -> if (info.notes.isNotBlank()) {
-                        Text(
-                            text = info.notes,
-                            style = AppText.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 12,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
+                    UpdateDownloadState.Idle -> Unit
                 }
                 Spacer(Modifier.height(24.dp))
                 // 主操作(按状态切换):下载中取消 / 失败重试 / 已下载安装 / 默认下载
                 Button(
                     onClick = {
-                        when {
-                            downloading -> {
-                                UpdateDownloader.cancel()
-                                downloadJob?.cancel()
-                            }
-                            downloadFailed -> startDownload(info)
-                            downloadedApk != null -> downloadedApk?.let(::install)
-                            else -> startDownload(info)
+                        when (dState) {
+                            is UpdateDownloadState.Downloading -> UpdateDownloadService.cancel(context)
+                            is UpdateDownloadState.Failed -> startDownload(info)
+                            is UpdateDownloadState.Done -> install(dState.apk)
+                            UpdateDownloadState.Idle -> startDownload(info)
                         }
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
                         text = stringResource(
-                            when {
-                                downloading -> R.string.common_cancel
-                                downloadFailed -> R.string.common_retry
-                                downloadedApk != null -> R.string.about_update_install
-                                else -> R.string.about_update_download
+                            when (dState) {
+                                is UpdateDownloadState.Downloading -> R.string.common_cancel
+                                is UpdateDownloadState.Failed -> R.string.common_retry
+                                is UpdateDownloadState.Done -> R.string.about_update_install
+                                UpdateDownloadState.Idle -> R.string.about_update_download
                             }
                         ),
                         style = AppText.body,
@@ -369,7 +347,7 @@ fun AboutScreen(
                     horizontalArrangement = Arrangement.Center
                 ) {
                     // 下载失败时额外给网页兜底入口(直链异常时仍可手动下载)
-                    if (downloadFailed) {
+                    if (dState is UpdateDownloadState.Failed) {
                         TextButton(onClick = {
                             updateInfo = null
                             onOpenUrl(info.releaseUrl, updatePageTitle)
@@ -383,15 +361,8 @@ fun AboutScreen(
                     }) {
                         Text(stringResource(R.string.changelog_view))
                     }
-                    TextButton(
-                        onClick = {
-                            if (downloading) {
-                                UpdateDownloader.cancel()
-                                downloadJob?.cancel()
-                            }
-                            updateInfo = null
-                        }
-                    ) {
+                    // 忽略仅关弹窗:下载已在后台,不打断(取消走主按钮或通知栏)
+                    TextButton(onClick = { updateInfo = null }) {
                         Text(stringResource(R.string.common_ignore))
                     }
                 }
@@ -467,6 +438,61 @@ private fun BrandHeader(versionName: String) {
                 color = cs.outline,
                 textAlign = TextAlign.Center
             )
+        }
+    }
+}
+
+/** 把进程级下载状态挂到弹窗版本:非该版本的残留(重查出的新版本)视为空闲,不串台。 */
+private fun UpdateDownloadState.forVersion(version: String): UpdateDownloadState = when (this) {
+    is UpdateDownloadState.Idle -> this
+    is UpdateDownloadState.Downloading -> if (this.version == version) this else UpdateDownloadState.Idle
+    is UpdateDownloadState.Done -> if (this.version == version) this else UpdateDownloadState.Idle
+    is UpdateDownloadState.Failed -> if (this.version == version) this else UpdateDownloadState.Idle
+}
+
+/**
+ * 更新弹窗的「本次更新了什么」块 —— [UpdateChecker.UpdateNote] 列表渲染。
+ *
+ * 每版本 body 拼上 `## [version]` 合成头后复用 [parseChangelog] 解析(与 App 内
+ * 更新日志页同格式:release.yml 从 CHANGELOG.md 提取版本节写入 Release body),
+ * 结构化渲染分类 + `**加粗**` 条目;解析不出条目但 body 非空的历史 Release
+ * (自动生成的 body)退纯文本截断展示,两者皆空不渲染该版本。
+ */
+@Composable
+private fun UpdateNotesBlock(notes: List<UpdateChecker.UpdateNote>, modifier: Modifier = Modifier) {
+    val parsed = remember(notes) {
+        notes.map { note ->
+            note to parseChangelog("## [${note.version}]\n${note.markdown}").firstOrNull()
+        }
+    }
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(max = 260.dp)
+            .verticalScroll(rememberScrollState())
+    ) {
+        parsed.forEachIndexed { index, (note, version) ->
+            if (index > 0) Spacer(Modifier.height(12.dp))
+            if (version != null && version.entryCount > 0) {
+                // 多版本(跨版本更新)时版本小标题区分归属;单版本时弹窗标题已含版本号,不重复
+                if (parsed.size > 1) {
+                    Text(
+                        text = "v${note.version}",
+                        style = AppText.bodySmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                ChangelogSections(version.sections)
+            } else if (note.markdown.isNotBlank()) {
+                Text(
+                    text = note.markdown,
+                    style = AppText.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 8,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
     }
 }
