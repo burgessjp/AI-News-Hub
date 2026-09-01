@@ -80,15 +80,15 @@ VARIANTS = {
     ),
     ("mono", "light"): dict(
         name="ic_wordmark_mono",
-        gradient=("#1A1A1E", "#63636E"),                       # MonoLight primary → secondary
-        text="#1A1A1E",                                        # MonoLight onSurface
-        dot=((0.0, "#FFFFFF"), (0.55, "#8E8E96"), (1.0, "#1A1A1E")),
+        gradient=("#161613", "#5F5E55"),                       # MonoLight primary → secondary
+        text="#191917",                                        # MonoLight onSurface
+        dot=((0.0, "#FFFFFF"), (0.55, "#8B8A80"), (1.0, "#161613")),
     ),
     ("mono", "dark"): dict(
         name="ic_wordmark_mono_dark",
-        gradient=("#F0F0F3", "#B9B9C2"),                       # MonoDark primary → secondary
-        text="#EFEFF2",                                        # MonoDark onSurface
-        dot=((0.0, "#FFFFFF"), (0.55, "#8E8E96"), (1.0, "#1A1A1E")),
+        gradient=("#F0EFE6", "#C0BFB3"),                       # MonoDark primary → secondary
+        text="#EDECE4",                                        # MonoDark onSurface
+        dot=((0.0, "#FFFFFF"), (0.55, "#8B8A80"), (1.0, "#161613")),
     ),
 }
 
@@ -96,8 +96,8 @@ VARIANTS = {
 PREVIEW_BG = {
     ("classic", "light"): "#F9F9FF",
     ("classic", "dark"): "#11132A",
-    ("mono", "light"): "#FAFAFB",
-    ("mono", "dark"): "#0B0B0D",
+    ("mono", "light"): "#F4F3EE",
+    ("mono", "dark"): "#121210",
 }
 
 

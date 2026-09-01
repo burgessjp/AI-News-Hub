@@ -45,24 +45,24 @@ private val CloudPaletteNight = listOf(
     listOf(Color(0xFF93A5B9), Color(0xFFAFBECE))   // 青灰
 )
 
-/** 黑白皮肤 · 浅色色表:深灰阶梯(头档近黑 → 尾档中灰),白底上保对比。 */
+/** 黑白皮肤 · 浅色色表:暖灰墨阶(头档近墨黑 → 尾档中灰),纸白底上保对比。 */
 private val CloudPaletteMonoDay = listOf(
-    listOf(Color(0xFF15151A), Color(0xFF242429)),  // 近黑 —— 头部大词
-    listOf(Color(0xFF2C2C32), Color(0xFF38383E)),
-    listOf(Color(0xFF414148), Color(0xFF4B4B52)),
-    listOf(Color(0xFF505057), Color(0xFF58585F)),
-    listOf(Color(0xFF5C5C63), Color(0xFF64646B)),
-    listOf(Color(0xFF66666D), Color(0xFF6E6E75))   // 中灰 —— 最小词
+    listOf(Color(0xFF171713), Color(0xFF23231E)),  // 近墨黑 —— 头部大词
+    listOf(Color(0xFF2B2B25), Color(0xFF35352E)),
+    listOf(Color(0xFF3D3D36), Color(0xFF46463F)),
+    listOf(Color(0xFF4B4B44), Color(0xFF52524B)),
+    listOf(Color(0xFF57574F), Color(0xFF5D5D56)),
+    listOf(Color(0xFF616159), Color(0xFF67675F))   // 中灰 —— 最小词
 )
 
-/** 黑白皮肤 · 深色色表:浅灰阶梯(头档纸白 → 尾档中浅灰),黑底上保对比。 */
+/** 黑白皮肤 · 深色色表:暖调纸白阶(头档纸白 → 尾档中浅灰),墨黑底上保对比。 */
 private val CloudPaletteMonoNight = listOf(
-    listOf(Color(0xFFF2F2F5), Color(0xFFE4E4E8)),  // 纸白 —— 头部大词
-    listOf(Color(0xFFD8D8DC), Color(0xFFCCCCD1)),
-    listOf(Color(0xFFC0C0C6), Color(0xFFB5B5BB)),
-    listOf(Color(0xFFABABB2), Color(0xFFA1A1A8)),
-    listOf(Color(0xFF97979E), Color(0xFF8E8E95)),
-    listOf(Color(0xFF86868D), Color(0xFF7E7E85))   // 中浅灰 —— 最小词
+    listOf(Color(0xFFF1F0E8), Color(0xFFE3E2D9)),  // 纸白 —— 头部大词
+    listOf(Color(0xFFD7D6CC), Color(0xFFCBCABF)),
+    listOf(Color(0xFFC0BFB4), Color(0xFFB5B4A9)),
+    listOf(Color(0xFFABAAA0), Color(0xFFA2A197)),
+    listOf(Color(0xFF99988E), Color(0xFF908F85)),
+    listOf(Color(0xFF87867C), Color(0xFF7F7E74))   // 中浅灰 —— 最小词
 )
 
 /**

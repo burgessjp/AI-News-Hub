@@ -153,59 +153,62 @@ val DarkColors = darkColorScheme(
     inversePrimary = DarkInversePrimary
 )
 
-// ===== Mono 皮肤(黑白灰阶「原型」风)=====
+// ===== Mono 皮肤(「纸与墨」黑白原型风)=====
 //
-// 设计意图:纸面原型观感 —— 去色相、靠明度阶梯分层,primary 即墨色(浅色=近黑 /
-// 深色=纸白),AppAlpha 系洗色(cs.primary.copy(alpha))随之自然变灰调。
+// 设计意图:纸面原型观感 —— 暖调纸白(浅色)/ 暖调墨黑(深色)打底,去色相、
+// 靠明度阶梯分层;primary 即墨色(浅色=墨黑 / 深色=纸白),按钮/选中 chip 呈
+// 实心黑(白)胶囊的「贴纸」感,outlineVariant 压得比常规深让卡片描边可见
+// (原型风的细黑描边语言)。整体带一丝暖灰(黄灰相),不是中性冷灰。
+// AppAlpha 系洗色(cs.primary.copy(alpha))随之自然变灰调。
 // error 特意保留经典红:错误语义不随皮肤消失。结构与上方 Classic 两套逐槽对应,
 // 选中逻辑见 ui/theme/Theme.kt(明暗仍跟随用户 ThemeMode)。
 
-/** Mono · 浅色 —— 白纸黑字:近黑墨 primary,中性灰阶梯分层。 */
+/** Mono · 浅色 —— 纸面:暖纸白底 + 墨黑 primary,白卡片浮层,描边可见。 */
 val MonoLightColors = lightColorScheme(
-    primary = Color(0xFF1A1A1E), onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFF2F2F36), onPrimaryContainer = Color(0xFFEDEDF0),
-    secondary = Color(0xFF63636E), onSecondary = Color(0xFFFFFFFF),
-    secondaryContainer = Color(0xFF82828D), onSecondaryContainer = Color(0xFFF5F5F7),
-    tertiary = Color(0xFF494952), onTertiary = Color(0xFFFFFFFF),
-    tertiaryContainer = Color(0xFF65656F), onTertiaryContainer = Color(0xFFF3F3F5),
+    primary = Color(0xFF161613), onPrimary = Color(0xFFFBFAF6),
+    primaryContainer = Color(0xFF2A2A26), onPrimaryContainer = Color(0xFFF0EFE8),
+    secondary = Color(0xFF5F5E55), onSecondary = Color(0xFFFBFAF6),
+    secondaryContainer = Color(0xFF7E7D72), onSecondaryContainer = Color(0xFFF6F5EE),
+    tertiary = Color(0xFF45443E), onTertiary = Color(0xFFFBFAF6),
+    tertiaryContainer = Color(0xFF616058), onTertiaryContainer = Color(0xFFF0EFE8),
     error = LightError, onError = LightOnError,
     errorContainer = LightErrorContainer, onErrorContainer = LightOnErrorContainer,
-    background = Color(0xFFFAFAFB), onBackground = Color(0xFF1A1A1E),
-    surface = Color(0xFFFAFAFB), onSurface = Color(0xFF1A1A1E),
-    surfaceVariant = Color(0xFFE4E4E9), onSurfaceVariant = Color(0xFF48484F),
-    outline = Color(0xFF78787F), outlineVariant = Color(0xFFCACAD0),
-    surfaceDim = Color(0xFFDBDBE0), surfaceBright = Color(0xFFFAFAFB),
+    background = Color(0xFFF4F3EE), onBackground = Color(0xFF191917),
+    surface = Color(0xFFF4F3EE), onSurface = Color(0xFF191917),
+    surfaceVariant = Color(0xFFE3E2DB), onSurfaceVariant = Color(0xFF4A4A45),
+    outline = Color(0xFF8A897F), outlineVariant = Color(0xFFCFCEC5),
+    surfaceDim = Color(0xFFDBDAD3), surfaceBright = Color(0xFFFDFCFA),
     surfaceContainerLowest = Color(0xFFFFFFFF),
-    surfaceContainerLow = Color(0xFFF5F5F7),
-    surfaceContainer = Color(0xFFF0F0F3),
-    surfaceContainerHigh = Color(0xFFEAEAEF),
-    surfaceContainerHighest = Color(0xFFE4E4E9),
-    inverseSurface = Color(0xFF2B2B31), inverseOnSurface = Color(0xFFF1F1F4),
-    inversePrimary = Color(0xFFE7E7EB)
+    surfaceContainerLow = Color(0xFFECEBE5),
+    surfaceContainer = Color(0xFFE7E6E0),
+    surfaceContainerHigh = Color(0xFFE1E0DA),
+    surfaceContainerHighest = Color(0xFFDBDAD4),
+    inverseSurface = Color(0xFF2A2A26), inverseOnSurface = Color(0xFFF4F3EC),
+    inversePrimary = Color(0xFFE6E5DC)
 )
 
-/** Mono · 深色 —— 黑板白字:纸白 primary,深空黑背景(避 OLED 纯黑)配灰阶容器阶梯。 */
+/** Mono · 深色 —— 墨面:暖调墨黑底 + 纸白 primary,灰阶容器阶梯避 OLED 纯黑。 */
 val MonoDarkColors = darkColorScheme(
-    primary = Color(0xFFF0F0F3), onPrimary = Color(0xFF17171B),
-    primaryContainer = Color(0xFF3A3A41), onPrimaryContainer = Color(0xFFE9E9ED),
-    secondary = Color(0xFFB9B9C2), onSecondary = Color(0xFF26262B),
-    secondaryContainer = Color(0xFF5C5C66), onSecondaryContainer = Color(0xFFEDEDF0),
-    tertiary = Color(0xFFCBCBD3), onTertiary = Color(0xFF33333A),
-    tertiaryContainer = Color(0xFF65656F), onTertiaryContainer = Color(0xFFF0F0F3),
+    primary = Color(0xFFF0EFE6), onPrimary = Color(0xFF181814),
+    primaryContainer = Color(0xFF3A3934), onPrimaryContainer = Color(0xFFE9E8DF),
+    secondary = Color(0xFFC0BFB3), onSecondary = Color(0xFF2B2A24),
+    secondaryContainer = Color(0xFF5D5C52), onSecondaryContainer = Color(0xFFECEBE1),
+    tertiary = Color(0xFFD2D1C5), onTertiary = Color(0xFF2F2E28),
+    tertiaryContainer = Color(0xFF5E5D53), onTertiaryContainer = Color(0xFFEFEEE4),
     error = DarkError, onError = DarkOnError,
     errorContainer = DarkErrorContainer, onErrorContainer = DarkOnErrorContainer,
-    background = Color(0xFF0B0B0D), onBackground = Color(0xFFEFEFF2),
-    surface = Color(0xFF0B0B0D), onSurface = Color(0xFFEFEFF2),
-    surfaceVariant = Color(0xFF2F2F35), onSurfaceVariant = Color(0xFFC7C7CF),
-    outline = Color(0xFF91919A), outlineVariant = Color(0xFF4B4B53),
-    surfaceDim = Color(0xFF0B0B0D), surfaceBright = Color(0xFF313139),
-    surfaceContainerLowest = Color(0xFF070709),
-    surfaceContainerLow = Color(0xFF15151A),
-    surfaceContainer = Color(0xFF1D1D22),
-    surfaceContainerHigh = Color(0xFF26262C),
-    surfaceContainerHighest = Color(0xFF313139),
-    inverseSurface = Color(0xFFEFEFF2), inverseOnSurface = Color(0xFF2B2B31),
-    inversePrimary = Color(0xFF1A1A1E)
+    background = Color(0xFF121210), onBackground = Color(0xFFEDECE4),
+    surface = Color(0xFF121210), onSurface = Color(0xFFEDECE4),
+    surfaceVariant = Color(0xFF2E2D28), onSurfaceVariant = Color(0xFFCBCAC0),
+    outline = Color(0xFF96958A), outlineVariant = Color(0xFF4A4943),
+    surfaceDim = Color(0xFF121210), surfaceBright = Color(0xFF3C3B36),
+    surfaceContainerLowest = Color(0xFF0C0C0A),
+    surfaceContainerLow = Color(0xFF1A1A17),
+    surfaceContainer = Color(0xFF201F1C),
+    surfaceContainerHigh = Color(0xFF2A2925),
+    surfaceContainerHighest = Color(0xFF353430),
+    inverseSurface = Color(0xFFEDECE4), inverseOnSurface = Color(0xFF2A2A26),
+    inversePrimary = Color(0xFF181814)
 )
 
 // ===== 品牌渐变(AI 特性专用)=====
