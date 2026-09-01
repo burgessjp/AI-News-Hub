@@ -166,7 +166,9 @@ val DarkColors = darkColorScheme(
 val MonoLightColors = lightColorScheme(
     primary = Color(0xFF000000), onPrimary = Color(0xFFFFFFFF),
     primaryContainer = Color(0xFF1F1F1F), onPrimaryContainer = Color(0xFFF5F5F5),
-    secondary = Color(0xFF6B6B6B), onSecondary = Color(0xFFFFFFFF),
+    // secondary 兼任「选中强调墨色」:底部栏选中态 tint 取 secondary(见 AppBottomBar),
+    // 必须明显深于未选中 onSurfaceVariant(#4D4D4D)才有选中感,不能定成中灰
+    secondary = Color(0xFF1F1F1F), onSecondary = Color(0xFFFFFFFF),
     secondaryContainer = Color(0xFF8A8A8A), onSecondaryContainer = Color(0xFFF7F7F7),
     tertiary = Color(0xFF4D4D4D), onTertiary = Color(0xFFFFFFFF),
     tertiaryContainer = Color(0xFF696969), onTertiaryContainer = Color(0xFFF5F5F5),
@@ -190,7 +192,8 @@ val MonoLightColors = lightColorScheme(
 val MonoDarkColors = darkColorScheme(
     primary = Color(0xFFF5F5F5), onPrimary = Color(0xFF111111),
     primaryContainer = Color(0xFF383838), onPrimaryContainer = Color(0xFFEDEDED),
-    secondary = Color(0xFFC6C6C6), onSecondary = Color(0xFF292929),
+    // 同浅色:secondary 兼任选中强调(底部栏选中 tint),须明显亮于 onSurfaceVariant(#C9C9C9)
+    secondary = Color(0xFFEDEDED), onSecondary = Color(0xFF292929),
     secondaryContainer = Color(0xFF5A5A5A), onSecondaryContainer = Color(0xFFEDEDED),
     tertiary = Color(0xFFD0D0D0), onTertiary = Color(0xFF2A2A2A),
     tertiaryContainer = Color(0xFF5C5C5C), onTertiaryContainer = Color(0xFFF0F0F0),
