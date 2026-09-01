@@ -49,7 +49,6 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.peng.ainewshub.R
@@ -485,13 +484,9 @@ private fun UpdateNotesBlock(notes: List<UpdateChecker.UpdateNote>, modifier: Mo
                 }
                 ChangelogSections(version.sections)
             } else if (note.markdown.isNotBlank()) {
-                Text(
-                    text = note.markdown,
-                    style = AppText.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 8,
-                    overflow = TextOverflow.Ellipsis
-                )
+                // 历史 Release(GitHub 自动生成 body)结构化解析不出条目:轻量
+                // Markdown 行渲染兜底(标题/列表/加粗/链接去符号),不裸显标记
+                MarkdownishBody(note.markdown)
             }
         }
     }

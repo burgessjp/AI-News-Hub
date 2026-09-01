@@ -84,3 +84,25 @@ internal fun ChangelogSections(sections: List<ChangelogSection>, modifier: Modif
         }
     }
 }
+
+/**
+ * Release body 兜底渲染 —— [markdownLines] 拆出的行逐条直读:标题行 SemiBold 强调,
+ * 其余 onSurfaceVariant;`**加粗**` 复用 [renderBoldLine]。用于更新弹窗里结构化
+ * 解析不出条目的历史 Release(GitHub 自动生成 body),不裸显 Markdown 符号。
+ * 长度由调用方统一封顶滚动(更新弹窗的高度封顶容器)。
+ */
+@Composable
+internal fun MarkdownishBody(md: String, modifier: Modifier = Modifier) {
+    Column(modifier) {
+        markdownLines(md).forEach { line ->
+            Text(
+                text = renderBoldLine(line.text),
+                style = AppText.bodySmall,
+                fontWeight = if (line.heading) FontWeight.SemiBold else null,
+                color = if (line.heading) MaterialTheme.colorScheme.onSurface
+                else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = if (line.heading) 8.dp else 2.dp)
+            )
+        }
+    }
+}

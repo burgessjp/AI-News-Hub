@@ -100,3 +100,45 @@ private class MutableSection(val category: String) {
 
     fun toImmutable() = ChangelogSection(category, entries.toList())
 }
+
+/** 轻量 Markdown 兜底渲染的单行：heading = 原标题行（去 # 前缀）；列表项文本已去标记。 */
+internal data class MarkdownishLine(val heading: Boolean, val text: String)
+
+/** Markdown 行内链接 `[文字](url)`；Release body 兜底时仅保留文字。 */
+private val LINK_REGEX = Regex("\\[([^]]+)]\\(([^)]+)\\)")
+
+/**
+ * 轻量 Markdown 行拆分 —— 更新弹窗 Release body 的兜底渲染用。
+ *
+ * [parseChangelog] 认不出条目时（历史 Release 的 GitHub 自动生成 body：`## What's
+ * Changed` / `* PR 标题` / `**Full Changelog:**`，不含 CHANGELOG 版本节格式），
+ * 退到本拆分按行直读，避免整段原样展示 Markdown 符号：
+ *  - `#`~`######` 标题行去前缀，记 heading（渲染层强调）；
+ *  - `- ` / `* ` 列表项去标记，加 `• ` 前缀（自动生成 body 用 `*`，CHANGELOG 用 `-`，统一处理）；
+ *  - `[文字](url)` 只留文字（弹窗内不可点）；
+ *  - `**加粗**` 标记原样保留，交渲染层（renderBoldLine）转 AnnotatedString；
+ *  - 空行过滤；其余行原样。
+ *
+ * 不追求完整 Markdown：代码块/表格/图片 Release body 罕见，不支持。
+ */
+internal fun markdownLines(md: String): List<MarkdownishLine> =
+    md.lineSequence()
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+        .map { line ->
+            val heading = HEADING_LINE_REGEX.find(line)
+            when {
+                heading != null -> MarkdownishLine(heading = true, text = linkText(heading.groupValues[1].trim()))
+                line.startsWith("- ") || line.startsWith("* ") ->
+                    MarkdownishLine(heading = false, text = "• " + linkText(line.substring(2).trim()))
+                else -> MarkdownishLine(heading = false, text = linkText(line))
+            }
+        }
+        .toList()
+
+/** Markdown 标题行 `#`~`######` 前缀。 */
+private val HEADING_LINE_REGEX = Regex("^#{1,6}\\s+(.+)$")
+
+/** `[文字](url)` → `文字`；无链接语法时原样返回（避免无谓的正则替换）。 */
+private fun linkText(s: String): String =
+    if (s.contains("](")) LINK_REGEX.replace(s) { it.groupValues[1] } else s
