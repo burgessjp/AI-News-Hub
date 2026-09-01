@@ -28,7 +28,7 @@ object ArchiveDiskCache {
     /** 总量护栏:超出后从最旧开始淘汰。 */
     private const val MAX_BYTES = 64L * 1024 * 1024
 
-    /** 时效护栏:读取时超过此年龄的条目视为过期(数据 3 批/天,7 天已足够离线出行用)。 */
+    /** 时效护栏:读取时超过此年龄的条目视为过期(数据 2 批/天,7 天已足够离线出行用)。 */
     private const val MAX_AGE_MS = 7L * 24 * 60 * 60 * 1000
 
     @Volatile

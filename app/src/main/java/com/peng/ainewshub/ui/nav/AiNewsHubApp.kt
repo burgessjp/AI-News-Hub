@@ -549,6 +549,10 @@ internal fun AiNewsHubApp(
                 settingsStore = settingsStore,
                 deferWhile = onboardingActive
             )
+
+            // 远程配置同步(app_config.json → 批次时刻表):无 UI,每次进程启动
+            // 拉一次并应用到 PipelineSchedule,失败静默回退内置默认表
+            AppConfigSyncHost(settingsStore = settingsStore)
         }
     }
 }

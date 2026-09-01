@@ -31,7 +31,7 @@
 |---|---|---|
 | 导航 / 新增二级页 / WebView / 深链 | [docs/agents/navigation.md](docs/agents/navigation.md) | 新页三处同步、列表状态上提、`openUrl` 唯一入口、WebView 页 FADE 转场 |
 | 文案 / 双语资源 / 语言切换 | [docs/agents/i18n.md](docs/agents/i18n.md) | 双语同步、`AppLocale.kt` 单点机制、流水线内容恒中文 |
-| 数据源 / Repository / 小组件 / 通知 | [docs/agents/data-layer.md](docs/agents/data-layer.md) | 恒定归档（实时路径已删除）、归档禁 raw 直链（WAF）、`CHECK_SLOTS` 联动流水线批次、`SourceKeys.kt` 唯一真相源 |
+| 数据源 / Repository / 小组件 / 通知 | [docs/agents/data-layer.md](docs/agents/data-layer.md) | 恒定归档（实时路径已删除）、归档禁 raw 直链（WAF）、批次表经数据仓库 `app_config.json` 远程覆盖、`SourceKeys.kt` 唯一真相源 |
 | DataStore / Room / 缓存 | [docs/agents/persistence.md](docs/agents/persistence.md) | prefs 键清单、favorites 表迁移与清理红线 |
 | 单元测试 / fixture / Robolectric | [docs/agents/testing.md](docs/agents/testing.md) | 必测层清单、fixture 存放与裁剪、object 单例重置 |
 | `scripts/` 流水线 / CI/CD | [docs/agents/pipeline.md](docs/agents/pipeline.md) | 4 个必需环境变量、失败继承语义、日期统一北京时间 |

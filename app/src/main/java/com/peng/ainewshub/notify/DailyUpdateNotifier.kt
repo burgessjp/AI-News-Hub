@@ -20,6 +20,7 @@ import androidx.work.WorkerParameters
 import com.peng.ainewshub.MainActivity
 import com.peng.ainewshub.R
 import com.peng.ainewshub.data.PipelineSchedule
+import com.peng.ainewshub.data.source.AppConfigSync
 import com.peng.ainewshub.data.source.ArchiveHttpClient
 import com.peng.ainewshub.ui.i18n.AppLocale
 import kotlinx.coroutines.flow.first
@@ -101,12 +102,13 @@ object DailyNotifyScheduler {
     private val RETRY_DELAY_MS = TimeUnit.MINUTES.toMillis(40)
 
     /**
-     * 检查时刻表(北京时间,小时 to 分钟)—— 由 [PipelineSchedule.BATCH_SLOTS]
-     * 各 +40 分钟余量派生(GitHub cron 漂移 + 抓取与 AI 生成耗时)。
-     * ⚠️ 流水线批次时间变更只改 PipelineSchedule(批次唯一真相源),本表自动跟随
-     * (AGENTS.md / docs/agents/data-layer.md 有同样提醒)。
+     * 检查时刻表(北京时间,小时 to 分钟)—— 由 [PipelineSchedule.batchSlots]
+     * (可被远程 app_config.json 覆盖)各 +40 分钟余量派生(GitHub cron 漂移 +
+     * 抓取与 AI 生成耗时)。按需计算而非构造期固化:批次表在进程内会随远程配置
+     * 刷新变化,每次续链都要用最新值。⚠️ 批次时间变更改 PipelineSchedule 或数据
+     * 仓库 app_config.json(唯一真相源),本表自动跟随。
      */
-    private val CHECK_SLOTS = PipelineSchedule.BATCH_SLOTS.map { (h, m) -> h to m + 40 }
+    private fun checkSlots(): List<Pair<Int, Int>> = PipelineSchedule.batchSlots.map { (h, m) -> h to m + 40 }
 
     /**
      * 设置页开关同步入口:开 → 从下一档开始续链;关 → 取消全部,链终止。
@@ -152,7 +154,8 @@ object DailyNotifyScheduler {
     /** 距下一个档位的毫秒数(今天档位已过 → 明天第一档)。 */
     private fun nextSlotDelayMillis(): Long {
         val now = Calendar.getInstance(PipelineSchedule.BEIJING)
-        for ((hour, minute) in CHECK_SLOTS) {
+        val slots = checkSlots()
+        for ((hour, minute) in slots) {
             val candidate = now.clone() as Calendar
             candidate.set(Calendar.HOUR_OF_DAY, hour)
             candidate.set(Calendar.MINUTE, minute)
@@ -162,8 +165,8 @@ object DailyNotifyScheduler {
         }
         val tomorrowFirst = now.clone() as Calendar
         tomorrowFirst.add(Calendar.DAY_OF_YEAR, 1)
-        tomorrowFirst.set(Calendar.HOUR_OF_DAY, CHECK_SLOTS.first().first)
-        tomorrowFirst.set(Calendar.MINUTE, CHECK_SLOTS.first().second)
+        tomorrowFirst.set(Calendar.HOUR_OF_DAY, slots.first().first)
+        tomorrowFirst.set(Calendar.MINUTE, slots.first().second)
         tomorrowFirst.set(Calendar.SECOND, 0)
         tomorrowFirst.set(Calendar.MILLISECOND, 0)
         return tomorrowFirst.timeInMillis - now.timeInMillis
@@ -197,6 +200,9 @@ class DailyUpdateWorker(
         val store = SettingsStore(applicationContext)
         // 开关已关:链终止(正常路径 sync 已 cancel 全部任务,此为竞态兜底)
         if (!store.prefsFlow.first().dailyNotify) return Result.success()
+        // 远程配置先行:进程可能刚被 WorkManager 唤醒(无 UI 入口),批次表还没
+        // 机会同步;下方续链的 delay 依赖当前生效表,先刷新再排。失败静默用现表
+        AppConfigSync.refresh()
         DailyNotifyScheduler.enqueueNext(applicationContext)
         store.setLastNotifyCheckAt(System.currentTimeMillis())
 

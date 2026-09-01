@@ -24,7 +24,8 @@
     <string name="summary_archive_title">历史摘要</string>
     <string name="summary_archive_load_failed">历史摘要加载失败</string>
     <string name="summary_archive_empty_title">暂无历史摘要</string>
-    <string name="summary_archive_empty_subtitle">每天 08:00 / 18:00 / 22:00(北京时间)更新\n历史记录自功能上线起累积(最近 31 天)</string>
+    <!-- 批次时刻由远程 app_config.json 动态下发,文案不写死时刻(对齐 onboarding 泛化约定) -->
+    <string name="summary_archive_empty_subtitle">每天定时批量更新(北京时间)\n历史记录自功能上线起累积(最近 31 天)</string>
     <plurals name="summary_sources_with_digest">
         <item quantity="other">%1$d 个源有当日摘要</item>
     </plurals>

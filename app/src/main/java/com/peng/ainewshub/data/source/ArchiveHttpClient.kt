@@ -87,6 +87,16 @@ object ArchiveHttpClient {
         absentAsNull = true
     )
 
+    // app_config.json 是人工维护、可能尚未创建的远程配置(批次时刻表等):
+    // 404 = 正常暂态 → absentAsNull 返回 null,调用方(AppConfigSync)保持当前值
+    private val appConfigFileCache = ArchiveJsonCache(
+        fetcher = ArchiveFetcher,
+        cacheKey = "app_config.json",
+        url = { ArchiveEndpoints.rootUrl("app_config.json") },
+        hint = "读取应用配置失败",
+        absentAsNull = true
+    )
+
     private val snapshotCache = ArchiveSnapshotCache(ArchiveFetcher)
 
     /** 公开只读离线状态(UI 订阅,断网切换时提示「正在展示缓存数据」)。 */
@@ -105,6 +115,7 @@ object ArchiveHttpClient {
         trendsHistoryFileCache.clearForTest()
         trendsFileCache.clearForTest()
         trendsCloudFileCache.clearForTest()
+        appConfigFileCache.clearForTest()
         snapshotCache.clearForTest()
     }
 
@@ -298,6 +309,22 @@ object ArchiveHttpClient {
             if (rel.isNotBlank()) result[date] = rel
         }
         result
+    }
+
+    /**
+     * 拉根级配置文件 `app_config.json`(人工维护的远程配置,当前仅批次时刻表
+     * `batch_slots`,由 [AppConfigSync] 解析后应用到 PipelineSchedule)。
+     * 独立缓存 + 并发去重,与 index 等根级文件互不影响。
+     *
+     * 文件尚未创建(404)返回 null —— 正常暂态,语义为「暂无远程配置,保持内置
+     * 默认」,与 trends 的「成功才写」同款 absentAsNull;其余网络/解析失败照常
+     * 抛错,由调用方静默吞掉。断网时随磁盘兜底(7 天 write-through)读上次配置。
+     *
+     * @param force true 绕过缓存(本文件冷启动经进程闸门每进程只拉一次,
+     *               默认 false 已足够;force 语义与其他根级文件一致)
+     */
+    suspend fun fetchAppConfig(force: Boolean = false): JSONObject? = withContext(Dispatchers.IO) {
+        appConfigFileCache.fetch(force)
     }
 
     /**

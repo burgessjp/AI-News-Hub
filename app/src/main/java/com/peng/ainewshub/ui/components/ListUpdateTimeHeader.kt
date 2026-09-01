@@ -22,7 +22,7 @@ import java.util.Locale
  * 列表顶部居中的「数据时间」横幅 —— 各归档源列表页通用:
  * 显示「数据更新时间：YYYY-MM-DD HH:mm:ss」(绝对时间)。
  *
- * 归档数据是历史快照(每天三批),绝对时间让用户知道看的是哪一批的归档;
+ * 归档数据是历史快照(每天两批),绝对时间让用户知道看的是哪一批的归档;
  * 时间取自 ViewModel 的 lastRefreshAt(快照顶层的 fetched_at_ms,归档
  * Repository 已透传)。
  *

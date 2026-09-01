@@ -8,7 +8,7 @@ import com.peng.ainewshub.data.source.SourceKeys
 /**
  * HackerNews 的 [gitcode 归档]数据源。
  *
- * 数据来自数据流水线每天三批归档的快照(见 docs/news-hub-data-usage.md)。
+ * 数据来自数据流水线每天两批归档的快照(见 docs/news-hub-data-usage.md)。
  * 缓存语义:fetch() 走 index 2 分钟缓存,forceRefresh() 绕过 TTL 强制重读 index
  * (源列表二级页下拉刷新);快照本体按路径不可变,无需 force。
  *
