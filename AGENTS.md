@@ -23,7 +23,7 @@
 - 字号一律 `AppText.xxx`、透明度一律 `AppAlpha.xxx`、圆角一律 `MaterialTheme.shapes` 或 `CircleShape`、颜色只走 `colorScheme`——不散落 `.sp`/`.alpha`/hex 字面量（hex 仅两处集中例外：源品牌色 `ui/more/SourceBrandColors.kt`、词云调色板 `ui/trends/CloudWordColors.kt`）。列表排名/统计/章节条/骨架屏统一复用 `ui/components/` 现有组件，不新建私有拷贝。
 - **UI 文案一律走 string 资源，不写硬编码字面量**，新 feature 必须同步 `values/`（中文全集）+ `values-en/` 双语；语言切换机制与共用词条约定见「深入文档」i18n 篇。
 - 协程 + Flow：`StateFlow` 驱动 UI，`collectAsStateWithLifecycle` 订阅；网络在 Repository 内切 `Dispatchers.IO`；并发去重用 `Mutex.withLock`。
-- release 开启 R8 + shrinkResources；`com.peng.ainewshub.data.**` 已全部保留（`app/proguard-rules.pro`），新增需反射/序列化保留的类时同步补规则。
+- release 开启 R8 + shrinkResources；数据层**无**整包 keep（`app/proguard-rules.pro` 仅按 `@Parcelize` 注解限定保留），新增依赖反射/序列化的类时必须同步补 keep 规则。
 
 ## 深入文档（动对应领域前先读）
 
