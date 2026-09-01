@@ -3,19 +3,24 @@
 AI News Hub 总览页 wordmark(Logo 字标)生成器。
 
 设计:品牌「光环 + 核」图形(icon.svg 同源)+ Inter 字体的 "AI NEWS HUB" 字标
-  - 左侧开口能量环 + 发光核,环描边走品牌双色渐变(Future Blue → Intelligence Purple)
-  - "AI" 二字 Bold + 同款品牌渐变;"NEWS HUB" Medium + 宽字距,随深/浅主题的中性色
-  - 渐变与中性色全部引用 @color(values / values-night 双份),深/浅主题自适应,
+  - 左侧开口能量环 + 发光核,环描边走双色渐变(classic: Future Blue → Intelligence Purple)
+  - "AI" 二字 Bold + 同款渐变;"NEWS HUB" Medium + 宽字距,随深/浅主题的中性色
+  - 渐变与中性色全部引用 @color,深/浅主题自适应,
     与 Compose 侧 BrandGradient(primary→secondary)同套色值
+  - mono 皮肤(黑白灰阶原型风)另出两份:渐变/文字换灰阶,与 ui/theme/Color.kt
+    的 MonoLight/MonoDarkColors 同套色值
 
 输出(入库资源,重新运行即重新生成):
-  - app/src/main/res/drawable/ic_wordmark.xml        浅色变体(VectorDrawable,文字已转路径)
-  - app/src/main/res/drawable/ic_wordmark_dark.xml   深色变体
-  - /tmp/wordmark_preview_{light,dark}.png           渲染预览
+  - app/src/main/res/drawable/ic_wordmark.xml             classic 浅色变体
+  - app/src/main/res/drawable/ic_wordmark_dark.xml        classic 深色变体
+  - app/src/main/res/drawable/ic_wordmark_mono.xml        mono 浅色变体
+  - app/src/main/res/drawable/ic_wordmark_mono_dark.xml   mono 深色变体
+  - /tmp/wordmark_preview_{skin}_{theme}.png              渲染预览
 
-深/浅双变体的原因:App 的深色模式可在设置页自选(Compose 层 AiNewsHubTheme 决定),
-values-night 资源限定符只跟随系统 night mode,感知不到应用内设置;故色值直接
-写进两份 drawable,运行时由调用方按 colorScheme 选择(见 ui/components/BrandWordmark.kt)。
+每个变体单独成文件的原因:App 的深色模式与皮肤均可在设置页自选(Compose 层
+AiNewsHubTheme 决定),values-night 资源限定符只跟随系统 night mode,感知不到
+应用内设置;故色值直接写进各份 drawable,运行时由调用方按 LocalAppSkin +
+LocalAppDarkTheme 选择(见 ui/components/BrandWordmark.kt)。
 
 依赖:fontTools(pip install fontTools,见 scripts/requirements.txt);
 预览渲染依赖 macOS qlmanage(与 gen_icon_svg.py 相同)。
@@ -57,13 +62,43 @@ RUNS = [
 ]
 RUN_GAP_EXTRA_EM = 0.05           # 段间在空格宽度上追加的间距
 
-# 品牌渐变(深/浅双份,与 ui/theme/Color.kt 色板一致)
-GRADIENT = {
-    "light": ("#003EC7", "#6B38D4"),   # primary → secondary (light)
-    "dark": ("#B7C4FF", "#D0BCFF"),    # primary → secondary (dark)
+# 变体定义:皮肤 × 明暗,共 4 份(色值与 ui/theme/Color.kt 四套色板一致)。
+#   gradient = 环描边与 "AI" 渐变(primary → secondary);text = "NEWS HUB" 中性色
+#   (onSurface);dot = 核心"发光球"径向渐变(皮肤内明暗共用一份,球体明暗自洽)。
+VARIANTS = {
+    ("classic", "light"): dict(
+        name="ic_wordmark",
+        gradient=("#003EC7", "#6B38D4"),                       # primary → secondary (light)
+        text="#141B2B",                                        # onSurface (light)
+        dot=((0.0, "#FFFFFF"), (0.55, "#B7C4FF"), (1.0, "#003EC7")),
+    ),
+    ("classic", "dark"): dict(
+        name="ic_wordmark_dark",
+        gradient=("#B7C4FF", "#D0BCFF"),                       # primary → secondary (dark)
+        text="#EDF0FF",                                        # onSurface (dark)
+        dot=((0.0, "#FFFFFF"), (0.55, "#B7C4FF"), (1.0, "#003EC7")),
+    ),
+    ("mono", "light"): dict(
+        name="ic_wordmark_mono",
+        gradient=("#1A1A1E", "#63636E"),                       # MonoLight primary → secondary
+        text="#1A1A1E",                                        # MonoLight onSurface
+        dot=((0.0, "#FFFFFF"), (0.55, "#8E8E96"), (1.0, "#1A1A1E")),
+    ),
+    ("mono", "dark"): dict(
+        name="ic_wordmark_mono_dark",
+        gradient=("#F0F0F3", "#B9B9C2"),                       # MonoDark primary → secondary
+        text="#EFEFF2",                                        # MonoDark onSurface
+        dot=((0.0, "#FFFFFF"), (0.55, "#8E8E96"), (1.0, "#1A1A1E")),
+    ),
 }
-WORDMARK_TEXT = {"light": "#141B2B", "dark": "#EDF0FF"}   # onSurface 两态
-DOT_STOPS = ((0.0, "#FFFFFF"), (0.55, "#B7C4FF"), (1.0, "#003EC7"))  # 核心径向渐变(两态共用)
+
+# 预览画布底色:与各变体 colorScheme.background 一致,肉眼校验对比度用。
+PREVIEW_BG = {
+    ("classic", "light"): "#F9F9FF",
+    ("classic", "dark"): "#11132A",
+    ("mono", "light"): "#FAFAFB",
+    ("mono", "dark"): "#0B0B0D",
+}
 
 
 def arc_path(cx, cy, r, deg1, deg2, large_arc, sweep):
@@ -124,11 +159,13 @@ def gradient_stops_xml(stops, indent):
     )
 
 
-def build_vector(glyphs, ai_span, total_w, theme):
-    """生成指定主题变体的 VectorDrawable XML(色值硬编码,不走 values-night:
-    应用内自选深色模式在 Compose 层,资源系统感知不到,运行时再选变体文件)。"""
-    g0, g1 = GRADIENT[theme]
-    text_color = WORDMARK_TEXT[theme]
+def build_vector(glyphs, ai_span, total_w, skin, theme):
+    """生成指定皮肤 × 明暗变体的 VectorDrawable XML(色值硬编码,不走 values-night:
+    应用内自选深色模式/皮肤在 Compose 层,资源系统感知不到,运行时再选变体文件)。"""
+    var = VARIANTS[(skin, theme)]
+    g0, g1 = var["gradient"]
+    text_color = var["text"]
+    dot_stops = var["dot"]
     ring = arc_path(MARK_CX, MARK_CY, RING_R, -110, 130, 1, 1)  # 右下留 ~120° 开口
     dot = circle_path(MARK_CX, MARK_CY, DOT_R)
     hl = circle_path(MARK_CX + HL_DX, MARK_CY + HL_DY, HL_R)
@@ -152,7 +189,7 @@ def build_vector(glyphs, ai_span, total_w, theme):
             <gradient android:type="radial"
                 android:centerX="{MARK_CX:g}" android:centerY="{MARK_CY:g}"
                 android:gradientRadius="{DOT_R:g}">
-{gradient_stops_xml([(o, c) for o, c in DOT_STOPS], 16)}
+{gradient_stops_xml(dot_stops, 16)}
             </gradient>
         </aapt:attr>
     </path>
@@ -177,7 +214,7 @@ def build_vector(glyphs, ai_span, total_w, theme):
         else:
             paths.append(f'    <path android:pathData="{data}" android:fillColor="{text_color}"/>\n')
     return f'''<?xml version="1.0" encoding="utf-8"?>
-<!-- 总览页 wordmark("AI NEWS HUB" Logo 字标,{theme} 变体)—— 由 scripts/gen_wordmark.py 生成,勿手改 -->
+<!-- 总览页 wordmark("AI NEWS HUB" Logo 字标,{skin}/{theme} 变体)—— 由 scripts/gen_wordmark.py 生成,勿手改 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:aapt="http://schemas.android.com/aapt"
     android:width="{total_w / 4:.1f}dp"
@@ -188,12 +225,13 @@ def build_vector(glyphs, ai_span, total_w, theme):
 '''
 
 
-def build_preview_svg(glyphs, ai_span, total_w, theme):
+def build_preview_svg(glyphs, ai_span, total_w, skin, theme):
     """与 vector 同版面的 SVG 预览(渐变 userSpaceOnUse 对齐坐标)。"""
-    g0, g1 = GRADIENT[theme]
-    text_color = WORDMARK_TEXT[theme]
-    bg = "#F9F9FF" if theme == "light" else "#11132A"
-    dot_stops = "".join(f'<stop offset="{o:g}" stop-color="{c}"/>' for o, c in DOT_STOPS)
+    var = VARIANTS[(skin, theme)]
+    g0, g1 = var["gradient"]
+    text_color = var["text"]
+    bg = PREVIEW_BG[(skin, theme)]
+    dot_stops = "".join(f'<stop offset="{o:g}" stop-color="{c}"/>' for o, c in var["dot"])
     parts = [
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {total_w:.2f} {VH:g}" '
         f'width="{total_w * 4:.0f}" height="{VH * 4:.0f}">',
@@ -253,20 +291,20 @@ def main():
     glyphs, ai_span, total_w = layout_runs()
     print(f"viewport: {total_w:.2f} x {VH:g} ({len(glyphs)} glyph paths)")
 
-    for theme in ("light", "dark"):
-        svg = build_preview_svg(glyphs, ai_span, total_w, theme)
-        out = f"/tmp/wordmark_preview_{theme}.png"
+    for skin, theme in VARIANTS:
+        svg = build_preview_svg(glyphs, ai_span, total_w, skin, theme)
+        out = f"/tmp/wordmark_preview_{skin}_{theme}.png"
         render_preview(svg, out, total_w)
         print(f"preview -> {out}")
 
     if args.preview_only:
         return
 
-    for theme, name in (("light", "ic_wordmark"), ("dark", "ic_wordmark_dark")):
-        drawable = os.path.join(RES, "drawable", f"{name}.xml")
+    for (skin, theme), var in VARIANTS.items():
+        drawable = os.path.join(RES, "drawable", f'{var["name"]}.xml')
         os.makedirs(os.path.dirname(drawable), exist_ok=True)
         with open(drawable, "w") as f:
-            f.write(build_vector(glyphs, ai_span, total_w, theme))
+            f.write(build_vector(glyphs, ai_span, total_w, skin, theme))
         print(f"drawable -> {drawable}")
 
 
