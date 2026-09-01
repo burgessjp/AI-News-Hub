@@ -22,9 +22,6 @@
 # 直接调用无反射,无需 keep
 -dontwarn coil.**
 
-# ---- jsoup (HTML 解析,解析 github.com/trending) ----
--dontwarn org.jsoup.**
-
 # ---- 数据模型（@Parcelize 保留）----
 # 项目 JSON 解析一律用 org.json 硬编码 key(不依赖反射读字段名),Room 的 @Entity
 # 由 Room consumer rules 自动保留,故此前整包 -keep data.** 已无必要且会让 R8
