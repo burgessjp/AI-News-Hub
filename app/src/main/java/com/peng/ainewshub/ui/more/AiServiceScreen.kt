@@ -138,8 +138,10 @@ private fun AiServiceSection(
     var editingField by rememberSaveable { mutableStateOf<String?>(null) }
     var showProviderDialog by rememberSaveable { mutableStateOf(false) }
     var showModelDialog by rememberSaveable { mutableStateOf(false) }
-    // 测试连接:进行态 + 复用 client(与翻译同一出口 AiChatClient,超时/连接池同规格)
-    var testing by rememberSaveable { mutableStateOf(false) }
+    // 测试连接:进行态 + 复用 client(与翻译同一出口 AiChatClient,超时/连接池同规格)。
+    // 进行态刻意用 remember 而非 rememberSaveable:请求中旋转/重建后协程已亡,
+    // 恢复 true 会让行尾永久转圈且点击被吞,宁可重建后回到空闲态
+    var testing by remember { mutableStateOf(false) }
     val chatClient = remember { AiChatClient() }
     val context = LocalContext.current
 
@@ -262,14 +264,17 @@ private fun AiServiceSection(
                 !config.isReady -> scope.launch { snackbarHostState.showSnackbar(requireConfigMsg) }
                 else -> scope.launch {
                     testing = true
-                    chatClient.chat(config, TEST_PROBE_SYSTEM, TEST_PROBE_USER, temperature = 0.0)
+                    val result = chatClient.chat(config, TEST_PROBE_SYSTEM, TEST_PROBE_USER, temperature = 0.0)
+                    // 先复位进行态再弹结果:showSnackbar 会挂起到 Snackbar 消失,
+                    // 若放在其后,行尾转圈会陪着 Snackbar 一直转到超时
+                    testing = false
+                    result
                         .onSuccess { snackbarHostState.showSnackbar(testSuccessMsg) }
                         .onFailure { e ->
                             snackbarHostState.showSnackbar(
                                 testFailedFmt.format(e.toUiError(context).message)
                             )
                         }
-                    testing = false
                 }
             }
         }
