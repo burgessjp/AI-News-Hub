@@ -65,4 +65,12 @@
     <string name="aiservice_error_price">格式无效,请输入数字</string>
     <string name="aiservice_saved">已保存</string>
     <string name="aiservice_cleared">已清除</string>
+
+    <!-- ===== 测试连接 ===== -->
+    <string name="aiservice_test_connection">测试连接</string>
+    <string name="aiservice_test_subtitle">发送一次最小请求,验证地址 / Key / 模型可用(不计入用量)</string>
+    <string name="aiservice_test_require_config">请先配置 API 地址、Key 与模型</string>
+    <string name="aiservice_test_success">连接成功,模型可用</string>
+    <!-- %1$s=失败原因(复用 error_ai_auth / error_ai_service 等统一文案) -->
+    <string name="aiservice_test_failed">连接失败:%1$s</string>
 </resources>

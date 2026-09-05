@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
@@ -19,8 +20,10 @@ import androidx.compose.material.icons.filled.Hub
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Memory
+import androidx.compose.material.icons.filled.NetworkCheck
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -48,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.peng.ainewshub.R
+import com.peng.ainewshub.data.net.AiChatClient
 import com.peng.ainewshub.data.prefs.AiConfig
 import com.peng.ainewshub.data.prefs.AiConfigStore
 import com.peng.ainewshub.data.prefs.AiProvider
@@ -56,7 +60,13 @@ import com.peng.ainewshub.ui.components.AppTopBar
 import com.peng.ainewshub.ui.components.AppTopBarDefaults
 import com.peng.ainewshub.ui.components.SectionHeader
 import com.peng.ainewshub.ui.components.SettingsRow
+import com.peng.ainewshub.ui.toUiError
 import kotlinx.coroutines.launch
+
+/** 「测试连接」探针请求的 prompt:只为验证链路可用,输出内容不展示。 */
+private const val TEST_PROBE_SYSTEM = "You are a connectivity probe."
+
+private const val TEST_PROBE_USER = "ping"
 
 /**
  * AI 服务独立二级页 —— 全局 AI 服务配置 + token 用量统计。
@@ -128,6 +138,10 @@ private fun AiServiceSection(
     var editingField by rememberSaveable { mutableStateOf<String?>(null) }
     var showProviderDialog by rememberSaveable { mutableStateOf(false) }
     var showModelDialog by rememberSaveable { mutableStateOf(false) }
+    // 测试连接:进行态 + 复用 client(与翻译同一出口 AiChatClient,超时/连接池同规格)
+    var testing by rememberSaveable { mutableStateOf(false) }
+    val chatClient = remember { AiChatClient() }
+    val context = LocalContext.current
 
     // 编辑对话框保存/清除后的轻量确认反馈(行副标题「未设置→已设置」之外,
     // 显式告知配置已落库,消除「存没存上」的疑虑)
@@ -152,6 +166,11 @@ private fun AiServiceSection(
     val apiUrlPlaceholder = stringResource(R.string.aiservice_api_url_placeholder)
     val modelPlaceholder = stringResource(R.string.aiservice_model_placeholder)
     val pricePlaceholder = stringResource(R.string.aiservice_price_placeholder)
+    val testTitle = stringResource(R.string.aiservice_test_connection)
+    val testSubtitle = stringResource(R.string.aiservice_test_subtitle)
+    val requireConfigMsg = stringResource(R.string.aiservice_test_require_config)
+    val testSuccessMsg = stringResource(R.string.aiservice_test_success)
+    val testFailedFmt = stringResource(R.string.aiservice_test_failed)
 
     SettingsRow(
         icon = Icons.Filled.Translate,
@@ -210,10 +229,49 @@ private fun AiServiceSection(
         iconAccent = cs.secondary,
         title = modelTitle,
         subtitle = config.model.ifBlank { notSetLabel },
-        showDivider = config.provider == AiProvider.CUSTOM,
+        // 测试连接行恒定跟随其后(不再按 CUSTOM 分档,下方测试行自己收尾)
+        showDivider = true,
         onClick = {
             if (config.provider == AiProvider.CUSTOM) editingField = "model"
             else showModelDialog = true
+        }
+    )
+
+    // 测试连接:一次最小请求实测 地址/Key/模型 三件套(只验证,不改配置)。
+    // 与「启用翻译」开关解耦 —— 验证的是服务配置本身;失败文案复用 toUiError
+    // 统一映射(AiAuth/AiService 已分类);token 用量记账在翻译调用点,
+    // 这里不经过,天然不污染用量统计。
+    SettingsRow(
+        icon = Icons.Filled.NetworkCheck,
+        iconAccent = cs.tertiary,
+        title = testTitle,
+        subtitle = if (config.isReady) testSubtitle else requireConfigMsg,
+        showDivider = config.provider == AiProvider.CUSTOM,
+        trailing = if (testing) {
+            {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    strokeWidth = 2.dp,
+                    color = cs.secondary
+                )
+            }
+        } else null,
+        onClick = {
+            when {
+                testing -> Unit
+                !config.isReady -> scope.launch { snackbarHostState.showSnackbar(requireConfigMsg) }
+                else -> scope.launch {
+                    testing = true
+                    chatClient.chat(config, TEST_PROBE_SYSTEM, TEST_PROBE_USER, temperature = 0.0)
+                        .onSuccess { snackbarHostState.showSnackbar(testSuccessMsg) }
+                        .onFailure { e ->
+                            snackbarHostState.showSnackbar(
+                                testFailedFmt.format(e.toUiError(context).message)
+                            )
+                        }
+                    testing = false
+                }
+            }
         }
     )
 

@@ -60,4 +60,12 @@
     <string name="aiservice_error_price">Invalid format, enter a number</string>
     <string name="aiservice_saved">Saved</string>
     <string name="aiservice_cleared">Cleared</string>
+
+    <!-- ===== Test connection ===== -->
+    <string name="aiservice_test_connection">Test connection</string>
+    <string name="aiservice_test_subtitle">Send a minimal request to verify the URL, key and model (usage not counted)</string>
+    <string name="aiservice_test_require_config">Set the API URL, key and model first</string>
+    <string name="aiservice_test_success">Connected — model is available</string>
+    <!-- %1$s=failure reason (reuses error_ai_auth / error_ai_service wording) -->
+    <string name="aiservice_test_failed">Connection failed: %1$s</string>
 </resources>
