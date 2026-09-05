@@ -23,10 +23,13 @@ import java.util.concurrent.TimeUnit
  * 对齐 ArchiveHttpClientTest 惯例)。
  *
  * 钉住后台下载([UpdateDownloadService] 只是宿主,流式/取消语义全在这里)的
- * 三组契约:
+ * 五组契约:
  *  1. 流式写盘:落 cacheDir/updates、内容逐字节一致、进度回调单调且对齐总量;
  *  2. HTTP 错误码抛错(交由调用方置 Failed);
- *  3. cancel() 立即 abort:不限速要 ~10s 的慢体在 2s 内结束(未生效则超时失败)。
+ *  3. cancel() 立即 abort:不限速要 ~10s 的慢体在 2s 内结束(未生效则超时失败);
+ *  4. 断点续传:残留 .part 触发 Range 请求,206 追加写、进度从偏移起算、
+ *     完成后 rename 为整包(取消/断网重试不再从 0 重下);
+ *  5. 服务器忽略 Range(回 200):半截作废整包覆盖重写,不留旧字节污染。
  */
 @RunWith(RobolectricTestRunner::class)
 class UpdateDownloaderTest {
@@ -82,6 +85,67 @@ class UpdateDownloaderTest {
         // 下载前置空旧文件:失败后目录里不留半截 APK
         val dir = java.io.File(context.cacheDir, "updates")
         assertTrue(dir.listFiles().isNullOrEmpty() || dir.listFiles()!!.all { it.length() != 0L })
+    }
+
+    @Test
+    fun `断点续传携带 Range 头追加写满且进度从偏移起算`() = runBlocking {
+        val full = "x".repeat(300 * 1024)
+        val headLen = 100L * 1024
+        // 预置上次中断留下的半截 .part(前 100KB)
+        val dir = java.io.File(context.cacheDir, "updates")
+        dir.mkdirs()
+        val part = java.io.File(dir, "ainewshub-v8.8.8.apk.part")
+        part.writeText(full.substring(0, headLen.toInt()))
+
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(206)
+                .setHeader("Content-Range", "bytes $headLen-${full.length - 1}/${full.length}")
+                .setBody(full.substring(headLen.toInt()))
+        )
+
+        val progresses = mutableListOf<Pair<Long, Long>>()
+        val file = UpdateDownloader.download(context, server.url("/app.apk").toString(), "8.8.8") { read, total ->
+            progresses += read to total
+        }
+
+        // 请求确实带了续传区间
+        assertEquals("bytes=$headLen-", server.takeRequest().getHeader("Range"))
+        // 最终文件 = 旧字节 + 追加字节,逐字节一致
+        assertEquals(full.length.toLong(), file.length())
+        assertEquals(full, file.readText())
+        // 进度从偏移起算、总量对齐全量(不是剩余量)、末值对齐
+        assertTrue(progresses.first().first >= headLen)
+        progresses.forEach { (_, total) -> assertEquals(full.length.toLong(), total) }
+        assertEquals(full.length.toLong(), progresses.last().first)
+        // 完成后 .part 已 rename,目录里只剩整包
+        assertTrue(!part.exists())
+    }
+
+    @Test
+    fun `服务器忽略 Range 回 200 时半截作废整包重写`() = runBlocking {
+        val full = "y".repeat(200 * 1024)
+        // 预置脏 .part(模拟未知来源的半截,内容与本次下载无关)
+        val dir = java.io.File(context.cacheDir, "updates")
+        dir.mkdirs()
+        val part = java.io.File(dir, "ainewshub-v7.7.7.apk.part")
+        val garbage = "garbage-prefix-not-apk"
+        part.writeText(garbage)
+
+        server.enqueue(MockResponse().setBody(full)) // 200,不支持 Range
+
+        val progresses = mutableListOf<Pair<Long, Long>>()
+        val file = UpdateDownloader.download(context, server.url("/app.apk").toString(), "7.7.7") { read, total ->
+            progresses += read to total
+        }
+
+        // 请求方确实尝试过续传(带 Range),但按 200 整包覆盖
+        assertEquals("bytes=${garbage.length}-", server.takeRequest().getHeader("Range"))
+        assertEquals(full, file.readText())
+        assertTrue(!part.exists())
+        // 200 路径进度从 0 重新起算
+        assertTrue(progresses.first().first <= 64L * 1024)
+        assertEquals(full.length.toLong(), progresses.last().first)
     }
 
     @Test

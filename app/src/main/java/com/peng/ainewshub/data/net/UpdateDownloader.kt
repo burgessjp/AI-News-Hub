@@ -12,6 +12,8 @@ import okhttp3.Call
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
+import java.io.FileOutputStream
+import kotlin.coroutines.coroutineContext
 
 /**
  * APK 应用内直装链路(与 [UpdateChecker] 配套):
@@ -24,7 +26,9 @@ import java.io.File
  *    普通接口设的,APK 数 MB 在慢网下轻松超过;connect/read 逐次超时保留即可
  *    (停滞 20s 仍会断,避免死等),且派生实例与 base 共享连接池;
  *  - 下载落 app 私有缓存(cacheDir/updates/):无任何存储权限问题,系统低存储时
- *    可自动回收;每次下载前清空目录,不积压旧版本 APK;
+ *    可自动回收;每次下载只清「非当前版本」的残留,不积压旧版本 APK;
+ *  - 断点续传:当前版本的半截文件(.part)保留,重试经 Range 头续拉(移动网络下
+ *    取消/断网/进程被杀不再从 0 重下几十 MB),详见 [downloadOnce];
  *  - 下载经 FileProvider(content://)交给系统安装器,Android 7+ 强制 file://
  *    禁止直发 FileUriExposedException;
  *  - Android 8+ 安装未知来源应用需用户在系统设置里授权本 App(运行时不可弹窗
@@ -66,13 +70,15 @@ object UpdateDownloader {
     }
 
     /**
-     * 流式下载 APK 到私有缓存目录。
+     * 流式下载 APK 到私有缓存目录(中断可续传)。
      *
      * @param url Release 资产直链([UpdateChecker.UpdateInfo.downloadUrl])
      * @param version 版本号(用于落盘文件名)
-     * @param onProgress 进度回调(已读字节,总字节;总字节未知时为 -1,UI 走不确定进度)
+     * @param onProgress 进度回调(已读字节含续传偏移,总字节;总字节未知时为 -1,
+     *                   UI 走不确定进度)
      * @return 下载完成的 APK 文件
-     * @throws Exception 网络/磁盘错误或调用方协程取消(取消时底层请求同步 abort)
+     * @throws Exception 网络/磁盘错误或调用方协程取消(取消时底层请求同步 abort,
+     *                   已写部分保留为 .part 供下次续传)
      */
     suspend fun download(
         context: Context,
@@ -80,25 +86,88 @@ object UpdateDownloader {
         version: String,
         onProgress: (Long, Long) -> Unit
     ): File = withContext(Dispatchers.IO) {
+        downloadWithRangeRetry(context, url, version, onProgress)
+    }
+
+    /**
+     * 416(半截越界)信号驱动的外层重试:删 .part 整包重下,仅一次。
+     * 循环放独立函数(而非 withContext lambda 内)是因为 lambda 末尾的
+     * `while(true)` 推不出表达式类型,声明返回类型的函数则允许非正常完结结尾。
+     */
+    private suspend fun downloadWithRangeRetry(
+        context: Context,
+        url: String,
+        version: String,
+        onProgress: (Long, Long) -> Unit
+    ): File {
+        var allowRangeRetry = true
+        while (true) {
+            try {
+                return downloadOnce(context, url, version, onProgress, allowRangeRetry)
+            } catch (_: RangeStaleException) {
+                allowRangeRetry = false
+            }
+        }
+    }
+
+    /** 416(半截文件越界)内部信号:[downloadOnce] 删 .part 后抛出,仅 [download] 消费。 */
+    private class RangeStaleException : java.io.IOException()
+
+    /**
+     * 单次下载尝试。写盘目标是 `.part` 临时文件,完整读满才 rename 成正式 APK ——
+     * 任何中断(取消/断网/进程被杀)留下的 `.part` 都会在下次同版本下载时经
+     * `Range: bytes=<len>-` 头续拉:
+     *  - 206:追加写,总量优先取 Content-Range 尾段;
+     *  - 200:服务器不支持 Range(或 CDN 直链换了),半截作废整包覆盖重写;
+     *  - 416:半截已越界(上次写满未 rename 的边缘/文件损坏),删 `.part` 整包
+     *    重下,仅重试一次(仍失败走 isSuccessful 抛错,不无限循环)。
+     *
+     * 仅由 [download] 在 IO 调度上调用。
+     */
+    private suspend fun downloadOnce(
+        context: Context,
+        url: String,
+        version: String,
+        onProgress: (Long, Long) -> Unit,
+        allowRangeRetry: Boolean
+    ): File {
         val dir = File(context.cacheDir, UPDATE_DIR).apply { mkdirs() }
-        // 清空历史:同一目录只保留当前这次下载的 APK
-        dir.listFiles()?.forEach { it.delete() }
-        val target = File(dir, "ainewshub-v$version.apk")
+        // 只清「非当前版本」残留(旧版整包/半截);当前版本 .part 保留作续传起点
+        val baseName = "ainewshub-v$version"
+        dir.listFiles()?.forEach { if (!it.name.startsWith(baseName)) it.delete() }
+        val target = File(dir, "$baseName.apk")
+        val part = File(dir, "$baseName.apk.part")
+        val offset = if (part.isFile) part.length() else 0L
 
         val call = downloadClient.newCall(
             Request.Builder()
                 .url(url)
                 .header("User-Agent", HttpClients.DEFAULT_BROWSER_UA)
+                .apply { if (offset > 0L) header("Range", "bytes=$offset-") }
                 .build()
         )
         activeCall = call
-        try {
+        return try {
             call.execute().use { resp ->
+                if (resp.code == 416 && offset > 0L && allowRangeRetry) {
+                    part.delete()
+                    // 抛出经 use/finally 正常收尾(关响应、清挂)后由 download 重下
+                    throw RangeStaleException()
+                }
                 check(resp.isSuccessful) { "HTTP ${resp.code}" }
-                val total = resp.body?.contentLength() ?: -1L
-                var read = 0L
+                val append = resp.code == 206 && offset > 0L
+                // 200 = 服务器忽略 Range:半截作废,整包覆盖重写
+                if (!append && part.exists()) part.delete()
+                val bodyLen = resp.body?.contentLength() ?: -1L
+                // 206 的 contentLength 只是剩余字节:总量优先取 Content-Range 尾段,
+                // 取不到退 offset+剩余(仍未知则 -1,UI 走不确定进度)
+                val total = if (append) {
+                    contentRangeTotal(resp.header("Content-Range"))
+                        ?: (if (bodyLen >= 0L) offset + bodyLen else -1L)
+                } else bodyLen
+                var read = if (append) offset else 0L
                 resp.body?.byteStream()?.use { input ->
-                    target.outputStream().use { output ->
+                    FileOutputStream(part, append).use { output ->
                         val buf = ByteArray(64 * 1024)
                         while (true) {
                             // 每写一块检查取消,让「取消下载」即时生效
@@ -111,11 +180,21 @@ object UpdateDownloader {
                         }
                     }
                 } ?: error("empty body")
+                // 连接被干净地提前掐断(没抛 IO 却没读满):不让半截冒充整包进 Done 态
+                if (total > 0L && read != total) error("incomplete body: $read/$total")
+                if (target.exists()) target.delete()
+                check(part.renameTo(target)) { "rename to ${target.name} failed" }
                 target
             }
         } finally {
             activeCall = null
         }
+    }
+
+    /** 解析 `Content-Range: bytes start-end/total` 尾段的 total;缺失/畸形返回 null。 */
+    private fun contentRangeTotal(header: String?): Long? {
+        if (header.isNullOrBlank()) return null
+        return header.substringAfter('/', "").trim().toLongOrNull()
     }
 
     /**
