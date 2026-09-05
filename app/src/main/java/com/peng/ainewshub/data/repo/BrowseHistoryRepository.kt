@@ -15,6 +15,7 @@ import com.peng.ainewshub.data.db.BrowseHistoryEntity
  *  - 解析 host(从 URL 抽域名,失败回退为原始 URL)
  *  - URL 合法性校验(空串 / 非 http(s) 直接丢弃,不污染历史)
  *  - upsert 计数:同 URL 已存在则 visitCount+1、visitedAt 刷新;否则新建
+ *  - 保留策略:每 16 次记录抽样清理 90 天前的旧历史(见 [record]),表规模有上界
  *
  * 记录点统一在 MainActivity 的 openUrl,全 App 覆盖。
  *
@@ -57,6 +58,12 @@ class BrowseHistoryRepository(private val dao: BrowseHistoryDao) {
             )
         }
         dao.upsert(entity)
+        // 抽样清理:历史无限增长会拖重已读集合(observeReadUrls 全表转 Set)与
+        // 分页查询,每 N 次记录顺带清一次 90 天前旧历史(与 SearchIndexRepository
+        // 同范式);favorites 刻意不清 —— 那是用户主动收藏,不受时效约束
+        if (++writeCount % PRUNE_INTERVAL == 0) {
+            runCatching { dao.pruneBefore(now - RETAIN_MS) }
+        }
     }
 
     /** 删除单条。 */
@@ -101,12 +108,22 @@ class BrowseHistoryRepository(private val dao: BrowseHistoryDao) {
     /** 历史总数流(顶栏计数 / 空态判断备用)。 */
     fun observeCount(): Flow<Int> = dao.observeCount()
 
-    /**
-     * 已读 URL 集合(列表「已读/未读」判定):浏览历史在 openUrl 唯一入口记录,
+    /** 已读 URL 集合(列表「已读/未读」判定):浏览历史在 openUrl 唯一入口记录,
      * 「URL 在集合中」即天然已读状态,无需独立已读表。Room Flow 自动推送 ——
      * 打开文章返回列表后弱化即时生效;删除单条历史 = 恢复未读。
      */
     fun observeReadUrls(): Flow<Set<String>> = dao.observeAllUrls().map { it.toSet() }
+
+    companion object {
+        /** 抽样清理周期:每 N 次记录顺带清一次旧历史。 */
+        private const val PRUNE_INTERVAL = 16
+
+        /** 历史保留期:90 天(对齐 search_items 的既有保留窗口)。 */
+        private const val RETAIN_MS = 90L * 24 * 60 * 60 * 1000
+
+        /** 进程内写入计数(抽样清理用;非持久化,进程重启归零,与搜索索引同取舍)。 */
+        private var writeCount = 0
+    }
 }
 
 /**

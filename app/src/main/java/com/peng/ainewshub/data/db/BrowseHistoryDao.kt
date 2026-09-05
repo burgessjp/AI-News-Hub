@@ -39,6 +39,13 @@ interface BrowseHistoryDao {
     @Query("DELETE FROM browse_history")
     suspend fun clearAll()
 
+    /**
+     * 删除 [before](毫秒 epoch)之前的旧历史 —— 保留策略抽样清理用。
+     * [BrowseHistoryEntity.visitedAt] 已建索引,全量 DELETE 走索引扫描。
+     */
+    @Query("DELETE FROM browse_history WHERE visitedAt < :before")
+    suspend fun pruneBefore(before: Long)
+
     /** 回写真实标题(WebView 加载完成后更新)。 */
     @Query("UPDATE browse_history SET title = :title WHERE url = :url")
     suspend fun updateTitle(url: String, title: String)
