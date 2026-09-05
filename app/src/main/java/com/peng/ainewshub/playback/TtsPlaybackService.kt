@@ -5,8 +5,10 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
@@ -63,6 +65,7 @@ data class TtsPlaybackState(
     *    接受 —— 系统通道是兜底路径,常态走音频通道的真暂停/原地续播,换取
     *    全引擎一致的确定行为;
  *  - AudioFocus 用 GAIN_TRANSIENT_MAY_DUCK:背景音乐压低而非打断;
+ *  - 拔耳机/断蓝牙(AUDIO_BECOMING_NOISY)立即暂停,声音不落到扬声器外放;
  *  - 播放状态经 companion 的 [state] StateFlow 回流 App 内浮窗(浮窗控制走
  *    companion 的 prev/playPause/next/stop 便捷方法,与通知栏 action 同一通路)。
  */
@@ -86,6 +89,27 @@ class TtsPlaybackService : Service() {
     private val mainHandler = Handler(Looper.getMainLooper())
     private var audioManager: AudioManager? = null
     private var audioFocusRequest: AudioFocusRequest? = null
+
+    /**
+     * 拔耳机/断蓝牙(BECOMING_NOISY)即暂停:避免播报声突然切到扬声器外放
+     * (隐私尴尬 + 打扰)。手动暂停同一语义,点播放可续。
+     */
+    private val noisyReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action != AudioManager.ACTION_AUDIO_BECOMING_NOISY) return
+            if (playlist.isNotEmpty() && !paused) pauseForInterruption()
+        }
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        // 项目首例 receiver:系统保护广播,NOT_EXPORTED 也能收到(targetSdk 34+ 显式 flag)
+        ContextCompat.registerReceiver(
+            this, noisyReceiver,
+            IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY),
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -122,9 +146,7 @@ class TtsPlaybackService : Service() {
                     // 回收/未就绪)则销毁重起当前条。TTS 通道维持重读语义。
                     if (!(usingAudio && audioPlayer?.resume() == true)) playCurrent()
                 } else {
-                    paused = true
-                    if (usingAudio) audioPlayer?.pause() else tts?.stop()
-                    updateNotification()
+                    pauseForInterruption()
                 }
             }
             ACTION_NEXT -> if (playlist.isNotEmpty()) {
@@ -258,6 +280,17 @@ class TtsPlaybackService : Service() {
         }
     }
 
+    /**
+     * 暂停当前播放(手动暂停与拔耳机共用):音频通道真暂停(原地续播),
+     * TTS 通道 stop + 记 index(恢复重读当前条,与手动暂停同一取舍)。
+     */
+    private fun pauseForInterruption() {
+        paused = true
+        if (usingAudio) audioPlayer?.pause() else tts?.stop()
+        updateNotification()
+        publishState()
+    }
+
     private fun stopPlayback() {
         paused = true
         audioPlayer?.release()
@@ -283,6 +316,7 @@ class TtsPlaybackService : Service() {
     }
 
     override fun onDestroy() {
+        unregisterReceiver(noisyReceiver)
         audioPlayer?.release()
         audioPlayer = null
         runCatching { tts?.stop() }
