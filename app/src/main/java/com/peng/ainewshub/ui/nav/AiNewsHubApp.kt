@@ -66,7 +66,9 @@ import com.peng.ainewshub.ui.i18n.AppLocale
 import com.peng.ainewshub.ui.RefreshNotices
 import com.peng.ainewshub.ui.FollowNotices
 import com.peng.ainewshub.ui.theme.AiNewsHubTheme
+import com.peng.ainewshub.widget.HotNowWidget
 import com.peng.ainewshub.widget.HotNowWidgetUpdater
+import androidx.glance.appwidget.updateAll
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -155,7 +157,14 @@ internal fun AiNewsHubApp(
         initialValue = AiConfig()
     )
     val onSelectTheme: (ThemeMode) -> Unit = { scope.launch { settingsStore.updateTheme(it) } }
-    val onSelectSkin: (AppSkin) -> Unit = { scope.launch { settingsStore.updateSkin(it) } }
+    // 切皮肤后主动重绘桌面小组件(纯重渲染:数据新鲜时 provideGlance 不碰网络),
+    // 保证「切完立刻看到」;不刷新也会被系统 30min 周期自愈,这里只是即时性
+    val onSelectSkin: (AppSkin) -> Unit = { skin ->
+        scope.launch {
+            settingsStore.updateSkin(skin)
+            runCatching { HotNowWidget().updateAll(appContext) }
+        }
+    }
     val onToggleDynamicColor: (Boolean) -> Unit = { scope.launch { settingsStore.updateDynamicColor(it) } }
     val onSelectFont: (FontChoice) -> Unit = { scope.launch { settingsStore.updateFont(it) } }
     val onSelectFontScale: (FontScale) -> Unit = { scope.launch { settingsStore.updateFontScale(it) } }
