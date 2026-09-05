@@ -67,7 +67,7 @@ class ShortContentException : RuntimeException("content_too_short")
  * 设计要点(复刻项目既有范式):
  *  - 网络统一走 [AiChatClient](OpenAI 兼容,超时同 [NewsRepository]);
  *  - 缓存存 `cacheDir/hn_translations.json`,key=原文纯文本 sha256 前 16 位;
- *    进程内持内存副本(懒加载一次),文件级 Mutex 串行化读-改-写,上限 1000 条按插入序淘汰;
+ *    进程内持内存副本(懒加载一次),文件级 Mutex 串行化读-改-写,上限 1000 条按 LRU(访问序)淘汰;
  *  - 落盘走「延迟合并」:单条翻译只更新内存副本,短窗口内的连续翻译合并为一次
  *    全量写(替代每条即写,收敛写放大);批量翻译(deferPersist)结束后由调用方 flush;
  *  - per-key [Mutex] 串行化网络请求,防同一条内容被并发点两次,完成后即回收;
@@ -111,7 +111,10 @@ class TranslationRepository private constructor(context: Context) {
     private suspend fun cacheLocked(): LinkedHashMap<String, String> {
         memCache?.let { return it }
         val loaded = withContext(Dispatchers.IO) { TranslationCache.read(cacheDir) }
-        val map = LinkedHashMap(loaded)
+        // accessOrder=true:命中即重排,淘汰循环按「最久未用」踢出 —— 高频词条
+        // 不因插入早而败给刚译过的冷词,被挤出后重译白烧 token
+        val map = LinkedHashMap<String, String>(16, 0.75f, true)
+        map.putAll(loaded)
         memCache = map
         return map
     }
@@ -129,7 +132,7 @@ class TranslationRepository private constructor(context: Context) {
         }
     }
 
-    /** [cacheMutex] 锁内调用:超出上限按插入序淘汰最旧(只动内存,落盘由 flush 统一)。 */
+    /** [cacheMutex] 锁内调用:超出上限按 LRU(访问序)淘汰最久未用(只动内存,落盘由 flush 统一)。 */
     private suspend fun updateMemOnlyLocked(key: String, value: String) {
         val map = cacheLocked()
         map[key] = value
@@ -221,7 +224,7 @@ class TranslationRepository private constructor(context: Context) {
     }
 
     companion object {
-        /** 缓存条目上限:超出按插入序淘汰最旧,防文件无界增长。 */
+        /** 缓存条目上限:超出按 LRU(访问序)淘汰最久未用,防文件无界增长。 */
         private const val MAX_CACHE_ENTRIES = 1000
 
         /** 单条翻译的延迟合并落盘窗口:窗口内连续翻译合并为一次全量写。 */
