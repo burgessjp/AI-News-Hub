@@ -66,6 +66,7 @@ import com.peng.ainewshub.ui.EmptyState
 import com.peng.ainewshub.ui.components.AppTopBar
 import com.peng.ainewshub.ui.components.AppTopBarDefaults
 import com.peng.ainewshub.ui.components.SectionHeader
+import com.peng.ainewshub.ui.components.rememberHaptics
 import com.peng.ainewshub.ui.theme.AppAlpha
 import com.peng.ainewshub.ui.theme.AppText
 import java.text.SimpleDateFormat
@@ -318,9 +319,12 @@ private fun HistoryRow(
 ) {
     val cs = MaterialTheme.colorScheme
     val context = LocalContext.current
+    val haptics = rememberHaptics()
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = {
             if (it == SwipeToDismissBoxValue.EndToStart) {
+                // 删除真正提交的那一刻给确认触感(半程回弹不震)
+                haptics.confirm()
                 onSwipeDelete()
                 true
             } else false

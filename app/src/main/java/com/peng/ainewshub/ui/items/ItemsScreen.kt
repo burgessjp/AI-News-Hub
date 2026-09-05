@@ -70,6 +70,7 @@ import com.peng.ainewshub.ui.dayKeyOf
 import com.peng.ainewshub.ui.components.BottomBarReservedHeight
 import com.peng.ainewshub.ui.components.HairlineDivider
 import com.peng.ainewshub.ui.components.NewsCardSkeletonList
+import com.peng.ainewshub.ui.components.rememberHaptics
 import com.peng.ainewshub.ui.components.rememberReadUrls
 import kotlinx.coroutines.launch
 
@@ -110,6 +111,7 @@ fun ItemsScreen(
     val isLoadingMore by vm.isLoadingMore.collectAsStateWithLifecycle()
     val isRefreshing by vm.isRefreshing.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
+    val haptics = rememberHaptics()
 
     // 已读判定与「只看未读」过滤(屏幕级状态,不持久化):过滤在展示层做,
     // 不改 ViewModel 取数 —— 分页/刷新逻辑不受影响,翻到底仍会加载更多
@@ -218,6 +220,7 @@ fun ItemsScreen(
                                 PullToRefreshBox(
                                     isRefreshing = isRefreshing,
                                     onRefresh = {
+                                        haptics.tick()
                                         vm.refresh()
                                         // 联动刷新页面自带的额外模块(如精选的「今日热点」)
                                         onRefreshExtra?.invoke()

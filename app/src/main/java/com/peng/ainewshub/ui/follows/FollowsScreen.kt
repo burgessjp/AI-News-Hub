@@ -79,6 +79,7 @@ import com.peng.ainewshub.ui.components.BottomBarPillHeight
 import com.peng.ainewshub.ui.components.BrandWordmark
 import com.peng.ainewshub.ui.components.RankRowSkeletonList
 import com.peng.ainewshub.ui.components.SectionHeader
+import com.peng.ainewshub.ui.components.rememberHaptics
 import com.peng.ainewshub.ui.components.rememberReadUrls
 import com.peng.ainewshub.ui.theme.AppAlpha
 import com.peng.ainewshub.ui.theme.AppText
@@ -114,6 +115,7 @@ fun FollowsScreen(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val isRefreshing by vm.isRefreshing.collectAsStateWithLifecycle()
+    val haptics = rememberHaptics()
     val readUrls = rememberReadUrls()
     var showManage by rememberSaveable { mutableStateOf(false) }
 
@@ -157,7 +159,10 @@ fun FollowsScreen(
                 )
                 is UiState.Success -> PullToRefreshBox(
                     isRefreshing = isRefreshing,
-                    onRefresh = { vm.refresh() }
+                    onRefresh = {
+                        haptics.tick()
+                        vm.refresh()
+                    }
                 ) {
                     val ui = s.data
                     when {

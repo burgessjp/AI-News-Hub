@@ -204,6 +204,7 @@ private fun NavPillItem(
 ) {
     val cs = MaterialTheme.colorScheme
     val interactionSource = remember { MutableInteractionSource() }
+    val haptics = rememberHaptics()
     // 选中:实心图标(FILL 1);未选中:描边图标(FILL 0)
     val icon = if (selected) tab.selectedIcon else tab.icon
     // 选中:secondary 着色到图标/文字(深浅色板均为可辨紫,无需模式判断;
@@ -225,7 +226,11 @@ private fun NavPillItem(
                 interactionSource = interactionSource,
                 indication = null,
                 role = Role.Tab,
-                onClick = onClick
+                onClick = {
+                    // 重击当前 tab(回根/刷新时刻)给一次轻触感;普通切 tab 不震
+                    if (selected) haptics.tick()
+                    onClick()
+                }
             )
             // 选中:统一椭圆最小宽(各 tab 等宽,见 [SelectedTabMinWidth]);
             // 未选中:触控宽保底 48dp(8×2+22=38dp 不达标,补足)。

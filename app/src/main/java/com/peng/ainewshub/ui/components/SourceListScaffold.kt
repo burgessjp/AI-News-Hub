@@ -61,6 +61,7 @@ fun <T> SourceListScaffold(
     topBarActions: @Composable RowScope.() -> Unit = {},
     successContent: LazyListScope.() -> Unit
 ) {
+    val haptics = rememberHaptics()
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
         snackbarHost = {
@@ -102,7 +103,10 @@ fun <T> SourceListScaffold(
                     } else {
                         PullToRefreshBox(
                             isRefreshing = isRefreshing,
-                            onRefresh = onForceRefresh,
+                            onRefresh = {
+                                haptics.tick()
+                                onForceRefresh()
+                            },
                         ) {
                             LazyColumn(
                                 state = listState,

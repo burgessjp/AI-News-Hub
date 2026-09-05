@@ -31,6 +31,7 @@ import com.peng.ainewshub.data.repo.SummaryRepository
 import com.peng.ainewshub.ui.SummaryViewModel
 import com.peng.ainewshub.ui.UiState
 import com.peng.ainewshub.ui.components.AppTopBar
+import com.peng.ainewshub.ui.components.rememberHaptics
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
@@ -72,6 +73,7 @@ fun SummaryScreen(
 ) {
     val states by vm.states.collectAsStateWithLifecycle()
     val isRefreshing by vm.isRefreshing.collectAsStateWithLifecycle()
+    val haptics = rememberHaptics()
     val sourceKeys by vm.sourceKeys.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
@@ -161,7 +163,10 @@ fun SummaryScreen(
             // 下拉手势经 PullToRefreshBox 触发 vm.refresh()(纵向手势不与横向 Pager 冲突)
             PullToRefreshBox(
                 isRefreshing = isRefreshing,
-                onRefresh = { vm.refresh() },
+                onRefresh = {
+                    haptics.tick()
+                    vm.refresh()
+                },
                 modifier = Modifier.fillMaxSize()
             ) {
                 HorizontalPager(

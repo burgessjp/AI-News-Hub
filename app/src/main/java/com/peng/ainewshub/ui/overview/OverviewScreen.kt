@@ -77,6 +77,7 @@ import com.peng.ainewshub.ui.components.BrandWordmark
 import com.peng.ainewshub.ui.components.HairlineDivider
 import com.peng.ainewshub.ui.components.RankBadge
 import com.peng.ainewshub.ui.components.RankRowSkeletonList
+import com.peng.ainewshub.ui.components.rememberHaptics
 import com.peng.ainewshub.ui.components.rememberReadUrls
 import com.peng.ainewshub.ui.i18n.AppLocale
 import com.peng.ainewshub.ui.theme.AppAlpha
@@ -114,6 +115,7 @@ fun OverviewScreen(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val isRefreshing by vm.isRefreshing.collectAsStateWithLifecycle()
+    val haptics = rememberHaptics()
 
     // 重击当前 tab:滚回顶部 + 缓存感知刷新(指纹未变零开销,归档更新才重新生成)。
     // lastHandled 防「重新进入组合就自动刷新」(同摘要 tab 套路)。
@@ -234,7 +236,10 @@ fun OverviewScreen(
                 )
                 is OverviewState.Success -> PullToRefreshBox(
                     isRefreshing = isRefreshing,
-                    onRefresh = { vm.refresh() }
+                    onRefresh = {
+                        haptics.tick()
+                        vm.refresh()
+                    }
                 ) {
                     OverviewContent(
                         digest = s.digest,

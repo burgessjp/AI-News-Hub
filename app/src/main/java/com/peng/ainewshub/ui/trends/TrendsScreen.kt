@@ -65,6 +65,7 @@ import com.peng.ainewshub.ui.components.BrandWordmark
 import com.peng.ainewshub.ui.components.HairlineDivider
 import com.peng.ainewshub.ui.components.RankBadge
 import com.peng.ainewshub.ui.components.RankRowSkeletonList
+import com.peng.ainewshub.ui.components.rememberHaptics
 import com.peng.ainewshub.ui.theme.AppText
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -98,6 +99,7 @@ fun TrendsScreen(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val isRefreshing by vm.isRefreshing.collectAsStateWithLifecycle()
+    val haptics = rememberHaptics()
     // 已关注词集合(小写):展开区「+ 关注」按钮的已关注态判定
     val followedKeywords by vm.followedKeywords.collectAsStateWithLifecycle()
 
@@ -150,7 +152,10 @@ fun TrendsScreen(
                 )
                 is TrendsState.Success -> PullToRefreshBox(
                     isRefreshing = isRefreshing,
-                    onRefresh = { vm.refresh() }
+                    onRefresh = {
+                        haptics.tick()
+                        vm.refresh()
+                    }
                 ) {
                     TrendsContent(
                         digest = s.digest,
@@ -225,6 +230,7 @@ internal fun TrendsContent(
     val context = LocalContext.current
     // 当前展开的词条(单展开,再点收起);瞬态 UI 状态,切 tab 丢失可接受
     var expandedTerm by remember { mutableStateOf<String?>(null) }
+    val haptics = rememberHaptics()
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
@@ -285,6 +291,7 @@ internal fun TrendsContent(
                     keyword = keyword,
                     expanded = expandedTerm == keyword.term,
                     onToggle = {
+                        haptics.tick()
                         expandedTerm = if (expandedTerm == keyword.term) null else keyword.term
                     },
                     onOpenUrl = onOpenUrl,

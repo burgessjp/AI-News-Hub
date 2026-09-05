@@ -55,6 +55,7 @@ import com.peng.ainewshub.ui.components.AppTopBar
 import com.peng.ainewshub.ui.components.AppTopBarDefaults
 import com.peng.ainewshub.ui.components.ArchiveIconButton
 import com.peng.ainewshub.ui.components.SectionHeader
+import com.peng.ainewshub.ui.components.rememberHaptics
 import com.peng.ainewshub.ui.components.weekdayLabel
 import com.peng.ainewshub.ui.theme.AppText
 import com.peng.ainewshub.ui.theme.TrackingWide
@@ -81,6 +82,7 @@ fun DailyScreen(
 ) {
     val state by vm.latest.collectAsStateWithLifecycle()
     val isRefreshing by vm.isRefreshing.collectAsStateWithLifecycle()
+    val haptics = rememberHaptics()
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
@@ -120,7 +122,10 @@ fun DailyScreen(
                 // 下拉刷新:不翻回 Loading,仅转刷新指示(对齐 8 源页既有模式)
                 is UiState.Success -> PullToRefreshBox(
                     isRefreshing = isRefreshing,
-                    onRefresh = { vm.pullRefreshLatest() }
+                    onRefresh = {
+                        haptics.tick()
+                        vm.pullRefreshLatest()
+                    }
                 ) {
                     DailyContent(
                         report = s.data,

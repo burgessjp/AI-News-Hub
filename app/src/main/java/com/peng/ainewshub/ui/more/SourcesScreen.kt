@@ -34,6 +34,7 @@ import com.peng.ainewshub.R
 import com.peng.ainewshub.data.source.SourceFreshness
 import com.peng.ainewshub.ui.components.AppTopBar
 import com.peng.ainewshub.ui.components.AppTopBarDefaults
+import com.peng.ainewshub.ui.components.rememberHaptics
 import com.peng.ainewshub.ui.theme.AppText
 import kotlinx.coroutines.launch
 import org.burnoutcrew.reorderable.ReorderableItem
@@ -63,6 +64,7 @@ fun SourcesScreen(
     val context = LocalContext.current
     val settingsStore = remember(context) { SettingsStore(context) }
     val scope = rememberCoroutineScope()
+    val haptics = rememberHaptics()
 
     // 数据未加载完前用空列表占位(不渲染任何 item),DataStore 读完后直接用真实用户顺序渲染 ——
     // 避免先用默认顺序渲染再切到用户顺序,被 ReorderableItem 的 animateItemPlacement 播成
@@ -82,7 +84,8 @@ fun SourcesScreen(
             }
         },
         onDragEnd = { _, _ ->
-            // 拖拽结束持久化;延迟捕获 localOrder 最新值(此时 onMove 已更新完毕)
+            // 拖拽落定:中档确认触感;持久化延迟捕获 localOrder 最新值(此时 onMove 已更新完毕)
+            haptics.confirm()
             scope.launch { settingsStore.updateSourceOrder(localOrder) }
         }
     )
@@ -126,6 +129,9 @@ fun SourcesScreen(
             itemsIndexed(localOrder, key = { _, key -> key }) { idx, key ->
                 val meta = sourceMeta(key)
                 ReorderableItem(reorderState, key = key) { isDragging ->
+                    // 长按拾起瞬间一次重触感(reorderable 0.9.6 无 onDragStart 回调,
+                    // 以 isDragging 翻转为 true 的时刻等效实现)
+                    LaunchedEffect(isDragging) { if (isDragging) haptics.grab() }
                     val stale = staleDays[key]
                     IconTileRow(
                         icon = meta.icon,
