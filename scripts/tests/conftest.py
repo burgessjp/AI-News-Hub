@@ -1,12 +1,16 @@
-"""流水线测试共享夹具。
+"""
+流水线测试共享夹具。
 
 惯例(对齐 docs/agents/testing.md 的 Python 侧小节):
  - sys.path 插入 scripts/ 目录,与各脚本自身的 path-insert 惯例一致,直接 import 被测模块;
  - frozen_now:钉死当前北京时间为 2026-08-29 11:01(与 fixtures/ 的真实批次同刻),
-   patch 面 = fetch_data + sources 包内各模块的 now_cst 绑定(包迭代,新增源自动覆盖),
-   断言「快照目录日期 / fetched_at / index.updated_at」才有确定值;
+   patch 面 = fetch_data + trend_keywords + tts_broadcast + sources 包内各模块的
+   now_cst 绑定(包迭代,新增源自动覆盖),断言「快照目录日期 / fetched_at /
+   index.updated_at / 趋势窗口与归档日期」才有确定值;
  - no_retry_backoff:把 common.retry(经 fetch_data 命名空间绑定的引用)替换为直调版,
-   跳过 2s/4s 指数退避的真实 sleep —— 测试里重试路径不该等墙钟。
+   跳过 2s/4s 指数退避的真实 sleep —— 测试里重试路径不该等墙钟;
+ - frozen_push_datetime:push_data 不走 now_cst 而是直接 datetime.now(CST)(提交
+   时间戳/音频清理 cutoff),用 datetime 子类冻结 now、保留 strptime 真实现。
 """
 
 import sys
@@ -20,6 +24,9 @@ if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
 import fetch_data  # noqa: E402  (需先完成 sys.path 注入)
+import push_data  # noqa: E402
+import trend_keywords  # noqa: E402
+import tts_broadcast  # noqa: E402
 from common import BEIJING_TZ  # noqa: E402
 
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
@@ -45,9 +52,10 @@ def frozen_now(monkeypatch):
     """钉死当前北京时间。
 
     注意 patch 的是各模块命名空间里 `from common import now_cst` 的绑定
-    (import 时拷贝,patch common.now_cst 不生效):fetch_data(main 的时间戳)
-    与 sources 包内绑定了 now_cst 的模块(vendor 源的 2 天窗口)一并冻结。"""
-    for mod in [fetch_data, *_iter_sources_modules()]:
+    (import 时拷贝,patch common.now_cst 不生效):fetch_data(main 的时间戳)、
+    trend_keywords(generatedAt/归档日期)、tts_broadcast(音频目录日期)与
+    sources 包内绑定了 now_cst 的模块(vendor 源的 2 天窗口)一并冻结。"""
+    for mod in [fetch_data, trend_keywords, tts_broadcast, *_iter_sources_modules()]:
         if hasattr(mod, "now_cst"):
             monkeypatch.setattr(mod, "now_cst", lambda: FROZEN_NOW)
     return FROZEN_NOW
@@ -61,6 +69,23 @@ def no_retry_backoff(monkeypatch):
         return fn()
 
     monkeypatch.setattr(fetch_data, "retry", instant)
+
+
+@pytest.fixture
+def frozen_push_datetime(monkeypatch):
+    """冻结 push_data.datetime:now() 恒返 FROZEN_NOW,strptime 等真实现保留。
+
+    push_data 的两处时钟(commit 时间戳 / _prune_old_audio 的 cutoff)都直接
+    datetime.now(CST),不经 now_cst —— 需要确定性时(提交信息、旧音频判定)
+    用本夹具。返回冻结时刻。"""
+
+    class _FrozenDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return FROZEN_NOW
+
+    monkeypatch.setattr(push_data, "datetime", _FrozenDatetime)
+    return FROZEN_NOW
 
 
 def load_fixture(relpath: str):
