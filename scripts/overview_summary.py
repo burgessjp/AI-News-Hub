@@ -25,6 +25,7 @@
 
 设计要点(初版逐行搬自 OverviewRepository.kt,后经准确性优化):
   - 输入 8 源快照(SOURCE_KEYS,与 App 端一致),每源取前 ITEMS_PER_SOURCE=8 条;
+    AI 候选上限 14 条(>10,给数据侧同事件去重留余量);
   - 跨源归一化热度档位:有指标源按自身 top-8 最大原始热度归一化到 10-100%,
     让 AI 跨源比较的是相对档位而非量级悬殊的原始数字;
     无指标源(rundown-ai/stormzhang-ai/openai-anthropic-news)无真实指标,按列表序号
@@ -35,6 +36,16 @@
     breaking 时效窗口 = 数据日期及其前一天(每日批次制,晚间跑批时前一日大事对未及阅读的用户仍是突发);
   - 调 OpenAI 兼容 /v1/chat/completions,温度 0.3,read 超时放宽到 120s(输出长);
   - 解析后做 ref 回填 + 时效兜底 + URL/标题双层去重 + breaking 截断到 MAX_BREAKING;
+  - 标题去重三规则(2026-09 收紧,拦跨语言同事件重复——aihot 精选常是 HN/GitHub
+    热点的中文转述,中文标题与英文原标题的 Jaccard 天然够不着 0.5,曾致 Shopify
+    迁移同事件双条目上榜):① Jaccard ≥0.5 原路径;② 近似包含(短 token 集被长集
+    包含/只多 1 个 token,且交集含非泛词锚点——专拦「GLM-5.3」「GPT-6 Astra」式
+    裸产品名标题,泛词锚点表防止「两条都提到 OpenAI 的不同新闻」误杀);③ 重合度
+    (交集 ≥3 且 Jaccard ≥0.25)。原「token<3 豁免」已移除——豁免曾让裸产品名
+    标题完全绕过判重;
+  - 去重后不足 MAX_TOP 时从输入池按归一化热度降序回填(单源 ≤3、7 天时效硬闸、
+    同套 URL/标题去重),保证常规批次恒输出 10 条;回填条目无 AI 点评(comment 留
+    空,App 端空串不渲染)、恒非 breaking;
   - 失败返回 None,不阻断推送(对齐单源 AI 摘要失败的优雅降级,
     fetch_data.py 会从 previous_index 继承上次的 latest_overview)。
 
@@ -49,6 +60,7 @@ import os
 import re
 import sys
 import time
+from collections import Counter
 from datetime import datetime, timezone, timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -78,7 +90,45 @@ ITEMS_PER_SOURCE = 8       # 每源喂 AI 的条目数
 MIN_SOURCES = 4            # 低于此源数不生成(数据太少,分析无意义)
 MAX_BREAKING = 2           # 「突发重磅」上限(占 Top10 名额)
 MAX_TOP = 10               # 热点列表总条数上限
-TITLE_DUP_THRESHOLD = 0.5  # 标题 Jaccard 去重阈值
+TITLE_DUP_THRESHOLD = 0.5  # 标题 Jaccard 去重阈值(纯英文同事件高重合兜底)
+OVERLAP_MIN_SHARED = 3     # 重合度规则:标题 token 交集下限
+OVERLAP_MIN_JACCARD = 0.25 # 重合度规则:Jaccard 下限(跨语言同事件实测 0.32~0.5)
+FRESH_WINDOW_DAYS = 7      # 回填时效硬闸,与 prompt 选条规则同口径
+
+# 英文虚词(2~4 字符):判重前丢弃——「Kimi-K3 on HuggingFace」的 on 会多算一个
+# token 差;the/for 这类 3 字符虚词还会虚增重合度规则的交集数(Flint vs Kronos
+# 论文曾靠 for/the/language 凑满 3 个交集被误杀)。
+EN_STOP = {
+    "on", "of", "to", "in", "is", "it", "at", "by", "as", "us",
+    "we", "or", "an", "be", "do", "if", "no", "so", "up", "my", "vs",
+    "the", "and", "for", "with", "from", "that", "this", "are", "was",
+    "has", "have", "had", "will", "can", "its", "all", "how", "why",
+    "what", "when", "who", "now", "not", "but", "out", "get", "you", "your",
+}
+
+# 泛词锚点表:公司/产品线/生态名 + 高频通用词。近似包含规则要求交集至少含一个
+# 非泛词,防止「两条都提到同一公司的不同新闻」被误判同事件。产品线/协议名
+# (code/cursor/mcp/iphone/voice…)是池级压测实锤的弱锚点——同一产品线的不同
+# 新闻(Claude Code「Auto 模式默认化」vs「会话间互发消息」)会共享它们;
+# 公司名(cloudflare)同理。新厂商/新产品线上线时滚动补,补词前先核对不会
+# 误杀在榜好词——同 trend_keywords.py 补停用词的模式。
+GENERIC_ANCHORS = {
+    "ai", "openai", "claude", "anthropic", "google", "deepmind", "gemini",
+    "github", "microsoft", "meta", "nvidia", "apple", "amazon", "aws",
+    "cloudflare", "hugging", "face", "agent", "agents", "model", "models",
+    "llm", "api", "app", "apps", "new", "open", "source", "release",
+    "released", "launch", "launches", "announces", "pro", "skills", "use",
+    "files", "computer", "preview",
+    "code", "cursor", "mcp", "iphone", "mac", "editor", "voice", "chrome",
+    "chatgpt", "gpt", "codex", "labs", "gpu", "video", "companies",
+    "world", "expert",
+    # 型号后缀与参数规模:flash/max/ultra/mini/exp/next/vision、3b/70b 等——
+    # 不同厂商共用(GLM-Flash vs Qwen-Flash、Tines 3B vs Ling-tiny 均曾误杀);
+    # 真同产品的裸名对(「Gemini 3.7 Flash」⊂ 中文报道)走纯包含,不依赖锚点
+    "flash", "max", "ultra", "mini", "exp", "next", "vision", "3d",
+    "1b", "3b", "7b", "13b", "30b", "35b", "70b", "80b",
+    "宣布", "推出", "发布", "开源", "报告", "实测", "体验", "上手",
+}
 
 # 对齐 App:connectTimeout 15s, readTimeout 120s(总览输出长,比单源摘要的 30s 放宽)
 TIMEOUT = (15, 120)
@@ -105,7 +155,7 @@ SYSTEM_PROMPT = """你是「AI News Hub」今日总览栏目的主编。输入�
 - 原始指标量级差异极大(HN 几百、GitHub 几万),禁止直接比较原始数字。
 
 二、选条与排序:
-1. items 为今日最值得关注的条目,最多 10 条(数据不足按实际给,至少 5 条)。按热度档位从高到低排序;档位差 ≤2% 视为同档,同档时有指标源在前、日期新鲜的在前。
+1. items 为今日最值得关注的条目,最多 14 条(数据不足按实际给,至少 5 条;数据侧会对跨源同事件去重后截取前 10)。按热度档位从高到低排序;档位差 ≤2% 视为同档,同档时有指标源在前、日期新鲜的在前。
 2. 时效:输入顶部给出「数据日期(北京)」。日期早于数据日期 7 天以上的条目不得入选(档位再高也不行);标注「抓取日期」的条目其日期不代表发布日,不得作为时效依据。
 3. 跨源同事件合并:同一事件(如某新模型发布,含其衍生通稿如「上线某平台」「开源某组件」)在多个源出现时只保留一条,取各报道源中的最高档位参与排序;ref 优先选有指标源的条目,同为有指标源取档位最高者。analysis 里可点出「多家报道」。同一事件不得占多个名额。
 4. 同一来源(ref 源key)最多 3 条;超出时把名额让给其它源的高档位条目。
@@ -116,7 +166,7 @@ SYSTEM_PROMPT = """你是「AI News Hub」今日总览栏目的主编。输入�
 ① 属于重大发布/行业事件(新模型、重大开源、巨头战略动作等);
 ② 至少 2 个源报道同一事件,且其中 ≥1 个是有指标源;
 ③ 佐证条目中至少 1 条的真实日期等于数据日期或前一天(「抓取日期」不算)。
-0 到 2 条,宁缺毋滥,绝不硬凑;任一条件不满足即 "breaking":false。breaking 条目排在 items 最前,计入 10 条总数。breaking=true 时必须给出 breakingReason:简体中文 ≤40 字,写清具体证据(哪些源报道、什么量级,如「HN 899 分热议 + PH 日榜#4」),禁止「影响面广」「引发热议」等无信息量表述,不复述 analysis;breaking=false 时留空字符串。"""
+0 到 2 条,宁缺毋滥,绝不硬凑;任一条件不满足即 "breaking":false。breaking 条目排在 items 最前,计入条目总数。breaking=true 时必须给出 breakingReason:简体中文 ≤40 字,写清具体证据(哪些源报道、什么量级,如「HN 899 分热议 + PH 日榜#4」),禁止「影响面广」「引发热议」等无信息量表述,不复述 analysis;breaking=false 时留空字符串。"""
 
 
 # ===== 快照读取 =====
@@ -399,9 +449,24 @@ def _validate_overview_obj(data):
 # ===== 解析兜底(搬自 OverviewRepository.kt parseResult/parseEntries) =====
 
 def _tokenize_title(title):
-    """标题切 token:按非字母数字(含中文字符保留)分段,统一小写,过滤 1 字符噪声。"""
-    tokens = re.split(r"[^a-z0-9\u4e00-\u9fa5]+", title.lower())
-    return {t for t in tokens if len(t) >= 2}
+    """
+    标题切 token:按非字母数字(含中文)分段、统一小写、滤 1 字符噪声与 EN_STOP 虚词;
+    含中文的段再按中英边界二次切分——否则「Pro与Grok」黏成一个 token,containment
+    判重时 pro 永远匹配不上(DeepSeek V4 Pro 跨语言重复曾因此漏网)。
+    """
+    tokens = set()
+    for seg in re.split(r"[^a-z0-9\u4e00-\u9fa5]+", title.lower()):
+        if not seg:
+            continue
+        if re.fullmatch(r"[a-z0-9]+", seg):
+            if len(seg) >= 2 and seg not in EN_STOP:
+                tokens.add(seg)
+        else:
+            for sub in re.split(
+                    r"(?<=[\u4e00-\u9fa5])(?=[a-z0-9])|(?<=[a-z0-9])(?=[\u4e00-\u9fa5])", seg):
+                if len(sub) >= 2 and sub not in EN_STOP:
+                    tokens.add(sub)
+    return tokens
 
 
 def _jaccard(a, b):
@@ -412,31 +477,120 @@ def _jaccard(a, b):
     return inter / (len(a) + len(b) - inter)
 
 
-def _title_not_duplicate(title, history):
+def _near_containment(ta, tb):
     """
-    标题去重:与历史标题集合逐一算 Jaccard,≥ TITLE_DUP_THRESHOLD 视为重复丢弃;否则记入历史。
-    返回 (is_unique, ) —— 调用方据此前进/跳过。
+    近似包含判重(仅跨源调用):较小 token 集被较大集完全包含;或只多出 ≤1 个
+    token,且交集含至少一个非泛词锚点(锚点必须是专名,不能只是公司名/泛词)。
+    专拦跨语言同事件的「裸产品名」形态:如「GLM-5.3」vs「GLM-5.3 发布:…」、
+    「GPT-6 Astra」vs「OpenAI 发布 GPT-6 Astra:…」。
+    """
+    small, big = (ta, tb) if len(ta) <= len(tb) else (tb, ta)
+    if not small:
+        return False
+    inter = small & big
+    if not inter:
+        return False
+    if small <= big:
+        return True
+    return len(small - big) <= 1 and any(t not in GENERIC_ANCHORS for t in inter)
+
+
+def _title_not_duplicate(title, history, source=""):
+    """
+    标题去重(三规则,对 history 逐一比对,命中任一即丢弃;均仅跨源生效):
+    ① Jaccard ≥ TITLE_DUP_THRESHOLD(纯英文同事件高重合);
+    ② 近似包含(裸产品名短标题形态,见 _near_containment);
+    ③ 重合度:交集 ≥ OVERLAP_MIN_SHARED 且 Jaccard ≥ OVERLAP_MIN_JACCARD
+      (跨语言长标题形态,如 Shopify 迁移中英报道)。
+    三规则限跨源:同源内已有 URL 精确去重兜底,而语义规则在同源内误杀率高且
+    结构性存在——GitHub 同 owner 不同仓(owner 共享,Jaccard 可达 0.67、近似
+    包含只差 1 token)必被误杀;回填把整池条目送进判重后此闸必须存在。15 对
+    历史实锤重复全部是跨源对,闸无漏拦。
+    不重复则记入 history。历史上的「token<3 豁免」已移除——裸产品名标题恰恰是
+    重复高发形态,豁免等于放行(「Hy4 preview」Jaccard=1.0 曾原样双条目上榜)。
+    history 条目为 (source, tokens),source 用于跨源闸判定。
     """
     tokens = _tokenize_title(title)
-    if len(tokens) < 3:
-        history.append(tokens)
+    if not tokens:
+        history.append((source, tokens))
         return True
-    for prev in history:
-        if _jaccard(tokens, prev) >= TITLE_DUP_THRESHOLD:
+    for prev_source, prev in history:
+        if prev_source == source:
+            continue
+        jac = _jaccard(tokens, prev)
+        shared = len(tokens & prev)
+        if (jac >= TITLE_DUP_THRESHOLD
+                or (shared >= OVERLAP_MIN_SHARED and jac >= OVERLAP_MIN_JACCARD)
+                or _near_containment(tokens, prev)):
             return False
-    history.append(tokens)
+    history.append((source, tokens))
     return True
 
 
-def _parse_result(ai_data, snapshots, breaking_dates):
+def _backfill_items(result, extracted, used_positions, urls_seen, title_history, data_today):
     """
-    解析 AI 输出为统一的热点列表(完成 ref 回填 + 时效兜底 + 双层去重 + breaking 截断)。
+    从输入池按归一化热度降序回填,把热点列表补足到 MAX_TOP。
+    触发条件:AI 候选经去重后不足 10 条(AI 候选上限 14 见 SYSTEM_PROMPT,双保险
+    保证常规批次恒 10 条)。约束对齐 prompt 选条规则:单源 ≤3 条、7 天时效硬闸、
+    URL/标题去重与 AI 条目共用同一套登记。回填条目 comment 留空(App 端空串不
+    渲染)、恒非 breaking。
+    """
+    if not data_today:
+        return []
+    try:
+        floor_date = (datetime.strptime(data_today, "%Y-%m-%d")
+                      - timedelta(days=FRESH_WINDOW_DAYS)).strftime("%Y-%m-%d")
+    except ValueError:
+        return []
+    source_counts = Counter(e["source"] for e in result)
+    pool = []
+    for src, items in extracted.items():
+        for item in items:
+            if (src, item[0]) in used_positions or not item[2].strip():
+                continue
+            pool.append(item + (SOURCE_KEYS.index(src), src))
+    pool.sort(key=lambda x: (-x[6], x[7], x[0]))
+
+    added = []
+    for index, title, url, metrics, _blurb, date_key, _pct, _order, src in pool:
+        if len(result) + len(added) >= MAX_TOP:
+            break
+        if source_counts[src] >= 3:
+            continue
+        # 时效硬闸:日期早于数据日期 7 天以上的不入池(与 prompt 选条规则同口径)
+        if date_key and date_key < floor_date:
+            continue
+        if url in urls_seen or not _title_not_duplicate(title, title_history, src):
+            continue
+        urls_seen.add(url)
+        source_counts[src] += 1
+        added.append({
+            "source": src,
+            "title": title,
+            "url": url,
+            "metrics": metrics,
+            "comment": "",
+            "breaking": False,
+            "breakingReason": "",
+        })
+    return added
+
+
+def _parse_result(ai_data, snapshots, breaking_dates, data_today=""):
+    """
+    解析 AI 输出为统一的热点列表:ref 回填 + 时效兜底 + 双层去重 + breaking 截断
+    到 MAX_BREAKING + 不足 MAX_TOP 时从输入池按热度回填。
     breaking_dates: 允许标 breaking 的北京日期集合(数据日期及其前一天——每日
     批次制下,前一日的大事对多数用户仍是新闻)。
+    data_today: 数据日期(北京 yyyy-MM-dd),回填时效过滤的基准。
     返回 [{source, title, url, metrics, comment, breaking, breakingReason}, ...]。
     """
+    # 每源条目只抽取一次:ref 回填与回填候选共用同一份(含归一化热度档位)
+    extracted = {src: _extract_items(src, snapshots[src]) for src in snapshots}
+
     raw_items = ai_data.get("items") or []
     seen_refs = set()
+    used_positions = set()  # AI 已点名的 (source, index):含被判重丢弃者,回填不再取
     entries = []
     for o in raw_items:
         if not isinstance(o, dict):
@@ -457,13 +611,14 @@ def _parse_result(ai_data, snapshots, breaking_dates):
         snapshot = snapshots.get(source)
         if not snapshot:
             continue
-        items = _extract_items(source, snapshot)
+        items = extracted.get(source) or []
         if index < 0 or index >= len(items):
             continue
         item = items[index]
         _, title, url, metrics, _, date_key, _ = item
         if not url.strip():
             continue
+        used_positions.add((source, index))
         # 时效硬约束:AI 标 breaking 但日期不在允许窗口(数据日期/前一天)的,强制降级
         ai_breaking = bool(o.get("breaking"))
         effective_date = date_key if date_key else _beijing_date_key_of_ms(snapshot.get("fetched_at_ms", 0))
@@ -481,10 +636,20 @@ def _parse_result(ai_data, snapshots, breaking_dates):
     if not entries:
         return []
 
-    # breaking 截断到 MAX_BREAKING
-    breaking_left = MAX_BREAKING
     urls_seen = set()
     title_history = []
+
+    def _admit(entry):
+        """URL 精确去重 + 标题三规则去重,通过则登记并返回 True。"""
+        if entry["url"] in urls_seen:
+            return False
+        if not _title_not_duplicate(entry["title"], title_history, entry["source"]):
+            return False
+        urls_seen.add(entry["url"])
+        return True
+
+    # breaking 截断到 MAX_BREAKING
+    breaking_left = MAX_BREAKING
     result = []
     for e in entries:
         if e["breaking"] and breaking_left > 0:
@@ -492,14 +657,13 @@ def _parse_result(ai_data, snapshots, breaking_dates):
         else:
             e["breaking"] = False
             e["breakingReason"] = ""
-        # URL 去重
-        if e["url"] in urls_seen:
-            continue
-        urls_seen.add(e["url"])
-        # 标题相似度去重
-        if not _title_not_duplicate(e["title"], title_history):
-            continue
-        result.append(e)
+        if _admit(e):
+            result.append(e)
+
+    # 去重后不足 MAX_TOP:从输入池按热度回填(AI 条目优先,回填条目殿后)
+    if len(result) < MAX_TOP:
+        result.extend(_backfill_items(
+            result, extracted, used_positions, urls_seen, title_history, data_today))
 
     # breaking 排前,整体截断到 MAX_TOP(稳定排序,不打乱同级次序)
     result.sort(key=lambda x: 0 if x["breaking"] else 1)
@@ -553,7 +717,7 @@ def generate_overview(out_dir, now):
                 timeout=TIMEOUT, temperature=TEMPERATURE, expect="object",
             )
             _validate_overview_obj(ai_data)
-            items = _parse_result(ai_data, snapshots, breaking_dates)
+            items = _parse_result(ai_data, snapshots, breaking_dates, data_today)
             if not items:
                 raise RuntimeError("解析后无有效条目")
             overview = {
