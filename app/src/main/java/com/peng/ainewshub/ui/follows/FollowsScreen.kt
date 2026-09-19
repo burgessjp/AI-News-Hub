@@ -13,12 +13,18 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
@@ -30,11 +36,15 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.ripple
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -51,11 +61,21 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.peng.ainewshub.R
 import com.peng.ainewshub.data.repo.FollowFeedItem
 import com.peng.ainewshub.data.repo.FollowsRepository
 import com.peng.ainewshub.data.repo.SummaryRepository
+import com.peng.ainewshub.ui.SectionNotice
+import com.peng.ainewshub.ui.UiState
+import com.peng.ainewshub.ui.components.BottomBarPillHeight
+import com.peng.ainewshub.ui.components.BrandWordmark
+import com.peng.ainewshub.ui.components.DoubleRule
+import com.peng.ainewshub.ui.components.RankRowSkeletonList
 import com.peng.ainewshub.ui.components.SectionHeader
+import com.peng.ainewshub.ui.components.rememberHaptics
+import com.peng.ainewshub.ui.components.rememberReadUrls
 import com.peng.ainewshub.ui.theme.AppAlpha
 import com.peng.ainewshub.ui.theme.AppText
 import java.text.SimpleDateFormat
@@ -64,14 +84,273 @@ import java.util.Locale
 import com.peng.ainewshub.data.prefs.MAX_FOLLOWED_KEYWORDS
 
 /**
- * 「我的关注」共享件 —— 「热词」根屏(HotwordsScreen)上段的渲染实现。
+ * 「关注」域 —— 根 tab 屏([FollowsScreen])+ 共享渲染件:关键词区
+ * ([FollowsHeaderRow])、命中条目行([FollowItemRow])、页脚([FollowsFooter])
+ * 与管理弹层([FollowsManageSheet])。
  *
- * 原关注 tab 根屏已随 v1.4.0 日刊化并入 [HotwordsScreen](关注命中流在上、
- * 热词榜在下的单页);本文件只保留共享渲染件:关键词区([FollowsHeaderRow])、
- * 命中条目行([FollowItemRow])、页脚([FollowsFooter])与管理弹层
- * ([FollowsManageSheet])。语料与过滤在 [FollowsViewModel] 内完成
+ * v1.4.0 曾把关注命中流并入「热词」tab 上段;现独立回根 tab(热词榜/词云
+ * 拆入 Page.Hotwords 二级页)。语料与过滤在 [FollowsViewModel] 内完成
  * (当日总览 Top10 + 8 源结构化摘要,见 FollowsRepository)。
  */
+
+/**
+ * 「关注」Tab 根屏 —— 关键词命中流(原「热词」tab 上段独立成 tab)。
+ *
+ * 无关注词时空态给两条收起式引导:管理关键词(开弹层)+ 去热词页看看趋势;
+ * 有关注词时不留热词入口(tab 职责单一)。下拉刷新强刷语料;重击 tab 滚回
+ * 顶部重读。管理弹层与热词页「+ 关注」是同一套关注词存储的两个入口。
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun FollowsScreen(
+    onOpenUrl: (url: String, title: String, source: String) -> Unit,
+    // 空态引导「去热词页看看趋势」→ 热词二级页(Page.Hotwords)
+    onOpenTrends: () -> Unit,
+    // 列表状态由 AiNewsHubApp 上提持有:切 tab / 进二级页返回后保持滚动位置
+    listState: LazyListState,
+    reselectSignal: Int = 0,
+    followsVm: FollowsViewModel = viewModel()
+) {
+    val followsState by followsVm.state.collectAsStateWithLifecycle()
+    val followsRefreshing by followsVm.isRefreshing.collectAsStateWithLifecycle()
+    val haptics = rememberHaptics()
+    val readUrls = rememberReadUrls()
+    var showManage by rememberSaveable { mutableStateOf(false) }
+
+    // 重击当前 tab:滚回顶部 + 语料重读(归档取数带缓存,低开销)。
+    // lastHandled 防「重新进入组合就自动刷新」。
+    var lastHandledReselect by remember { mutableIntStateOf(reselectSignal) }
+    LaunchedEffect(reselectSignal) {
+        if (reselectSignal != lastHandledReselect) {
+            lastHandledReselect = reselectSignal
+            listState.animateScrollToItem(0)
+            followsVm.load()
+        }
+    }
+
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.surface,
+        topBar = {
+            // 报头与「今天」页同构但更简:居中字标 + 双细线(无日期/动作位),
+            // 刷新收口到下拉手势
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surface)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    BrandWordmark(
+                        modifier = Modifier.padding(top = 14.dp, bottom = 12.dp)
+                    )
+                }
+                DoubleRule()
+            }
+        }
+    ) { padding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                // 列表可滚入页脚 TAB 之下,但可视区不超出页脚底缘
+                .navigationBarsPadding()
+                .padding(bottom = 16.dp)
+        ) {
+            PullToRefreshBox(
+                isRefreshing = followsRefreshing,
+                onRefresh = {
+                    haptics.tick()
+                    followsVm.refresh()
+                }
+            ) {
+                FollowsContent(
+                    followsState = followsState,
+                    readUrls = readUrls,
+                    listState = listState,
+                    onOpenUrl = onOpenUrl,
+                    onOpenTrends = onOpenTrends,
+                    onSelectKeyword = { followsVm.selectKeyword(it) },
+                    onRetry = { followsVm.retry() },
+                    onManage = { showManage = true }
+                )
+            }
+        }
+    }
+
+    // 管理弹层:关注语料就绪(Success)才有意义;入口在空态引导行/统计区
+    val latestFollowsUi = (followsState as? UiState.Success)?.data
+    if (showManage && latestFollowsUi != null) {
+        FollowsManageSheet(
+            keywords = latestFollowsUi.keywords,
+            suggestions = latestFollowsUi.suggestions,
+            onDismiss = { showManage = false },
+            onAdd = { followsVm.addKeyword(it) },
+            onRemove = { followsVm.removeKeyword(it) }
+        )
+    }
+}
+
+/** 关注页主体:单 LazyColumn 命中流(Loading 骨架 / Error / 空态引导 / 命中列表)。 */
+@Composable
+private fun FollowsContent(
+    followsState: UiState<FollowsUi>,
+    readUrls: Set<String>,
+    listState: LazyListState,
+    onOpenUrl: (String, String, String) -> Unit,
+    onOpenTrends: () -> Unit,
+    onSelectKeyword: (String) -> Unit,
+    onRetry: () -> Unit,
+    onManage: () -> Unit
+) {
+    val context = LocalContext.current
+    LazyColumn(
+        state = listState,
+        modifier = Modifier.fillMaxSize(),
+        // 根 tab 末项可停到页脚条之上(页脚高 + 16dp 呼吸空间)
+        contentPadding = PaddingValues(bottom = BottomBarPillHeight + 16.dp)
+    ) {
+        when (followsState) {
+            is UiState.Loading -> item(key = "follows-skeleton", contentType = "skeleton") {
+                RankRowSkeletonList(count = 3)
+            }
+            is UiState.Error -> item(key = "follows-error", contentType = "notice") {
+                SectionNotice(
+                    title = stringResource(R.string.common_load_failed),
+                    message = followsState.message,
+                    actionLabel = stringResource(R.string.common_retry),
+                    onAction = onRetry
+                )
+            }
+            is UiState.Success -> {
+                val ui = followsState.data
+                when {
+                    // 无关注词:两条收起式引导(管理关键词 + 去热词页),不占整屏引导态
+                    ui.keywords.isEmpty() -> item(key = "follows-guide", contentType = "notice") {
+                        Column {
+                            FollowsGuideRow(onManage = onManage)
+                            TrendsGuideRow(onOpenTrends = onOpenTrends)
+                        }
+                    }
+                    // 有关注词但今天没有命中
+                    ui.items.isEmpty() -> item(key = "follows-empty", contentType = "notice") {
+                        SectionNotice(
+                            title = stringResource(R.string.follows_empty_no_match_title),
+                            message = stringResource(R.string.follows_empty_no_match_subtitle),
+                            actionLabel = stringResource(R.string.follows_manage_action),
+                            onAction = onManage
+                        )
+                    }
+                    // 命中流:关键词 chips + 条目列表 + 页脚
+                    else -> {
+                        // key:url(空 url 只读条目以序号消歧;重复 url 以出现序号消歧)。
+                        // (LazyListScope 非组合上下文不能 remember;小列表逐次重算可忽略)
+                        val itemKeys = run {
+                            val seenUrls = mutableMapOf<String, Int>()
+                            ui.items.mapIndexed { i, item ->
+                                val base = item.entry.url.ifBlank { "blank-$i" }
+                                val dup = seenUrls.getOrPut(base) { 0 }
+                                seenUrls[base] = dup + 1
+                                base + if (dup == 0) "" else "#$dup"
+                            }
+                        }
+                        item(key = "follows-keywords", contentType = "follows-head-row") {
+                            FollowsHeaderRow(ui = ui, onSelect = onSelectKeyword, onManage = onManage)
+                        }
+                        itemsIndexed(
+                            ui.items,
+                            key = { i, _ -> "fw-${itemKeys[i]}" },
+                            contentType = { _, _ -> "follows-item" }
+                        ) { i, feedItem ->
+                            val entry = feedItem.entry
+                            val sourceLabel = followsSourceLabel(context, entry.source)
+                            FollowItemRow(
+                                item = feedItem,
+                                sourceLabel = sourceLabel,
+                                isRead = entry.url.isNotEmpty() && entry.url in readUrls,
+                                onClick = { onOpenUrl(entry.url, entry.title, sourceLabel) }
+                            )
+                        }
+                        item(key = "follows-footer", contentType = "footer") { FollowsFooter(ui = ui) }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 无关注词时的收起式引导行:surfaceContainerLow 浅底长条(+ 图标 + 引导文案 +
+ * chevron),点击直达管理弹层。替代原整屏 onboarding 空态 —— 引导不挡路,
+ * 想用再展开。
+ */
+@Composable
+private fun FollowsGuideRow(onManage: () -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 18.dp, vertical = 4.dp)
+            .clip(MaterialTheme.shapes.small)
+            .background(cs.surfaceContainerLow)
+            .clickable(onClick = onManage)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // 「+」引导前缀符(去图标)
+        Text(
+            text = "+",
+            style = AppText.bodySmall,
+            fontWeight = FontWeight.SemiBold,
+            color = cs.primary
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = stringResource(R.string.follows_section_guide),
+            style = AppText.bodySmall,
+            color = cs.onSurfaceVariant,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            text = "›",
+            style = MaterialTheme.typography.titleMedium,
+            color = cs.onSurfaceVariant
+        )
+    }
+}
+
+/**
+ * 空态引导行二:去热词二级页逛趋势(与管理引导同款浅底行,无前缀符,尾随 ›)。
+ */
+@Composable
+private fun TrendsGuideRow(onOpenTrends: () -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 18.dp, vertical = 4.dp)
+            .clip(MaterialTheme.shapes.small)
+            .background(cs.surfaceContainerLow)
+            .clickable(onClick = onOpenTrends)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = stringResource(R.string.follows_guide_trends),
+            style = AppText.bodySmall,
+            color = cs.onSurfaceVariant,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            text = "›",
+            style = MaterialTheme.typography.titleMedium,
+            color = cs.onSurfaceVariant
+        )
+    }
+}
 
 /** 关键词区:统计行 + 编辑入口 + 关键词 chips(点选单选过滤,再点恢复全部)。 */
 @OptIn(ExperimentalLayoutApi::class)

@@ -3,8 +3,10 @@
     <string name="app_name">AI News Hub</string>
 
     <!-- Bottom navigation tabs -->
-    <!-- Root tabs (3); tab_overview still labels the overview pseudo-source in follow hits -->
+    <!-- Root tabs (3); tab_hotwords gave way to tab_follows and now titles the
+         Hotwords secondary page; tab_overview still labels the overview pseudo-source -->
     <string name="tab_today">Today</string>
+    <string name="tab_follows">Following</string>
     <string name="tab_hotwords">Trending</string>
     <string name="tab_more">More</string>
     <string name="tab_overview">Overview</string>

@@ -40,6 +40,7 @@ import com.peng.ainewshub.ui.more.SettingsScreen
 import com.peng.ainewshub.ui.more.SourcesScreen
 import com.peng.ainewshub.ui.overview.OverviewDateScreen
 import com.peng.ainewshub.ui.summary.SummaryDateScreen
+import com.peng.ainewshub.ui.trends.HotwordsScreen
 import com.peng.ainewshub.ui.trends.TrendsCloudScreen
 import com.peng.ainewshub.ui.trends.TrendsDateScreen
 import com.peng.ainewshub.ui.tabs.AllTab
@@ -358,6 +359,15 @@ internal fun PageView(
         Page.TrendsCloud -> TrendsCloudScreen(
             onBack = onBack,
             onOpenLocalSearch = { nav.push(Page.LocalSearch(it)) }
+        )
+        // 热词榜:近 N 天热词二级页(原「热词」根 tab 下段拆出)。复用趋势内容
+        // 渲染与展开区动作;今天页报头 / 关注空态引导 / tab 深链进入。
+        Page.Hotwords -> HotwordsScreen(
+            onBack = onBack,
+            onOpenUrl = { url, title, source -> onOpenUrl(url, title, source) },
+            onOpenCloud = { nav.push(Page.TrendsCloud) },
+            onOpenLocalSearch = { nav.push(Page.LocalSearch(it)) },
+            listState = listStates.forPage(page)
         )
     }
 }

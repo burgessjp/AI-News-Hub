@@ -4,9 +4,9 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
 import com.peng.ainewshub.data.source.SourceKeys
 import com.peng.ainewshub.ui.components.AppTab
+import com.peng.ainewshub.ui.follows.FollowsScreen
 import com.peng.ainewshub.ui.more.MoreScreen
 import com.peng.ainewshub.ui.overview.TodayScreen
-import com.peng.ainewshub.ui.trends.HotwordsScreen
 
 /**
  * 渲染某个 tab 的根屏幕。各 onOpenXxx 入口统一在分支内经 [AppNavState.push]
@@ -18,7 +18,7 @@ internal fun TabRoot(
     nav: AppNavState,
     reselectTick: Int,
     todayListState: LazyListState,
-    hotwordsListState: LazyListState,
+    followsListState: LazyListState,
     onOpenUrl: (String, String, String?) -> Unit
 ) {
     when (tab) {
@@ -26,18 +26,19 @@ internal fun TabRoot(
             onOpenUrl = onOpenUrl,
             // 顶栏搜索图标 → 本地搜索独立页(查设备内索引,覆盖本 App 浏览过的 8 源数据)
             onOpenSearch = { nav.push(Page.LocalSearch()) },
+            // 报头「热词」→ 热词榜二级页(近 N 天热词 + 词云入口)
+            onOpenTrends = { nav.push(Page.Hotwords) },
             // 分源摘要区块头「查看全部」→ 源完整列表二级页
             onOpenSource = { source -> nav.push(sourcePageOf(source)) },
             listState = todayListState,
             reselectSignal = reselectTick
         )
-        // 热词 tab 根屏:「我的关注」命中流(上)+ 热词榜/词云(下)的单页两段
-        AppTab.Hotwords -> HotwordsScreen(
+        // 关注 tab 根屏:关键词命中流(热词榜/词云已拆入 Page.Hotwords 二级页)
+        AppTab.Follows -> FollowsScreen(
             onOpenUrl = onOpenUrl,
-            onOpenCloud = { nav.push(Page.TrendsCloud) },
-            // 展开区「查看全部命中」带词进本地搜索(查设备内索引的全部命中)
-            onOpenLocalSearch = { nav.push(Page.LocalSearch(it)) },
-            listState = hotwordsListState,
+            // 空态引导「去热词页看看趋势」→ 热词榜二级页
+            onOpenTrends = { nav.push(Page.Hotwords) },
+            listState = followsListState,
             reselectSignal = reselectTick
         )
         AppTab.More -> MoreScreen(

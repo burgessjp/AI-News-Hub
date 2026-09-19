@@ -112,7 +112,10 @@ internal fun AiNewsHubApp(
     onPendingUrlConsumed: () -> Unit = {},
     /** ainewshub://tab/<name> 深链(待消费):非 null 时切到该根 tab(清空其二级栈),随后回调清空。 */
     pendingTab: AppTab? = null,
-    onPendingTabConsumed: () -> Unit = {}
+    onPendingTabConsumed: () -> Unit = {},
+    /** 「直达热词页」(待消费):ainewshub://tab/hotwords|trends 深链映射到热词二级页;消费后复位,支持热启动重复触发。 */
+    openHotwordsOnLaunch: Boolean = false,
+    onHotwordsConsumed: () -> Unit = {}
 ) {
     val appContext = LocalContext.current.applicationContext
     val scope = rememberCoroutineScope()
@@ -233,6 +236,14 @@ internal fun AiNewsHubApp(
         if (openSettingsOnLaunch) {
             nav.push(Page.Settings)
             onSettingsConsumed()
+        }
+    }
+
+    // 深链直达热词二级页(ainewshub://tab/hotwords|trends,原热词 tab 的语义后继)
+    LaunchedEffect(openHotwordsOnLaunch) {
+        if (openHotwordsOnLaunch) {
+            nav.push(Page.Hotwords)
+            onHotwordsConsumed()
         }
     }
 
@@ -388,8 +399,8 @@ internal fun AiNewsHubApp(
     // 走 pageListStates.forPage(Page.FeaturedHub),不再上提。
     // 「今天」tab 的列表滚动状态(总览+分源合一的垂直日报)
     val todayListState = rememberLazyListState()
-    // 「热词」tab 的列表滚动状态(关注命中流+热词榜的单页)
-    val hotwordsListState = rememberLazyListState()
+    // 「关注」tab 的列表滚动状态(关键词命中流;热词榜已拆入 Page.Hotwords 二级页)
+    val followsListState = rememberLazyListState()
     // 二级页滚动状态:以 Page 值(data class,可作 key)索引,页面弹出后清理。
     val pageListStates = remember { mutableMapOf<Page, LazyListState>() }
     // 二级页 Pager 状态(历史摘要按日期页):与列表状态同上提、同清理。
@@ -461,7 +472,7 @@ internal fun AiNewsHubApp(
                             nav = nav,
                             reselectTick = nav.reselectTick,
                             todayListState = todayListState,
-                            hotwordsListState = hotwordsListState,
+                            followsListState = followsListState,
                             onOpenUrl = openUrl
                         )
                         is Screen.Secondary -> PageView(

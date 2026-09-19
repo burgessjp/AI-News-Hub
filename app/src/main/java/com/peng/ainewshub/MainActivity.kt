@@ -45,6 +45,9 @@ class MainActivity : ComponentActivity() {
 
         /** 直达设置页(冷/热启动均可,经 openSettingsRequest 消费一次)。 */
         data object Settings : DeepLink
+
+        /** 直达热词二级页(原热词 tab 的语义后继,经 openHotwordsRequest 消费一次)。 */
+        data object Hotwords : DeepLink
     }
 
     /** 待消费的小组件/深链 WebView 请求(Compose 状态:onCreate/onNewIntent 写入,UI 层消费后经回调清空)。 */
@@ -55,6 +58,9 @@ class MainActivity : ComponentActivity() {
 
     /** 待消费的「直达设置」请求(冷启动 extras 与深链共用;消费后复位以支持热启动重复触发)。 */
     private var openSettingsRequest by mutableStateOf(false)
+
+    /** 待消费的「直达热词页」请求(同 openSettings 范式)。 */
+    private var openHotwordsRequest by mutableStateOf(false)
 
     /** 应用内语言(设置页「语言」):非「跟随系统」时按用户选择包裹配置。 */
     override fun attachBaseContext(newBase: android.content.Context) {
@@ -80,7 +86,9 @@ class MainActivity : ComponentActivity() {
                 pendingOpenUrl = pendingOpenUrl,
                 onPendingUrlConsumed = { pendingOpenUrl = null },
                 pendingTab = pendingTab,
-                onPendingTabConsumed = { pendingTab = null }
+                onPendingTabConsumed = { pendingTab = null },
+                openHotwordsOnLaunch = openHotwordsRequest,
+                onHotwordsConsumed = { openHotwordsRequest = false }
             )
         }
     }
@@ -131,6 +139,7 @@ class MainActivity : ComponentActivity() {
             is DeepLink.Web -> pendingOpenUrl = Triple(d.url, d.title, d.source)
             is DeepLink.Tab -> pendingTab = d.tab
             DeepLink.Settings -> openSettingsRequest = true
+            DeepLink.Hotwords -> openHotwordsRequest = true
             null -> Unit
         }
     }
@@ -149,8 +158,9 @@ class MainActivity : ComponentActivity() {
      * 解析 ainewshub:// 深链(非本 scheme 或路由不认识返回 null):
      *  - ainewshub://web?url=<encoded>&title=<encoded>&source=<encoded> → 内置 WebView
      *    (url 仅接受 http/https,防 file:// 等本地 scheme 注入)
-     *  - ainewshub://tab/<today|hotwords|more> → 切根 tab;旧版名 overview/summary/
-     *    follows 同映射今天、trends 映射热词(v1.4.0 五 tab 并三后永久兼容,不 404)
+     *  - ainewshub://tab/<today|follows|more> → 切根 tab;热词已成二级页:
+     *    hotwords(含旧名 trends)直达热词页;旧版名 overview/summary 映射今天、
+     *    follows 映射关注 tab(与新 tab 名重合,恰好恢复语义;均永久兼容,不 404)
      *  - ainewshub://settings → 设置页
      */
     private fun Intent.deepLink(): DeepLink? {
@@ -168,7 +178,11 @@ class MainActivity : ComponentActivity() {
                 )
             }
             "settings" -> DeepLink.Settings
-            "tab" -> tabOf(data.lastPathSegment?.lowercase())?.let { DeepLink.Tab(it) }
+            "tab" -> when (data.lastPathSegment?.lowercase()) {
+                // 热词 tab 已拆为二级页:两级名字都直达热词页(原 tab 级语义后继)
+                "hotwords", "trends" -> DeepLink.Hotwords
+                else -> tabOf(data.lastPathSegment?.lowercase())?.let { DeepLink.Tab(it) }
+            }
             else -> null
         }
     }
@@ -176,11 +190,10 @@ class MainActivity : ComponentActivity() {
     /** 深链 tab 名 → [AppTab];未知名称返回 null(视为无深链)。 */
     private fun tabOf(name: String?): AppTab? = when (name) {
         "today" -> AppTab.Today
-        "hotwords" -> AppTab.Hotwords
+        "follows" -> AppTab.Follows
         "more" -> AppTab.More
         // 旧版五 tab 深链名的永久兼容映射(外部短链/书签可能仍用旧名)
-        "overview", "summary", "follows" -> AppTab.Today
-        "trends" -> AppTab.Hotwords
+        "overview", "summary" -> AppTab.Today
         else -> null
     }
 }

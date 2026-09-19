@@ -96,6 +96,8 @@ fun TodayScreen(
     onOpenUrl: (url: String, title: String, source: String) -> Unit,
     // 顶栏搜索图标 → 本地搜索独立页(查设备内索引,覆盖本 App 浏览过的 8 源数据)
     onOpenSearch: () -> Unit = {},
+    // 报头「热词」→ 热词榜二级页(近 N 天热词 + 词云入口)
+    onOpenTrends: () -> Unit = {},
     // 分源摘要区块头「查看全部」→ 源完整列表二级页
     onOpenSource: (String) -> Unit,
     // 列表状态由 AiNewsHubApp 上提持有:切 tab / 进二级页返回后保持滚动位置
@@ -160,17 +162,29 @@ fun TodayScreen(
                             maxLines = 1
                         )
                     }
-                    // 本地搜索入口:查设备内索引(浏览过的 8 源数据),报头唯一动作位。
-                    // 文字按钮(去图标):纯排版语言,padding 撑足 48dp 触控高
-                    Text(
-                        text = stringResource(R.string.common_search),
-                        style = AppText.caption,
-                        color = cs.onSurfaceVariant,
-                        modifier = Modifier
-                            .align(Alignment.CenterEnd)
-                            .clickable(onClick = onOpenSearch)
-                            .padding(start = 12.dp, end = 18.dp, top = 16.dp, bottom = 16.dp)
-                    )
+                    // 报头动作位(右侧):热词榜入口 + 本地搜索。
+                    // 文字按钮(去图标):纯排版语言,padding 撑足 48dp 触控高;搜索保持最右
+                    Row(
+                        modifier = Modifier.align(Alignment.CenterEnd),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = stringResource(R.string.tab_hotwords),
+                            style = AppText.caption,
+                            color = cs.onSurfaceVariant,
+                            modifier = Modifier
+                                .clickable(onClick = onOpenTrends)
+                                .padding(start = 12.dp, end = 12.dp, top = 16.dp, bottom = 16.dp)
+                        )
+                        Text(
+                            text = stringResource(R.string.common_search),
+                            style = AppText.caption,
+                            color = cs.onSurfaceVariant,
+                            modifier = Modifier
+                                .clickable(onClick = onOpenSearch)
+                                .padding(start = 12.dp, end = 18.dp, top = 16.dp, bottom = 16.dp)
+                        )
+                    }
                 }
                 DoubleRule()
             }

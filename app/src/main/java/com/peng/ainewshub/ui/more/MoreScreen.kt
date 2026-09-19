@@ -1,6 +1,8 @@
 package com.peng.ainewshub.ui.more
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -10,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -22,9 +25,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.peng.ainewshub.R
-import com.peng.ainewshub.ui.components.AppTopBar
 import com.peng.ainewshub.ui.components.BottomBarReservedHeight
 import com.peng.ainewshub.ui.components.BrandWordmark
+import com.peng.ainewshub.ui.components.DoubleRule
 import com.peng.ainewshub.ui.components.SectionHeader
 import com.peng.ainewshub.ui.theme.AppText
 import com.peng.ainewshub.data.source.DEFAULT_SOURCE_ORDER
@@ -59,14 +62,25 @@ fun MoreScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
-            // 与「今天」页报头一致:排版字标(title 参数仅为兜底,有 titleContent 时不渲染)
-            AppTopBar(
-                title = stringResource(R.string.app_name),
-                titleContent = {
-                    BrandWordmark(modifier = Modifier.height(44.dp))
-                },
-                horizontalPadding = 18.dp
-            )
+            // 报头与「今天」/「关注」页同构但更简:居中字标 + 双细线(无日期/动作位)。
+            // 不走 AppTopBar(MD3 标题槽 start 对齐,字标会靠左)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surface)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    BrandWordmark(
+                        modifier = Modifier.padding(top = 14.dp, bottom = 12.dp)
+                    )
+                }
+                DoubleRule()
+            }
         }
     ) { padding ->
         LazyColumn(

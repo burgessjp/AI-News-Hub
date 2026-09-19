@@ -11,6 +11,8 @@
     <string name="follows_section_title">我的关注</string>
     <!-- 无关注词时的收起式引导行(点击展开管理弹层) -->
     <string name="follows_section_guide">关注关键词，每天只看你想看的</string>
+    <!-- 空态引导行二:去热词二级页逛趋势(与上面管理引导同款行,点击进热词页) -->
+    <string name="follows_guide_trends">去热词页看看趋势</string>
     <!-- 顶部统计行:%1$d=关注词数,%2$d=今天命中条数 -->
     <string name="follows_stats_caption">已关注 %1$d 个关键词 · 今天命中 %2$d 条</string>
 

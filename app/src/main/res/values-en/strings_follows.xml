@@ -5,6 +5,8 @@
     <string name="follows_section_title">My Keywords</string>
     <!-- Collapsed guide row shown when no keywords exist (tap to open the manage sheet) -->
     <string name="follows_section_guide">Follow keywords to see only what matters to you</string>
+    <!-- Second guide row: browse the Hotwords secondary page -->
+    <string name="follows_guide_trends">Browse trending keywords</string>
     <!-- Header stats line: %1$d=keyword count, %2$d=today\'s matched items -->
     <string name="follows_stats_caption">Following %1$d keywords · %2$d matches today</string>
 

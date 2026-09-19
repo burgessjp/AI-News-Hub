@@ -57,7 +57,8 @@ class PageBundleTest {
         Page.SummaryDate("2026-08-01"),
         Page.OverviewDate("2026-08-01"),
         Page.TrendsDate("2026-08-01"),
-        Page.TrendsCloud
+        Page.TrendsCloud,
+        Page.Hotwords
     )
 
     @Test
@@ -91,24 +92,29 @@ class PageBundleTest {
     fun `各 tab 页栈整体序列化往返`() {
         val stacks = mapOf(
             AppTab.Today to listOf(Page.Settings, Page.Web("https://e.com", "t", null), Page.LocalSearch("kw")),
-            AppTab.Hotwords to listOf(Page.TrendsCloud),
+            AppTab.Follows to listOf(Page.Hotwords),
             AppTab.More to listOf(Page.HistoryHub, Page.Favorites)
         )
         assertEquals(stacks, stacksFromBundle(stacksToBundle(stacks), "兜底标题"))
     }
 
     @Test
-    fun `旧版五 tab 的页栈在新枚举下被丢弃不崩溃`() {
-        // v1.4.0 五 tab 并三:升级用户的存量 Bundle 里存的是已移除的 tab 名,
-        // stacksFromBundle 按 AppTab.entries 名取键 → 旧栈整体丢弃(空 Map 可接受,
-        // 数据会重拉),不得抛异常;currentTab 兜底逻辑在 appNavStateSaver,不在本函数
+    fun `旧 tab 页栈被丢弃而 Follows 同名栈恢复不崩溃`() {
+        // v1.4.0 五 tab 并三、热词 tab 又让位关注:升级用户的存量 Bundle 里,
+        // 已移除的 tab 名(Overview/Summary/Trends)按 AppTab.entries 名取不到键
+        // → 旧栈整体丢弃(数据会重拉),不得抛异常;Follows 恰与新「关注」tab
+        // 同名 → v1.3.x 存量页栈直接恢复(升级即回归)。
+        // currentTab 兜底逻辑在 appNavStateSaver,不在本函数
         val legacy = Bundle().apply {
             putParcelableArrayList("Overview", arrayListOf(Page.Settings.toBundle()))
             putParcelableArrayList("Summary", arrayListOf(Page.SummaryDate("2026-08-01").toBundle()))
-            putParcelableArrayList("Follows", arrayListOf<Bundle>())
             putParcelableArrayList("Trends", arrayListOf(Page.TrendsCloud.toBundle()))
+            putParcelableArrayList("Follows", arrayListOf(Page.Settings.toBundle()))
         }
-        assertEquals(emptyMap<AppTab, List<Page>>(), stacksFromBundle(legacy, "兜底标题"))
+        assertEquals(
+            mapOf(AppTab.Follows to listOf(Page.Settings)),
+            stacksFromBundle(legacy, "兜底标题")
+        )
     }
 
     @Test
