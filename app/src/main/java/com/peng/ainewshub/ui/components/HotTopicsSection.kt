@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
@@ -22,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -31,9 +31,7 @@ import com.peng.ainewshub.data.model.HotTopic
 import com.peng.ainewshub.ui.HotTopicsViewModel
 import com.peng.ainewshub.ui.UiState
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.peng.ainewshub.ui.theme.AppAlpha
 import com.peng.ainewshub.ui.theme.AppText
-import com.peng.ainewshub.ui.theme.BrandGradient
 
 /**
  * 今日热点模块 —— 精选 tab 顶部的卡片式聚合模块。
@@ -100,35 +98,29 @@ fun HotTopicsSection(
 @Composable
 private fun HotTopicsHeader(count: Int) {
     val cs = MaterialTheme.colorScheme
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(BrandGradient)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Text(
-            text = stringResource(R.string.hot_topics_title),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = cs.onPrimary
-        )
-        Spacer(Modifier.weight(1f))
-        // 右侧:聚合来源数小标签
-        Box(
+    // 纸墨日报:双细线起头 + 衬线标题 + 底部粗线,去渐变卡头
+    Column(modifier = Modifier.fillMaxWidth()) {
+        DoubleRule()
+        Row(
             modifier = Modifier
-                .clip(CircleShape)
-                .background(cs.onPrimary.copy(alpha = AppAlpha.onPrimaryOverlay))
-                .padding(horizontal = 8.dp, vertical = 2.dp)
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
+            Text(
+                text = stringResource(R.string.hot_topics_title),
+                style = MaterialTheme.typography.titleMedium,
+                fontFamily = FontFamily.Serif,
+                color = cs.onSurface
+            )
+            Spacer(Modifier.weight(1f))
             Text(
                 text = pluralStringResource(R.plurals.hot_topics_count, count, count),
                 style = MaterialTheme.typography.labelSmall,
-                color = cs.onPrimary,
-                fontWeight = FontWeight.SemiBold
+                color = cs.onSurfaceVariant
             )
         }
+        SectionRule()
     }
 }
 

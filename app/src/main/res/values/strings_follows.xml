@@ -7,13 +7,14 @@
   overview_data_until / overview_breaking_tag 等复用不重复造。
 -->
 <resources>
+    <!-- 「热词」tab 上段小节条(我的关注命中流) -->
+    <string name="follows_section_title">我的关注</string>
+    <!-- 无关注词时的收起式引导行(点击展开管理弹层) -->
+    <string name="follows_section_guide">关注关键词，每天只看你想看的</string>
     <!-- 顶部统计行:%1$d=关注词数,%2$d=今天命中条数 -->
     <string name="follows_stats_caption">已关注 %1$d 个关键词 · 今天命中 %2$d 条</string>
 
-    <!-- 空态一:还没有任何关注词(onboarding) -->
-    <string name="follows_empty_no_keywords_title">关注你在意的 AI 动态</string>
-    <string name="follows_empty_no_keywords_subtitle">订阅关键词,从当日总览与各源摘要里筛出相关内容</string>
-    <!-- 空态一的动作按钮 / 顶栏编辑图标 contentDescription 共用 -->
+    <!-- 管理动作按钮(引导行与管理弹层共用) -->
     <string name="follows_manage_action">管理关键词</string>
     <!-- 推荐词区标题(onboarding 空态与管理弹层共用) -->
     <string name="follows_suggestions_title">今日热词推荐</string>

@@ -71,7 +71,7 @@ class TranslateSelectionActivity : ComponentActivity() {
 
         // 开关关闭时根本不构建 UI:系统菜单项无法运行时动态隐藏,
         // 这里在 setContent 前拦截——Toast 提示后直接关闭,连 Sheet 都不渲染。
-        // 显示偏好(主题模式/皮肤)同样在协程内一次性挂起读取(本 Activity 弹出
+        // 显示偏好(主题模式)同样在协程内一次性挂起读取(本 Activity 弹出
         // 即用即走,无需订阅 Flow),避免主线程同步磁盘 I/O;ThemeMode 解析
         // 与主入口同规则(System 回系统深浅)。
         lifecycleScope.launch {
@@ -92,8 +92,7 @@ class TranslateSelectionActivity : ComponentActivity() {
                         ThemeMode.System -> isSystemInDarkTheme()
                         ThemeMode.Light -> false
                         ThemeMode.Dark -> true
-                    },
-                    skin = prefs.skin
+                    }
                 ) {
                     TranslateSheet(
                         text = text,

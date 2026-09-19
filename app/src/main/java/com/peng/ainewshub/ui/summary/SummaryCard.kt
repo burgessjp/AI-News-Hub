@@ -7,6 +7,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,12 +25,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.outlined.CloudOff
-import androidx.compose.material.icons.outlined.HourglassEmpty
-import androidx.compose.material.icons.outlined.Warning
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -40,7 +36,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
@@ -70,9 +65,9 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * 摘要页共享件 —— 摘要 Tab(当日)与「历史摘要」按日期页(归档)共用的单页实现。
- *
- * 从 SummaryScreen 抽出:页 spec、顶部提示行+源名 chips 导航(两屏 pager 共用)、
+ * 摘要页共享件 —— 「历史摘要」按日期页(归档)的单页实现(v1.4.0 前与摘要 Tab
+ * 当日页同构共用,Tab 并入「今天」后仅剩历史日期页在用)。
+ * 页 spec、顶部提示行+源名 chips 导航、
  * 单张源摘要页(紧凑扁头 + 条目正文,平铺无卡片,「查看完整列表」出口收口在扁头;
  * v2 结构化条目 url 非空时整行可点直达原文)。两屏保持同构(同一产品语言),
  * 差异仅在数据来源(latest 快照 vs history 索引按日期寻址)
@@ -83,7 +78,6 @@ import java.util.Locale
 internal data class SummaryCardSpec(
     val source: String,
     val title: String,
-    val icon: ImageVector,
     val onOpen: (() -> Unit)?
 )
 
@@ -101,7 +95,7 @@ internal fun summaryCardSpecs(
     onOpenFor: @Composable (source: String) -> (() -> Unit)?
 ): List<SummaryCardSpec> = keys.map { key ->
     val meta = sourceMeta(key)
-    SummaryCardSpec(meta.key, meta.title, meta.icon, onOpenFor(key))
+    SummaryCardSpec(meta.key, meta.title, onOpenFor(key))
 }
 
 /**
@@ -202,9 +196,9 @@ internal data class SummaryHeaderPage(
 )
 
 /**
- * 源摘要「新内容未查看」判定(摘要 Tab chips 圆点):结构化条目非空,且当前
+ * 源摘要「新内容未查看」判定(「今天」页分源区块头):结构化条目非空,且当前
  * 快照指纹(落盘时刻)≠ 用户上次查看该源页时记录的指纹 —— 查看页面即消隐
- * (SummaryScreen 停留页写入指纹),下一批新快照指纹变化重新亮起;源断供
+ * (「今天」页区块头进入视口时写入指纹),下一批新快照指纹变化重新亮起;源断供
  * 继承旧快照时指纹不变,不误亮。加载中/失败/旧纯文本格式一律不亮(无内容可看)。
  */
 internal fun hasUnseenDigest(state: UiState<SourceSummary>?, seenFingerprint: Long?): Boolean {
@@ -291,12 +285,6 @@ private fun SummaryPageHeader(
             .padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            spec.icon,
-            contentDescription = null,
-            tint = accent,
-            modifier = Modifier.size(18.dp)
-        )
         Spacer(Modifier.size(8.dp))
         Text(
             text = spec.title,
@@ -309,12 +297,13 @@ private fun SummaryPageHeader(
             // 完整说明在源列表页顶部的断供横幅,这里只做轻量提示
             val stale = SourceFreshness.isStale(state.data.fetchedAtMs)
             if (stale) {
-                Icon(
-                    Icons.Outlined.Warning,
-                    // 断供状态语义只靠图形+颜色表达不行,补读屏描述
-                    contentDescription = stringResource(R.string.summary_stale_cd),
-                    tint = cs.error,
-                    modifier = Modifier.size(14.dp)
+                // 断供警示「!」文字符(error 色):语义靠字形+颜色,读屏由同行
+                // 数据时刻文案承载(「数据时刻」行整体转 error 色)
+                Text(
+                    text = "!",
+                    style = AppText.caption,
+                    fontWeight = FontWeight.SemiBold,
+                    color = cs.error
                 )
                 Spacer(Modifier.size(2.dp))
             }
@@ -326,11 +315,13 @@ private fun SummaryPageHeader(
         }
         if (onOpen != null) {
             Spacer(Modifier.size(2.dp))
-            Icon(
-                Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = stringResource(R.string.summary_view_full_list),
-                tint = cs.onSurfaceVariant,
-                modifier = Modifier.size(18.dp)
+            // 「›」文字箭头(去图标),读屏语义经 semantics 保留
+            val viewFullListLabel = stringResource(R.string.summary_view_full_list)
+            Text(
+                text = "›",
+                style = MaterialTheme.typography.titleMedium,
+                color = cs.onSurfaceVariant,
+                modifier = Modifier.semantics { contentDescription = viewFullListLabel }
             )
         }
     }
@@ -352,7 +343,7 @@ private fun SummaryHairline() {
  * 8 张卡同构(同一产品语言),仅靠强调色与图标区分源。
  */
 @Composable
-private fun sourceAccentOf(source: String): Color {
+internal fun sourceAccentOf(source: String): Color {
     val cs = MaterialTheme.colorScheme
     return when (source) {
         SourceKeys.HACKERNEWS -> cs.tertiary            // 暖橙,呼应 HN 品牌与热度语义
@@ -413,11 +404,10 @@ private fun SummaryUnavailable(onOpenFullList: (() -> Unit)?) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Icon(
-            Icons.Outlined.HourglassEmpty,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(20.dp)
+        Text(
+            text = "※",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(Modifier.size(8.dp))
         Text(
@@ -552,7 +542,7 @@ private fun SummaryPlainText(
  * title 与 desc 之间用全角冒号「：」连接,视觉上对齐 v1 纯文本「**标题**：描述」的观感,
  * 保证新旧格式切换时用户感知一致。
  */
-private fun renderItemLine(title: String, desc: String): AnnotatedString {
+internal fun renderItemLine(title: String, desc: String): AnnotatedString {
     val boldStyle = SpanStyle(fontWeight = FontWeight.SemiBold)
     return buildAnnotatedString {
         withStyle(boldStyle) { append(title) }
@@ -570,7 +560,7 @@ private val BOLD_SEGMENT_REGEX = Regex("\\*\\*(.+?)\\*\\*")
  * prompt 要求每条格式「• **标题**：简述」,加粗段即标题,视觉上与正文拉开层级。
  * 实现:正则切 ** 包裹的段,交替应用 Normal / Bold 样式。支持一行内多处加粗。
  */
-private fun renderRichLine(line: String): AnnotatedString {
+internal fun renderRichLine(line: String): AnnotatedString {
     // 去掉行首 bullet 与多余空白,统一缩进由排版负责
     val raw = line.trim().removePrefix("•").trimStart()
     if (raw.isBlank()) return AnnotatedString(line)
@@ -621,12 +611,11 @@ private fun SummaryError(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // 卡片内嵌的紧凑错误态:CloudOff 小图标 + 口语化标题 + 底层错误详情
-        Icon(
-            Icons.Outlined.CloudOff,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(20.dp)
+        // 卡片内嵌的紧凑错误态:「※」附注符 + 口语化标题 + 底层错误详情
+        Text(
+            text = "※",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(Modifier.size(8.dp))
         Text(

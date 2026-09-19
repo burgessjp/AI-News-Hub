@@ -24,8 +24,6 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Article
-import androidx.compose.material.icons.automirrored.filled.Comment
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -190,7 +188,6 @@ fun HackerNewsCommentsScreen(
                                 EmptyState(
                                     title = stringResource(R.string.hn_comments_empty_title),
                                     subtitle = stringResource(R.string.hn_comments_empty_subtitle),
-                                    icon = Icons.AutoMirrored.Filled.Comment
                                 )
                             }
                         } else {
@@ -324,13 +321,6 @@ private fun LinkRow(
             .padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            imageVector = Icons.AutoMirrored.Filled.Article,
-            contentDescription = null,
-            tint = cs.primary,
-            modifier = Modifier.size(20.dp)
-        )
-        Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = label,

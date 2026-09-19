@@ -36,8 +36,9 @@
     <string name="trends_cloud_title">趋势词云</string>
     <!-- 趋势 Tab caption 行的入口链接文字 -->
     <string name="trends_cloud_entry">词云</string>
-    <!-- 顶栏布局切换图标的 contentDescription(螺旋 / 圆形气泡两态循环) -->
-    <string name="trends_cloud_switch_layout">切换布局</string>
+    <!-- 布局切换文字按钮:显示「将切换到的布局」名 -->
+    <string name="trends_cloud_mode_spiral">螺旋</string>
+    <string name="trends_cloud_mode_bubble">气泡</string>
     <!-- 空态:归档 trends_cloud.json 缺失 -->
     <string name="trends_cloud_no_data_title">趋势词云尚未生成</string>
     <string name="trends_cloud_no_data_subtitle">词云由每日流水线统计生成,请稍后再来</string>

@@ -8,14 +8,14 @@ import org.json.JSONObject
 
 /**
  * gitcode 归档数据 HTTP 客户端(门面) —— 各 Archive Repository / SummaryRepository /
- * OverviewRepository / TrendsRepository / BroadcastRepository 共用的唯一入口。
+ * OverviewRepository / TrendsRepository 共用的唯一入口。
  *
  * 数据仓库:https://gitcode.com/peng1818/AI-News-Hub-Data
  * 分支:news-hub-data
  *
  * 取数流程(对齐 docs/news-hub-data-usage.md):
  *  1. GET `index.json?ref=news-hub-data` → 读 `latest.<source>` 拿最新快照路径
- *     (index 只含即时字段:updated_at / latest / latest_overview / latest_audio)
+ *     (index 只含即时字段:updated_at / latest / latest_overview)
  *  2. 拼 `<source>/<相对路径>?ref=news-hub-data` GET 该快照 JSON
  *  3. 解析顶层 `fetched_at_ms` 与 `items[]`,交由各 Repository 做字段映射
  *  4. 按需另拉根级独立文件:趋势 `trends.json`(趋势 Tab)与历史索引
@@ -193,7 +193,7 @@ object ArchiveHttpClient {
      * (语义:今日总览尚未生成,UI 走 NoData 态)。OverviewRepository 据此反序列化为 OverviewDigest。
      *
      * @param force true 绕过缓存(手动刷新路径)
-     * @param networkOnly true 时为「网络探测」语义(每日更新 Worker / 冷启动新数据弹窗):
+     * @param networkOnly true 时为「网络探测」语义(每日更新 Worker):
      *        跳过内存缓存与磁盘兜底,必须真实打网络,传输层/HTTP/解析失败一律抛 ——
      *        调用方拿失败当信号(档内补查/放弃弹窗),绝不能把盘上旧数据当成新批次。
      *        总览 Tab / 小组件等展示路径不要传(需要断网兜底)。
@@ -202,26 +202,6 @@ object ArchiveHttpClient {
         fetchIndex(force, allowDiskFallback = !networkOnly).optJSONObject("latest_overview")
             ?.takeIf { it.has("items") }
     }
-
-    /**
-     * 读 index.json 顶层的 `latest_audio` 字段(语音速报预生成音频描述,流水线
-     * tts_broadcast.py 以 Qwen3-TTS 合成单段全量 MP3 后写入)。与 [fetchLatestOverview]
-     * 同一份 index 缓存(一次请求双读);字段缺失或无 file 返回 null
-     * (语义:预生成音频未就绪,调用方回落系统 TTS)。断网时随 index 磁盘兜底
-     * 一起生效 —— 盘上旧描述由调用方按 generatedAt 新鲜度判定取舍。
-     */
-    suspend fun fetchLatestAudio(force: Boolean = false): JSONObject? = withContext(Dispatchers.IO) {
-        fetchIndex(force).optJSONObject("latest_audio")?.takeIf { it.optString("file").isNotBlank() }
-    }
-
-    /**
-     * 预生成音频文件的直读 URL(与快照的 REST API raw 端点同拼法;
-     * 播放走 MediaPlayer 流式拉取,不经本客户端的 JSON 解析链路)。
-     *
-     * @param relPath 仓库根相对路径,即 latest_audio.file(如
-     *                `audio/2026-08-22/broadcast.mp3`)
-     */
-    fun audioUrl(relPath: String): String = ArchiveEndpoints.rootUrl(relPath.removePrefix("/"))
 
     /**
      * 拉根级独立文件 `trends.json`(跨源热词趋势榜,流水线 trend_keywords.py 在

@@ -2,11 +2,11 @@
     <string name="app_name">AI News Hub</string>
 
     <!-- 底部导航 tab -->
-    <string name="tab_overview">总览</string>
-    <string name="tab_summary">摘要</string>
-    <string name="tab_follows">关注</string>
-    <string name="tab_trends">趋势</string>
+    <!-- 根 tab(3 个);tab_overview 仍被关注命中流的「总览」伪源标签使用 -->
+    <string name="tab_today">今天</string>
+    <string name="tab_hotwords">热词</string>
     <string name="tab_more">更多</string>
+    <string name="tab_overview">总览</string>
 
     <!-- 桌面小组件(picker 显示名 / 描述;界面内文案在 widget/ 代码中,与 App 惯例一致) -->
     <string name="widget_hot_now_name">今日热点</string>

@@ -90,13 +90,25 @@ class PageBundleTest {
     @Test
     fun `各 tab 页栈整体序列化往返`() {
         val stacks = mapOf(
-            AppTab.Overview to listOf(Page.Settings, Page.Web("https://e.com", "t", null), Page.LocalSearch("kw")),
-            AppTab.Summary to listOf(Page.SummaryDate("2026-08-01")),
-            AppTab.Follows to emptyList<Page>(),
-            AppTab.Trends to listOf(Page.TrendsCloud),
+            AppTab.Today to listOf(Page.Settings, Page.Web("https://e.com", "t", null), Page.LocalSearch("kw")),
+            AppTab.Hotwords to listOf(Page.TrendsCloud),
             AppTab.More to listOf(Page.HistoryHub, Page.Favorites)
         )
         assertEquals(stacks, stacksFromBundle(stacksToBundle(stacks), "兜底标题"))
+    }
+
+    @Test
+    fun `旧版五 tab 的页栈在新枚举下被丢弃不崩溃`() {
+        // v1.4.0 五 tab 并三:升级用户的存量 Bundle 里存的是已移除的 tab 名,
+        // stacksFromBundle 按 AppTab.entries 名取键 → 旧栈整体丢弃(空 Map 可接受,
+        // 数据会重拉),不得抛异常;currentTab 兜底逻辑在 appNavStateSaver,不在本函数
+        val legacy = Bundle().apply {
+            putParcelableArrayList("Overview", arrayListOf(Page.Settings.toBundle()))
+            putParcelableArrayList("Summary", arrayListOf(Page.SummaryDate("2026-08-01").toBundle()))
+            putParcelableArrayList("Follows", arrayListOf<Bundle>())
+            putParcelableArrayList("Trends", arrayListOf(Page.TrendsCloud.toBundle()))
+        }
+        assertEquals(emptyMap<AppTab, List<Page>>(), stacksFromBundle(legacy, "兜底标题"))
     }
 
     @Test

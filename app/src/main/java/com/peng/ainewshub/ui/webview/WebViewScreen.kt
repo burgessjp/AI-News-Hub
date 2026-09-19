@@ -24,25 +24,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.ContentCopy
-import androidx.compose.material.icons.outlined.History
-import androidx.compose.material.icons.outlined.Language
-import androidx.compose.material.icons.outlined.MoreVert
-import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -70,10 +60,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -88,7 +78,6 @@ import com.peng.ainewshub.data.repo.FavoritesRepository
 import com.peng.ainewshub.data.repo.TranslationRepository
 import com.peng.ainewshub.ui.ErrorState
 import com.peng.ainewshub.ui.LoadingState
-import com.peng.ainewshub.ui.anim.Motion
 import com.peng.ainewshub.ui.components.AppTopBar
 import com.peng.ainewshub.ui.components.AppTopBarDefaults
 import com.peng.ainewshub.ui.theme.AppText
@@ -183,13 +172,19 @@ fun WebViewScreen(
     var translateOriginals by remember { mutableStateOf<List<String>?>(null) }
     var translateResults by remember { mutableStateOf<List<String?>?>(null) }
     var showTranslateSheet by remember { mutableStateOf(false) }
+    // 「翻译直达」待接续标记:非阅读模式下点翻译 → 先自动进阅读模式(译文抽块依赖
+    // 阅读模板的干净 DOM),阅读页 onPageFinished 后自动接续 startTranslate。
+    // 提取失败/手动退出阅读时清除,避免下次进阅读模式被误触发。
+    var pendingTranslate by remember { mutableStateOf(false) }
 
-    // 延迟挂载 WebView:进入转场(FADE)结束后再创建,避免 factory 的主线程重活
-    // 与转场抢帧(此前实测转场被拉长、且淡入目标是白屏,视觉上像没有动画)。
+    // 延迟挂载 WebView:进入转场(FADE,250ms)结束后再创建,避免 factory 的主线程
+    // 重活与转场抢帧(此前实测转场被拉长、且淡入目标是白屏,视觉上像没有动画)。
     // 转场期间先展示顶栏 + 加载进度条,WebView 创建完成后再接上。
+    // 延迟量对齐 FADE 实际时长 + 30ms 余量(原 MEDIUM+50=350ms 是按 PUSH 时长拍的,
+    // 比实际 FADE 多等 100ms 白白吃进点按→可读的延迟)。
     var attachWeb by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
-        delay(Motion.MEDIUM + 50L)
+        delay(280L)
         attachWeb = true
     }
 
@@ -329,6 +324,8 @@ fun WebViewScreen(
                 val article = extractReaderArticle(web, lib)
                 if (article == null) {
                     toast(context.getString(R.string.webview_toast_reader_extract_failed))
+                    // 直达翻译的接续作废:本次没能进阅读模式
+                    pendingTranslate = false
                     return@launch
                 }
                 // 进入新阅读页前清掉上一页的翻译产物
@@ -354,6 +351,7 @@ fun WebViewScreen(
     fun exitReaderMode() {
         val web = webViewRef.web ?: return
         translateJobRef.job?.cancel()
+        pendingTranslate = false
         if (web.canGoBack()) web.goBack() else web.loadUrl(currentUrl)
     }
 
@@ -424,6 +422,12 @@ fun WebViewScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             containerColor = MaterialTheme.colorScheme.surface,
+            // WebView 铺到屏幕物理底缘(edge-to-edge,同浏览器惯例):
+            // 底部导航栏 inset 交给悬浮工具栏自带的 navigationBarsPadding 处理。
+            // 若沿用默认 contentWindowInsets(内容止于导航栏上方),转场退出根页后
+            // 导航栏条带区域不会被重绘,残留根页最后的像素(陈旧像素伪影)——
+            // 内容铺满后该区域由不透明的 WebView 持续绘制,伪影无从产生。
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
             topBar = {
                 AppTopBar(
                     title = pageTitle.ifBlank { stringResource(R.string.common_loading) },
@@ -435,32 +439,40 @@ fun WebViewScreen(
                         }
                     },
                     actions = {
-                        // 星标收藏当前页(toggle);已收藏实心主色,未收藏描边
-                        IconButton(onClick = {
-                            scope.launch {
-                                val favorited = favoritesRepo.toggle(currentUrl, pageTitle, source)
-                                toast(
-                                    context.getString(
-                                        if (favorited) R.string.webview_toast_favorited
-                                        else R.string.webview_toast_unfavorited
-                                    )
-                                )
-                            }
-                        }) {
-                            Icon(
-                                imageVector = if (favoriteEntity != null) Icons.Filled.Star else Icons.Outlined.StarBorder,
-                                contentDescription = stringResource(
-                                    if (favoriteEntity != null) R.string.favorites_remove_desc
-                                    else R.string.favorites_add_desc
-                                ),
-                                tint = if (favoriteEntity != null) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                        // 收藏当前页(toggle):文字按钮双态(去图标)——已藏 = 报纸红
+                        Text(
+                            text = stringResource(
+                                if (favoriteEntity != null) R.string.webview_action_unfavorite
+                                else R.string.webview_action_favorite
+                            ),
+                            style = AppText.caption,
+                            fontWeight = if (favoriteEntity != null) FontWeight.SemiBold else FontWeight.Normal,
+                            color = if (favoriteEntity != null) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .clickable {
+                                    scope.launch {
+                                        val favorited = favoritesRepo.toggle(currentUrl, pageTitle, source)
+                                        toast(
+                                            context.getString(
+                                                if (favorited) R.string.webview_toast_favorited
+                                                else R.string.webview_toast_unfavorited
+                                            )
+                                        )
+                                    }
+                                }
+                                .padding(horizontal = 10.dp, vertical = 14.dp)
+                        )
                         Box {
-                            IconButton(onClick = { menuExpanded = true }) {
-                                Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.tab_more))
-                            }
+                            // 更多菜单入口:文字按钮(去图标)
+                            Text(
+                                text = stringResource(R.string.tab_more),
+                                style = AppText.caption,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier
+                                    .clickable { menuExpanded = true }
+                                    .padding(start = 2.dp, end = 14.dp, top = 14.dp, bottom = 14.dp)
+                            )
                             DropdownMenu(
                                 expanded = menuExpanded,
                                 onDismissRequest = { menuExpanded = false }
@@ -470,7 +482,6 @@ fun WebViewScreen(
                                 if (!readerActive) {
                                     DropdownMenuItem(
                                         text = { Text(stringResource(R.string.common_refresh)) },
-                                        leadingIcon = { Icon(Icons.Outlined.Refresh, null) },
                                         onClick = {
                                             menuExpanded = false
                                             webViewRef.web?.reload()
@@ -481,7 +492,6 @@ fun WebViewScreen(
                                 HorizontalDivider()
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.webview_menu_copy_link)) },
-                                    leadingIcon = { Icon(Icons.Outlined.ContentCopy, null) },
                                     onClick = {
                                         menuExpanded = false
                                         copyText(currentUrl)
@@ -489,7 +499,6 @@ fun WebViewScreen(
                                 )
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.webview_menu_open_browser)) },
-                                    leadingIcon = { Icon(Icons.Outlined.Language, null) },
                                     onClick = {
                                         menuExpanded = false
                                         openInBrowser(currentUrl)
@@ -584,6 +593,11 @@ fun WebViewScreen(
                                         val finishedUrl = url?.removeSuffix(READER_SENTINEL)
                                         currentUrl = finishedUrl ?: currentUrl
                                         loading = false
+                                        // 「翻译直达」接续:阅读页 DOM 就绪后自动开始翻译
+                                        if (readerActive && pendingTranslate) {
+                                            pendingTranslate = false
+                                            startTranslate()
+                                        }
                                         webCanGoBack = view.canGoBack()
                                         webCanGoForward = view.canGoForward()
                                         // 回写真实标题到浏览历史(用最终落地 URL,跟随重定向)
@@ -791,12 +805,6 @@ fun WebViewScreen(
                         }
                         .padding(horizontal = 16.dp, vertical = 10.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.History,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.inverseOnSurface,
-                        modifier = Modifier.size(16.dp)
-                    )
                     Text(
                         text = stringResource(R.string.webview_resume_reading, resumeProgress ?: 0),
                         style = AppText.caption,
@@ -825,7 +833,16 @@ fun WebViewScreen(
                     onBack = { webViewRef.web?.goBack() },
                     onForward = { webViewRef.web?.goForward() },
                     onToggleReader = { if (readerActive) exitReaderMode() else enterReaderMode() },
-                    onTranslate = { startTranslate() },
+                    // 翻译直达:非阅读模式下点翻译 = 先自动进阅读模式再接续翻译
+                    //(省去「先进阅读模式才能翻译」的一层前提),阅读模式内行为不变
+                    onTranslate = {
+                        if (!readerActive) {
+                            pendingTranslate = true
+                            enterReaderMode()
+                        } else {
+                            startTranslate()
+                        }
+                    },
                     onShare = { shareUrl(context, pageTitle, currentUrl) }
                 )
             }

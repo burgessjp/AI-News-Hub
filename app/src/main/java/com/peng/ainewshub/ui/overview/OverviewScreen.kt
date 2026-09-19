@@ -1,12 +1,10 @@
 package com.peng.ainewshub.ui.overview
 
 import android.content.Context
-import android.widget.Toast
 import androidx.compose.ui.platform.LocalContext
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -17,329 +15,69 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.TrendingUp
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.outlined.AutoAwesome
-import androidx.compose.material.icons.outlined.HourglassEmpty
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.ui.unit.sp
 import com.peng.ainewshub.R
-import com.peng.ainewshub.data.repo.BroadcastRepository
 import com.peng.ainewshub.data.repo.OverviewDigest
 import com.peng.ainewshub.data.repo.OverviewEntry
 import com.peng.ainewshub.data.PipelineSchedule
 import com.peng.ainewshub.data.repo.SummaryRepository
-import com.peng.ainewshub.data.source.ArchiveHttpClient
-import com.peng.ainewshub.playback.TtsEntry
-import com.peng.ainewshub.playback.rememberTtsStartHandler
-import com.peng.ainewshub.ui.EmptyState
-import com.peng.ainewshub.ui.ErrorState
-import com.peng.ainewshub.ui.components.AppTopBar
 import com.peng.ainewshub.ui.components.BottomBarPillHeight
-import com.peng.ainewshub.ui.components.BrandWordmark
-import com.peng.ainewshub.ui.components.HairlineDivider
+import com.peng.ainewshub.ui.components.editionLabel
 import com.peng.ainewshub.ui.components.RankBadge
-import com.peng.ainewshub.ui.components.RankRowSkeletonList
-import com.peng.ainewshub.ui.components.rememberHaptics
 import com.peng.ainewshub.ui.components.rememberReadUrls
-import com.peng.ainewshub.ui.i18n.AppLocale
 import com.peng.ainewshub.ui.theme.AppAlpha
 import com.peng.ainewshub.ui.theme.AppText
-import com.peng.ainewshub.ui.theme.BrandGradient
-import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 /**
- * 今日总览 Tab 根屏 —— 流水线预生成的跨源综合分析(读归档 latest_overview 字段)。
+ * 总览内容共享件 —— 「今天」根屏(TodayScreen)与「历史总览」日期页(OverviewDateScreen)
+ * 共用的渲染实现。
+ *
+ * 原 OverviewScreen 根屏已随 v1.4.0 日刊化并入 [TodayScreen](综述 Hero + Top10 +
+ * 分源摘要区块的垂直日报);本文件只保留共享渲染件:
+ *  - [OverviewContent]:历史总览日期页的整页渲染(hero + Top10 + 页脚,自持 LazyColumn)
+ *  - [OverviewLead] / [TopEntryRow] / [OverviewFooter] 等:TodayScreen 逐 item 复用
  *
  * 结构(编辑风,去卡片化):
  *  - 首屏 digest Hero:[BrandGradient] 通栏 = 「今日综述」label + digest 正文
- *    + 数据时效 caption(digest 空串退化为纯文本时效行)——首屏焦点即 AI 综合产物
+ *    + 刊名/时效 caption(digest 空串退化为纯文本时效行)——首屏焦点即 AI 综合产物
  *    (权重反转:渐变焦点从单条新闻收口到综述,对齐「渐变只用于 AI 特性」纪律)
  *  - Top10 平铺列表:无卡片容器、无头条特殊位,行间 0.5dp 发丝线(缩进对齐文字列);
- *    breaking 条目整行 tertiary 浅底通栏 + 「Breaking」标签,推荐理由改左侧
- *    2dp 竖条引述块;与浅底带相邻的行间不画分隔线,由色带边缘自然分隔
- *  - 页脚:生成时间 / 基于源数 / 缺源标注(「数据截至」已由首屏 Hero 承载,不重复)
- *
- * 与「摘要」tab 同范式:都读流水线预生成的归档字段,App 端不再调 AI。
+ *    breaking 条目带「突发」标签,推荐理由为左侧 2dp 竖条引述块
+ *  - 页脚:生成时间 / 基于源数 / 缺源标注(刊名/「数据截至」已由首屏 Hero 承载,不重复)
  */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun OverviewScreen(
-    onOpenUrl: (url: String, title: String, source: String) -> Unit,
-    // 顶栏搜索图标 → 本地搜索独立页(TabRoot 注入 nav.push(Page.LocalSearch))
-    onOpenSearch: () -> Unit = {},
-    // 列表状态由 MainActivity 上提持有:切 tab / 进二级页返回后保持滚动位置
-    listState: LazyListState,
-    reselectSignal: Int = 0,
-    vm: OverviewViewModel = viewModel()
-) {
-    val state by vm.state.collectAsStateWithLifecycle()
-    val isRefreshing by vm.isRefreshing.collectAsStateWithLifecycle()
-    val haptics = rememberHaptics()
-
-    // 重击当前 tab:滚回顶部 + 缓存感知刷新(指纹未变零开销,归档更新才重新生成)。
-    // lastHandled 防「重新进入组合就自动刷新」(同摘要 tab 套路)。
-    var lastHandledReselect by remember { mutableIntStateOf(reselectSignal) }
-    LaunchedEffect(reselectSignal) {
-        if (reselectSignal != lastHandledReselect) {
-            lastHandledReselect = reselectSignal
-            listState.animateScrollToItem(0)
-            vm.load()
-        }
-    }
-
-    val context = LocalContext.current
-    val dateText = remember { formatToday(context) }
-    // 语音速报:通知权限请求 + 服务启动统一收口(见 playback/TtsBriefing.kt)
-    val startBriefing = rememberTtsStartHandler()
-    // 预生成音频清单:播报优先流水线神经语音(Qwen3-TTS),清单不可用回落系统 TTS
-    val scope = rememberCoroutineScope()
-    val broadcastRepo = remember { BroadcastRepository() }
-
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.surface,
-        topBar = {
-            // 一级根 tab 规格:品牌 wordmark + 右侧日期(刷新收口到下拉手势,顶栏不再放按钮)
-            AppTopBar(
-                title = "AI NEWS HUB",
-                titleContent = {
-                    // 品牌字标(矢量,跟随设置页自选的深/浅主题),替换原纯文字标题
-                    BrandWordmark(modifier = Modifier.height(44.dp))
-                },
-                horizontalPadding = 18.dp,
-                actions = {
-                    // 语音速报入口:朗读今日综述(通勤/睡前场景);数据未就绪时禁用
-                    IconButton(
-                        onClick = {
-                            val digest = (state as? OverviewState.Success)?.digest ?: return@IconButton
-                            scope.launch {
-                                // 新鲜度(generatedAt 对齐)在 Repository 内判定。总览播报恒为
-                                // 单条整段(仅今日综述,不含条目明细,文本与流水线合成侧一致):
-                                // 预生成音频可用时挂 audioUrl 走 CDN 流播,否则同一段文本交
-                                // 系统 TTS 整段朗读(清单缺失/批次滞后时 Toast 提示)——
-                                // 两条通道听感一致,浮窗/通知栏均为单条形态(无上一条/下一条)。
-                                val text = digest.digest.trim()
-                                if (text.isEmpty()) return@launch // 综述为空无可播,流水线同样跳过
-                                val audio = runCatching {
-                                    broadcastRepo.load(overviewGeneratedAt = digest.generatedAt)
-                                }.getOrNull()
-                                val entry = TtsEntry(
-                                    id = "overview-broadcast",
-                                    title = AppLocale.wrap(context)
-                                        .getString(R.string.tts_playlist_overview_title),
-                                    text = text,
-                                    audioUrl = audio?.let { ArchiveHttpClient.audioUrl(it.file) },
-                                    durationMs = audio?.durationMs ?: 0L
-                                )
-                                if (audio == null) {
-                                    Toast.makeText(
-                                        context,
-                                        AppLocale.wrap(context).getString(R.string.tts_audio_unavailable),
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                }
-                                startBriefing(listOf(entry))
-                            }
-                        },
-                        enabled = state is OverviewState.Success
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.VolumeUp,
-                            contentDescription = stringResource(R.string.tts_entry_cd),
-                            tint = if (state is OverviewState.Success) {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            } else {
-                                MaterialTheme.colorScheme.outline
-                            }
-                        )
-                    }
-                    // 本地搜索入口:查设备内索引(浏览过的 8 源数据),一步直达
-                    IconButton(onClick = onOpenSearch) {
-                        Icon(
-                            imageVector = Icons.Filled.Search,
-                            contentDescription = stringResource(R.string.local_search_cd),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Text(
-                        text = dateText,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            )
-        }
-    ) { padding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                // 列表可滚入药丸 TAB 之下,但可视区不超出药丸底缘
-                // (与 MainActivity 底栏定位一致:navigationBarsPadding + 距底 16dp),
-                // 内容不再透出到药丸与系统导航栏之间的间隙
-                .navigationBarsPadding()
-                .padding(bottom = 16.dp)
-        ) {
-            when (val s = state) {
-                is OverviewState.Loading -> OverviewLoading()
-                is OverviewState.NoData -> EmptyState(
-                    title = stringResource(R.string.overview_no_data_title),
-                    subtitle = stringResource(R.string.overview_no_data_subtitle),
-                    icon = Icons.Outlined.HourglassEmpty,
-                    actionLabel = stringResource(R.string.common_retry),
-                    onAction = { vm.load() }
-                )
-                is OverviewState.Error -> ErrorState(
-                    message = s.message,
-                    onRetry = { vm.load() },
-                    title = stringResource(R.string.overview_load_failed)
-                )
-                is OverviewState.Success -> PullToRefreshBox(
-                    isRefreshing = isRefreshing,
-                    onRefresh = {
-                        haptics.tick()
-                        vm.refresh()
-                    }
-                ) {
-                    OverviewContent(
-                        digest = s.digest,
-                        listState = listState,
-                        onOpenUrl = onOpenUrl
-                    )
-                }
-            }
-        }
-    }
-}
-
-/**
- * 加载中:匹配内容态布局的骨架屏(digest Hero 渐变块 + 5 条排名行),避免转圈→内容态
- * 的结构跳变。底部保留原「AI 正在生成」文案(AI 长输出,避免用户误以为卡死)。
- *
- * digest Hero 骨架用 [BrandGradient] 通栏块占位(与真实 Hero 同区位),内部用 onPrimary
- * 半透静态块占 label/正文/时效位;下方直接复用 [RankRowSkeletonList]。
- */
-@Composable
-private fun OverviewLoading() {
-    val cs = MaterialTheme.colorScheme
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        // 与 OverviewContent 同款末项留白(药丸高 + 16dp 呼吸空间)
-        contentPadding = PaddingValues(bottom = BottomBarPillHeight + 16.dp)
-    ) {
-        // digest Hero 骨架:BrandGradient 通栏块,内部 onPrimary 半透占位块
-        item(key = "hero_skeleton") {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(BrandGradient)
-                    .padding(horizontal = 18.dp, vertical = 16.dp)
-            ) {
-                // label 行占位(图标 + 「今日综述」)
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    HeroShimmerBox(modifier = Modifier.size(14.dp), cornerRadius = 7.dp)
-                    HeroShimmerBox(modifier = Modifier.size(64.dp, 12.dp), cornerRadius = 6.dp)
-                }
-                Spacer(Modifier.height(10.dp))
-                // digest 正文占位(三行,宽递减)
-                HeroShimmerBox(modifier = Modifier.fillMaxWidth(0.95f).height(12.dp))
-                Spacer(Modifier.height(6.dp))
-                HeroShimmerBox(modifier = Modifier.fillMaxWidth(0.88f).height(12.dp))
-                Spacer(Modifier.height(6.dp))
-                HeroShimmerBox(modifier = Modifier.fillMaxWidth(0.6f).height(12.dp))
-                Spacer(Modifier.height(10.dp))
-                // 「数据截至」时效占位
-                HeroShimmerBox(modifier = Modifier.size(110.dp, 10.dp), cornerRadius = 5.dp)
-            }
-        }
-        // Top10 排名行骨架(复用通用 RankRowSkeletonList)
-        item(key = "rows_skeleton") {
-            RankRowSkeletonList(count = 5)
-        }
-        // 底部「AI 正在生成」文案(保留原语义提示,居中弱色)
-        item(key = "loading_hint") {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                CircularProgressIndicator(
-                    color = cs.primary,
-                    strokeWidth = 2.dp,
-                    modifier = Modifier.size(14.dp)
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    text = stringResource(R.string.overview_loading),
-                    style = AppText.bodySmall,
-                    color = cs.onSurfaceVariant
-                )
-            }
-        }
-    }
-}
-
-/**
- * Hero 骨架占位块 —— 在 [BrandGradient] 深色底上用 onPrimary 半透静态块占位
- *(Hero 区不做 shimmer 动画,与渐变底叠加会显脏;静态半透块足够表达结构)。
- */
-@Composable
-private fun HeroShimmerBox(
-    modifier: Modifier,
-    cornerRadius: androidx.compose.ui.unit.Dp = 6.dp
-) {
-    val cs = MaterialTheme.colorScheme
-    Box(
-        modifier = modifier
-            .clip(androidx.compose.foundation.shape.RoundedCornerShape(cornerRadius))
-            .background(cs.onPrimary.copy(alpha = AppAlpha.onPrimaryOverlay))
-    )
-}
 
 /**
  * 总览内容列表(digest Hero + Top10 平铺 + 页脚)。
  *
- * 总览 Tab 与「历史总览」日期页共用(后者复用同一渲染,仅差底部预留):
+ * 「今天」页与「历史总览」日期页共用(后者复用同一渲染,仅差底部预留):
  *
  * @param bottomReserve true 预留浮动药丸底栏高度(根 tab);false 为二级页
  *        (无悬浮底栏),只留呼吸空间
@@ -383,24 +121,19 @@ internal fun OverviewContent(
         }
 
         // Top10 全量平铺(去卡片,无头条特殊位;breaking 条目数据层已排最前,
-        // 由「Breaking」标签承接强调)。相邻行间统一绘制发丝线
+        // 由「Breaking」标签承接强调)。行间不画线,靠行自身 14dp 纵向 padding 留白分层
         val items = digest.items
         itemsIndexed(
             items,
             key = { i, _ -> topKeys[i] },
             contentType = { _, e -> if (e.breaking) "top10-breaking" else "top10" }
         ) { index, entry ->
-            Column {
-                TopEntryRow(
-                    rank = index + 1,
-                    entry = entry,
-                    isRead = entry.url in readUrls,
-                    onClick = { onOpenUrl(entry.url, entry.title, SummaryRepository.titleOf(context, entry.source)) }
-                )
-                if (index < items.lastIndex) {
-                    RowDivider()
-                }
-            }
+            TopEntryRow(
+                rank = index + 1,
+                entry = entry,
+                isRead = entry.url in readUrls,
+                onClick = { onOpenUrl(entry.url, entry.title, SummaryRepository.titleOf(context, entry.source)) }
+            )
         }
 
         item(key = "footer", contentType = "footer") {
@@ -413,9 +146,8 @@ internal fun OverviewContent(
  * 首屏 digest Hero —— 跨源「今日综述」的页面焦点区(权重反转:原头条渐变 Hero 已去除,
  * 渐变焦点从单条新闻收口到 AI 综合产物,对齐 Color.kt「渐变只用于 AI 特性」纪律)。
  *
- * 视觉:full-bleed [BrandGradient] 通栏(无圆角无描边),内容一律 onPrimary 系:
- * AutoAwesome 图标 + 「今日综述」label → digest 正文 → 「数据截至 · 下一批」时效 caption。
- * 语言复用 [HotTopicsSection] 渐变标题栏(图标/标签 + onPrimary 文字)。
+ * 视觉(纸墨日报):双细线起头 → 报纸红 letterspaced「今日综述」栏目名 →
+ * 衬线正文 → 底部发丝线收边。
  *
  * digest 折叠:长综述默认收 [DIGEST_COLLAPSED_LINES] 行,仅溢出时出现「展开/收起」
  * (onTextLayout 检测,短综述不渲染按钮);折叠态为瞬态 remember —— push Web 页
@@ -427,72 +159,70 @@ internal fun OverviewContent(
  * 页脚不再重复。digest 空串但 dataFetchedAt > 0(旧归档)退化为纯文本时效 caption。
  */
 @Composable
-private fun OverviewLead(digest: OverviewDigest) {
+internal fun OverviewLead(digest: OverviewDigest) {
     val cs = MaterialTheme.colorScheme
     val context = LocalContext.current
     if (digest.digest.isNotBlank()) {
         var expanded by remember { mutableStateOf(false) }
         // 折叠态检测溢出:仅在折叠布局回调里读 hasVisualOverflow,展开后不回写
         var digestOverflowed by remember { mutableStateOf(false) }
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(BrandGradient)
-                .padding(horizontal = 18.dp, vertical = 16.dp)
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Outlined.AutoAwesome,
-                    contentDescription = null,
-                    tint = cs.onPrimary,
-                    modifier = Modifier.size(14.dp)
-                )
-                Spacer(Modifier.width(6.dp))
+        Column(modifier = Modifier.fillMaxWidth()) {
+            // 纸墨日报 Hero:红色 letterspaced 栏目名 → 衬线正文 → 时效 caption,
+            // 无起收边线(线收敛:结构线只留各页报头一处;正文用系统衬线,
+            // 缺 CJK 衬线的 ROM 优雅降级无衬线)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp, vertical = 14.dp)
+            ) {
                 Text(
                     text = stringResource(R.string.overview_digest_title),
                     style = AppText.caption,
                     fontWeight = FontWeight.SemiBold,
-                    color = cs.onPrimary
+                    color = cs.primary,
+                    letterSpacing = 3.sp
                 )
-            }
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = digest.digest,
-                style = AppText.body,
-                color = cs.onPrimary,
-                maxLines = if (expanded) Int.MAX_VALUE else DIGEST_COLLAPSED_LINES,
-                overflow = TextOverflow.Ellipsis,
-                onTextLayout = { if (!expanded) digestOverflowed = it.hasVisualOverflow }
-            )
-            // 展开/收起:仅长综述渲染(短文无按钮);文案按钮 + onClickLabel 供读屏
-            if (digestOverflowed) {
-                val toggleLabel = stringResource(
-                    if (expanded) R.string.overview_digest_collapse else R.string.overview_digest_expand
-                )
-                Text(
-                    text = toggleLabel,
-                    style = AppText.caption,
-                    fontWeight = FontWeight.SemiBold,
-                    color = cs.onPrimary,
-                    modifier = Modifier
-                        .clip(MaterialTheme.shapes.small)
-                        .clickable(onClickLabel = toggleLabel) { expanded = !expanded }
-                        .padding(vertical = 2.dp)
-                )
-            }
-            if (digest.dataFetchedAt > 0) {
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    text = freshnessCaption(context, digest.dataFetchedAt),
-                    style = AppText.caption,
-                    color = cs.onPrimary.copy(alpha = AppAlpha.primaryEmphasis)
+                    text = digest.digest,
+                    style = AppText.body,
+                    fontFamily = FontFamily.Serif,
+                    color = cs.onSurface,
+                    lineHeight = 24.sp, // 综述衬线正文行高(纸墨版面规格,有意宽于正文档)
+                    maxLines = if (expanded) Int.MAX_VALUE else DIGEST_COLLAPSED_LINES,
+                    overflow = TextOverflow.Ellipsis,
+                    onTextLayout = { if (!expanded) digestOverflowed = it.hasVisualOverflow }
                 )
+                // 展开/收起:仅长综述渲染(短文无按钮);文案按钮 + onClickLabel 供读屏
+                if (digestOverflowed) {
+                    val toggleLabel = stringResource(
+                        if (expanded) R.string.overview_digest_collapse else R.string.overview_digest_expand
+                    )
+                    Text(
+                        text = toggleLabel,
+                        style = AppText.caption,
+                        fontWeight = FontWeight.SemiBold,
+                        color = cs.primary,
+                        modifier = Modifier
+                            .clip(MaterialTheme.shapes.small)
+                            .clickable(onClickLabel = toggleLabel) { expanded = !expanded }
+                            .padding(vertical = 2.dp)
+                    )
+                }
+                if (digest.dataFetchedAt > 0) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = freshnessCaption(context, digest),
+                        style = AppText.caption,
+                        color = cs.onSurfaceVariant
+                    )
+                }
             }
         }
     } else if (digest.dataFetchedAt > 0) {
-        // 旧归档无 digest 字段:退化为纯文本时效 caption,不占渐变块
+        // 旧归档无 digest 字段:退化为纯文本时效 caption,不占版面
         Text(
-            text = freshnessCaption(context, digest.dataFetchedAt),
+            text = freshnessCaption(context, digest),
             style = AppText.caption,
             color = cs.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)
@@ -504,17 +234,19 @@ private fun OverviewLead(digest: OverviewDigest) {
 private const val DIGEST_COLLAPSED_LINES = 6
 
 /**
- * 时效 caption:「数据截至 X · 下一批 Y」。下一批由批次唯一真相源
+ * 时效 caption:「刊名 · 数据截至 X · 下一批 Y」。刊名由数据自身 generatedAt 映射
+ * 槽位序号(数据是哪批的就是哪刊,不拿当前时刻冒充);下一批由批次唯一真相源
  * [PipelineSchedule.nextBatchEpoch] 算出,按设备时区格式化(与「数据截至」
  * 同口径:北京定义、本地显示);格式化失败退化为不含下一批的短句。
  */
-private fun freshnessCaption(context: Context, fetchedAtMs: Long): String {
-    val fetchedAt = formatFetchedAt(context, fetchedAtMs)
+private fun freshnessCaption(context: Context, digest: OverviewDigest): String {
+    val fetchedAt = formatFetchedAt(context, digest.dataFetchedAt)
     val nextBatch = runCatching {
         SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(PipelineSchedule.nextBatchEpoch()))
     }.getOrDefault("")
     return if (nextBatch.isNotEmpty()) {
-        context.getString(R.string.overview_freshness_caption, fetchedAt, nextBatch)
+        val edition = editionLabel(context, PipelineSchedule.slotIndexOn(digest.generatedAt))
+        context.getString(R.string.overview_freshness_caption, edition, fetchedAt, nextBatch)
     } else {
         context.getString(R.string.overview_data_until, fetchedAt)
     }
@@ -526,15 +258,15 @@ private fun BreakingTag(modifier: Modifier = Modifier) {
     val cs = MaterialTheme.colorScheme
     Box(
         modifier = modifier
-            .clip(MaterialTheme.shapes.small)
-            .background(cs.tertiary)
+            .clip(MaterialTheme.shapes.extraSmall)
+            .background(cs.primary)
             .padding(horizontal = 6.dp, vertical = 2.dp)
     ) {
         Text(
             text = stringResource(R.string.overview_breaking_tag),
             style = AppText.caption,
             fontWeight = FontWeight.Bold,
-            color = cs.onTertiary
+            color = cs.onPrimary
         )
     }
 }
@@ -545,7 +277,7 @@ private fun BreakingTag(modifier: Modifier = Modifier) {
  * 推荐理由为左侧 2dp 竖条引述块(原「卡中卡」面板随卡片容器一并去除)。
  */
 @Composable
-private fun TopEntryRow(
+internal fun TopEntryRow(
     rank: Int,
     entry: OverviewEntry,
     onClick: () -> Unit,
@@ -570,7 +302,11 @@ private fun TopEntryRow(
             Text(
                 text = entry.title,
                 style = AppText.body,
-                fontWeight = FontWeight.SemiBold,
+                fontFamily = FontFamily.Serif,
+                // 头条升权:第 1 名 16sp SemiBold(大节头 17 之下、普通条目 14 之上),
+                // 「今日重点」的重点感由它承担;衬线大字是报纸头版语言
+                fontSize = if (rank == 1) 16.sp else AppText.body.fontSize,
+                fontWeight = if (rank == 1) FontWeight.SemiBold else FontWeight.Normal,
                 color = if (isRead) cs.onSurface.copy(alpha = AppAlpha.readDim) else cs.onSurface,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
@@ -619,52 +355,25 @@ private fun TopEntryRow(
                 }
             }
             Spacer(Modifier.height(6.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                SourceChip(title = SummaryRepository.titleOf(LocalContext.current, entry.source))
-                if (entry.metrics.isNotBlank()) {
-                    Spacer(Modifier.size(8.dp))
-                    // 指标提权:前缀 TrendingUp 图标,与各源列表页 StatBadge 节奏对齐
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.TrendingUp,
-                        contentDescription = null,
-                        tint = cs.onSurfaceVariant,
-                        modifier = Modifier.size(13.dp)
-                    )
-                    Spacer(Modifier.size(3.dp))
-                    Text(
-                        text = entry.metrics,
-                        style = AppText.caption,
-                        color = cs.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
+            // 文末署名行(报纸署名语言):「—— 源名 · 指标」小灰字,破折号前缀把
+            // meta 从上方 comment 内容行里剥出来;无胶囊底衬、无图标(胶囊是 App
+            // 语言且自带分隔噪音,与线收敛的「以白当黑」相悖)
+            val sourceTitle = SummaryRepository.titleOf(LocalContext.current, entry.source)
+            Text(
+                text = "—— " + if (entry.metrics.isBlank()) sourceTitle
+                       else sourceTitle + " · " + entry.metrics,
+                style = AppText.caption,
+                color = cs.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
-    }
-}
-
-/** 行间发丝线:缩进对齐文字列(18 行 padding + 24 徽章 + 12 间距 = 54),与 HotTopicsSection 同语言。 */
-@Composable
-private fun RowDivider() = HairlineDivider(startIndent = 54.dp)
-
-/** 来源徽章:surfaceContainerHigh 底衬小胶囊。 */
-@Composable
-private fun SourceChip(title: String) {
-    val cs = MaterialTheme.colorScheme
-    Box(
-        modifier = Modifier
-            .clip(CircleShape)
-            .background(cs.surfaceContainerHigh)
-            .padding(horizontal = 8.dp, vertical = 2.dp)
-    ) {
-        Text(text = title, style = AppText.caption, color = cs.onSurfaceVariant, maxLines = 1)
     }
 }
 
 /** 页脚:生成时间 / 基于源数 / 缺源标注(「数据截至」已在首屏 digest Hero 展示,此处不重复)。 */
 @Composable
-private fun OverviewFooter(digest: OverviewDigest) {
+internal fun OverviewFooter(digest: OverviewDigest) {
     val cs = MaterialTheme.colorScheme
     val context = LocalContext.current
     // 各片段在进 buildString 前算好(stringResource 只能在 @Composable 上下文调)
@@ -703,8 +412,8 @@ private fun OverviewFooter(digest: OverviewDigest) {
     }
 }
 
-/** 今天日期(系统时区),中文格式「M月d日 · 周x」,与摘要 tab 顶栏日期同规格;模式串走 date_fmt_month_day_week。 */
-private fun formatToday(context: Context): String =
+/** 今天日期(系统时区),中文格式「M月d日 · 周x」,与「今天」页报头日期行同规格;模式串走 date_fmt_month_day_week。 */
+internal fun formatToday(context: Context): String =
     runCatching {
         SimpleDateFormat(context.getString(R.string.date_fmt_month_day_week), Locale.getDefault()).format(Date())
     }.getOrDefault("")

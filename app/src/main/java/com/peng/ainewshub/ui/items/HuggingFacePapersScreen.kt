@@ -14,12 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Code
-import androidx.compose.material.icons.filled.Groups
-import androidx.compose.material.icons.filled.ThumbUp
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -214,20 +209,20 @@ private fun PaperRow(
             ) {
                 // upvotes 是热度主指标,用 primary 强调,让用户一眼看到「为什么上趋势」
                 StatBadge(
-                    icon = Icons.Filled.ThumbUp,
+                    label = "赞",
                     value = formatCount(item.upvotes),
                     tint = cs.primary,
                     fontWeight = FontWeight.SemiBold
                 )
                 if (item.published.isNotBlank()) {
                     StatBadge(
-                        icon = Icons.Filled.CalendarMonth,
+                        label = "日",
                         value = item.published
                     )
                 }
                 if (item.authors.isNotBlank()) {
                     StatBadge(
-                        icon = Icons.Filled.Groups,
+                        label = "人",
                         value = item.authors
                     )
                 }
@@ -266,13 +261,6 @@ private fun GithubCodeChip(onClick: () -> Unit) {
             .padding(horizontal = 6.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            imageVector = Icons.Filled.Code,
-            contentDescription = null,
-            tint = cs.primary,
-            modifier = Modifier.size(14.dp)
-        )
-        Spacer(Modifier.width(3.dp))
         Text(
             text = stringResource(R.string.items_view_code),
             style = AppText.bodySmall,

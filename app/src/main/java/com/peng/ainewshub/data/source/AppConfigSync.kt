@@ -17,7 +17,7 @@ import org.json.JSONObject
  *  - 每日通知 Worker 运行前(覆盖进程被杀后 WorkManager 唤醒的无 UI 入口)。
  *
  * 失败一律静默 —— 配置拉不到不是错误,内置默认表兜底,不打扰用户(对齐冷启动
- * 探测类动作的既有哲学,如 NewDataPromptHost)。
+ * 探测类动作的既有哲学)。
  */
 internal object AppConfigSync {
 
@@ -35,7 +35,7 @@ internal object AppConfigSync {
             ArchiveHttpClient.fetchAppConfig()
         } catch (e: CancellationException) {
             // 调用方作用域销毁的取消要放行重抛,不能当「拉取失败」吞掉
-            // (破坏结构化取消语义,对齐 NewDataPromptHost 的处理)
+            // (破坏结构化取消语义)
             throw e
         } catch (e: Exception) {
             null // 断网 / HTTP 错误 / JSON 解析失败:静默保持当前值

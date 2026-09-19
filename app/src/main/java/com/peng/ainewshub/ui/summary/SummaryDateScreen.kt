@@ -28,6 +28,7 @@ import com.peng.ainewshub.R
 import com.peng.ainewshub.data.repo.SummaryRepository
 import com.peng.ainewshub.ui.SummaryArchiveViewModel
 import com.peng.ainewshub.ui.UiState
+import com.peng.ainewshub.ui.components.archiveDateLabel
 import com.peng.ainewshub.ui.components.AppTopBar
 import com.peng.ainewshub.ui.components.AppTopBarDefaults
 import kotlinx.coroutines.launch
@@ -35,7 +36,7 @@ import kotlinx.coroutines.launch
 /**
  * 历史摘要 —— 指定日期的全源摘要卡页。
  *
- * 卡片实现与摘要 Tab 完全同构(共享 [SummaryCardPage] / [SummaryHeaderRow]),
+ * 卡片实现沿用 v1.4.0 前摘要 Tab 的单页结构(共享 [SummaryCardPage] / [SummaryHeaderRow]),
  * 差异仅在:
  *  - 数据按日期经 history 索引寻址([SummaryArchiveViewModel.loadDate]);
  *  - 二级页语义:顶栏带返回、无刷新按钮、底部不预留浮动底栏高度;
@@ -57,6 +58,7 @@ fun SummaryDateScreen(
     val states by vm.dateStates.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
+    val context = LocalContext.current
     LaunchedEffect(date) { vm.loadDate(date) }
 
     // 历史页用全集固定顺序(不跟随用户自定义顺序),无列表出口:onOpenFor 一律 null
@@ -66,7 +68,7 @@ fun SummaryDateScreen(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             AppTopBar(
-                title = stringResource(R.string.summary_date_title, date),
+                title = stringResource(R.string.summary_date_title, archiveDateLabel(context, date)),
                 titleFontSize = AppTopBarDefaults.secondaryTitleFontSize,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -81,7 +83,7 @@ fun SummaryDateScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // 历史日期页回看的是往日内容,无「新内容未查看」语义(那是摘要 Tab
+            // 历史日期页回看的是往日内容,无「新内容未查看」语义(那是「今天」页
             // 对当下批次的信号)——复用同一头行组件,圆点恒不亮
             SummaryHeaderRow(
                 currentPage = pagerState.currentPage,

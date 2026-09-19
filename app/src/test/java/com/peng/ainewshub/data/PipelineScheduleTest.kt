@@ -93,4 +93,39 @@ class PipelineScheduleTest {
         // 归一后与当前一致 → 无变化
         assertFalse(PipelineSchedule.applyBatchSlots(listOf(18 to 0, 8 to 0, 22 to 0)))
     }
+
+    // ===== slotIndexOn(日刊身份:数据 generatedAt → 槽位序号,1 起) =====
+
+    @Test
+    fun `槽位序号按默认两批表映射早刊与晚刊`() {
+        // 早批窗口内生成的数据(08:00-17:59) → 槽 1;晚批(≥18:00) → 槽 2
+        assertEquals(1, PipelineSchedule.slotIndexOn(beijing(8, 0)))
+        assertEquals(1, PipelineSchedule.slotIndexOn(beijing(12, 34)))
+        assertEquals(2, PipelineSchedule.slotIndexOn(beijing(18, 0)))
+        assertEquals(2, PipelineSchedule.slotIndexOn(beijing(23, 59)))
+    }
+
+    @Test
+    fun `早于当日第一批的数据钳到槽 1`() {
+        // 流水线延迟/异常时刻(如 03:00 落盘)不发明 0 号刊,归早槽
+        assertEquals(1, PipelineSchedule.slotIndexOn(beijing(3, 0)))
+    }
+
+    @Test
+    fun `自定义批次表按新表槽位映射`() {
+        assertTrue(PipelineSchedule.applyBatchSlots(listOf(6 to 30, 12 to 0)))
+        assertEquals(1, PipelineSchedule.slotIndexOn(beijing(6, 30)))
+        assertEquals(2, PipelineSchedule.slotIndexOn(beijing(15, 0)))
+    }
+
+    @Test
+    fun `三批以上表序号连续递增`() {
+        assertTrue(PipelineSchedule.applyBatchSlots(listOf(6 to 0, 12 to 0, 22 to 0)))
+        assertEquals(1, PipelineSchedule.slotIndexOn(beijing(7, 0)))
+        assertEquals(2, PipelineSchedule.slotIndexOn(beijing(12, 0)))
+        // 21:59 仍属 12:00 批(时刻不晚于它的最后一批);过 22:00 才归第 3 槽
+        assertEquals(2, PipelineSchedule.slotIndexOn(beijing(21, 59)))
+        assertEquals(3, PipelineSchedule.slotIndexOn(beijing(22, 0)))
+        assertEquals(3, PipelineSchedule.slotIndexOn(beijing(23, 0)))
+    }
 }

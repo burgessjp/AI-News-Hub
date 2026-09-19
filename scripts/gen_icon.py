@@ -1,13 +1,27 @@
 #!/usr/bin/env python3
 """
-AI News Hub launcher icon generator.
+AI News Hub launcher icon generator (v1.4.0 纸墨日报).
 
-Design: "AI Flame"
-  - Background: diagonal gradient dark-teal (top-left) -> near-black (bottom-right)
-                with a soft cyan glow in the upper-center.
-  - Foreground: cyan-gradient flame (bright #67e8f9 -> deep teal #0e7490),
-                an inner brighter core for glow,
-                and a white 4-point sparkle (AI mark) in the upper-center.
+Design: "头版" (front page on a red seal)
+  - Background: solid newspaper red (#B93B1D, LightPrimary of the paper-ink palette).
+  - Foreground: a paper front page (#FBFAF7) carrying the news identity ——
+    ink inscriptional serif "AI" masthead + ink double rule (报头语言,同 App 内
+    DoubleRule), a red headline bar (头条) and three ink text bars (新闻行).
+    表意:报纸头版形态传达 NEWS,AI 在报头位。
+
+Debug variant (--debug): same front page on an ink (#1B1A17) seal ——
+红 = 正式包 / 墨 = debug 包,纸墨双色系内一眼可分(配合 label 后缀 "(Debug)")。
+Writes into app/src/debug/res (source-set overlay; pre-API-26 legacy mipmaps are
+intentionally not overridden —— 老设备上 debug 与正式同图标,靠标签区分)。
+
+  Layout: masthead/headline/bars all sit inside the adaptive safe zone
+  (center 66% circle, never masked); the page card intentionally reaches beyond
+  it so circular launcher masks clip its corners into an arc (standard practice
+  for document-style icons).
+
+  Typography is drawn as polygons (碑刻体: triangle-minus-triangle "A" with crossbar
+  and foot slabs, stemmed "I" with serif slabs) — no font files needed, deterministic
+  everywhere the script runs.
 
 Outputs (under app/src/main/res):
   - drawable-xxxhdpi/ic_launcher_background.png  (432px, layer)
@@ -19,26 +33,20 @@ Outputs (under app/src/main/res):
 
 Usage:
   python3 scripts/gen_icon.py            # generate everything
-  python3 scripts/gen_icon.py --preview  # write /tmp/icon_preview.png only
+  python3 scripts/gen_icon.py --preview  # write /tmp/icon_preview*.png only
 """
 import os
 import sys
-import math
 import argparse
 
 import numpy as np
-from PIL import Image, ImageDraw, ImageFilter
+from PIL import Image, ImageDraw
 
-# ---------------------------------------------------------------- palette
-CYAN_BRIGHT = (0x67, 0xE8, 0xF9)   # core / top of flame
-CYAN_ACCENT = (0x22, 0xD3, 0xEE)   # brand accent
-TEAL_MID    = (0x08, 0x91, 0xB2)
-TEAL_DEEP   = (0x0E, 0x74, 0x90)
-WHITE       = (0xFF, 0xFF, 0xFF)
-
-BG_TOP_LEFT = (0x0A, 0x4F, 0x5A)   # dark teal
-BG_BOTTOM_R = (0x06, 0x08, 0x0F)   # near-black (matches site dark bg)
-GLOW        = (0x22, 0xD3, 0xEE)
+# ---------------------------------------------------------------- palette (theme/Color.kt 纸墨令牌)
+RED = (0xB9, 0x3B, 0x1D)          # LightPrimary 报纸红
+PAPER = (0xFB, 0xFA, 0xF7)        # surface 纸白(头版卡面)
+PAPER_WARM = (0xFF, 0xF8, 0xF4)   # LightOnPrimary 纸白(红底上的前景)
+INK = (0x1B, 0x1A, 0x17)          # onSurface 墨色(报头/新闻行)
 
 # master render resolution (downscaled for crisp anti-aliasing)
 MASTER = 1536
@@ -50,193 +58,71 @@ LEGACY = {                          # density -> px (48dp base)
 RES = os.path.join("app", "src", "main", "res")
 
 
-# ---------------------------------------------------------------- helpers
-def lerp(a, b, t):
-    return tuple(int(round(a[i] + (b[i] - a[i]) * t)) for i in range(3))
+# ---------------------------------------------------------------- 碑刻衬线字形(单位坐标,y 向下)
+def draw_A(draw, x, y, w, h, fg, bg):
+    """罗马碑刻 A:外三角(fg)- 内三角(bg)+ 横档 + 双足衬线板。"""
+    draw.polygon([(x + 0.5 * w, y), (x + w, y + h), (x, y + h)], fill=fg)
+    draw.polygon([(x + 0.5 * w, y + 0.34 * h), (x + 0.75 * w, y + h), (x + 0.25 * w, y + h)], fill=bg)
+    draw.rectangle([x + 0.355 * w, y + 0.60 * h, x + 0.645 * w, y + 0.74 * h], fill=fg)   # 横档
+    draw.rectangle([x - 0.01 * w, y + 0.945 * h, x + 0.30 * w, y + h], fill=fg)            # 左足板
+    draw.rectangle([x + 0.70 * w, y + 0.945 * h, x + 1.01 * w, y + h], fill=fg)            # 右足板
 
 
-def diagonal_gradient(size, c_tl, c_br):
-    """Diagonal top-left -> bottom-right gradient as uint8 HxWx3."""
-    t = np.zeros((size, size, 3), dtype=np.float32)
-    # normalized diagonal coordinate
-    yy, xx = np.mgrid[0:size, 0:size].astype(np.float32)
-    d = (xx + yy) / (2 * (size - 1))           # 0 tl .. 1 br
-    for i in range(3):
-        t[..., i] = c_tl[i] + (c_br[i] - c_tl[i]) * d
-    return np.clip(t, 0, 255).astype(np.uint8)
+def draw_I(draw, x, y, w, h, fg):
+    """罗马碑刻 I:竖干 + 上下衬线板(总宽 = 板宽)。"""
+    draw.rectangle([x + 0.50 * w - 0.075 * h, y, x + 0.50 * w + 0.075 * h, y + h], fill=fg)
+    draw.rectangle([x, y, x + w, y + 0.07 * h], fill=fg)
+    draw.rectangle([x, y + 0.93 * h, x + w, y + h], fill=fg)
 
 
-def radial_glow(size, center, radius, color, intensity=1.0):
-    """Return RGBA float array (HxWx4) with a soft radial glow."""
-    yy, xx = np.mgrid[0:size, 0:size].astype(np.float32)
-    cx, cy = center
-    dist = np.sqrt((xx - cx) ** 2 + (yy - cy) ** 2) / radius
-    a = np.clip(1.0 - dist, 0.0, 1.0) ** 2.2
-    a *= intensity
-    out = np.zeros((size, size, 4), dtype=np.float32)
-    out[..., 0] = color[0]
-    out[..., 1] = color[1]
-    out[..., 2] = color[2]
-    out[..., 3] = a * 255.0
-    return out
-
-
-def flame_outline(size, cx, tip_y, base_y, max_half):
-    """
-    Build a closed flame polygon (list of (x,y)) with a pointed tip at top,
-    rounded base, and two asymmetric side licks for an organic flame.
-    Coordinates in pixels.
-    """
-    n_side = 80
-    right, left = [], []
-
-    def profile(t):
-        """
-        Flame half-width profile, t: 0 at tip .. 1 at base.
-        Classic candle-flame: sharp tip at top, widens to broad
-        lower-middle belly (~t=0.62), gentle rounding at base.
-        """
-        # broad belly, centered lower-mid
-        belly = math.exp(-(((t - 0.62) / 0.30) ** 2))
-        # subtle waist pinch just below the tip (t~0.22) for flame neck
-        neck = math.exp(-(((t - 0.22) / 0.10) ** 2))
-        # gentle taper so base isn't wider than belly
-        base_taper = 0.10 * max(0.0, (0.92 - t) / 0.92)
-        w = max_half * (1.00 * belly - 0.18 * neck + base_taper)
-        return max(w, max_half * 0.015)
-
-    def bump(t, center, amp, width):
-        return amp * math.exp(-(((t - center) / width) ** 2))
-
-    # asymmetric lean: shift center axis slightly to the right toward the tip
-    lean = max_half * 0.05
-    for i in range(n_side + 1):
-        t = i / n_side
-        y = tip_y + t * (base_y - tip_y)
-        w = profile(t)
-        # right side: a flame lick near the upper neck/belly
-        w_r = w + bump(t, 0.30, max_half * 0.16, 0.08)
-        # left side: a lower-side outward curl
-        w_l = w + bump(t, 0.78, max_half * 0.10, 0.10)
-        ax = cx + lean * (1 - t)   # axis leans toward upper-right
-        right.append((ax + w_r, y))
-        left.append((ax - w_l, y))
-
-    # rounded base: arc from right-base to left-base (slightly below)
-    base_cx, base_cy = cx, base_y
-    base_rx = max_half * 0.78
-    base_ry = max_half * 0.42
-    arc = []
-    steps = 24
-    for i in range(steps + 1):
-        a = math.pi * (i / steps)         # 0 (right) -> pi (left)
-        x = base_cx + base_rx * math.cos(a)
-        y = base_cy + base_ry * math.sin(a) * 0.9
-        arc.append((x, y))
-
-    # Insert an explicit sharp tip point at the very top so the flame
-    # comes to a point rather than a flat top from sampling.
-    tip_point = (cx + lean, tip_y - max_half * 0.05)
-    polygon = [tip_point] + right + arc + list(reversed(left))
-    # close back to tip
-    polygon.append(tip_point)
-    return polygon
-
-
-def vertical_gradient(size, bbox, c_top, c_bottom):
-    """Vertical gradient image cropped to whole canvas; returns RGBA uint8."""
-    x0, y0, x1, y1 = bbox
-    h = max(1, int(y1 - y0))
-    grad = np.zeros((size, size, 4), dtype=np.float32)
-    yy, xx = np.mgrid[0:size, 0:size].astype(np.float32)
-    t = np.clip((yy - y0) / max(1, (y1 - y0)), 0, 1)
-    for i in range(3):
-        grad[..., i] = c_top[i] + (c_bottom[i] - c_top[i]) * t
-    grad[..., 3] = 0
-    return grad
-
-
-def mask_from_polygon(size, polygon, feather=0.0):
-    img = Image.new("L", (size, size), 0)
-    ImageDraw.Draw(img).polygon([(float(x), float(y)) for x, y in polygon], fill=255)
-    if feather:
-        img = img.filter(ImageFilter.GaussianBlur(feather))
-    return np.asarray(img).astype(np.float32) / 255.0
-
-
-def sparkle_polygon(size, cx, cy, r_out, r_in, rot=0.0):
-    """4-point concave star (✦) polygon."""
-    pts = []
-    for k in range(8):
-        ang = math.pi / 2 + k * (math.pi / 4) + rot
-        rr = r_out if k % 2 == 0 else r_in
-        pts.append((cx + rr * math.cos(ang), cy - rr * math.sin(ang)))
-    return pts
+def draw_AI(draw, x, y, w, h, fg, bg):
+    """'AI' 一行:A 宽 0.78h、I 板宽 0.34h、字距 0.16h,整体居中于给定框;返回包围盒。"""
+    total = (0.78 + 0.16 + 0.34) * h
+    if total > w:
+        h = w / 1.28
+        total = w
+    a_w, i_w, gap = 0.78 * h, 0.34 * h, 0.16 * h
+    x0 = x + (w - total) / 2
+    draw_A(draw, x0, y, a_w, h, fg, bg)
+    draw_I(draw, x0 + a_w + gap, y, i_w, h, fg)
+    return (x0, y, x0 + total, y + h)
 
 
 # ---------------------------------------------------------------- layers
 def build_background(size):
-    arr = diagonal_gradient(size, BG_TOP_LEFT, BG_BOTTOM_R).astype(np.float32)
-    # add cyan glow upper-center
-    glow = radial_glow(size, (size * 0.5, size * 0.42), size * 0.55, GLOW, intensity=0.55)
-    rgba = np.zeros((size, size, 4), dtype=np.float32)
-    rgba[..., :3] = arr
-    rgba[..., 3] = 255
-    # screen-blend glow
-    a = (glow[..., 3:4] / 255.0)
-    rgba[..., :3] = rgba[..., :3] * (1 - a * 0.8) + glow[..., :3] * (a * 0.8)
-    rgba = np.clip(rgba, 0, 255).astype(np.uint8)
-    return Image.fromarray(rgba, "RGBA")
+    """报纸红纯色层(adaptive background)。"""
+    arr = np.zeros((size, size, 4), dtype=np.uint8)
+    arr[..., 0], arr[..., 1], arr[..., 2] = RED
+    arr[..., 3] = 255
+    return Image.fromarray(arr, "RGBA")
 
 
 def build_foreground(size):
-    """Transparent foreground: flame (gradient + core) + sparkle."""
-    canvas = np.zeros((size, size, 4), dtype=np.float32)
+    """透明前景:红刊头底上的纸面「头版」—— AI 报头 + 双细线 + 红头条 + 新闻行。
 
-    # ---- flame ----
-    # keep within adaptive safe zone (~66% center): margin ~17% each side
-    cx = size * 0.50
-    tip_y = size * 0.13
-    base_y = size * 0.85
-    max_half = size * 0.28
-    flame = flame_outline(size, cx, tip_y, base_y, max_half)
-
-    bbox = (cx - max_half * 1.3, tip_y, cx + max_half * 1.3, base_y)
-    grad = vertical_gradient(size, bbox, CYAN_BRIGHT, TEAL_DEEP)
-    flame_mask = mask_from_polygon(size, flame, feather=size * 0.004)
-
-    # composite gradient into canvas via flame_mask
-    for i in range(3):
-        canvas[..., i] += grad[..., i] * flame_mask
-    canvas[..., 3] = np.maximum(canvas[..., 3], flame_mask * 255)
-
-    # inner brighter core (smaller, slightly up)
-    core = flame_outline(size, cx, tip_y + size * 0.06, base_y - size * 0.10, max_half * 0.55)
-    core_mask = mask_from_polygon(size, core, feather=size * 0.010)
-    core_grad = vertical_gradient(size, bbox, WHITE, CYAN_ACCENT)
-    add = core_mask * 0.85
-    for i in range(3):
-        canvas[..., i] = canvas[..., i] * (1 - add) + core_grad[..., i] * add
-    # boost alpha a touch where core is
-    canvas[..., 3] = np.maximum(canvas[..., 3], (flame_mask * 255) )
-
-    # ---- sparkle (AI mark) in upper-center of flame ----
-    sp_cx = cx
-    sp_cy = size * 0.44
-    sp = sparkle_polygon(size, sp_cx, sp_cy, size * 0.095, size * 0.026)
-    sp_mask = mask_from_polygon(size, sp, feather=size * 0.0025)
-    # soft glow behind sparkle
-    sp_glow = mask_from_polygon(size, sp, feather=size * 0.022)
-    for i in range(3):
-        canvas[..., i] = canvas[..., i] * (1 - sp_glow * 0.6) + np.full((size, size), WHITE[i], dtype=np.float32) * (sp_glow * 0.6)
-    canvas[..., 3] = np.maximum(canvas[..., 3], sp_glow * 255)
-    # crisp white sparkle on top
-    for i in range(3):
-        canvas[..., i] = canvas[..., i] * (1 - sp_mask) + 255.0 * sp_mask
-    canvas[..., 3] = np.maximum(canvas[..., 3], sp_mask * 255)
-
-    canvas = np.clip(canvas, 0, 255).astype(np.uint8)
-    return Image.fromarray(canvas, "RGBA")
+    内容元素(报头/双线/头条/新闻行)全部落在 adaptive 安全区(中心 66% 圆)
+    内,任何 launcher 遮罩都不会裁到内容;纸面卡片本身越出安全区,圆形遮罩
+    会把四角裁成弧(文档类图标的通行做法)。
+    """
+    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    # 纸面头版卡片(微圆角)
+    d.rounded_rectangle([size * 0.19, size * 0.155, size * 0.81, size * 0.845],
+                        radius=size * 0.014, fill=PAPER + (255,))
+    # 报头:墨字碑刻 AI + 双细线
+    b = draw_AI(d, size * 0.31, size * 0.205, size * 0.38, size * 0.15,
+                INK + (255,), PAPER + (255,))
+    y = b[3] + size * 0.04
+    t = size * 0.013
+    g = size * 0.012
+    d.rectangle([size * 0.27, y, size * 0.73, y + t], fill=INK + (255,))
+    d.rectangle([size * 0.27, y + t + g, size * 0.73, y + 2 * t + g], fill=INK + (255,))
+    # 头条(红)+ 新闻行(墨,长短错落)
+    d.rectangle([size * 0.27, size * 0.455, size * 0.71, size * 0.505], fill=RED + (255,))
+    d.rectangle([size * 0.27, size * 0.545, size * 0.73, size * 0.575], fill=INK + (255,))
+    d.rectangle([size * 0.27, size * 0.605, size * 0.55, size * 0.635], fill=INK + (255,))
+    d.rectangle([size * 0.27, size * 0.665, size * 0.62, size * 0.695], fill=INK + (255,))
+    return img
 
 
 def downscale(img, size):
@@ -264,11 +150,34 @@ def write_adaptive_xml(path, fg, bg):
         )
 
 
+def build_background_debug(size):
+    """debug 专属背景:墨色纯色层(红=正式 / 墨=debug 的区分位)。"""
+    arr = np.zeros((size, size, 4), dtype=np.uint8)
+    arr[..., 0], arr[..., 1], arr[..., 2] = INK
+    arr[..., 3] = 255
+    return Image.fromarray(arr, "RGBA")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--preview", action="store_true",
-                    help="only write /tmp/icon_preview.png and exit")
+                    help="only write /tmp/icon_preview*.png and exit")
+    ap.add_argument("--debug", action="store_true",
+                    help="write debug source-set assets (ink seal) into app/src/debug/res")
     args = ap.parse_args()
+
+    if args.debug:
+        # debug 源集覆盖:墨底 + 同一头版前景(文件名沿用 ic_launcher_debug,
+        # debug 的 mipmap-anydpi-v26/ic_launcher.xml 引用它)
+        dbg = os.path.join(RES, "..", "..", "debug", "res")
+        dxx = os.path.join(dbg, "drawable-xxxhdpi")
+        os.makedirs(dxx, exist_ok=True)
+        downscale(build_background_debug(MASTER), ADAPTIVE_DP).save(
+            os.path.join(dxx, "ic_launcher_background.png"))
+        downscale(build_foreground(MASTER), ADAPTIVE_DP).save(
+            os.path.join(dxx, "ic_launcher_debug.png"))
+        print("debug assets -> app/src/debug/res")
+        return
 
     bg = build_background(MASTER)
     fg = build_foreground(MASTER)
@@ -280,12 +189,10 @@ def main():
     if args.preview:
         out = "/tmp/icon_preview.png"
         composite.resize((512, 512), Image.LANCZOS).save(out)
-        # also save a round preview
         rnd = composite.resize((512, 512), Image.LANCZOS)
         arr = np.asarray(rnd).copy()
         arr[..., 3] = np.minimum(arr[..., 3], circle_mask(512))
         Image.fromarray(arr, "RGBA").save("/tmp/icon_preview_round.png")
-        # foreground only
         fg.resize((512, 512), Image.LANCZOS).save("/tmp/icon_preview_fg.png")
         bg.resize((512, 512), Image.LANCZOS).save("/tmp/icon_preview_bg.png")
         print("preview -> /tmp/icon_preview*.png")

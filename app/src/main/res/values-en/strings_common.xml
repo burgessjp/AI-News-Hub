@@ -8,7 +8,6 @@
     <string name="common_ok">OK</string>
     <string name="common_view">View</string>
     <string name="common_ignore">Ignore</string>
-    <string name="common_got_it">Got it</string>
     <string name="common_loading">Loading…</string>
     <string name="common_load_failed">Failed to load</string>
     <string name="common_refresh">Refresh</string>
@@ -18,6 +17,7 @@
     <string name="common_empty_today">Nothing here today</string>
     <string name="common_no_result">No matching results</string>
     <string name="common_share">Share</string>
+    <string name="common_search">Search</string>
     <string name="common_copy">Copy</string>
     <string name="common_copied">Copied</string>
     <string name="common_go_settings">Open Settings</string>
@@ -26,9 +26,14 @@
     <string name="common_translate_config_missing">Set up the translation service in Settings → Translate first</string>
     <!-- Offline fallback: shown once when archive fetches fall back to disk data -->
     <string name="offline_banner">You\'re offline — showing cached data</string>
-    <!-- Pull-to-refresh found no new batch: archive updates a few times a day; also sets expectation -->
-    <string name="refresh_no_new_batch">You\'re up to date · data generated at %1$s · next batch %2$s</string>
-    <string name="refresh_no_new_batch_plain">You\'re up to date · next batch %1$s</string>
+    <!-- Edition names (daily-paper identity); ordinal fallback when >2 batches -->
+    <string name="edition_morning">Morning edition</string>
+    <string name="edition_evening">Evening edition</string>
+    <string name="edition_ordinal">Batch %1$d</string>
+    <!-- Pull-to-refresh found no new batch: edition framing + next batch expectation;
+         plain is the fallback when the data timestamp is missing (edition unknown) -->
+    <string name="refresh_no_new_batch">Up to date · %1$s · data generated at %2$s · next batch %3$s</string>
+    <string name="refresh_no_new_batch_plain">Up to date · latest edition · next batch %1$s</string>
     <!-- Source staleness: latest pointer hasn't advanced for >24h = fetches keep failing -->
     <string name="source_stale_warning">Data hasn\'t updated for %1$s — this source may be interrupted</string>
     <string name="source_stale_badge">No updates for %1$s</string>

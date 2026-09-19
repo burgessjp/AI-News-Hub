@@ -5,12 +5,10 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -50,7 +48,7 @@ import org.burnoutcrew.reorderable.reorderable
  * Product Hunt / The Rundown AI / AIHot 精选 / stormzhang AI),元数据来自 [sourceMeta]。
  *
  * **可拖拽自定义顺序**:长按某行进入拖拽,松手即落位并持久化(存 [SettingsStore.sourceOrderFlow])。
- * 顺序变化后摘要 Tab 跟随,关于页固定默认顺序。
+ * 顺序变化后「今天」页分源区块跟随,关于页固定默认顺序。
  *
  * 二级页惯例:顶栏带返回箭头、标题用 secondaryTitleFontSize,列表不预留浮动底栏
  * (二级页底栏不悬浮)。无章节条(顶栏标题即「信息源」,再加章节条重复)。
@@ -133,12 +131,9 @@ fun SourcesScreen(
                     // 以 isDragging 翻转为 true 的时刻等效实现)
                     LaunchedEffect(isDragging) { if (isDragging) haptics.grab() }
                     val stale = staleDays[key]
-                    IconTileRow(
-                        icon = meta.icon,
-                        brand = meta.brand,
+                    MenuRow(
                         title = meta.title,
                         subtitle = meta.subtitle,
-                        showDivider = idx != localOrder.lastIndex,
                         // let 内不是可组合上下文,须在 composable 作用域现建 lambda
                         trailing = if (stale == null) null else ({ StaleBadge(stale) }),
                         onClick = { onOpen(key) }
@@ -160,12 +155,6 @@ private fun StaleBadge(days: Int) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(2.dp)
     ) {
-        Icon(
-            Icons.Outlined.Warning,
-            contentDescription = null,
-            tint = cs.error,
-            modifier = Modifier.size(14.dp)
-        )
         Text(
             text = stringResource(
                 R.string.source_stale_badge,

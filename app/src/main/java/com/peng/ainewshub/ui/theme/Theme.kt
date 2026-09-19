@@ -1,25 +1,14 @@
 package com.peng.ainewshub.ui.theme
 
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
-import com.peng.ainewshub.data.prefs.AppSkin
-
-/**
- * 当前皮肤([AiNewsHubTheme] 解析结果)—— 供词云等绕过 colorScheme 的固定色板
- * 读取(见 ui/trends/CloudWordColors.kt),非 UI 场景默认 Classic。
- */
-val LocalAppSkin = staticCompositionLocalOf { AppSkin.Classic }
 
 /**
  * App 实际明暗态([AiNewsHubTheme] 的 darkTheme 参数,用户 ThemeMode 解析结果,
@@ -29,15 +18,10 @@ val LocalAppSkin = staticCompositionLocalOf { AppSkin.Classic }
 val LocalAppDarkTheme = staticCompositionLocalOf { false }
 
 /**
- * App 主题入口。
+ * App 主题入口 —— 「纸墨日报」单一风格(Color.kt 亮/暗双 scheme)。
  *
- * 默认 `dynamicColor = false` —— 优先保证 Future Blue + Intelligence Purple 品牌色稳定。
- * Android 12+ 用户可在调用处显式传 `dynamicColor = true` 启用壁纸派生色。
- * 明暗跟随调用方传入的 darkTheme(主入口由用户 ThemeMode 解析,见 AiNewsHubApp)。
- *
- * 皮肤 [skin]:Classic = 品牌双色板(默认);Mono = 黑白灰阶原型风(Color.kt 的
- * MonoLight/MonoDarkColors),明暗仍随 darkTheme。皮肤优先于动态取色 ——
- * 非 Classic 时忽略 dynamicColor,壁纸派生色让位(设置页开关同步置灰)。
+ * 不做动态取色与多皮肤:编辑色板是固定品牌资产,壁纸派生色会破坏纸墨身份
+ * (v1.4.0 随日刊化改版移除,决策记录见 CHANGELOG)。
  *
  * @param fontFamily 字体族覆盖。默认 null 跟随系统字体;
  *        设置页"衬线/等宽"选项传 Serif/Monospace 将全 App 文字统一切换。
@@ -50,23 +34,11 @@ val LocalAppDarkTheme = staticCompositionLocalOf { false }
 @Composable
 fun AiNewsHubTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = false,
-    skin: AppSkin = AppSkin.Classic,
     fontFamily: FontFamily? = null,
     fontScale: Float = 1f,
     content: @Composable () -> Unit
 ) {
-    val context = LocalContext.current
-    val colorScheme = when {
-        // 皮肤优先于动态取色:非默认皮肤下壁纸派生色让位,保证皮肤观感完整
-        dynamicColor && skin == AppSkin.Classic && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-        skin == AppSkin.Mono && darkTheme -> MonoDarkColors
-        skin == AppSkin.Mono -> MonoLightColors
-        darkTheme -> DarkColors
-        else -> LightColors
-    }
+    val colorScheme = if (darkTheme) DarkColors else LightColors
 
     // 字体族替换与字号缩放同源应用:fontScale = 1 时 TextStyle.scaled 原样返回,零开销
     val typography = remember(fontFamily, fontScale) {
@@ -80,7 +52,6 @@ fun AiNewsHubTheme(
 
     CompositionLocalProvider(
         LocalAppTextStyles provides appTextStyles,
-        LocalAppSkin provides skin,
         LocalAppDarkTheme provides darkTheme
     ) {
         MaterialTheme(

@@ -7,140 +7,67 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.TrendingUp
-import androidx.compose.material.icons.automirrored.outlined.TrendingUp
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.GridView
-import androidx.compose.material.icons.filled.Insights
-import androidx.compose.material.icons.filled.PersonAddAlt
-import androidx.compose.material.icons.outlined.AutoAwesome
-import androidx.compose.material.icons.outlined.GridView
-import androidx.compose.material.icons.outlined.Insights
-import androidx.compose.material.icons.outlined.PersonAddAlt
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.peng.ainewshub.R
-import com.peng.ainewshub.ui.theme.AppAlpha
 import com.peng.ainewshub.ui.theme.AppText
 
 /**
- * 根 tab 集合(总览 / 摘要 / 关注 / 趋势 / 更多,entries 顺序即底栏顺序)。
+ * 根 tab 集合(今天 / 热词 / 更多,entries 顺序即底栏顺序)。
  *
- * 设计稿(参考 system_stream_editorial)用图标 FILL 区分选中态:
- *  - 选中:[selectedIcon] 实心(Filled)变体
- *  - 未选中:[icon] 描边(Outlined)变体
- *
- * 「总览」是默认首页:端侧 AI 对全部归档源榜单的当日综合分析(OverviewScreen)。
- * 「趋势」是流水线纯统计的跨源热词榜(TrendsScreen,读归档 trends.json)。
- * 「关注」是关键词订阅的当日命中流(FollowsScreen),原为趋势页顶栏图标进入的
- * 二级页(Page.Follows),现升为根 tab,沿用入口原「人形+加号」图标语义。
- * 「AIHot 精选」原为独立根 tab,现改为从「更多」页进入的二级页(Page.FeaturedHub),
- * 精选 tab 的 Whatshot 图标语义迁移到 MoreScreen 浏览组入口。
+ * 「今天」是默认首页:一份垂直日报 —— 综述 Hero + Top10 + 分源摘要区块
+ * (TodayScreen,合并原 总览/摘要 两个 tab,读完重点顺着读完分源)。
+ * 「热词」合并原 关注/趋势:「我的关注」命中流在上,跨源热词榜 + 词云在下
+ * (HotwordsScreen)。「更多」维持信息源/历史/收藏/设置等 hub 不变。
+ * 原四个内容 tab(总览/摘要/关注/趋势)的内容页全部保留为二级页或页内区块;
+ * 旧 tab 深链名(overview/summary/follows/trends)在 MainActivity.tabOf 永久映射。
  *
  * @param labelRes 显示文案的 string resource
- * @param icon 未选中时的描边图标(FILL 0)
- * @param selectedIcon 选中时的实心图标(FILL 1)
  */
 enum class AppTab(
-    val labelRes: Int,
-    val icon: ImageVector,
-    val selectedIcon: ImageVector
+    val labelRes: Int
 ) {
-    Overview(
-        R.string.tab_overview,
-        Icons.Outlined.Insights,
-        Icons.Filled.Insights
-    ),
-    Summary(
-        R.string.tab_summary,
-        Icons.Outlined.AutoAwesome,
-        Icons.Filled.AutoAwesome
-    ),
-    Follows(
-        R.string.tab_follows,
-        Icons.Outlined.PersonAddAlt,
-        Icons.Filled.PersonAddAlt
-    ),
-    Trends(
-        R.string.tab_trends,
-        Icons.AutoMirrored.Outlined.TrendingUp,
-        Icons.AutoMirrored.Filled.TrendingUp
-    ),
-    More(
-        R.string.tab_more,
-        Icons.Outlined.GridView,
-        Icons.Filled.GridView
-    )
+    Today(R.string.tab_today),
+    Hotwords(R.string.tab_hotwords),
+    More(R.string.tab_more)
 }
 
 /**
- * 浮动药丸底栏占位高度 —— 列表/滚动容器底部 contentPadding 应预留此值,
+ * 页脚条占位高度 —— 列表/滚动容器底部 contentPadding 应预留此值,
  * 避免末项被悬浮底栏遮挡。
  *
- * 组成:药丸自身约 56dp + 距底 16dp margin + 16dp 呼吸空间
- *      + 手势导航栏 inset(约 24-48dp)。取 96dp 覆盖大多数设备的实际悬浮区域。
+ * 组成:发丝线 0.5dp + 项触控行 61.5dp(铅字块自身约 32dp,居中)。
  */
-val BottomBarReservedHeight = 96.dp
+val BottomBarPillHeight = 62.dp
 
 /**
- * 药丸自身高度(不含距底 margin 与导航栏 inset):
- * icon 22dp + 图标/文字间距 2dp + 文字行高 ~16dp
- * + 项内 vertical padding 4dp×2 + 容器 vertical padding 4dp×2。
- *
- * 用途:列表允许滚入药丸之下、但要把可视区收在药丸底缘时(总览页),容器底部
- * padding 用 navigationBarsPadding + 16dp(与 MainActivity 底栏定位一致),
- * 列表 contentPadding 用本值 + 间距让末项能停到药丸之上。
+ * 旧悬浮药丸时代的总预留高度(页脚条高 + 距底 margin + 呼吸 + 手势导航栏 inset)。
+ * 保留供个别整体预留场景使用,常规列表用 [BottomBarPillHeight] + 16dp 呼吸空间。
  */
-val BottomBarPillHeight = 56.dp
+val BottomBarReservedHeight = 102.dp
 
 /**
- * 选中项水洗底的统一最小宽 —— 各 tab 选中态椭圆严格等宽的保证。
+ * 根 tab 底栏 —— 纸墨日报「报纸页脚条」:全宽实底 + 顶部发丝线,不用悬浮药丸。
  *
- * 32dp 横向内边距 + 两字中文标签(内容列约 24dp)的自然宽刚好在本值附近,
- * 但自适应宽度会随标签字符数/系统字号漂移(英文 Overview 更是长出一截);
- * 以 min 宽拉齐后任意 tab 选中椭圆完全一致,且更长标签只放宽不被裁剪。
- */
-val SelectedTabMinWidth = 96.dp
-
-/**
- * 浮动药丸底栏 —— 对齐 "Synthetic Intelligence News" 设计系统
- * (参考 system_stream_editorial 原型底栏)。
- *
- * 与全宽 [androidx.compose.material3.NavigationBar] 的区别:
- *  - 浮在内容上(由调用方在 Box 内对齐 BottomCenter,不再用 Scaffold bottomBar 槽)
- *  - 90% 宽 + max 400dp,圆角 50dp(完全药丸)
- *  - 近实底:surface-container × AppAlpha.bottomBarSurface(0.94——Compose 无真模糊,
- *    半透明叠滚动内容显脏,近实底遮透出)+ 3dp 浮起阴影(无边框,靠阴影分层)
- *  - 容器内边距:horizontal 16dp(tab 增至 5 个后从 24dp 收紧)/ vertical 4dp
- *    (紧凑化:原 12dp 偏高,药丸整体高度压缩约 1/3,只收内间距,图标/字号不动)
- *  - 选中项:onSurface 半透明水洗药丸(AppAlpha.selectedTabWash,浅色压深/深色
- *    提亮,与底栏底色反向保证对比) + secondary 文字/图标 +
- *    实心图标(FILL 1);未选中:透明 + on-surface-variant + 描边图标(FILL 0)
- *
- * 调用方负责:(1) 在 Box 内用 Modifier.align(BottomCenter) 定位;(2) 给内容区补底部
- * padding 避免列表末项被遮挡(见 [BottomBarReservedHeight])。
- *
- * @param current 当前选中 tab
- * @param onSelect 切 tab 回调
+ * 选中态 = 铅字块(inverseSurface 直角实底 + inverseOnSurface 反白字),
+ * 像一枚铅字/印章盖在页脚,存在感靠墨块不靠线也不靠彩色(报纸红留给内容层;
+ * 发丝线只承担悬浮 overlay 的滚动分界职能,不做装饰);未选中 = onSurfaceVariant
+ * 裸文字。挂载方式不变:由 AiNewsHubApp 以 overlay
+ * 对齐 BottomCenter 悬浮(内容可滚入其下,各列表 contentPadding 预留
+ * [BottomBarPillHeight] + 呼吸空间),自身补 navigationBarsPadding。
  */
 @Composable
 fun AppBottomBar(
@@ -148,25 +75,22 @@ fun AppBottomBar(
     onSelect: (AppTab) -> Unit
 ) {
     val cs = MaterialTheme.colorScheme
-    // 药丸 Surface:近实底(遮内容透出)+ 3dp 浮起阴影
-    Surface(
+    // 报纸页脚条:全宽实底 + 顶部发丝线(悬浮 overlay 的滚动分界,非装饰)
+    Column(
         modifier = Modifier
-            .fillMaxWidth(0.9f)
-            .widthIn(max = 400.dp),
-        shape = CircleShape,
-        color = cs.surfaceContainer.copy(alpha = AppAlpha.bottomBarSurface),
-        // 浮动层的合理浮起(卡片零阴影惯例的例外,仅悬浮底栏)
-        shadowElevation = 3.dp
+            .fillMaxWidth()
+            .background(cs.surface)
     ) {
+        HorizontalDivider(thickness = 0.5.dp, color = cs.outlineVariant)
         Row(
-            // 容器内边距:横向 16dp(原 24dp,tab 增至 5 个后收紧防英文长词溢出),
-            // 纵向 4dp(原 12dp,压缩药丸高度)
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(61.5.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
             AppTab.entries.forEach { tab ->
-                NavPillItem(
+                NavFooterItem(
                     tab = tab,
                     selected = tab == current,
                     onClick = { onSelect(tab) }
@@ -177,26 +101,15 @@ fun AppBottomBar(
 }
 
 /**
- * 药丸内单项。
+ * 页脚条单项 —— 铅字块式:纯文字,无图标。
  *
- * 视觉:
- * 视觉:
- *  - 选中:onSurface 半透明水洗长椭圆(horizontal 32dp / vertical 4dp,
- *    AppAlpha.selectedTabWash,浅色压深/深色提亮,与底栏底色反向保证对比),
- *    图标用 Filled 实心变体(FILL 1),图标/文字着 secondary(深浅两套色板均为
- *    可辨紫,见 Color.kt 的 fixed-dim 设计;secondaryContainer 深色值过暗,
- *    不可用作内容色)
- *  - 未选中:透明底(horizontal 8dp / vertical 4dp),图标用 Outlined 描边变体(FILL 0),
- *    图标/文字着 on-surface-variant
- *  - 点击:无 ripple;状态靠水洗底 + 图标 FILL 表达
- *
- * @param tab 对应根 tab(取 label 与图标变体)
- * @param selected 是否选中态
- * @param modifier 外部布局约束
- * @param onClick 点击回调
+ *  - 选中:inverseSurface 直角实底块 + inverseOnSurface 反白 SemiBold 字
+ *  - 未选中:onSurfaceVariant 裸文字,无任何修饰
+ *  - 触控高 48dp 保底(外层 Box 撑足命中区,铅字块自身约 32dp 居中);
+ *    重击当前 tab 给一次轻触感
  */
 @Composable
-private fun NavPillItem(
+private fun NavFooterItem(
     tab: AppTab,
     selected: Boolean,
     modifier: Modifier = Modifier,
@@ -205,22 +118,10 @@ private fun NavPillItem(
     val cs = MaterialTheme.colorScheme
     val interactionSource = remember { MutableInteractionSource() }
     val haptics = rememberHaptics()
-    // 选中:实心图标(FILL 1);未选中:描边图标(FILL 0)
-    val icon = if (selected) tab.selectedIcon else tab.icon
-    // 选中:secondary 着色到图标/文字(深浅色板均为可辨紫,无需模式判断;
-    // secondaryContainer 深色值过暗不可用);未选中:on-surface-variant
-    val tint = if (selected) cs.secondary else cs.onSurfaceVariant
     Box(
+        contentAlignment = Alignment.Center,
         modifier = modifier
-            .clip(CircleShape)
-            // 选中:onSurface 半透明水洗底(浅色压深/深色提亮,与底栏底色反向);
-            // 未选中:透明
-            .background(
-                if (selected) cs.onSurface.copy(alpha = AppAlpha.selectedTabWash)
-                else Color.Transparent
-            )
-            // selectable(非 clickable):向读屏声明 Tab 角色与选中状态,
-            // TalkBack 会播报「已选中」;视觉仍靠水洗底 + 图标 FILL 表达
+            // selectable(非 clickable):向读屏声明 Tab 角色与选中状态
             .selectable(
                 selected = selected,
                 interactionSource = interactionSource,
@@ -232,40 +133,22 @@ private fun NavPillItem(
                     onClick()
                 }
             )
-            // 选中:统一椭圆最小宽(各 tab 等宽,见 [SelectedTabMinWidth]);
-            // 未选中:触控宽保底 48dp(8×2+22=38dp 不达标,补足)。
-            // 注意 widthIn 必须排在 padding 之前 —— 约束的是含内边距的水洗底整体,
-            // 排在后面会把内边距加在 min 之外导致椭圆过宽
-            .widthIn(min = if (selected) SelectedTabMinWidth else 48.dp)
-            // 选中态横向展开(32dp)未选中收紧(8dp);纵向统一 4dp(原 8dp,压缩药丸高度)。
-            // 选中 32dp 把 wash 拉成横向长椭圆(20dp 时宽高比 ~1.3 趋圆);
-            // 不要用 weight 等份代替自适应:等份钳宽会把选中项连 padding 一起钳小,
-            // 导致图标文字被裁(已踩坑回退);超宽设备的竖排防线是文字 maxLines=1
-            .padding(
-                horizontal = if (selected) 32.dp else 8.dp,
-                vertical = 4.dp
-            ),
-        contentAlignment = Alignment.Center
+            // 触控高保底 48dp(铅字块约 32dp,靠本值撑足命中区)
+            .heightIn(min = 48.dp)
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(2.dp)
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = tint,
-                modifier = Modifier.size(22.dp)
-            )
-            Text(
-                text = stringResource(tab.labelRes),
-                style = AppText.caption,
-                color = tint,
-                fontWeight = FontWeight.SemiBold,
-                // 大字体/窄屏设备预算受钳时禁止折行 —— 竖排堆叠比轻微截断更破相
-                maxLines = 1,
-                softWrap = false
-            )
-        }
+        Text(
+            text = stringResource(tab.labelRes),
+            style = AppText.caption,
+            color = if (selected) cs.inverseOnSurface else cs.onSurfaceVariant,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            maxLines = 1,
+            softWrap = false,
+            modifier = Modifier
+                // 铅字块:background 在 padding 前 = padding 计入块内(块内边距)
+                .then(
+                    if (selected) Modifier.background(cs.inverseSurface) else Modifier
+                )
+                .padding(horizontal = 20.dp, vertical = 8.dp)
+        )
     }
 }

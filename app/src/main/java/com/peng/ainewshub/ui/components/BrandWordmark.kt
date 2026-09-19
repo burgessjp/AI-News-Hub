@@ -1,33 +1,32 @@
 package com.peng.ainewshub.ui.components
 
-import androidx.compose.foundation.Image
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
-import com.peng.ainewshub.R
-import com.peng.ainewshub.data.prefs.AppSkin
-import com.peng.ainewshub.ui.theme.LocalAppDarkTheme
-import com.peng.ainewshub.ui.theme.LocalAppSkin
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 
 /**
- * 品牌 wordmark("AI NEWS HUB" 字标)—— 总览/更多页顶栏共用。
+ * 品牌字标("AI NEWS HUB")—— 根页顶栏共用。
  *
- * 皮肤 × 明暗共四套矢量(drawable/ic_wordmark{,_dark,_mono,_mono_dark}.xml,
- * 由 scripts/gen_wordmark.py 生成):classic 走品牌蓝紫渐变,mono 走灰阶渐变
- * (与 MonoLight/MonoDarkColors 同套色值)。皮肤与明暗读
- * [LocalAppSkin]/[LocalAppDarkTheme](AiNewsHubTheme 按「设置页自选主题模式 + 皮肤」
- * 解析后下发),而非 values-night 资源限定符(它只跟随系统 night mode)。
+ * v1.4.0 纸墨日报改版:由四套矢量 drawable(皮肤 × 明暗)改为**排版字标**——
+ * 衬线(FontFamily.Serif,系统 NotoSerifCJK;个别 ROM 缺 CJK 衬线时优雅降级
+ * 无衬线,版式不塌)+ 宽字距 + onSurface 墨色,随 colorScheme 自动适配明暗,
+ * 不再需要按皮肤/明暗挑资源。保留组件名与签名,调用方零改动。
  */
 @Composable
 fun BrandWordmark(modifier: Modifier = Modifier) {
-    val dark = LocalAppDarkTheme.current
-    val res = when (LocalAppSkin.current) {
-        AppSkin.Classic -> if (dark) R.drawable.ic_wordmark_dark else R.drawable.ic_wordmark
-        AppSkin.Mono -> if (dark) R.drawable.ic_wordmark_mono_dark else R.drawable.ic_wordmark_mono
-    }
-    Image(
-        painter = painterResource(res),
-        contentDescription = "AI News Hub",
+    // 固定 20sp(不随字号档位缩放:字标是版面元素,不是正文)
+    Text(
+        text = "AI NEWS HUB",
+        color = MaterialTheme.colorScheme.onSurface,
+        fontSize = 20.sp,
+        lineHeight = 24.sp,
+        fontWeight = FontWeight.Bold,
+        fontFamily = FontFamily.Serif,
+        letterSpacing = 2.5.sp,
         modifier = modifier
     )
 }

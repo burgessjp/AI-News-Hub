@@ -53,6 +53,25 @@ object PipelineSchedule {
     }
 
     /**
+     * 数据所属批次的槽位序号(1 起,「日刊身份」的机器值):取时刻不晚于
+     * [generatedAtMillis] 的最后一个生效批次槽。generatedAt 早于当日第一批时钳到 1
+     * (流水线延迟重跑等边缘,不发明 0 号刊);跨天旧数据同样按时刻映射(昨日晚批
+     * 数据 → 尾槽),是否过期由展示侧「数据截至」的日期兜底标注,这里不发明「昨日刊」。
+     *
+     * 展示映射(两批表):1=早刊、2=晚刊;批次增至 3 个及以上时槽位名不再自然,
+     * 展示侧兜底「第 N 批」。映射规则在 ui 侧 editionLabel(取词不走本文件)。
+     */
+    fun slotIndexOn(generatedAtMillis: Long): Int {
+        val gen = Calendar.getInstance(BEIJING).apply { timeInMillis = generatedAtMillis }
+        val minuteOfDay = gen.get(Calendar.HOUR_OF_DAY) * 60 + gen.get(Calendar.MINUTE)
+        var index = 1
+        for ((i, slot) in activeSlots.withIndex()) {
+            if (slot.first * 60 + slot.second <= minuteOfDay) index = i + 1 else break
+        }
+        return index
+    }
+
+    /**
      * 下一个未来批次的绝对时间(epoch 毫秒):今天批次已全部过完 → 明天第一批。
      * 返回 epoch,展示侧自行按设备时区格式化(与全 App「北京定义、本地显示」
      * 的时间口径一致,如总览「数据截至」)。

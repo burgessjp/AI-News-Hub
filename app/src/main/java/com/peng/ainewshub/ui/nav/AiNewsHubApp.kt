@@ -23,10 +23,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.WifiOff
-import androidx.compose.material.icons.rounded.CheckCircle
-import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -51,31 +47,27 @@ import com.peng.ainewshub.data.db.AppDatabase
 import com.peng.ainewshub.data.repo.BrowseHistoryRepository
 import com.peng.ainewshub.data.repo.FavoritesRepository
 import com.peng.ainewshub.data.PipelineSchedule
-import com.peng.ainewshub.data.repo.SummaryRepository
 import com.peng.ainewshub.data.source.ArchiveHttpClient
 import com.peng.ainewshub.notify.DailyNotifyScheduler
-import com.peng.ainewshub.playback.TtsFloatingPill
 import com.peng.ainewshub.ui.anim.pageTransition
 import com.peng.ainewshub.ui.anim.predictivePopTransition
 import com.peng.ainewshub.ui.components.AppBottomBar
 import com.peng.ainewshub.ui.components.AppTab
 import com.peng.ainewshub.ui.components.NoticePillHost
+import com.peng.ainewshub.ui.components.editionLabel
 import com.peng.ainewshub.ui.components.rememberNoticePillState
 import com.peng.ainewshub.data.prefs.AppLanguage
 import com.peng.ainewshub.ui.i18n.AppLocale
 import com.peng.ainewshub.ui.RefreshNotices
 import com.peng.ainewshub.ui.FollowNotices
 import com.peng.ainewshub.ui.theme.AiNewsHubTheme
-import com.peng.ainewshub.widget.HotNowWidget
 import com.peng.ainewshub.widget.HotNowWidgetUpdater
-import androidx.glance.appwidget.updateAll
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import com.peng.ainewshub.data.prefs.AppSkin
 import com.peng.ainewshub.data.prefs.FontChoice
 import com.peng.ainewshub.data.prefs.FontScale
 import com.peng.ainewshub.data.prefs.SettingsStore
@@ -145,7 +137,6 @@ internal fun AiNewsHubApp(
         initialValue = SettingsStore.DisplayPrefs()
     )
     val themeMode = displayPrefs.themeMode
-    val dynamicColor = displayPrefs.dynamicColor
     val fontChoice = displayPrefs.fontChoice
     val fontScale = displayPrefs.fontScale
     // 每日更新通知自查链上次运行时刻(设置页「上次检查」,排障可观测出口)
@@ -157,15 +148,6 @@ internal fun AiNewsHubApp(
         initialValue = AiConfig()
     )
     val onSelectTheme: (ThemeMode) -> Unit = { scope.launch { settingsStore.updateTheme(it) } }
-    // 切皮肤后主动重绘桌面小组件(纯重渲染:数据新鲜时 provideGlance 不碰网络),
-    // 保证「切完立刻看到」;不刷新也会被系统 30min 周期自愈,这里只是即时性
-    val onSelectSkin: (AppSkin) -> Unit = { skin ->
-        scope.launch {
-            settingsStore.updateSkin(skin)
-            runCatching { HotNowWidget().updateAll(appContext) }
-        }
-    }
-    val onToggleDynamicColor: (Boolean) -> Unit = { scope.launch { settingsStore.updateDynamicColor(it) } }
     val onSelectFont: (FontChoice) -> Unit = { scope.launch { settingsStore.updateFont(it) } }
     val onSelectFontScale: (FontScale) -> Unit = { scope.launch { settingsStore.updateFontScale(it) } }
     // 应用内语言:持久化 + 重建 Activity 生效;小组件同步刷新文案。
@@ -287,7 +269,6 @@ internal fun AiNewsHubApp(
             if (offline) {
                 noticeState.show(
                     offlineBannerText,
-                    Icons.Outlined.WifiOff,
                     OFFLINE_NOTICE_DURATION_MS,
                     tag = OFFLINE_NOTICE_TAG
                 )
@@ -297,13 +278,16 @@ internal fun AiNewsHubApp(
         }
     }
 
-    // 「已是最新批次」轻提示:用户下拉强刷成功但批次指纹未变时,各页 ViewModel 经
+    // 「已是早/晚刊」轻提示:用户下拉强刷成功但批次指纹未变时,各页 ViewModel 经
     // RefreshNotices 发事件(归档一天只更数批,刷新大概率无新内容;完整播放刷新动画
-    // 却纹丝不动会被误读为「App 坏了」,这里主动说清)。与离线提示共用胶囊宿主;
-    // 2 秒节流防多页连刷排队连弹。时间戳缺失(0)时退化为不带时间的短文案。
+    // 却纹丝不动会被误读为「App 坏了」,这里以刊名主动说清「这期的都看过了」)。
+    // 与离线提示共用胶囊宿主;2 秒节流防多页连刷排队连弹。
+    // 时间戳缺失(0)时退化为不带时间的短文案。刊名按数据时间戳映射槽位
+    // (LocalContext 是 Activity、随应用内语言包裹;applicationContext 不取词)。
     val noNewBatchText = stringResource(R.string.refresh_no_new_batch)
     val noNewBatchPlain = stringResource(R.string.refresh_no_new_batch_plain)
     val noNewBatchTimeFmt = stringResource(R.string.date_fmt_month_day_time_dash)
+    val uiContext = LocalContext.current
     LaunchedEffect(Unit) {
         var lastShownAt = 0L
         RefreshNotices.noNewBatch.collect { dataAtMs ->
@@ -315,12 +299,14 @@ internal fun AiNewsHubApp(
                 val nextBatch = SimpleDateFormat("HH:mm", Locale.getDefault())
                     .format(Date(PipelineSchedule.nextBatchEpoch()))
                 val message = if (dataAtMs > 0) {
+                    val edition = editionLabel(uiContext, PipelineSchedule.slotIndexOn(dataAtMs))
                     val time = SimpleDateFormat(noNewBatchTimeFmt, Locale.getDefault()).format(Date(dataAtMs))
-                    String.format(noNewBatchText, time, nextBatch)
+                    String.format(noNewBatchText, edition, time, nextBatch)
                 } else {
+                    // 时间戳缺失:不知是哪刊,不捏造刊名,退化为无刊名短文案
                     String.format(noNewBatchPlain, nextBatch)
                 }
-                noticeState.show(message, Icons.Rounded.CheckCircle, BATCH_NOTICE_DURATION_MS)
+                noticeState.show(message, BATCH_NOTICE_DURATION_MS)
             }
         }
     }
@@ -334,12 +320,10 @@ internal fun AiNewsHubApp(
             when (event.outcome) {
                 FollowNotices.Outcome.Added -> noticeState.show(
                     String.format(followAddedText, event.keyword),
-                    Icons.Rounded.CheckCircle,
                     BATCH_NOTICE_DURATION_MS
                 )
                 FollowNotices.Outcome.Capped -> noticeState.show(
                     followLimitText,
-                    Icons.Rounded.ErrorOutline,
                     BATCH_NOTICE_DURATION_MS
                 )
             }
@@ -402,14 +386,10 @@ internal fun AiNewsHubApp(
     // 进程死亡后不保留(数据本身也会重拉,可接受)。
     // 注:「AIHot 精选」原为根 tab 时有独立的 featuredListState;改为二级页后
     // 走 pageListStates.forPage(Page.FeaturedHub),不再上提。
-    // 摘要 tab 的 Pager 状态(顶部圆点页指示器跳页与内容 Pager 共用此状态)
-    val summaryPagerState = rememberPagerState(pageCount = { SummaryRepository.SOURCE_KEYS.size })
-    // 总览 tab 的列表滚动状态(与 summaryPagerState 同层上提)
-    val overviewListState = rememberLazyListState()
-    // 关注 tab 的列表滚动状态(同上提)
-    val followsListState = rememberLazyListState()
-    // 趋势 tab 的列表滚动状态(同上提)
-    val trendsListState = rememberLazyListState()
+    // 「今天」tab 的列表滚动状态(总览+分源合一的垂直日报)
+    val todayListState = rememberLazyListState()
+    // 「热词」tab 的列表滚动状态(关注命中流+热词榜的单页)
+    val hotwordsListState = rememberLazyListState()
     // 二级页滚动状态:以 Page 值(data class,可作 key)索引,页面弹出后清理。
     val pageListStates = remember { mutableMapOf<Page, LazyListState>() }
     // 二级页 Pager 状态(历史摘要按日期页):与列表状态同上提、同清理。
@@ -434,23 +414,14 @@ internal fun AiNewsHubApp(
     val displayControls = DisplayControls(
         prefs = displayPrefs,
         onSelectTheme = onSelectTheme,
-        onSelectSkin = onSelectSkin,
-        onToggleDynamicColor = onToggleDynamicColor,
         onSelectFont = onSelectFont,
         onSelectFontScale = onSelectFontScale,
         onSelectLanguage = onSelectLanguage,
         onToggleDailyNotify = onToggleDailyNotify
     )
 
-    // 首启引导展示状态(上提):升级用户可能同时满足冷启动新数据弹窗的触发条件
-    // (通知开关已开 + 批次指纹落后 + 引导未看过),两个弹窗须互斥 —— 引导优先,
-    // 新数据弹窗排队等引导关闭后再弹(见 NewDataPromptHost 的 deferWhile)。
-    var onboardingActive by remember { mutableStateOf(false) }
-
     AiNewsHubTheme(
         darkTheme = darkTheme,
-        dynamicColor = dynamicColor,
-        skin = displayPrefs.skin,
         fontFamily = if (fontChoice == FontChoice.System) null else fontChoice.fontFamily,
         fontScale = fontScale.scale
     ) {
@@ -489,10 +460,8 @@ internal fun AiNewsHubApp(
                             tab = s.tab,
                             nav = nav,
                             reselectTick = nav.reselectTick,
-                            summaryPagerState = summaryPagerState,
-                            overviewListState = overviewListState,
-                            followsListState = followsListState,
-                            trendsListState = trendsListState,
+                            todayListState = todayListState,
+                            hotwordsListState = hotwordsListState,
                             onOpenUrl = openUrl
                         )
                         is Screen.Secondary -> PageView(
@@ -520,14 +489,12 @@ internal fun AiNewsHubApp(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .navigationBarsPadding()
-                        .padding(bottom = 16.dp)
                 ) {
                     AppBottomBar(current = nav.currentTab, onSelect = { nav.selectTab(it) })
                 }
 
                 // 全局轻提示胶囊宿主:「已是最新批次」/ 离线兜底都从这里浮现,悬浮于
-                // 页面转场层之上(与语音浮窗同级,不随页面 push/pop 销毁),自状态栏
-                // 下方滑入滑出。
+                // 页面转场层之上(不随页面 push/pop 销毁),自状态栏下方滑入滑出。
                 NoticePillHost(
                     state = noticeState,
                     modifier = Modifier
@@ -535,29 +502,14 @@ internal fun AiNewsHubApp(
                         .statusBarsPadding()
                         .padding(top = 8.dp)
                 )
-
-                // 语音速报播放浮窗:播放期间悬浮于任意 tab / 二级页(含 WebView 页)之上,
-                // 与底栏/轻提示胶囊同级挂载(转场层之上,不随页面 push/pop 销毁);
-                // 组件以屏幕绝对坐标定位(TopStart + offset),默认停在右下、底栏上方,
-                // 整条可拖,松手后吸附到左右边缘并缩小为悬浮球。显隐由服务 state 驱动。
-                TtsFloatingPill(modifier = Modifier.align(Alignment.TopStart))
             }
 
             // 首次启动引导:一次性 BottomSheet,悬浮于任意 tab / 二级页之上。须挂在
             // AiNewsHubTheme 内 —— ModalBottomSheet 沿调用处 CompositionLocal 取主题色,
             // 放主题外深色模式会退化成默认浅色。
-            OnboardingHost(
-                settingsStore = settingsStore,
-                onActiveChanged = { onboardingActive = it }
-            )
-
-            // 冷启动新数据全局弹窗(检查与渲染见 NewDataPromptHost):同为
-            // ModalBottomSheet,同样须挂在主题内(原因同上)。deferWhile:与首启引导
-            // 互斥 —— 引导展示期间暂停弹窗渲染,关闭后补弹(引导优先)。
-            NewDataPromptHost(
-                settingsStore = settingsStore,
-                deferWhile = onboardingActive
-            )
+            // (冷启动新数据弹窗 NewDataPrompt 已随 v1.4.0 日刊化移除:每日通知 +
+            //  首屏 Hero 已覆盖其职能,冷启动不再叠加第二张 sheet。)
+            OnboardingHost(settingsStore = settingsStore)
 
             // 远程配置同步(app_config.json → 批次时刻表):无 UI,每次进程启动
             // 拉一次并应用到 PipelineSchedule,失败静默回退内置默认表

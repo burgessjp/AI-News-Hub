@@ -61,7 +61,7 @@ internal object ArchiveFetcher {
      * 解析失败抛 [AppException.ServerError] —— 服务端故障不能伪装成「离线」拿旧数据
      * 顶上,须如实走 Error 态。
      *
-     * [allowDiskFallback] 为 false(通知自查/冷启动弹窗的 networkOnly 探测)时:
+     * [allowDiskFallback] 为 false(通知自查的 networkOnly 探测)时:
      * 传输层失败也不读盘,直接抛 —— 调用方拿「失败」当信号走补查/放弃,绝不把盘上
      * 旧数据当成新批次。
      *

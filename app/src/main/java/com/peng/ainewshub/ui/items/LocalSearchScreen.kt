@@ -33,9 +33,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.outlined.Devices
 import androidx.compose.material.icons.outlined.SearchOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
@@ -178,7 +176,6 @@ fun LocalSearchScreen(
                         EmptyState(
                             title = stringResource(R.string.local_search_intro_title),
                             subtitle = stringResource(R.string.local_search_intro_subtitle),
-                            icon = Icons.Outlined.Devices
                         )
                     } else {
                         Column(
@@ -220,7 +217,6 @@ fun LocalSearchScreen(
                 results.isEmpty() -> EmptyState(
                     title = stringResource(R.string.search_local_empty_title),
                     subtitle = stringResource(R.string.search_local_empty_subtitle),
-                    icon = Icons.Outlined.SearchOff
                 )
                 // 结果列表:点击直达 WebView;已读弱化标题
                 else -> LazyColumn(
@@ -376,12 +372,6 @@ private fun LocalSearchTopBar(
                     .padding(horizontal = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    Icons.Filled.Search,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp)
-                )
                 Spacer(Modifier.width(8.dp))
                 BasicTextField(
                     value = text,
@@ -426,11 +416,10 @@ private fun LocalSearchTopBar(
                             ),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            Icons.Filled.Clear,
-                            contentDescription = stringResource(R.string.items_clear),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(16.dp)
+                        Text(
+                            text = "×",
+                            style = AppText.body,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }

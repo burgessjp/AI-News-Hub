@@ -15,12 +15,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.peng.ainewshub.R
 import com.peng.ainewshub.ui.ErrorState
 import com.peng.ainewshub.ui.UiState
+import com.peng.ainewshub.ui.components.archiveDateLabel
 import com.peng.ainewshub.ui.components.AppTopBar
 import com.peng.ainewshub.ui.components.AppTopBarDefaults
 import com.peng.ainewshub.ui.components.NewsCardSkeletonList
@@ -45,6 +47,7 @@ fun TrendsDateScreen(
     listState: LazyListState,
     vm: TrendsArchiveViewModel = viewModel(key = "trends-date-$date")
 ) {
+    val context = LocalContext.current
     val state by vm.digest.collectAsStateWithLifecycle()
 
     LaunchedEffect(date) { vm.loadDigest(date) }
@@ -53,7 +56,7 @@ fun TrendsDateScreen(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             AppTopBar(
-                title = stringResource(R.string.trends_date_title, date),
+                title = stringResource(R.string.trends_date_title, archiveDateLabel(context, date)),
                 titleFontSize = AppTopBarDefaults.secondaryTitleFontSize,
                 navigationIcon = {
                     IconButton(onClick = onBack) {

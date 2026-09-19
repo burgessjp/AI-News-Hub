@@ -131,6 +131,17 @@ class AppTextStyles(
         lineHeight = 16.sp * fontScale,
         letterSpacing = 0.5.sp
     )
+
+    /** 日报大节头 —— 「今日重点 / 我的关注」等版面栏目标题(17/24/SemiBold)。
+     *  使用处通常再覆盖 FontFamily.Serif(报头语言);与 body(14)拉开三档,
+     *  分隔线收敛后大节层级靠它 + 留白承担。 */
+    val sectionHead: TextStyle = TextStyle(
+        fontFamily = fontFamily,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 17.sp * fontScale,
+        lineHeight = 24.sp * fontScale,
+        letterSpacing = 0.sp
+    )
 }
 
 /**

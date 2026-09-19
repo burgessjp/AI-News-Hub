@@ -2,6 +2,7 @@ package com.peng.ainewshub.ui.trends
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -14,9 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.outlined.BubbleChart
-import androidx.compose.material.icons.outlined.Cyclone
-import androidx.compose.material.icons.outlined.HourglassEmpty
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -109,17 +107,19 @@ fun TrendsCloudScreen(
                     }
                 },
                 actions = {
+                    // 布局切换文字按钮:显示「将切换到的布局」名(去图标)
                     if (state is UiState.Success) {
-                        IconButton(onClick = { mode = mode.next() }) {
-                            Icon(
-                                imageVector = if (mode == CloudLayoutMode.SPIRAL) {
-                                    Icons.Outlined.Cyclone
-                                } else {
-                                    Icons.Outlined.BubbleChart
-                                },
-                                contentDescription = stringResource(R.string.trends_cloud_switch_layout)
-                            )
-                        }
+                        Text(
+                            text = stringResource(
+                                if (mode == CloudLayoutMode.SPIRAL) R.string.trends_cloud_mode_bubble
+                                else R.string.trends_cloud_mode_spiral
+                            ),
+                            style = AppText.caption,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .clickable { mode = mode.next() }
+                                .padding(horizontal = 14.dp, vertical = 14.dp)
+                        )
                     }
                 }
             )
@@ -136,7 +136,6 @@ fun TrendsCloudScreen(
                     EmptyState(
                         title = stringResource(R.string.trends_cloud_no_data_title),
                         subtitle = stringResource(R.string.trends_cloud_no_data_subtitle),
-                        icon = Icons.Outlined.HourglassEmpty,
                         actionLabel = stringResource(R.string.common_retry),
                         onAction = { vm.retry() }
                     )

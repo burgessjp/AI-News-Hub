@@ -48,3 +48,6 @@ __pycache__/
 scripts/.venv/
 
 todo-docs/
+.superpowers/
+# 设计过程稿(superpowers specs 等,仓库政策:功能设计文档不入库)
+docs/superpowers/

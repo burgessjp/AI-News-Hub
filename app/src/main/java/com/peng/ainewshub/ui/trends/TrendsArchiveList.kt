@@ -10,11 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -62,7 +58,6 @@ internal fun TrendsArchiveContent(
                 EmptyState(
                     title = stringResource(R.string.trends_archive_empty_title),
                     subtitle = stringResource(R.string.trends_archive_empty_subtitle),
-                    icon = Icons.AutoMirrored.Outlined.TrendingUp
                 )
             } else {
                 LazyColumn(
@@ -115,10 +110,10 @@ private fun TrendsArchiveRow(date: String, onClick: () -> Unit) {
             fontWeight = FontWeight.Medium,
             modifier = Modifier.weight(1f)
         )
-        Icon(
-            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-            contentDescription = null,
-            tint = cs.outlineVariant
+        Text(
+            text = "›",
+            style = MaterialTheme.typography.titleMedium,
+            color = cs.outlineVariant
         )
     }
 }

@@ -3,11 +3,11 @@
     <string name="app_name">AI News Hub</string>
 
     <!-- Bottom navigation tabs -->
-    <string name="tab_overview">Overview</string>
-    <string name="tab_summary">Digest</string>
-    <string name="tab_follows">Follows</string>
-    <string name="tab_trends">Trends</string>
+    <!-- Root tabs (3); tab_overview still labels the overview pseudo-source in follow hits -->
+    <string name="tab_today">Today</string>
+    <string name="tab_hotwords">Trending</string>
     <string name="tab_more">More</string>
+    <string name="tab_overview">Overview</string>
 
     <!-- Home-screen widget (picker name / description) -->
     <string name="widget_hot_now_name">Hot Now</string>

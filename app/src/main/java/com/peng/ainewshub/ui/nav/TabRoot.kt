@@ -1,14 +1,12 @@
 package com.peng.ainewshub.ui.nav
 
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.pager.PagerState
 import androidx.compose.runtime.Composable
+import com.peng.ainewshub.data.source.SourceKeys
 import com.peng.ainewshub.ui.components.AppTab
-import com.peng.ainewshub.ui.follows.FollowsScreen
 import com.peng.ainewshub.ui.more.MoreScreen
-import com.peng.ainewshub.ui.overview.OverviewScreen
-import com.peng.ainewshub.ui.summary.SummaryScreen
-import com.peng.ainewshub.ui.trends.TrendsScreen
+import com.peng.ainewshub.ui.overview.TodayScreen
+import com.peng.ainewshub.ui.trends.HotwordsScreen
 
 /**
  * 渲染某个 tab 的根屏幕。各 onOpenXxx 入口统一在分支内经 [AppNavState.push]
@@ -19,46 +17,27 @@ internal fun TabRoot(
     tab: AppTab,
     nav: AppNavState,
     reselectTick: Int,
-    summaryPagerState: PagerState,
-    overviewListState: LazyListState,
-    followsListState: LazyListState,
-    trendsListState: LazyListState,
+    todayListState: LazyListState,
+    hotwordsListState: LazyListState,
     onOpenUrl: (String, String, String?) -> Unit
 ) {
     when (tab) {
-        AppTab.Overview -> OverviewScreen(
+        AppTab.Today -> TodayScreen(
             onOpenUrl = onOpenUrl,
             // 顶栏搜索图标 → 本地搜索独立页(查设备内索引,覆盖本 App 浏览过的 8 源数据)
             onOpenSearch = { nav.push(Page.LocalSearch()) },
-            listState = overviewListState,
+            // 分源摘要区块头「查看全部」→ 源完整列表二级页
+            onOpenSource = { source -> nav.push(sourcePageOf(source)) },
+            listState = todayListState,
             reselectSignal = reselectTick
         )
-        AppTab.Summary -> SummaryScreen(
-            reselectSignal = reselectTick,
-            pagerState = summaryPagerState,
-            onOpenHackerNews = { nav.push(Page.HackerNews) },
-            onOpenGitHubTrending = { nav.push(Page.GitHubTrending) },
-            onOpenHuggingFacePapers = { nav.push(Page.HuggingFacePapers) },
-            onOpenStormzhangAiNews = { nav.push(Page.StormzhangAiNews) },
-            onOpenProductHunt = { nav.push(Page.ProductHunt) },
-            onOpenRundownAi = { nav.push(Page.RundownAi) },
-            onOpenOpenAiAnthropicNews = { nav.push(Page.OpenAiAnthropicNews) },
-            onOpenFeaturedHub = { nav.push(Page.FeaturedHub) },
-            // 摘要条目点击直达原文(走 openUrl 单点:内置 WebView + 记浏览历史)
-            onOpenUrl = { url, title, source -> onOpenUrl(url, title, source) }
-        )
-        // 关注 tab 根屏:关键词订阅的当日命中流(原为趋势页顶栏进入的二级页,现升为根 tab)
-        AppTab.Follows -> FollowsScreen(
-            onOpenUrl = { url, title, source -> onOpenUrl(url, title, source) },
-            listState = followsListState,
-            reselectSignal = reselectTick
-        )
-        AppTab.Trends -> TrendsScreen(
+        // 热词 tab 根屏:「我的关注」命中流(上)+ 热词榜/词云(下)的单页两段
+        AppTab.Hotwords -> HotwordsScreen(
             onOpenUrl = onOpenUrl,
             onOpenCloud = { nav.push(Page.TrendsCloud) },
             // 展开区「查看全部命中」带词进本地搜索(查设备内索引的全部命中)
             onOpenLocalSearch = { nav.push(Page.LocalSearch(it)) },
-            listState = trendsListState,
+            listState = hotwordsListState,
             reselectSignal = reselectTick
         )
         AppTab.More -> MoreScreen(
@@ -72,4 +51,20 @@ internal fun TabRoot(
             onOpenAbout = { nav.push(Page.About) }
         )
     }
+}
+
+/**
+ * 源 key → 源完整列表二级页(「今天」页分源区块头「查看全部」的目标)。
+ * 8 源全集经 [SourceKeys] 常量分发;未知 key 兜底回信息源 hub(不崩、有出口)。
+ */
+private fun sourcePageOf(source: String): Page = when (source) {
+    SourceKeys.HACKERNEWS -> Page.HackerNews
+    SourceKeys.GITHUB_TRENDING -> Page.GitHubTrending
+    SourceKeys.HUGGINGFACE_PAPERS -> Page.HuggingFacePapers
+    SourceKeys.STORMZHANG_AI -> Page.StormzhangAiNews
+    SourceKeys.PRODUCTHUNT -> Page.ProductHunt
+    SourceKeys.RUNDOWN_AI -> Page.RundownAi
+    SourceKeys.OPENAI_ANTHROPIC_NEWS -> Page.OpenAiAnthropicNews
+    SourceKeys.AIHOT_FEATURED -> Page.FeaturedHub
+    else -> Page.Sources
 }

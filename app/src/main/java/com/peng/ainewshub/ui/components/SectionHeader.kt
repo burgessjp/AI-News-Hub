@@ -17,8 +17,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.peng.ainewshub.ui.theme.AppText
 import com.peng.ainewshub.ui.theme.TrackingSection
 
 /**
@@ -39,6 +41,9 @@ import com.peng.ainewshub.ui.theme.TrackingSection
  * @param title 章节标题
  * @param accent 竖条强调色,默认 primary;分组对照场景可传 secondary/tertiary
  * @param showAccent 是否显示左竖条(默认 true);弹层紧凑场景传 false 只留标题
+ * @param large 日报大节头模式:「今日重点 / 我的关注」等版面栏目标题 ——
+ *        竖条 3×15dp、衬线 [AppText.sectionHead](17sp SemiBold)、上方留白加大;
+ *        默认 false 维持紧凑小节样式(设置分组/弹层等)
  * @param contentPadding 章节条内边距,默认见上;已自带水平边距的场景可清零水平缩进
  * @param trailing 右侧可选内容
  */
@@ -48,37 +53,48 @@ fun SectionHeader(
     modifier: Modifier = Modifier,
     accent: Color = MaterialTheme.colorScheme.primary,
     showAccent: Boolean = true,
-    contentPadding: PaddingValues = PaddingValues(
-        start = 18.dp,
-        end = 18.dp,
-        top = 12.dp,
-        bottom = 6.dp
-    ),
+    large: Boolean = false,
+    contentPadding: PaddingValues? = null,
     trailing: @Composable (RowScope.() -> Unit)? = null
 ) {
+    val padding = contentPadding ?: if (large) {
+        PaddingValues(start = 18.dp, end = 18.dp, top = 20.dp, bottom = 6.dp)
+    } else {
+        PaddingValues(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 6.dp)
+    }
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(contentPadding),
+            .padding(padding),
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (showAccent) {
-            // 左竖条 —— 章节强调锚点
+            // 左竖条 —— 章节强调锚点(大节头 15dp 高,小节 12dp)
             Box(
                 modifier = Modifier
-                    .size(width = 3.dp, height = 12.dp)
+                    .size(width = 3.dp, height = if (large) 15.dp else 12.dp)
                     .clip(MaterialTheme.shapes.small)
                     .background(accent)
             )
             Spacer(Modifier.width(8.dp))
         }
-        Text(
-            text = title,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface,
-            letterSpacing = TrackingSection
-        )
+        if (large) {
+            // 日报大节头:衬线 + sectionHead 档,分隔线收敛后大节层级靠它承担
+            Text(
+                text = title,
+                style = AppText.sectionHead,
+                fontFamily = FontFamily.Serif,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        } else {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                letterSpacing = TrackingSection
+            )
+        }
         if (trailing != null) {
             Spacer(Modifier.weight(1f))
             trailing()

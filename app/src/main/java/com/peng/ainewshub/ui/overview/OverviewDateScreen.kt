@@ -15,12 +15,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.peng.ainewshub.R
 import com.peng.ainewshub.ui.ErrorState
 import com.peng.ainewshub.ui.UiState
+import com.peng.ainewshub.ui.components.archiveDateLabel
 import com.peng.ainewshub.ui.components.AppTopBar
 import com.peng.ainewshub.ui.components.AppTopBarDefaults
 import com.peng.ainewshub.ui.components.NewsCardSkeletonList
@@ -28,7 +30,7 @@ import com.peng.ainewshub.ui.components.NewsCardSkeletonList
 /**
  * 历史总览 —— 指定日期的总览页。
  *
- * 内容渲染与总览 Tab 完全同构(共享 [OverviewContent]:digest Hero + Top10 平铺
+ * 内容渲染与「今天」页同构(共享 [OverviewContent]:digest Hero + Top10 平铺
  * + 页脚),差异仅在:
  *  - 数据按日期经 overview_history 索引寻址([OverviewArchiveViewModel.loadDigest]);
  *  - 二级页语义:顶栏带返回、无下拉刷新、底部不预留浮动底栏高度。
@@ -45,6 +47,7 @@ fun OverviewDateScreen(
     listState: LazyListState,
     vm: OverviewArchiveViewModel = viewModel(key = "overview-date-$date")
 ) {
+    val context = LocalContext.current
     val state by vm.digest.collectAsStateWithLifecycle()
 
     LaunchedEffect(date) { vm.loadDigest(date) }
@@ -53,7 +56,7 @@ fun OverviewDateScreen(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             AppTopBar(
-                title = stringResource(R.string.overview_date_title, date),
+                title = stringResource(R.string.overview_date_title, archiveDateLabel(context, date)),
                 titleFontSize = AppTopBarDefaults.secondaryTitleFontSize,
                 navigationIcon = {
                     IconButton(onClick = onBack) {

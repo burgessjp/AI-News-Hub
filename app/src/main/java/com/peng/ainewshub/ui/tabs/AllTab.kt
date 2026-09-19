@@ -5,9 +5,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.clickable
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.MaterialTheme
@@ -17,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.peng.ainewshub.R
+import com.peng.ainewshub.ui.theme.AppText
 import com.peng.ainewshub.data.model.Mode
 import com.peng.ainewshub.data.model.NewsItem
 import com.peng.ainewshub.ui.ItemsViewModel
@@ -59,19 +61,23 @@ fun AllTab(
                     }
                 },
                 actions = {
-                    // 「日报」入口 —— 原独立 tab,现收纳于此
-                    IconButton(onClick = onOpenDaily) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Outlined.MenuBook,
-                            contentDescription = stringResource(R.string.daily_title)
-                        )
-                    }
-                    IconButton(onClick = onOpenSearch) {
-                        Icon(
-                            imageVector = Icons.Filled.Search,
-                            contentDescription = stringResource(R.string.action_search)
-                        )
-                    }
+                    // 「日报」「搜索」文字按钮(去图标)
+                    Text(
+                        text = stringResource(R.string.daily_title),
+                        style = AppText.caption,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .clickable(onClick = onOpenDaily)
+                            .padding(horizontal = 10.dp, vertical = 14.dp)
+                    )
+                    Text(
+                        text = stringResource(R.string.action_search),
+                        style = AppText.caption,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .clickable(onClick = onOpenSearch)
+                            .padding(start = 2.dp, end = 14.dp, top = 14.dp, bottom = 14.dp)
+                    )
                 }
             )
         }

@@ -21,6 +21,8 @@
     <string name="webview_toast_no_app_for_link">No app found to open this link</string>
     <string name="webview_toast_open_link_failed">Couldn\'t open this link</string>
     <!-- Top-bar star: favorite / unfavorite the current page -->
+    <string name="webview_action_favorite">Save</string>
+    <string name="webview_action_unfavorite">Saved</string>
     <string name="webview_toast_favorited">Saved to Favorites</string>
     <string name="webview_toast_unfavorited">Removed from Favorites</string>
 

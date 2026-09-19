@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -12,33 +11,17 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.automirrored.filled.TrendingDown
-import androidx.compose.material.icons.automirrored.filled.TrendingUp
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Remove
-import androidx.compose.material.icons.outlined.HourglassEmpty
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -51,20 +34,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.peng.ainewshub.R
 import com.peng.ainewshub.data.repo.SummaryRepository
 import com.peng.ainewshub.data.repo.TrendKeyword
 import com.peng.ainewshub.data.repo.TrendsDigest
-import com.peng.ainewshub.ui.EmptyState
-import com.peng.ainewshub.ui.ErrorState
-import com.peng.ainewshub.ui.components.AppTopBar
 import com.peng.ainewshub.ui.components.BottomBarPillHeight
-import com.peng.ainewshub.ui.components.BrandWordmark
 import com.peng.ainewshub.ui.components.HairlineDivider
 import com.peng.ainewshub.ui.components.RankBadge
-import com.peng.ainewshub.ui.components.RankRowSkeletonList
 import com.peng.ainewshub.ui.components.rememberHaptics
 import com.peng.ainewshub.ui.theme.AppText
 import java.text.SimpleDateFormat
@@ -72,138 +48,20 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * 热词趋势 Tab 根屏 —— 流水线预生成的跨源热词榜(读归档 trends.json,统计
- * 为主 + 可选 AI 精修;与「总览」tab 同范式:流水线预生成、App 只读归档)。
+ * 热词内容共享件 —— 「热词」根屏(HotwordsScreen)与「历史热词」日期页
+ * (TrendsDateScreen)共用的渲染实现。
  *
- * 结构(编辑风,去卡片化,与总览 Top10 平铺同语言):
- *  - 顶部时效 caption:「近 N 天热词 · 数据截至 M月d日」(归档每日跑批,先交代新鲜度)
- *  - 热词榜平铺:[RankBadge] + 排名变化小字(较昨日:+N/-N/持平/新上榜)+ 热词 +
- *    命中统计 + 14 日 sparkline(Canvas 手绘,不引图表库)+ 涨跌箭头;行间 0.5dp 发丝线(缩进对齐文字列)
- *  - 点击词条整行展开 ≤3 条代表条目(浅底通栏带,标题点击经 openUrl 进内置 WebView);
- *    展开区尾部动作行(仅根 tab):「+ 关注」一键订阅该词(经 TrendsViewModel 写
- *    DataStore,结果走 FollowNotices 玻璃胶囊)+「查看全部命中 ›」带词进本地搜索
- *  - 页脚:生成时间
+ * 原 TrendsScreen 根屏已随 v1.4.0 日刊化并入 [HotwordsScreen](「我的关注」
+ * 命中流在上、热词榜在下的单页);本文件只保留共享渲染件:
+ *  - [TrendsContent]:历史热词日期页的整页渲染(caption + 榜单 + 页脚,自持 LazyColumn)
+ *  - [TrendsCaptionRow] / [KeywordRow]:HotwordsScreen 逐 item 复用
+ *
+ * 热词榜行结构(编辑风,去卡片化):[RankBadge] + 排名变化小字(较昨日:+N/-N/持平/
+ * 新上榜)+ 热词 + 命中统计 + 14 日 sparkline(Canvas 手绘,不引图表库)+ 涨跌箭头;
+ * 行间 0.5dp 发丝线。点击词条整行展开 ≤3 条代表条目(浅底通栏带,标题点击进
+ * 内置 WebView);展开区尾部动作行:「+ 关注」一键订阅该词 +「查看全部命中 ›」
+ * 带词进本地搜索(两者由根屏传入回调驱动,历史日期页保持 null 不渲染)。
  */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun TrendsScreen(
-    onOpenUrl: (url: String, title: String, source: String) -> Unit,
-    // 词云二级页入口(TabRoot 分支内经 nav.push 构造;入口在 caption 行)
-    onOpenCloud: () -> Unit,
-    // 带词进本地搜索(展开区「查看全部命中」;TabRoot 分支内经 nav.push 构造)
-    onOpenLocalSearch: (String) -> Unit,
-    // 列表状态由 MainActivity 上提持有:切 tab / 进二级页返回后保持滚动位置
-    listState: LazyListState,
-    reselectSignal: Int = 0,
-    vm: TrendsViewModel = viewModel()
-) {
-    val state by vm.state.collectAsStateWithLifecycle()
-    val isRefreshing by vm.isRefreshing.collectAsStateWithLifecycle()
-    val haptics = rememberHaptics()
-    // 已关注词集合(小写):展开区「+ 关注」按钮的已关注态判定
-    val followedKeywords by vm.followedKeywords.collectAsStateWithLifecycle()
-
-    // 重击当前 tab:滚回顶部 + 重读归档(命中 trends.json 2 分钟缓存零开销)。
-    // lastHandled 防「重新进入组合就自动刷新」(同总览 tab 套路)。
-    var lastHandledReselect by remember { mutableIntStateOf(reselectSignal) }
-    LaunchedEffect(reselectSignal) {
-        if (reselectSignal != lastHandledReselect) {
-            lastHandledReselect = reselectSignal
-            listState.animateScrollToItem(0)
-            vm.load()
-        }
-    }
-
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.surface,
-        topBar = {
-            // 一级根 tab 规格:品牌 wordmark;刷新收口到下拉手势,日期仅总览 tab 保留。
-            // 关注入口已升为独立根 tab,顶栏不再放 action。
-            AppTopBar(
-                title = "AI NEWS HUB",
-                titleContent = {
-                    BrandWordmark(modifier = Modifier.height(44.dp))
-                },
-                horizontalPadding = 18.dp
-            )
-        }
-    ) { padding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                // 列表可滚入药丸 TAB 之下,但可视区不超出药丸底缘(同总览)
-                .navigationBarsPadding()
-                .padding(bottom = 16.dp)
-        ) {
-            when (val s = state) {
-                is TrendsState.Loading -> TrendsLoading()
-                is TrendsState.NoData -> EmptyState(
-                    title = stringResource(R.string.trends_no_data_title),
-                    subtitle = stringResource(R.string.trends_no_data_subtitle),
-                    icon = Icons.Outlined.HourglassEmpty,
-                    actionLabel = stringResource(R.string.common_retry),
-                    onAction = { vm.load() }
-                )
-                is TrendsState.Error -> ErrorState(
-                    message = s.message,
-                    onRetry = { vm.load() },
-                    title = stringResource(R.string.trends_load_failed)
-                )
-                is TrendsState.Success -> PullToRefreshBox(
-                    isRefreshing = isRefreshing,
-                    onRefresh = {
-                        haptics.tick()
-                        vm.refresh()
-                    }
-                ) {
-                    TrendsContent(
-                        digest = s.digest,
-                        listState = listState,
-                        onOpenUrl = onOpenUrl,
-                        onOpenCloud = onOpenCloud,
-                        onFollowKeyword = { vm.followKeyword(it) },
-                        onSearchTerm = onOpenLocalSearch,
-                        followedKeywords = followedKeywords
-                    )
-                }
-            }
-        }
-    }
-}
-
-/** 加载中:与内容态同构的排名行骨架,避免转圈→内容态的结构跳变。 */
-@Composable
-private fun TrendsLoading() {
-    val cs = MaterialTheme.colorScheme
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = BottomBarPillHeight + 16.dp)
-    ) {
-        item(key = "rows_skeleton") {
-            RankRowSkeletonList(count = 8)
-        }
-        item(key = "loading_hint") {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                CircularProgressIndicator(
-                    color = cs.primary,
-                    strokeWidth = 2.dp,
-                    modifier = Modifier.size(14.dp)
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    text = stringResource(R.string.trends_loading),
-                    style = AppText.bodySmall,
-                    color = cs.onSurfaceVariant
-                )
-            }
-        }
-    }
-}
 
 /**
  * 热词榜内容渲染 —— 趋势 Tab 与「历史热词」日期页共用。
@@ -239,44 +97,7 @@ internal fun TrendsContent(
         // 顶部时效 caption:窗口 + 数据截至(归档每日跑批,先交代新鲜度);
         // 根 tab 在行尾带「词云 ›」入口链接(顶栏无 actions,入口收进内容区)
         item(key = "caption", contentType = "caption") {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 18.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = stringResource(
-                        R.string.trends_window_caption,
-                        digest.windowDays,
-                        formatDay(context, digest.days.lastOrNull().orEmpty())
-                    ),
-                    style = AppText.caption,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f)
-                )
-                if (onOpenCloud != null) {
-                    Row(
-                        modifier = Modifier
-                            .clip(MaterialTheme.shapes.small)
-                            .clickable(onClick = onOpenCloud)
-                            .padding(start = 12.dp, top = 4.dp, bottom = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = stringResource(R.string.trends_cloud_entry),
-                            style = AppText.caption,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(14.dp)
-                        )
-                    }
-                }
-            }
+            TrendsCaptionRow(digest = digest, onOpenCloud = onOpenCloud)
         }
 
         val keywords = digest.keywords
@@ -307,14 +128,67 @@ internal fun TrendsContent(
 
         // generatedAt 缺省 0(异常数据)时不渲染页脚,避免显示成 1970 年的时刻
         if (digest.generatedAt > 0) {
-            item(key = "footer", contentType = "footer") {
+            item(key = "footer", contentType = "footer") { TrendsFooter(digest = digest) }
+        }
+    }
+}
+
+/** 页脚:生成时间。TrendsContent 与 HotwordsScreen 共用(generatedAt ≤ 0 由调用侧把关)。 */
+@Composable
+internal fun TrendsFooter(digest: TrendsDigest) {
+    Text(
+        text = stringResource(R.string.trends_generated_at, formatClock(digest.generatedAt)),
+        style = AppText.caption,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 18.dp, vertical = 12.dp)
+    )
+}
+
+/**
+ * 时效 caption 行:「近 N 天热词 · 数据截至 M月d日」,根屏在行尾带「词云 ›」入口
+ * ([onOpenCloud] 非空时)。TrendsContent 与 HotwordsScreen 共用。
+ */
+@Composable
+internal fun TrendsCaptionRow(
+    digest: TrendsDigest,
+    onOpenCloud: (() -> Unit)? = null
+) {
+    val context = LocalContext.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 18.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = stringResource(
+                R.string.trends_window_caption,
+                digest.windowDays,
+                formatDay(context, digest.days.lastOrNull().orEmpty())
+            ),
+            style = AppText.caption,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f)
+        )
+        if (onOpenCloud != null) {
+            Row(
+                modifier = Modifier
+                    .clip(MaterialTheme.shapes.small)
+                    .clickable(onClick = onOpenCloud)
+                    .padding(start = 12.dp, top = 4.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
-                    text = stringResource(R.string.trends_generated_at, formatClock(digest.generatedAt)),
+                    text = stringResource(R.string.trends_cloud_entry),
                     style = AppText.caption,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 18.dp, vertical = 12.dp)
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = "›",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
         }
@@ -326,7 +200,7 @@ internal fun TrendsContent(
  * 展开时下方带出代表条目浅底通栏带(对齐总览 breaking 色带语言:无卡片、色带边缘分隔)。
  */
 @Composable
-private fun KeywordRow(
+internal fun KeywordRow(
     rank: Int,
     keyword: TrendKeyword,
     expanded: Boolean,
@@ -407,16 +281,16 @@ private fun TrendArrow(trend: String) {
             else -> R.string.trends_trend_flat_cd
         }
     )
-    val (icon, tint) = when (trend) {
-        "up" -> Icons.AutoMirrored.Filled.TrendingUp to cs.primary
-        "down" -> Icons.AutoMirrored.Filled.TrendingDown to cs.tertiary
-        else -> Icons.Filled.Remove to cs.onSurfaceVariant
+    val (mark, tint) = when (trend) {
+        "up" -> "↑" to cs.primary
+        "down" -> "↓" to cs.tertiary
+        else -> "—" to cs.onSurfaceVariant
     }
-    Icon(
-        imageVector = icon,
-        contentDescription = cd,
-        tint = tint,
-        modifier = Modifier.size(16.dp)
+    // 文字方向符(↑↓—):数据语义符号,与排名数字同语言
+    Text(
+        text = mark,
+        style = AppText.body,
+        color = tint
     )
 }
 
@@ -560,11 +434,10 @@ private fun KeywordItems(
                             .padding(vertical = 2.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = if (followed) Icons.Filled.Check else Icons.Filled.Add,
-                            contentDescription = null,
-                            tint = if (followed) cs.onSurfaceVariant else cs.primary,
-                            modifier = Modifier.size(14.dp)
+                        Text(
+                            text = if (followed) "✓" else "+",
+                            style = AppText.caption,
+                            color = if (followed) cs.onSurfaceVariant else cs.primary
                         )
                         Spacer(Modifier.width(4.dp))
                         Text(
@@ -592,11 +465,10 @@ private fun KeywordItems(
                             fontWeight = FontWeight.SemiBold,
                             color = cs.primary
                         )
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                            contentDescription = null,
-                            tint = cs.primary,
-                            modifier = Modifier.size(14.dp)
+                        Text(
+                            text = "›",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = cs.primary
                         )
                     }
                 }

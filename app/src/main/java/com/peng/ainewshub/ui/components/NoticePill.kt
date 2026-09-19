@@ -10,9 +10,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -25,7 +23,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.peng.ainewshub.ui.anim.Motion
@@ -37,14 +34,12 @@ import kotlinx.coroutines.delay
  * 单条轻提示的内容规格([NoticePillState.show] 入参/读取单元)。
  *
  * @property message 展示文案(调用方拼装好的最终字符串)
- * @property icon 前置装饰图标
  * @property durationMs 展示时长,到点自动淡出;重复 show 会以新的一条重置计时
  * @property tag 可选标识(如离线提示 "offline"),供 [NoticePillState.clearIfTag] 条件撤下
  * @property id 由 [NoticePillState] 自增分配,驱动宿主按「每条新提示重置计时器」
  */
 data class ActiveNotice(
     val message: String,
-    val icon: ImageVector,
     val durationMs: Long,
     val tag: String?,
     val id: Long
@@ -68,8 +63,8 @@ class NoticePillState {
      * 立即展示一条轻提示:顶掉正在显示的上一条并整体重置消失计时。
      * 连续两条相同文案也会因 id 递增被识别为新的一条。
      */
-    fun show(message: String, icon: ImageVector, durationMs: Long, tag: String? = null) {
-        notice = ActiveNotice(message, icon, durationMs, tag, nextId++)
+    fun show(message: String, durationMs: Long, tag: String? = null) {
+        notice = ActiveNotice(message, durationMs, tag, nextId++)
         visible = true
     }
 
@@ -91,7 +86,7 @@ fun rememberNoticePillState(): NoticePillState = remember { NoticePillState() }
  * 顶部居中轻提示胶囊 —— 项目内轻量瞬时通知的统一形态(「已是最新批次」/
  * 离线兜底共用),替代 Material 默认 Snackbar。
  *
- * 视觉与浮动药丸家族(底栏 / TtsFloatingPill / WebView 回读提示)同款悬浮语言:
+ * 视觉与浮动药丸家族(底栏 / WebView 回读提示)同款悬浮语言:
  * CircleShape 近实底 + 3dp 浮起阴影 + 玻璃边缘描边;进出场自上方滑入滑出
  * (enter 减速 / exit 加速,时长走 [Motion] 令牌)。
  *
@@ -142,12 +137,6 @@ fun NoticePillHost(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
             ) {
-                Icon(
-                    imageVector = notice.icon,
-                    contentDescription = null,
-                    tint = cs.onSurfaceVariant,
-                    modifier = Modifier.size(16.dp)
-                )
                 Text(
                     text = notice.message,
                     style = AppText.caption,

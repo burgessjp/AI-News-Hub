@@ -16,11 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -34,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.peng.ainewshub.R
 import com.peng.ainewshub.ui.theme.AppText
@@ -71,12 +68,6 @@ internal fun TranslateSheet(
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp)
         ) {
-            Icon(
-                imageVector = Icons.Outlined.Translate,
-                contentDescription = null,
-                tint = cs.primary,
-                modifier = Modifier.size(22.dp)
-            )
             Spacer(modifier = Modifier.width(10.dp))
             Text(
                 text = stringResource(R.string.webview_translate_sheet_title),
@@ -169,11 +160,11 @@ internal fun TranslateSheet(
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = Icons.Outlined.CheckCircle,
-                            contentDescription = null,
-                            tint = cs.primary,
-                            modifier = Modifier.size(16.dp)
+                        Text(
+                            text = "✓",
+                            style = AppText.bodySmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = cs.primary
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(

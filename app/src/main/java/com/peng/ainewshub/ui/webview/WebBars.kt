@@ -4,8 +4,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -17,25 +15,15 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.automirrored.outlined.ArrowForward
-import androidx.compose.material.icons.automirrored.outlined.MenuBook
-import androidx.compose.material.icons.outlined.Share
-import androidx.compose.material.icons.outlined.Translate
-import androidx.compose.material.icons.outlined.WebAsset
-import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.peng.ainewshub.R
 import com.peng.ainewshub.ui.anim.Motion
@@ -115,21 +103,18 @@ internal fun WebBottomBar(
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
             WebBarItem(
-                icon = Icons.AutoMirrored.Outlined.ArrowBack,
                 label = stringResource(R.string.webview_bar_back),
                 enabled = canGoBack,
                 onClick = onBack,
                 modifier = Modifier.weight(1f)
             )
             WebBarItem(
-                icon = Icons.AutoMirrored.Outlined.ArrowForward,
                 label = stringResource(R.string.webview_bar_forward),
                 enabled = canGoForward,
                 onClick = onForward,
                 modifier = Modifier.weight(1f)
             )
             WebBarItem(
-                icon = if (readerActive) Icons.Outlined.WebAsset else Icons.AutoMirrored.Outlined.MenuBook,
                 label = stringResource(
                     if (readerActive) R.string.webview_bar_exit_reader else R.string.webview_bar_reader
                 ),
@@ -137,17 +122,16 @@ internal fun WebBottomBar(
                 onClick = onToggleReader,
                 modifier = Modifier.weight(1f)
             )
-            // 翻译:阅读模式下可用;翻译中或已有结果时图标高亮表示已激活
+            // 翻译:非阅读模式下点击会先自动进阅读模式再接续翻译(调用方负责),
+            // 阅读模式构建中(readerLoading)暂不可点;翻译中/已有结果时图标高亮
             WebBarItem(
-                icon = Icons.Outlined.Translate,
                 label = stringResource(R.string.webview_bar_translate),
-                enabled = readerActive && translateEnabled,
+                enabled = translateEnabled && !readerLoading,
                 highlight = translateActive,
                 onClick = onTranslate,
                 modifier = Modifier.weight(1f)
             )
             WebBarItem(
-                icon = Icons.Outlined.Share,
                 label = stringResource(R.string.common_share),
                 enabled = true,
                 onClick = onShare,
@@ -157,31 +141,34 @@ internal fun WebBottomBar(
     }
 }
 
-/** 底部工具栏单项:图标 + 小字标签,触摸区 ≥48dp;禁用态用 outline 色压低。 */
+/**
+ * 底部工具栏单项:纯文字(去图标,与根底栏铅字块同语言)—— 中文双字词本身
+ * 就是最好的符号;高亮(激活)用 primary + SemiBold,禁用态用 outline 色压低,
+ * 触摸区 ≥48dp。
+ */
 @Composable
 private fun WebBarItem(
-    icon: ImageVector,
     label: String,
     enabled: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     highlight: Boolean = false
 ) {
-    // 高亮(已激活)用 primary 色,否则用常规禁用/可用色
+    val cs = MaterialTheme.colorScheme
     val color = when {
-        highlight -> MaterialTheme.colorScheme.primary
-        enabled -> MaterialTheme.colorScheme.onSurfaceVariant
-        else -> MaterialTheme.colorScheme.outline
+        highlight -> cs.primary
+        enabled -> cs.onSurfaceVariant
+        else -> cs.outline
     }
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
+    Text(
+        text = label,
+        style = AppText.bodySmall,
+        fontWeight = if (highlight) FontWeight.SemiBold else FontWeight.Normal,
+        color = color,
+        maxLines = 1,
         modifier = modifier
             .clickable(enabled = enabled, onClick = onClick)
             .heightIn(min = 48.dp)
-            .padding(vertical = 6.dp)
-    ) {
-        Icon(icon, contentDescription = label, tint = color, modifier = Modifier.size(20.dp))
-        Text(text = label, style = AppText.caption, color = color)
-    }
+            .padding(horizontal = 4.dp)
+    )
 }

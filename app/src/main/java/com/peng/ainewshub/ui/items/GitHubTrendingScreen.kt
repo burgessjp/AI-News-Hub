@@ -16,10 +16,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.CallSplit
-import androidx.compose.material.icons.filled.LocalFireDepartment
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -240,7 +239,6 @@ private fun TrendingRow(
                 // 今日新增(primary 强调,让用户一眼看到「为什么上趋势」)
                 if (repo.starsToday > 0) {
                     StatBadge(
-                        icon = Icons.Filled.LocalFireDepartment,
                         value = stringResource(R.string.trending_stars_today, formatCount(repo.starsToday)),
                         tint = cs.primary,
                         fontWeight = FontWeight.SemiBold

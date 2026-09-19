@@ -13,9 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Business
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -251,12 +248,6 @@ private fun VendorBadge(vendor: String) {
             )
             .padding(horizontal = 6.dp, vertical = 2.dp)
     ) {
-        Icon(
-            imageVector = Icons.Filled.Business,
-            contentDescription = null,
-            modifier = Modifier.height(12.dp),
-            tint = cs.onSecondaryContainer
-        )
         Text(
             text = vendor,
             style = AppText.bodySmall,

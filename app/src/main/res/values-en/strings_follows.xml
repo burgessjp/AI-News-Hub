@@ -1,13 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- My Follows strings (English; Chinese full set in values/strings_follows.xml). -->
 <resources>
+    <!-- Upper section header of the Trending tab (keyword follow hits) -->
+    <string name="follows_section_title">My Keywords</string>
+    <!-- Collapsed guide row shown when no keywords exist (tap to open the manage sheet) -->
+    <string name="follows_section_guide">Follow keywords to see only what matters to you</string>
     <!-- Header stats line: %1$d=keyword count, %2$d=today\'s matched items -->
     <string name="follows_stats_caption">Following %1$d keywords · %2$d matches today</string>
 
-    <!-- Empty state 1: no keywords yet (onboarding) -->
-    <string name="follows_empty_no_keywords_title">Follow the AI topics you care about</string>
-    <string name="follows_empty_no_keywords_subtitle">Subscribe to keywords and we\'ll filter the day\'s overview and source digests for matches</string>
-    <!-- Shared by the onboarding action button and the header edit icon content description -->
+    <!-- Manage action button (guide row and manage sheet) -->
     <string name="follows_manage_action">Manage keywords</string>
     <!-- Suggestion section title (shared by onboarding and the manage sheet) -->
     <string name="follows_suggestions_title">Today\'s trending keywords</string>

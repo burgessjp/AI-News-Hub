@@ -20,8 +20,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.DeleteSweep
-import androidx.compose.material.icons.outlined.History
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -169,13 +167,15 @@ fun BrowseHistoryScreen(
                             )
                         }
                         // 清空
-                        IconButton(onClick = { showClearDialog = true }) {
-                            Icon(
-                                Icons.Filled.DeleteSweep,
-                                contentDescription = stringResource(R.string.items_clear),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                        // 「清空」文字按钮(去图标),确认弹窗流程不变
+                        Text(
+                            text = stringResource(R.string.items_clear),
+                            style = AppText.caption,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .clickable { showClearDialog = true }
+                                .padding(horizontal = 14.dp, vertical = 14.dp)
+                        )
                     }
                 }
             )
@@ -186,7 +186,6 @@ fun BrowseHistoryScreen(
                 EmptyState(
                     title = stringResource(R.string.history_empty_title),
                     subtitle = stringResource(R.string.history_empty_subtitle),
-                    icon = Icons.Outlined.History
                 )
             } else {
                 HistoryList(
@@ -342,10 +341,11 @@ private fun HistoryRow(
                     .padding(horizontal = 18.dp),
                 contentAlignment = Alignment.CenterEnd
             ) {
-                Icon(
-                    Icons.Filled.DeleteSweep,
-                    contentDescription = stringResource(R.string.history_delete),
-                    tint = cs.onErrorContainer
+                Text(
+                    text = stringResource(R.string.history_delete),
+                    style = AppText.caption,
+                    fontWeight = FontWeight.SemiBold,
+                    color = cs.onErrorContainer
                 )
             }
         },
@@ -477,7 +477,7 @@ private fun ProgressBadge(percent: Int) {
 }
 
 /**
- * 按 host 字符串哈希选三档强调色之一(与 MoreScreen 的 IconTileRow 配色档一致)。
+ * 按 host 字符串哈希选三档强调色之一。
  * 同一站点始终同色,视觉上形成隐式分组。
  */
 private fun hostAccent(

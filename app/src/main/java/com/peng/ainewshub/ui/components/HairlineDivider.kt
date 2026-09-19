@@ -1,5 +1,6 @@
 package com.peng.ainewshub.ui.components
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -29,4 +30,25 @@ fun HairlineDivider(
         color = MaterialTheme.colorScheme.outlineVariant,
         modifier = modifier.padding(start = startIndent, end = endIndent)
     )
+}
+
+/**
+ * 报纸双细线(onSurface 实色,两条 1dp 相隔 2dp)—— 线收敛「以白当黑」后
+ * 全 App 唯一的结构线:仅用于「今天」/「热词」报头下缘与热点卡 Hero 上缘。
+ */
+@Composable
+fun DoubleRule(modifier: Modifier = Modifier) {
+    val color = MaterialTheme.colorScheme.onSurface
+    Column(modifier = modifier) {
+        HorizontalDivider(thickness = 1.dp, color = color)
+        HorizontalDivider(thickness = 1.dp, color = color, modifier = Modifier.padding(top = 2.dp))
+    }
+}
+
+/**
+ * 区块粗线(onSurface 实色 1.5dp)—— 分源摘要区块起头的分隔,弱于双细线、强于发丝线。
+ */
+@Composable
+fun SectionRule(modifier: Modifier = Modifier) {
+    HorizontalDivider(thickness = 1.5.dp, color = MaterialTheme.colorScheme.onSurface, modifier = modifier)
 }

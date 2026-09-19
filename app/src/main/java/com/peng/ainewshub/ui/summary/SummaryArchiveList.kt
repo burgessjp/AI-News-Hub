@@ -10,11 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -41,7 +37,7 @@ import com.peng.ainewshub.ui.theme.AppText
  * 点击某天进入该日的全源摘要卡页(SummaryDateScreen)。视觉:左栏相对日期 +
  * 周几,右栏当天有归档的源数,行间发丝线。
  *
- * 纯归档语义(同摘要 Tab);history 每源仅保留最近
+ * 纯归档语义(同「今天」页分源区块);history 每源仅保留最近
  * 31 天,且功能上线前的日期不在索引内(见 docs/news-hub-data-usage.md)。
  */
 @Composable
@@ -63,7 +59,6 @@ internal fun SummaryArchiveContent(
                 EmptyState(
                     title = stringResource(R.string.summary_archive_empty_title),
                     subtitle = stringResource(R.string.summary_archive_empty_subtitle),
-                    icon = Icons.Outlined.Inventory2
                 )
             } else {
                 LazyColumn(
@@ -123,10 +118,10 @@ private fun SummaryArchiveRow(date: String, sourceCount: Int, onClick: () -> Uni
             color = cs.onSurface,
             modifier = Modifier.weight(1f)
         )
-        Icon(
-            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-            contentDescription = null,
-            tint = cs.outlineVariant
+        Text(
+            text = "›",
+            style = MaterialTheme.typography.titleMedium,
+            color = cs.outlineVariant
         )
     }
 }

@@ -33,7 +33,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.SearchOff
 import androidx.compose.material3.AlertDialog
@@ -57,6 +56,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -65,6 +66,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.peng.ainewshub.R
+import com.peng.ainewshub.ui.theme.AppText
 import com.peng.ainewshub.data.model.HotTopic
 import com.peng.ainewshub.data.model.NewsItem
 import com.peng.ainewshub.data.repo.NewsRepository
@@ -172,7 +174,6 @@ fun SearchScreen(
                     EmptyState(
                         title = stringResource(R.string.search_empty_title),
                         subtitle = stringResource(R.string.search_empty_subtitle),
-                        icon = Icons.Filled.Search
                     )
                 } else {
                     SearchDiscovery(
@@ -195,7 +196,6 @@ fun SearchScreen(
                         EmptyState(
                             title = stringResource(R.string.search_no_result_title),
                             subtitle = stringResource(R.string.items_try_other_keyword),
-                            icon = Icons.Outlined.SearchOff
                         )
                     } else {
                         LazyColumn(
@@ -387,13 +387,6 @@ private fun SearchField(
             .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            Icons.Filled.Search,
-            contentDescription = null,
-            tint = cs.onSurfaceVariant,
-            modifier = Modifier.size(18.dp)
-        )
-        Spacer(Modifier.width(8.dp))
         BasicTextField(
             value = text,
             onValueChange = onTextChange,
@@ -437,11 +430,12 @@ private fun SearchField(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    Icons.Filled.Clear,
-                    contentDescription = stringResource(R.string.items_clear),
-                    tint = cs.onSurfaceVariant,
-                    modifier = Modifier.size(16.dp)
+                val clearCd = stringResource(R.string.items_clear)
+                Text(
+                    text = "×",
+                    style = AppText.body,
+                    color = cs.onSurfaceVariant,
+                    modifier = Modifier.semantics { contentDescription = clearCd }
                 )
             }
         }

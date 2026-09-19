@@ -1,5 +1,7 @@
 package com.peng.ainewshub.ui.items
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import com.peng.ainewshub.R
 
 import androidx.compose.animation.AnimatedVisibility
@@ -9,6 +11,9 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import com.peng.ainewshub.ui.anim.Motion
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,16 +30,10 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.outlined.Inbox
-import androidx.compose.material.icons.outlined.SearchOff
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -55,6 +54,7 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.debounce
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -195,7 +195,6 @@ fun ItemsScreen(
                                 EmptyState(
                                     title = stringResource(if (filter.isSearching) R.string.common_no_result else R.string.common_empty),
                                     subtitle = stringResource(if (filter.isSearching) R.string.items_try_other_keyword else R.string.items_refresh_hint_button),
-                                    icon = if (filter.isSearching) Icons.Outlined.SearchOff else Icons.Outlined.Inbox,
                                     actionLabel = if (filter.isSearching) null else stringResource(R.string.common_refresh_once),
                                     onAction = if (filter.isSearching) null else ({ vm.refresh() })
                                 )
@@ -204,7 +203,6 @@ fun ItemsScreen(
                             shown.isEmpty() -> EmptyState(
                                 title = stringResource(R.string.items_no_unread),
                                 subtitle = stringResource(R.string.items_no_unread_subtitle),
-                                icon = Icons.Outlined.Inbox
                             )
                             else -> {
                                 // 按天分组(本地时区),保持原列表顺序。
@@ -307,21 +305,28 @@ fun ItemsScreen(
             ) + fadeOut(tween(Motion.SHORT, easing = Motion.EmphasizedAccel)),
             modifier = Modifier.align(Alignment.BottomEnd)
         ) {
-            FloatingActionButton(
-                onClick = {
-                    scope.launch { listState.animateScrollToItem(0) }
-                },
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                // 根 tab 底部留白避开浮动药丸底栏(BottomBarReservedHeight 含药丸高度 +
-                // 距底 margin + 手势栏 inset);二级页底栏已隐藏,只留常规间距。
-                // 左右 18dp 维持与列表内容对齐。
-                modifier = Modifier.padding(
-                    end = 18.dp,
-                    bottom = if (reserveBottomBarSpace) BottomBarReservedHeight else 24.dp
-                )
+            // 回顶按钮:直角纸面块 + 发丝描边(刊物语言,替代 MD3 彩色 FAB)。
+            // 根 tab 底部留白避开底栏;二级页无悬浮底栏只留常规间距;左右 18dp 与列表对齐
+            Box(
+                modifier = Modifier
+                    .padding(
+                        end = 18.dp,
+                        bottom = if (reserveBottomBarSpace) BottomBarReservedHeight else 24.dp
+                    )
+                    .clip(MaterialTheme.shapes.extraSmall)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                    .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.extraSmall)
+                    .clickable { scope.launch { listState.animateScrollToItem(0) } }
+                    .padding(horizontal = 14.dp, vertical = 10.dp)
             ) {
-                Icon(Icons.Filled.KeyboardArrowUp, contentDescription = stringResource(R.string.common_back_to_top))
+                // 「↑」文字符回顶,读屏语义经 semantics 保留
+                val backToTopLabel = stringResource(R.string.common_back_to_top)
+                Text(
+                    text = "↑",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.semantics { contentDescription = backToTopLabel }
+                )
             }
         }
     }

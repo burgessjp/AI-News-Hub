@@ -2,6 +2,7 @@ package com.peng.ainewshub.ui.components
 
 import android.content.Context
 import com.peng.ainewshub.R
+import com.peng.ainewshub.data.PipelineSchedule
 import java.text.SimpleDateFormat
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -72,6 +73,17 @@ fun formatRelative(context: Context, tsMillis: Long): String {
  */
 fun weekdayLabel(context: Context, dayOfWeek: Int): String =
     context.resources.getStringArray(R.array.weekdays)[(dayOfWeek - 1).coerceIn(0, 6)]
+
+/**
+ * 刊名(日刊身份):批次槽位序号([PipelineSchedule.slotIndexOn] 产出)→ 展示名。
+ * 两批表固定映射 1=早刊、2=晚刊;批次增至 3 个及以上时槽位名不再自然,兜底「第 N 批」。
+ * 批次数在进程内可被远程 app_config.json 覆盖,故每次调用现查生效表。
+ */
+fun editionLabel(context: Context, slotIndex: Int): String = when {
+    PipelineSchedule.batchSlots.size == 2 && slotIndex == 1 -> context.getString(R.string.edition_morning)
+    PipelineSchedule.batchSlots.size == 2 && slotIndex == 2 -> context.getString(R.string.edition_evening)
+    else -> context.getString(R.string.edition_ordinal, slotIndex)
+}
 
 /**
  * 归档日期(YYYY-MM-DD)→ 列表行日期标签:「今天/昨天/前天/M月d日 · 周X」。

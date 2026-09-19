@@ -19,8 +19,6 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.DeleteSweep
-import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -156,13 +154,15 @@ fun FavoritesScreen(
                 actions = {
                     // 清空(有数据时才有意义)
                     if (favorites.isNotEmpty()) {
-                        IconButton(onClick = { showClearDialog = true }) {
-                            Icon(
-                                Icons.Filled.DeleteSweep,
-                                contentDescription = stringResource(R.string.items_clear),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                        // 「清空」文字按钮(去图标),确认弹窗流程不变
+                        Text(
+                            text = stringResource(R.string.items_clear),
+                            style = AppText.caption,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .clickable { showClearDialog = true }
+                                .padding(horizontal = 14.dp, vertical = 14.dp)
+                        )
                     }
                 }
             )
@@ -173,7 +173,6 @@ fun FavoritesScreen(
                 EmptyState(
                     title = stringResource(R.string.favorites_empty_title),
                     subtitle = stringResource(R.string.favorites_empty_subtitle),
-                    icon = Icons.Outlined.StarBorder
                 )
             } else {
                 FavoritesList(
@@ -300,10 +299,11 @@ private fun FavoriteRow(
                     .padding(horizontal = 18.dp),
                 contentAlignment = Alignment.CenterEnd
             ) {
-                Icon(
-                    Icons.Filled.DeleteSweep,
-                    contentDescription = stringResource(R.string.history_delete),
-                    tint = cs.onErrorContainer
+                Text(
+                    text = stringResource(R.string.history_delete),
+                    style = AppText.caption,
+                    fontWeight = FontWeight.SemiBold,
+                    color = cs.onErrorContainer
                 )
             }
         },

@@ -19,11 +19,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Notes
-import androidx.compose.material.icons.filled.Code
-import androidx.compose.material.icons.filled.Extension
-import androidx.compose.material.icons.filled.SystemUpdate
-import androidx.compose.material.icons.filled.TravelExplore
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -175,8 +170,6 @@ fun AboutScreen(
             item { SectionHeader(stringResource(R.string.about_section_resources)) }
             item {
                 SettingsRow(
-                    icon = Icons.Filled.TravelExplore,
-                    iconAccent = MaterialTheme.colorScheme.primary,
                     title = stringResource(R.string.about_section_data_sources),
                     subtitle = pluralStringResource(
                         R.plurals.more_sources_subtitle,
@@ -188,15 +181,12 @@ fun AboutScreen(
             }
             item {
                 SettingsRow(
-                    icon = Icons.Filled.Extension,
-                    iconAccent = MaterialTheme.colorScheme.primary,
                     title = stringResource(R.string.about_section_oss),
                     subtitle = pluralStringResource(
                         R.plurals.about_oss_entry_subtitle,
                         ossDeps.size,
                         ossDeps.size
                     ),
-                    showDivider = false,
                     onClick = onOpenOss
                 )
             }
@@ -205,8 +195,6 @@ fun AboutScreen(
             item { SectionHeader(stringResource(R.string.about_section_project)) }
             item {
                 SettingsRow(
-                    icon = Icons.Filled.SystemUpdate,
-                    iconAccent = MaterialTheme.colorScheme.secondary,
                     title = stringResource(R.string.about_update_check),
                     // 检查中/已是最新在行尾给状态字;空闲时显示默认 chevron
                     trailing = if (updateChecking || updateUpToDate) {
@@ -226,19 +214,14 @@ fun AboutScreen(
             }
             item {
                 SettingsRow(
-                    icon = Icons.AutoMirrored.Filled.Notes,
-                    iconAccent = MaterialTheme.colorScheme.secondary,
                     title = stringResource(R.string.changelog_title),
                     onClick = onOpenChangelog
                 )
             }
             item {
                 SettingsRow(
-                    icon = Icons.Filled.Code,
-                    iconAccent = MaterialTheme.colorScheme.secondary,
                     title = projectSourceTitle,
                     subtitle = "GitHub · burgessjp/AI-News-Hub",
-                    showDivider = false,
                     onClick = { onOpenUrl("https://github.com/burgessjp/AI-News-Hub", projectSourceTitle) }
                 )
             }

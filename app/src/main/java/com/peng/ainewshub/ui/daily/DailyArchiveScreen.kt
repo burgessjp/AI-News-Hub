@@ -14,7 +14,6 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -95,7 +94,6 @@ fun DailyArchiveScreen(
                         EmptyState(
                             title = stringResource(R.string.daily_archive_empty_title),
                             subtitle = stringResource(R.string.daily_archive_empty_subtitle),
-                            icon = Icons.Outlined.Inventory2,
                             actionLabel = stringResource(R.string.common_retry),
                             onAction = { vm.loadArchive() }
                         )

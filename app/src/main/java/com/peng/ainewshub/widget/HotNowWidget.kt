@@ -7,7 +7,6 @@ import android.graphics.Typeface
 import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -46,33 +45,25 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import com.peng.ainewshub.MainActivity
 import com.peng.ainewshub.R
-import com.peng.ainewshub.data.prefs.AppSkin
-import com.peng.ainewshub.data.prefs.SettingsStore
 import com.peng.ainewshub.data.repo.SummaryRepository
 import com.peng.ainewshub.ui.i18n.AppLocale
+import com.peng.ainewshub.ui.theme.AppAlpha
+import com.peng.ainewshub.ui.theme.DarkPrimary
 import com.peng.ainewshub.ui.theme.DarkErrorContainer
 import com.peng.ainewshub.ui.theme.DarkOnBackground
 import com.peng.ainewshub.ui.theme.DarkOnErrorContainer
 import com.peng.ainewshub.ui.theme.DarkOnPrimary
-import com.peng.ainewshub.ui.theme.DarkOnPrimaryContainer
 import com.peng.ainewshub.ui.theme.DarkOnSurfaceVariant
-import com.peng.ainewshub.ui.theme.DarkOnTertiary
-import com.peng.ainewshub.ui.theme.DarkOnTertiaryContainer
-import com.peng.ainewshub.ui.theme.DarkPrimaryContainer
+import com.peng.ainewshub.ui.theme.DarkOutlineVariant
 import com.peng.ainewshub.ui.theme.DarkSurfaceContainerHigh
-import com.peng.ainewshub.ui.theme.DarkTertiary
-import com.peng.ainewshub.ui.theme.DarkTertiaryContainer
 import com.peng.ainewshub.ui.theme.LightErrorContainer
 import com.peng.ainewshub.ui.theme.LightOnBackground
 import com.peng.ainewshub.ui.theme.LightOnErrorContainer
 import com.peng.ainewshub.ui.theme.LightOnPrimary
 import com.peng.ainewshub.ui.theme.LightOnSurfaceVariant
-import com.peng.ainewshub.ui.theme.LightOnTertiary
-import com.peng.ainewshub.ui.theme.LightOnTertiaryContainer
+import com.peng.ainewshub.ui.theme.LightOutlineVariant
 import com.peng.ainewshub.ui.theme.LightPrimary
 import com.peng.ainewshub.ui.theme.LightSurfaceContainerHigh
-import com.peng.ainewshub.ui.theme.LightTertiary
-import com.peng.ainewshub.ui.theme.LightTertiaryContainer
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -127,22 +118,18 @@ class HotNowWidget : GlanceAppWidget() {
             HotNowWidgetUpdater.refresh(context, force = false, triggerUpdate = false)
             state = HotNowWidgetStore.read(context)
         }
-        // 皮肤跟随 App 设置:Glance 拿不到 Compose 的 LocalAppSkin,provideGlance
-        // 是 suspend,直接读 DataStore 一次(范式同 AppLocale/TranslateSelectionActivity);
-        // 切皮肤时 AiNewsHubApp 会主动 updateAll 触发重绘,系统 30min 周期刷新兜底自愈
-        val mono = SettingsStore(context).prefsFlow.first().skin == AppSkin.Mono
         provideContent {
             GlanceTheme {
-                Content(context, state, mono)
+                Content(context, state)
             }
         }
     }
 
     @Composable
-    private fun Content(context: Context, state: HotNowWidgetState, mono: Boolean) {
+    private fun Content(context: Context, state: HotNowWidgetState) {
         // 小组件无 attachBaseContext:取词统一经 AppLocale.wrap 后的 context(下传各子组件)
         val ctx = AppLocale.wrap(context)
-        val colors = widgetColors(mono)
+        val colors = widgetColors()
         Column(
             modifier = GlanceModifier
                 .fillMaxSize()
@@ -454,82 +441,62 @@ class HotNowWidget : GlanceAppWidget() {
 }
 
 /**
- * 小组件配色 —— App 设计令牌(ui/theme/Color.kt)的 day/night ColorProvider 封装。
- * 不用 GlanceTheme 壁纸动态色,保证小组件与 App 观感同源。
- * 按皮肤经 [widgetColors] 构造两套:Classic 绑 Color.kt 顶层令牌;Mono 内联
- * MonoLight/MonoDarkColors 对应槽位(该色板无顶层命名常量,改 Color.kt 须同步)。
- * 卡面/渐变头 drawable resId 一并携带:明暗走 day/night 限定符,皮肤走 resId 分支
- * (_mono 变体,皮肤×明暗四象限,同 BrandWordmark 的做法)。
+ * 小组件配色 —— App 设计令牌(ui/theme/Color.kt 纸墨日报板)的 day/night
+ * ColorProvider 封装,单一风格(皮肤体系已随 v1.4.0 移除)。头部为报纸红实底
+ * (drawable 纯色,非渐变);排名徽章 1-2 名红底、其余纸灰底。
  */
 private class WidgetColors(
     /** 标题/空态正文。 */
     val onBackground: GlanceColorProvider,
-    /** 头部标题/图标前景(onPrimary)。 */
+    /** 头部标题/图标前景(红底上的纸白)。 */
     val headerText: GlanceColorProvider,
-    /** 头部「截至」时间(onPrimary 85% 弱化,对应 AppAlpha.primaryEmphasis)。 */
+    /** 头部「截至」时间(纸白 85% 弱化)。 */
     val headerMeta: GlanceColorProvider,
-    /** 头部刷新圆钮底(onPrimary 18% overlay,对应 AppAlpha.onPrimaryOverlay)。 */
+    /** 头部刷新圆钮底(纸白 18% overlay)。 */
     val headerBtnBg: GlanceColorProvider,
-    /** 第 1 名:tertiary 实心(唯一强强调)。 */
+    /** 第 1-2 名:报纸红实心。 */
     val badgeTopBg: GlanceColorProvider,
     val badgeTopFg: GlanceColorProvider,
-    /** 第 2-3 名:tertiaryContainer。 */
+    /** 第 3 名(保留槽位,观感同其余)。 */
     val badgeMidBg: GlanceColorProvider,
     val badgeMidFg: GlanceColorProvider,
     /** 其余:surfaceContainerHigh 低对比。 */
     val badgeRestBg: GlanceColorProvider,
     val badgeRestFg: GlanceColorProvider,
-    /** 行间发丝线(outlineVariant 50%,App HairlineDivider 观感)。 */
+    /** 行间发丝线(outlineVariant 50%)。 */
     val divider: GlanceColorProvider,
-    /** 空态重试胶囊:primary(深色 primaryContainer)实心 + 对比前景。 */
+    /** 空态重试胶囊:primary 实心 + 对比前景。 */
     val emptyActionBg: GlanceColorProvider,
     val emptyActionText: GlanceColorProvider,
-    /** breaking 胶囊:errorContainer 底 + onErrorContainer 字。 */
+    /** 突发胶囊:errorContainer 底 + onErrorContainer 字。 */
     val breakingBg: GlanceColorProvider,
     val breakingText: GlanceColorProvider,
     /** 卡片背景 drawable。 */
     val cardBgRes: Int,
-    /** 渐变头 drawable。 */
+    /** 头部红实底 drawable。 */
     val headerBgRes: Int
 )
 
-/** 按皮肤构造小组件配色。 */
-private fun widgetColors(mono: Boolean): WidgetColors = if (mono) WidgetColors(
-    // Mono(纸墨):渐变头浅色 = 墨黑→深灰、白字,深色 = 纸白→浅灰白、黑字
-    // (与 BrandGradient = primary→secondary 同构);error 系刻意沿用 Classic 红
-    // (紧急语义不随皮肤降级,与 Color.kt Mono 色板的决策一致)
-    onBackground = ColorProvider(day = Color(0xFF141414), night = Color(0xFFF1F1F1)),
-    headerText = ColorProvider(day = Color(0xFFFFFFFF), night = Color(0xFF111111)),
-    headerMeta = ColorProvider(day = Color(0xD9FFFFFF), night = Color(0xD9111111)),
-    headerBtnBg = ColorProvider(day = Color(0x2EFFFFFF), night = Color(0x2E111111)),
-    badgeTopBg = ColorProvider(day = Color(0xFF4D4D4D), night = Color(0xFFD0D0D0)),
-    badgeTopFg = ColorProvider(day = Color(0xFFFFFFFF), night = Color(0xFF2A2A2A)),
-    badgeMidBg = ColorProvider(day = Color(0xFF696969), night = Color(0xFF5C5C5C)),
-    badgeMidFg = ColorProvider(day = Color(0xFFF5F5F5), night = Color(0xFFF0F0F0)),
-    badgeRestBg = ColorProvider(day = Color(0xFFEDEDED), night = Color(0xFF262626)),
-    badgeRestFg = ColorProvider(day = Color(0xFF4D4D4D), night = Color(0xFFC9C9C9)),
-    divider = ColorProvider(day = Color(0x80D9D9D9), night = Color(0x80474747)),
-    emptyActionBg = ColorProvider(day = Color(0xFF000000), night = Color(0xFFF5F5F5)),
-    emptyActionText = ColorProvider(day = Color(0xFFFFFFFF), night = Color(0xFF111111)),
-    breakingBg = ColorProvider(day = LightErrorContainer, night = DarkErrorContainer),
-    breakingText = ColorProvider(day = LightOnErrorContainer, night = DarkOnErrorContainer),
-    cardBgRes = R.drawable.widget_bg_mono,
-    headerBgRes = R.drawable.widget_header_gradient_mono
-) else WidgetColors(
-    // Classic:全部绑 Color.kt 顶层令牌(day/night 成对)
+/** 构造小组件配色(纸墨日报单套,绑 Color.kt 顶层令牌 day/night 成对)。 */
+private fun widgetColors(): WidgetColors = WidgetColors(
     onBackground = ColorProvider(day = LightOnBackground, night = DarkOnBackground),
-    headerText = ColorProvider(day = LightOnPrimary, night = DarkOnPrimary),
-    headerMeta = ColorProvider(day = Color(0xD9FFFFFF), night = Color(0xD9002C9A)),
-    headerBtnBg = ColorProvider(day = Color(0x2EFFFFFF), night = Color(0x2E002C9A)),
-    badgeTopBg = ColorProvider(day = LightTertiary, night = DarkTertiary),
-    badgeTopFg = ColorProvider(day = LightOnTertiary, night = DarkOnTertiary),
-    badgeMidBg = ColorProvider(day = LightTertiaryContainer, night = DarkTertiaryContainer),
-    badgeMidFg = ColorProvider(day = LightOnTertiaryContainer, night = DarkOnTertiaryContainer),
+    // 头部为固定报纸红 drawable(day/night 同红系,night 压暗),前景恒纸白
+    // (LightOnPrimary 即纸白令牌;暗色 onPrimary 深褐是配 DarkPrimary 用的,压暗红上不可读)
+    headerText = ColorProvider(day = LightOnPrimary, night = LightOnPrimary),
+    headerMeta = ColorProvider(day = LightOnPrimary.copy(alpha = AppAlpha.primaryEmphasis),
+        night = LightOnPrimary.copy(alpha = AppAlpha.primaryEmphasis)),
+    headerBtnBg = ColorProvider(day = LightOnPrimary.copy(alpha = AppAlpha.onPrimaryOverlay),
+        night = LightOnPrimary.copy(alpha = AppAlpha.onPrimaryOverlay)),
+    badgeTopBg = ColorProvider(day = LightPrimary, night = DarkPrimary),
+    badgeTopFg = ColorProvider(day = LightOnPrimary, night = DarkOnPrimary),
+    badgeMidBg = ColorProvider(day = LightSurfaceContainerHigh, night = DarkSurfaceContainerHigh),
+    badgeMidFg = ColorProvider(day = LightOnSurfaceVariant, night = DarkOnSurfaceVariant),
     badgeRestBg = ColorProvider(day = LightSurfaceContainerHigh, night = DarkSurfaceContainerHigh),
     badgeRestFg = ColorProvider(day = LightOnSurfaceVariant, night = DarkOnSurfaceVariant),
-    divider = ColorProvider(day = Color(0x80C3C5D9), night = Color(0x80434656)),
-    emptyActionBg = ColorProvider(day = LightPrimary, night = DarkPrimaryContainer),
-    emptyActionText = ColorProvider(day = LightOnPrimary, night = DarkOnPrimaryContainer),
+    divider = ColorProvider(day = LightOutlineVariant.copy(alpha = AppAlpha.hairlineOverlay),
+        night = DarkOutlineVariant.copy(alpha = AppAlpha.hairlineOverlay)),
+    emptyActionBg = ColorProvider(day = LightPrimary, night = DarkPrimary),
+    emptyActionText = ColorProvider(day = LightOnPrimary, night = DarkOnPrimary),
     breakingBg = ColorProvider(day = LightErrorContainer, night = DarkErrorContainer),
     breakingText = ColorProvider(day = LightOnErrorContainer, night = DarkOnErrorContainer),
     cardBgRes = R.drawable.widget_bg,

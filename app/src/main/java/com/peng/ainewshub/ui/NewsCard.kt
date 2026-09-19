@@ -1,6 +1,8 @@
 package com.peng.ainewshub.ui
 import android.content.Context
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -12,11 +14,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.LocalFireDepartment
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -137,12 +134,13 @@ fun NewsCard(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 if (item.selected) {
-                    Icon(
-                        Icons.Filled.Star,
-                        // 精选状态只靠图标表达,需向读屏声明(与 HotBadge 同风格)
-                        contentDescription = stringResource(R.string.news_card_cd_featured),
-                        tint = cs.primary,
-                        modifier = Modifier.size(12.dp)
+                    // 「精」字标:精选状态(去图标),读屏语义经 semantics 保留
+                    val featuredCd = stringResource(R.string.news_card_cd_featured)
+                    Text(
+                        text = "精",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = cs.primary,
+                        modifier = Modifier.semantics { contentDescription = featuredCd }
                     )
                 }
                 if (item.source.isNotBlank()) {
@@ -199,11 +197,10 @@ private fun HotBadge(score: Int) {
                     .padding(horizontal = 6.dp, vertical = 2.dp)
             )
     ) {
-        Icon(
-            Icons.Filled.LocalFireDepartment,
-            contentDescription = stringResource(R.string.news_card_cd_hot),
-            tint = tint,
-            modifier = Modifier.size(14.dp)
+        Text(
+            text = "热",
+            style = MaterialTheme.typography.labelSmall,
+            color = tint
         )
         Text(
             text = score.toString(),

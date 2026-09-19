@@ -49,7 +49,6 @@ sealed interface UpdateDownloadState {
  * 让用户关弹窗 / 离开关于页 / App 退后台后下载继续(此前下载协程挂在关于页
  * 组合作用域上,页面一退即取消)。
  *
- * 结构对齐 [com.peng.ainewshub.playback.TtsPlaybackService] 的纪律:
  *  - 任何 [onStartCommand] 路径先升前台(5 秒红线)再处理动作;类型 dataSync
  *    (targetSdk 34+ 强制声明,manifest 已配 FOREGROUND_SERVICE(_DATA_SYNC) 权限);
  *  - 仅由前台 UI 点击启动(companion [start]),取消可经通知栏 action(通知
@@ -183,7 +182,7 @@ class UpdateDownloadService : Service() {
             }
             setOngoing(true)
             setOnlyAlertOnce(true)
-            // 取消走 PendingIntent.getService(通知交互进系统临时放行,同 TtsPlaybackService)
+            // 取消走 PendingIntent.getService(通知交互进系统临时放行)
             addAction(
                 NotificationCompat.Action(
                     0,

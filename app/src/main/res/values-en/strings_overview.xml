@@ -8,14 +8,23 @@
     <string name="overview_breaking_tag">Breaking</string>
     <string name="overview_breaking_reason_label">Why it\'s breaking</string>
     <string name="overview_digest_title">Today\'s Digest</string>
+    <!-- Today tab Top10 section header -->
+    <string name="today_focus_section">Today\'s Top 10</string>
+    <!-- Today tab per-source section header trailing "view all" link (link + count) -->
+    <plurals name="today_source_view_all">
+        <item quantity="one">All %1$d item</item>
+        <item quantity="other">All %1$d items</item>
+    </plurals>
+    <!-- Count-less variant when the source digest has 0 items -->
+    <string name="today_source_view_all_plain">View all</string>
     <!-- Expand/collapse toggle for long digests (only rendered on overflow) -->
     <string name="overview_digest_expand">Expand</string>
     <string name="overview_digest_collapse">Collapse</string>
 
     <string name="overview_generated_at">Generated at %1$s</string>
     <string name="overview_data_until">Data as of %1$s</string>
-    <!-- Hero freshness caption: data-through + next batch expectation (from PipelineSchedule) -->
-    <string name="overview_freshness_caption">Data as of %1$s · next batch %2$s</string>
+    <!-- Hero freshness caption: edition + data-through + next batch expectation (from PipelineSchedule) -->
+    <string name="overview_freshness_caption">%1$s · data as of %2$s · next batch %3$s</string>
     <plurals name="overview_based_on_sources">
         <item quantity="one">Based on today\'s content from %1$d source</item>
         <item quantity="other">Based on today\'s content from %1$d sources</item>

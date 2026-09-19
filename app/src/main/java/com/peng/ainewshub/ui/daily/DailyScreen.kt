@@ -21,7 +21,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Thunderstorm
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -192,12 +191,6 @@ internal fun DailyContent(report: DailyReport, onOpen: (String) -> Unit, listSta
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.padding(horizontal = 18.dp)
                 ) {
-                    Icon(
-                        Icons.Filled.Thunderstorm,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.tertiary,
-                        modifier = Modifier.size(18.dp)
-                    )
                     Spacer(Modifier.width(6.dp))
                     Text(
                         stringResource(R.string.daily_flashes),

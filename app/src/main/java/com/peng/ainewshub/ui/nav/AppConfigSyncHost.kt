@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.first
 
 /**
  * 远程配置同步的进程级会话闸门:每次进程启动只拉一次(见 [AppConfigSyncHost])。
- * 与 NewDataPromptGate 同理 —— 挂根组合 `LaunchedEffect(Unit)`,旋转/语言切换等
+ * 挂根组合 `LaunchedEffect(Unit)`,旋转/语言切换等
  * Activity 重建都会重跑 effect,不加闸门一次会话内会重复打网络。
  */
 private object AppConfigSyncGate {

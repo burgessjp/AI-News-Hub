@@ -15,13 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.CurrencyYuan
-import androidx.compose.material.icons.filled.Hub
 import androidx.compose.material.icons.filled.Key
-import androidx.compose.material.icons.filled.Language
-import androidx.compose.material.icons.filled.Memory
-import androidx.compose.material.icons.filled.NetworkCheck
-import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -175,11 +169,8 @@ private fun AiServiceSection(
     val testFailedFmt = stringResource(R.string.aiservice_test_failed)
 
     SettingsRow(
-        icon = Icons.Filled.Translate,
-        iconAccent = cs.primary,
         title = stringResource(R.string.aiservice_translate_enabled),
         subtitle = stringResource(R.string.aiservice_translate_subtitle),
-        showDivider = true,
         trailing = {
             Switch(
                 checked = config.translateEnabled,
@@ -192,8 +183,6 @@ private fun AiServiceSection(
     )
 
     SettingsRow(
-        icon = Icons.Filled.Hub,
-        iconAccent = cs.secondary,
         title = stringResource(R.string.aiservice_provider),
         subtitle = stringResource(config.provider.labelRes),
         onClick = { showProviderDialog = true }
@@ -202,16 +191,12 @@ private fun AiServiceSection(
     // API 地址:预设只读展示(回填值),自定义可编辑
     if (config.provider == AiProvider.CUSTOM) {
         SettingsRow(
-            icon = Icons.Filled.Language,
-            iconAccent = cs.tertiary,
             title = apiUrlTitle,
             subtitle = config.baseUrl.ifBlank { notSetLabel },
             onClick = { editingField = "base" }
         )
     } else {
         SettingsRow(
-            icon = Icons.Filled.Language,
-            iconAccent = cs.tertiary,
             title = apiUrlTitle,
             subtitle = config.effectiveBaseUrl,
             showChevron = false
@@ -219,20 +204,15 @@ private fun AiServiceSection(
     }
 
     SettingsRow(
-        icon = Icons.Filled.Key,
-        iconAccent = cs.primary,
         title = apiKeyTitle,
         subtitle = if (config.apiKey.isBlank()) notSetLabel else setLabel,
         onClick = { editingField = "key" }
     )
 
     SettingsRow(
-        icon = Icons.Filled.Memory,
-        iconAccent = cs.secondary,
         title = modelTitle,
         subtitle = config.model.ifBlank { notSetLabel },
         // 测试连接行恒定跟随其后(不再按 CUSTOM 分档,下方测试行自己收尾)
-        showDivider = true,
         onClick = {
             if (config.provider == AiProvider.CUSTOM) editingField = "model"
             else showModelDialog = true
@@ -244,11 +224,8 @@ private fun AiServiceSection(
     // 统一映射(AiAuth/AiService 已分类);token 用量记账在翻译调用点,
     // 这里不经过,天然不污染用量统计。
     SettingsRow(
-        icon = Icons.Filled.NetworkCheck,
-        iconAccent = cs.tertiary,
         title = testTitle,
         subtitle = if (config.isReady) testSubtitle else requireConfigMsg,
-        showDivider = config.provider == AiProvider.CUSTOM,
         trailing = if (testing) {
             {
                 CircularProgressIndicator(
@@ -283,18 +260,13 @@ private fun AiServiceSection(
     // 自定义模型的估算单价(仅 CUSTOM;留空则只统计 token 不估算费用)
     if (config.provider == AiProvider.CUSTOM) {
         SettingsRow(
-            icon = Icons.Filled.CurrencyYuan,
-            iconAccent = cs.tertiary,
             title = inputPriceTitle,
             subtitle = config.customInputPrice.ifBlank { priceNotSetLabel },
             onClick = { editingField = "inputPrice" }
         )
         SettingsRow(
-            icon = Icons.Filled.CurrencyYuan,
-            iconAccent = cs.tertiary,
             title = outputPriceTitle,
             subtitle = config.customOutputPrice.ifBlank { priceNotSetLabel },
-            showDivider = false,
             onClick = { editingField = "outputPrice" }
         )
     }
@@ -431,8 +403,8 @@ private fun AiUsageSection(
     }
 
     val monthEntries = entries.filter { it.month == AiUsageStore.monthNow() }
-    UsageSummaryRow(title = stringResource(R.string.aiservice_this_month), entries = monthEntries, config = config, showDivider = true)
-    UsageSummaryRow(title = stringResource(R.string.aiservice_total), entries = entries, config = config, showDivider = true)
+    UsageSummaryRow(title = stringResource(R.string.aiservice_this_month), entries = monthEntries, config = config)
+    UsageSummaryRow(title = stringResource(R.string.aiservice_total), entries = entries, config = config)
 
     // 按模型明细(跨月合计)
     entries.groupBy { it.model }.forEach { (model, list) ->
@@ -452,7 +424,6 @@ private fun AiUsageSection(
                 R.string.aiservice_usage_stats,
                 formatTokens(prompt), formatTokens(completion), calls, costText
             ),
-            showDivider = true,
             showChevron = false
         )
     }
@@ -497,12 +468,11 @@ private fun AiUsageSection(
 private fun UsageSummaryRow(
     title: String,
     entries: List<AiUsageStore.Entry>,
-    config: AiConfig,
-    showDivider: Boolean
+    config: AiConfig
 ) {
     val context = LocalContext.current
     if (entries.isEmpty()) {
-        SettingsRow(title = title, subtitle = stringResource(R.string.aiservice_no_records), showDivider = showDivider, showChevron = false)
+        SettingsRow(title = title, subtitle = stringResource(R.string.aiservice_no_records), showChevron = false)
         return
     }
     val prompt = entries.sumOf { it.promptTokens }
@@ -522,7 +492,6 @@ private fun UsageSummaryRow(
             R.string.aiservice_usage_stats,
             formatTokens(prompt), formatTokens(completion), calls, costText
         ),
-        showDivider = showDivider,
         showChevron = false
     )
 }

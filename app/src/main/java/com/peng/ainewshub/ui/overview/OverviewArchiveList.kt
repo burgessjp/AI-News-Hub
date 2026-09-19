@@ -10,11 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -36,7 +32,7 @@ import com.peng.ainewshub.ui.components.archiveDateLabel
  * 索引键,倒序)。原为独立二级页(OverviewArchiveScreen),现抽出内容
  * composable 嵌入 hub,由 hub 持 VM 与滚动状态。
  *
- * 点击某天进入该日的总览页(OverviewDateScreen,复用总览 Tab 内容渲染)。
+ * 点击某天进入该日的总览页(OverviewDateScreen,复用「今天」页内容渲染)。
  * 视觉:左栏相对日期 + 周几,行间发丝线;无右栏计数(总览是跨源单份产物)。
  *
  * 纯归档语义;索引每源仅保留最近 90 天,更早的日期不在列表内
@@ -61,7 +57,6 @@ internal fun OverviewArchiveContent(
                 EmptyState(
                     title = stringResource(R.string.overview_archive_empty_title),
                     subtitle = stringResource(R.string.overview_archive_empty_subtitle),
-                    icon = Icons.Outlined.AutoAwesome
                 )
             } else {
                 LazyColumn(
@@ -114,10 +109,10 @@ private fun OverviewArchiveRow(date: String, onClick: () -> Unit) {
             fontWeight = FontWeight.Medium,
             modifier = Modifier.weight(1f)
         )
-        Icon(
-            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-            contentDescription = null,
-            tint = cs.outlineVariant
+        Text(
+            text = "›",
+            style = MaterialTheme.typography.titleMedium,
+            color = cs.outlineVariant
         )
     }
 }

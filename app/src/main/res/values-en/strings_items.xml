@@ -59,8 +59,7 @@
     <!-- Clear search history confirm dialog (same pattern as favorites/history clear) -->
     <string name="search_clear_history_title">Clear search history?</string>
     <string name="search_clear_history_message">All search history will be deleted. This can\'t be undone.</string>
-    <!-- Dedicated on-device search page (local index, entered from the Overview top bar) -->
-    <string name="local_search_cd">Search</string>
+    <!-- Dedicated on-device search page (local index; entered from the Today masthead or trends/cloud word tap) -->
     <string name="local_search_hint">Search browsed feeds…</string>
     <string name="local_search_intro_title">On-device search</string>
     <string name="local_search_intro_subtitle">An index is built automatically as you browse feeds online — search titles and summaries you\'ve seen</string>
@@ -85,13 +84,10 @@
     <!-- ===== Favorites (read later) ===== -->
     <string name="favorites_title">Favorites</string>
     <string name="favorites_empty_title">No favorites yet</string>
-    <string name="favorites_empty_subtitle">Tap the star on a page and it will appear here</string>
+    <string name="favorites_empty_subtitle">Tap “Save” on a page and it will appear here</string>
     <string name="favorites_clear_dialog_title">Clear favorites</string>
     <plurals name="favorites_clear_dialog_message">
         <item quantity="one">This will delete %1$d favorite. This cannot be undone.</item>
         <item quantity="other">This will delete all %1$d favorites. This cannot be undone.</item>
     </plurals>
-    <!-- Accessibility labels for the WebView top-bar star button -->
-    <string name="favorites_add_desc">Save to Favorites</string>
-    <string name="favorites_remove_desc">Remove from Favorites</string>
 </resources>

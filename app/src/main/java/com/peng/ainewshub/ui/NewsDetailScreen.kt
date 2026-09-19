@@ -11,18 +11,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.automirrored.filled.Article
-import androidx.compose.material.icons.automirrored.filled.MenuBook
-import androidx.compose.material.icons.outlined.Category
-import androidx.compose.material.icons.outlined.Language
-import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -33,7 +26,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -127,7 +119,6 @@ fun NewsDetailScreen(
                 Spacer(Modifier.height(20.dp))
                 if (showPerma) {
                     LinkCard(
-                        icon = Icons.AutoMirrored.Filled.MenuBook,
                         sourceName = readerPageLabel,
                         title = stringResource(R.string.detail_reader_link_title),
                         onClick = { onOpenUrl(item.permalink, readerPageLabel) }
@@ -136,7 +127,6 @@ fun NewsDetailScreen(
                 }
                 if (showRaw) {
                     LinkCard(
-                        icon = Icons.AutoMirrored.Filled.Article,
                         sourceName = item.source.ifBlank { originalLabel },
                         title = item.titleEn?.takeIf { it.isNotBlank() } ?: item.title,
                         onClick = { onOpenUrl(item.url, item.source.ifBlank { originalLabel }) }
@@ -168,18 +158,17 @@ private fun MetaRow(item: NewsItem) {
         ) {
             if (item.source.isNotBlank()) {
                 MetaItem(
-                    icon = Icons.Outlined.Language,
                     text = item.source,
                     modifier = Modifier.weight(1f, fill = false)
                 )
             }
             val cat = item.categoryLabelRes()?.let { stringResource(it) } ?: item.category.orEmpty()
             if (cat.isNotBlank()) {
-                MetaItem(icon = Icons.Outlined.Category, text = cat)
+                MetaItem(text = cat)
             }
             val time = relativeTime(context, item.publishedAt)
             if (time.isNotBlank()) {
-                MetaItem(icon = Icons.Outlined.Schedule, text = time)
+                MetaItem(text = time)
             }
         }
 
@@ -193,18 +182,11 @@ private fun MetaRow(item: NewsItem) {
 /** meta 项 —— 12dp 小图标 + 4dp 间距 + labelSmall 文本(单行省略)。 */
 @Composable
 private fun MetaItem(
-    icon: ImageVector,
     text: String,
     modifier: Modifier = Modifier
 ) {
     val cs = MaterialTheme.colorScheme
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-            icon,
-            contentDescription = null,
-            tint = cs.onSurfaceVariant,
-            modifier = Modifier.size(12.dp)
-        )
         Spacer(Modifier.width(4.dp))
         Text(
             text = text,
@@ -286,7 +268,6 @@ private fun EnTitleBlock(text: String) {
  */
 @Composable
 private fun LinkCard(
-    icon: ImageVector,
     sourceName: String,
     title: String,
     onClick: () -> Unit
@@ -302,12 +283,6 @@ private fun LinkCard(
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                icon,
-                contentDescription = null,
-                tint = cs.primary,
-                modifier = Modifier.size(20.dp)
-            )
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -326,11 +301,10 @@ private fun LinkCard(
                 )
             }
             Spacer(Modifier.width(8.dp))
-            Icon(
-                Icons.AutoMirrored.Filled.ArrowForward,
-                contentDescription = stringResource(R.string.detail_cd_open),
-                tint = cs.onSurfaceVariant,
-                modifier = Modifier.size(16.dp)
+            Text(
+                text = "›",
+                style = MaterialTheme.typography.titleMedium,
+                color = cs.onSurfaceVariant
             )
         }
     }

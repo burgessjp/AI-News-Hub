@@ -23,7 +23,7 @@ import com.peng.ainewshub.data.source.DEFAULT_SOURCE_ORDER
 /**
  * 关于 · 数据来源二级页 —— 从关于页「资源」组进入。
  *
- * 列出 8 个源(与信息源页 / 摘要 Tab 同一套元数据,来自 [sourceMeta]),顺序固定用
+ * 列出 8 个源(与信息源页 / 「今天」页分源区块同一套元数据,来自 [sourceMeta]),顺序固定用
  * [DEFAULT_SOURCE_ORDER](关于域是 App 静态说明,不跟随用户自定义顺序)。
  *
  * 与「信息源」页([SourcesScreen])的分工:信息源页是浏览入口,点击进入 App 内
@@ -63,12 +63,9 @@ fun AboutSourcesScreen(
             DEFAULT_SOURCE_ORDER.forEachIndexed { idx, key ->
                 item(key = key) {
                     val meta = sourceMeta(key)
-                    IconTileRow(
-                        icon = meta.icon,
-                        brand = meta.brand,
+                    MenuRow(
                         title = meta.title,
                         subtitle = meta.subtitle,
-                        showDivider = idx != DEFAULT_SOURCE_ORDER.lastIndex,
                         onClick = { onOpenUrl(meta.url, meta.title) }
                     )
                 }

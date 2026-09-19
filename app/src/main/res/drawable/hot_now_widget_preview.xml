@@ -1,81 +1,81 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 「今日热点」小组件在系统 picker 中的静态预览图(手绘 mock,对齐实装:
-     卡面色圆角底 + 1dp 描边 + 品牌蓝→紫渐变 Hero(白字标题 + 「截至」时间 + 半透明刷新圆钮 +
-     「今日综述」两行正文);条目为「迷你排名徽章(1 名橙红实心/2-3 浅橙/其余灰)+ 标题」,行间发丝线。 -->
+<!-- 「今日热点」小组件在系统 picker 中的静态预览图(手绘 mock,对齐纸墨日报实装:
+     纸白卡面圆角底 + 1dp 纸灰描边 + 报纸红实底 Hero(白字标题 + 「截至」时间 + 半透明刷新圆钮 +
+     「今日综述」两行正文);条目为「迷你排名徽章(1-2 名报纸红实心/其余纸灰)+ 墨字标题」,
+     行间发丝线。色值与 widget_bg / widget_header_gradient / theme/Color.kt 同源。 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="240dp"
     android:height="140dp"
     android:viewportWidth="240"
     android:viewportHeight="140">
-    <!-- 卡片底(surfaceContainerLow #F1F3FF)+ 1dp outlineVariant 描边(#C3C5D9) -->
+    <!-- 卡片底(纸白 #FBFAF7)+ 1dp 纸灰描边(#E4E0D6) -->
     <path
-        android:fillColor="#FFF1F3FF"
-        android:strokeColor="#FFC3C5D9"
+        android:fillColor="#FFFBFAF7"
+        android:strokeColor="#FFE4E0D6"
         android:strokeWidth="1"
         android:pathData="M16,0.5h208c8.58,0 15.5,6.92 15.5,15.5v108c0,8.58 -6.92,15.5 -15.5,15.5H16c-8.58,0 -15.5,-6.92 -15.5,-15.5V16C0.5,7.42 7.42,0.5 16,0.5z" />
-    <!-- 渐变 Hero(#003EC7 → #6B38D4,顶部两角 16dp 圆角) -->
-    <path android:pathData="M16,0h208c8.84,0 16,7.16 16,16v44H0V16C0,7.16 7.16,0 16,0z">
-        <aapt:attr name="android:fillColor">
-            <gradient
-                android:type="linear"
-                android:startX="0"
-                android:startY="30"
-                android:endX="240"
-                android:endY="30"
-                android:startColor="#FF003EC7"
-                android:endColor="#FF6B38D4" />
-        </aapt:attr>
-    </path>
-    <!-- 头部标题「AI 热点」(白字 mock) -->
+    <!-- 报纸红实底 Hero(#B93B1D,顶部两角 16dp 圆角) -->
     <path
-        android:fillColor="#FFFFFFFF"
+        android:fillColor="#FFB93B1D"
+        android:pathData="M16,0h208c8.84,0 16,7.16 16,16v44H0V16C0,7.16 7.16,0 16,0z" />
+    <!-- 头部标题「今日热点」(纸白字 mock) -->
+    <path
+        android:fillColor="#FFFFF8F4"
         android:pathData="M14,13.5h46a4,4 0 0 1 4,4v0a4,4 0 0 1 -4,4H14a4,4 0 0 1 -4,-4v0a4,4 0 0 1 4,-4z" />
-    <!-- 头部「截至」时间(白 85% mock) -->
+    <!-- 头部「截至」时间(纸白 85% mock) -->
     <path
-        android:fillColor="#D9FFFFFF"
+        android:fillColor="#D9FFF8F4"
         android:pathData="M150,14.5h40a3,3 0 0 1 3,3v0a3,3 0 0 1 -3,3h-40a3,3 0 0 1 -3,-3v0a3,3 0 0 1 3,-3z" />
-    <!-- 头部刷新圆钮(白 18% overlay mock) -->
+    <!-- 头部刷新圆钮(纸白 18% overlay mock) -->
     <path
-        android:fillColor="#2EFFFFFF"
+        android:fillColor="#2EFFF8F4"
         android:pathData="M222,17.5m-8.5,0a8.5,8.5 0 1,1 17,0a8.5,8.5 0 1,1 -17,0" />
-    <!-- 「今日综述」正文(白 90% mock,两行截断) -->
+    <!-- 「今日综述」正文(纸白 90% mock,两行截断) -->
     <path
-        android:fillColor="#E6FFFFFF"
+        android:fillColor="#E6FFF8F4"
         android:pathData="M14,30h196a3,3 0 0 1 3,3v1a3,3 0 0 1 -3,3H14a3,3 0 0 1 -3,-3v-1a3,3 0 0 1 3,-3z" />
     <path
-        android:fillColor="#E6FFFFFF"
+        android:fillColor="#E6FFF8F4"
         android:pathData="M14,39h120a3,3 0 0 1 3,3v1a3,3 0 0 1 -3,3H14a3,3 0 0 1 -3,-3v-1a3,3 0 0 1 3,-3z" />
 
-    <!-- 条目 1:Top1 橙红实心徽章(tertiary #952200)+ 标题 -->
+    <!-- 条目 1:Top1 报纸红实心徽章(#B93B1D)+ 纸白衬线数字 mock + 墨字标题 -->
     <path
-        android:fillColor="#FF952200"
+        android:fillColor="#FFB93B1D"
         android:pathData="M12,64h13a5,5 0 0 1 5,5v8a5,5 0 0 1 -5,5h-13a5,5 0 0 1 -5,-5v-8a5,5 0 0 1 5,-5z" />
     <path
-        android:fillColor="#FF141B2B"
-        android:pathData="M38,66h118a3,3 0 0 1 3,3v2a3,3 0 0 1 -3,3H38a3,3 0 0 1 -3,-3v-2a3,3 0 0 1 3,-3z" />
-    <!-- 发丝线 1(outlineVariant 50%) -->
+        android:fillColor="#FFFFF8F4"
+        android:pathData="M16.5,68h4a1.2,1.2 0 0 1 1.2,1.2v0a1.2,1.2 0 0 1 -1.2,1.2h-4a1.2,1.2 0 0 1 -1.2,-1.2v0a1.2,1.2 0 0 1 1.2,-1.2z" />
     <path
-        android:fillColor="#80C3C5D9"
+        android:fillColor="#FF1B1A17"
+        android:pathData="M38,66h118a3,3 0 0 1 3,3v2a3,3 0 0 1 -3,3H38a3,3 0 0 1 -3,-3v-2a3,3 0 0 1 3,-3z" />
+    <!-- 发丝线 1(纸灰 50%) -->
+    <path
+        android:fillColor="#80E4E0D6"
         android:pathData="M38,88h190v1h-190z" />
 
-    <!-- 条目 2:2-3 名浅橙徽章(tertiaryContainer #BF3003)+ 标题 -->
+    <!-- 条目 2:Top2 同为报纸红实心徽章 + 墨字标题 -->
     <path
-        android:fillColor="#FFBF3003"
+        android:fillColor="#FFB93B1D"
         android:pathData="M12,94h13a5,5 0 0 1 5,5v8a5,5 0 0 1 -5,5h-13a5,5 0 0 1 -5,-5v-8a5,5 0 0 1 5,-5z" />
     <path
-        android:fillColor="#FF141B2B"
+        android:fillColor="#FFFFF8F4"
+        android:pathData="M16.5,98h4a1.2,1.2 0 0 1 1.2,1.2v0a1.2,1.2 0 0 1 -1.2,1.2h-4a1.2,1.2 0 0 1 -1.2,-1.2v0a1.2,1.2 0 0 1 1.2,-1.2z" />
+    <path
+        android:fillColor="#FF1B1A17"
         android:pathData="M38,96h150a3,3 0 0 1 3,3v2a3,3 0 0 1 -3,3H38a3,3 0 0 1 -3,-3v-2a3,3 0 0 1 3,-3z" />
     <!-- 发丝线 2 -->
     <path
-        android:fillColor="#80C3C5D9"
+        android:fillColor="#80E4E0D6"
         android:pathData="M38,118h190v1h-190z" />
 
-    <!-- 条目 3:其余灰徽章(surfaceContainerHigh #E1E8FD)+ 标题(自然截断) -->
+    <!-- 条目 3:其余纸灰徽章(surfaceContainerHigh #ECE8DE)+ 墨字标题(自然截断) -->
     <path
-        android:fillColor="#FFE1E8FD"
+        android:fillColor="#FFECE8DE"
         android:pathData="M12,124h13a5,5 0 0 1 5,5v8a5,5 0 0 1 -5,5h-13a5,5 0 0 1 -5,-5v-8a5,5 0 0 1 5,-5z" />
     <path
-        android:fillColor="#FF141B2B"
+        android:fillColor="#FF6B675E"
+        android:pathData="M16.5,128h4a1.2,1.2 0 0 1 1.2,1.2v0a1.2,1.2 0 0 1 -1.2,1.2h-4a1.2,1.2 0 0 1 -1.2,-1.2v0a1.2,1.2 0 0 1 1.2,-1.2z" />
+    <path
+        android:fillColor="#FF1B1A17"
         android:pathData="M38,126h96a3,3 0 0 1 3,3v2a3,3 0 0 1 -3,3H38a3,3 0 0 1 -3,-3v-2a3,3 0 0 1 3,-3z" />
 </vector>

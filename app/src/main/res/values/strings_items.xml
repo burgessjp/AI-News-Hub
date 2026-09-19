@@ -75,8 +75,7 @@
     <!-- 清空搜索历史确认弹窗(与收藏/历史清空同范式) -->
     <string name="search_clear_history_title">清空搜索历史？</string>
     <string name="search_clear_history_message">将删除全部搜索记录,此操作不可撤销。</string>
-    <!-- 本地搜索独立页(设备内索引,总览顶栏进入;与联网搜索页互不相干) -->
-    <string name="local_search_cd">搜索</string>
+    <!-- 本地搜索独立页(设备内索引;「今天」报头与热词/词云带词进入) -->
     <string name="local_search_hint">搜索已浏览的资讯…</string>
     <string name="local_search_intro_title">本地搜索</string>
     <string name="local_search_intro_subtitle">联网浏览各源时自动建立索引，可搜标题与摘要</string>
@@ -98,19 +97,16 @@
     <string name="history_group_by_host">域名</string>
     <string name="history_empty_title">还没有浏览记录</string>
     <string name="history_empty_subtitle">打开过的网页会出现在这里</string>
-    <!-- 左滑删除图标的无障碍描述 -->
+    <!-- 左滑删除的文字按钮 -->
     <string name="history_delete">删除</string>
 
     <!-- ===== 收藏(稍后读) ===== -->
     <string name="favorites_title">收藏</string>
     <string name="favorites_empty_title">还没有收藏</string>
-    <string name="favorites_empty_subtitle">在网页右上角点星标,收藏的文章会出现在这里</string>
+    <string name="favorites_empty_subtitle">在网页右上角点「收藏」,收藏的文章会出现在这里</string>
     <!-- 清空确认对话框 -->
     <string name="favorites_clear_dialog_title">清空收藏</string>
     <plurals name="favorites_clear_dialog_message">
         <item quantity="other">将删除全部 %1$d 条收藏,此操作不可撤销。</item>
     </plurals>
-    <!-- WebView 顶栏星标按钮的无障碍描述 -->
-    <string name="favorites_add_desc">收藏本页</string>
-    <string name="favorites_remove_desc">取消收藏</string>
 </resources>

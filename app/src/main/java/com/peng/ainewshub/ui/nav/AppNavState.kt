@@ -17,7 +17,7 @@ import com.peng.ainewshub.ui.components.AppTab
  * 多栈导航状态机 —— 顶层壳 AiNewsHubApp 的导航模型收编为单类。
  *
  * 模型:
- *  - currentTab: 当前选中的 5 个根 tab 之一(总览 / 摘要 / 关注 / 趋势 / 更多)
+ *  - currentTab: 当前选中的 3 个根 tab 之一(今天 / 热词 / 更多)
  *  - pageStacks: 每个 tab 独立的二级页栈(栈空 = 处于根)
  *
  * 行为(与原 AiNewsHubApp 内联实现逐条一致):
@@ -110,7 +110,7 @@ private const val SAVER_KEY_TAB = "currentTab"
 @Composable
 internal fun rememberAppNavState(webFallbackTitle: String): AppNavState =
     rememberSaveable(saver = appNavStateSaver(webFallbackTitle)) {
-        AppNavState(AppTab.Overview, emptyMap())
+        AppNavState(AppTab.Today, emptyMap())
     }
 
 /** AppNavState 持久化:每 tab 一个栈键(格式同 [stacksToBundle])+ 追加 currentTab 键。 */
@@ -121,8 +121,10 @@ private fun appNavStateSaver(webFallbackTitle: String) = Saver<AppNavState, Bund
         }
     },
     restore = { b ->
+        // 旧版本 Bundle 里存的是已移除的 tab 名(Overview/Summary/Follows/Trends),
+        // firstOrNull 落空 → 兜底回默认「今天」;旧 tab 名下的页栈也被 stacksFromBundle 丢弃
         val tab = AppTab.entries.firstOrNull { it.name == b.getString(SAVER_KEY_TAB) }
-            ?: AppTab.Overview
+            ?: AppTab.Today
         AppNavState(tab, stacksFromBundle(b, webFallbackTitle))
     }
 )
