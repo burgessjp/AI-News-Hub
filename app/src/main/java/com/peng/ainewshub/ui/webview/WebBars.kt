@@ -7,6 +7,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -19,6 +20,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
@@ -100,7 +102,8 @@ internal fun WebBottomBar(
         )
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
         ) {
             WebBarItem(
                 label = stringResource(R.string.webview_bar_back),
@@ -160,15 +163,19 @@ private fun WebBarItem(
         enabled -> cs.onSurfaceVariant
         else -> cs.outline
     }
-    Text(
-        text = label,
-        style = AppText.bodySmall,
-        fontWeight = if (highlight) FontWeight.SemiBold else FontWeight.Normal,
-        color = color,
-        maxLines = 1,
+    Box(
         modifier = modifier
             .clickable(enabled = enabled, onClick = onClick)
-            .heightIn(min = 48.dp)
-            .padding(horizontal = 4.dp)
-    )
+            .heightIn(min = 48.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = label,
+            style = AppText.bodySmall,
+            fontWeight = if (highlight) FontWeight.SemiBold else FontWeight.Normal,
+            color = color,
+            maxLines = 1,
+            modifier = Modifier.padding(horizontal = 4.dp)
+        )
+    }
 }
