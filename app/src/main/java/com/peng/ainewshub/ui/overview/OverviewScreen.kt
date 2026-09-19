@@ -3,21 +3,16 @@ package com.peng.ainewshub.ui.overview
 import android.content.Context
 import androidx.compose.ui.platform.LocalContext
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -66,11 +61,11 @@ import java.util.Locale
  *  - [OverviewLead] / [TopEntryRow] / [OverviewFooter] 等:TodayScreen 逐 item 复用
  *
  * 结构(编辑风,去卡片化):
- *  - 首屏 digest Hero:[BrandGradient] 通栏 = 「今日综述」label + digest 正文
- *    + 刊名/时效 caption(digest 空串退化为纯文本时效行)——首屏焦点即 AI 综合产物
+ *  - 首屏 digest Hero:刊期标签行(日期/刊名/数据截至)+ 衬线 digest 正文
+ *    (digest 空串退化为纯文本刊期行)——首屏焦点即 AI 综合产物
  *    (权重反转:渐变焦点从单条新闻收口到综述,对齐「渐变只用于 AI 特性」纪律)
- *  - Top10 平铺列表:无卡片容器、无头条特殊位,行间 0.5dp 发丝线(缩进对齐文字列);
- *    breaking 条目带「突发」标签,推荐理由为左侧 2dp 竖条引述块
+ *  - Top10 平铺列表:无卡片容器、无头条特殊位,行间不画线、靠行距分层;
+ *    breaking 条目带红色「头条 ·」内联前缀,描述位由推荐理由顶替 AI 一句话
  *  - 页脚:生成时间 / 基于源数 / 缺源标注(刊名/「数据截至」已由首屏 Hero 承载,不重复)
  */
 
@@ -113,7 +108,7 @@ internal fun OverviewContent(
             bottom = if (bottomReserve) BottomBarPillHeight + 16.dp else 24.dp
         )
     ) {
-        // 首屏 digest Hero:今日综述 + 时效 caption(两者都缺失时不占位)
+        // 首屏 digest Hero:综述正文 + 刊期标签行(两者都缺失时不占位)
         if (digest.dataFetchedAt > 0 || digest.digest.isNotBlank()) {
             item(key = "lead", contentType = "lead") {
                 OverviewLead(digest = digest)
@@ -121,7 +116,7 @@ internal fun OverviewContent(
         }
 
         // Top10 全量平铺(去卡片,无头条特殊位;breaking 条目数据层已排最前,
-        // 由「Breaking」标签承接强调)。行间不画线,靠行自身 14dp 纵向 padding 留白分层
+        // 由「头条」内联标签承接强调)。行间不画线,靠行自身 10dp 纵向 padding 留白分层
         val items = digest.items
         itemsIndexed(
             items,
@@ -146,17 +141,15 @@ internal fun OverviewContent(
  * 首屏 digest Hero —— 跨源「今日综述」的页面焦点区(权重反转:原头条渐变 Hero 已去除,
  * 渐变焦点从单条新闻收口到 AI 综合产物,对齐 Color.kt「渐变只用于 AI 特性」纪律)。
  *
- * 视觉(纸墨日报):双细线起头 → 报纸红 letterspaced「今日综述」栏目名 →
- * 衬线正文 → 底部发丝线收边。
+ * 视觉(纸墨日报):报纸红刊期行「M月d日 · 周x · 刊名 · 数据截至」(日期/时效
+ * 信息收拢于此,报头不再有日期副标题)→ 衬线正文。
  *
  * digest 折叠:长综述默认收 [DIGEST_COLLAPSED_LINES] 行,仅溢出时出现「展开/收起」
  * (onTextLayout 检测,短综述不渲染按钮);折叠态为瞬态 remember —— push Web 页
  * 返回后回落折叠(AnimatedContent 换页销毁页内 remember,项目无 SaveableStateHolder,
  * 与「默认折叠」意图一致)。
  *
- * 时效:归档一天只更数批,首屏让用户知道两件事——数据新鲜度(数据截至)与下次
- * 更新预期(下一批,批次唯一真相源 [PipelineSchedule]);「数据截至」由本区独占展示,
- * 页脚不再重复。digest 空串但 dataFetchedAt > 0(旧归档)退化为纯文本时效 caption。
+ * digest 空串但 dataFetchedAt > 0(旧归档)退化为纯文本刊期行。
  */
 @Composable
 internal fun OverviewLead(digest: OverviewDigest) {
@@ -173,14 +166,16 @@ internal fun OverviewLead(digest: OverviewDigest) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 18.dp, vertical = 14.dp)
+                    .padding(start = 18.dp, end = 18.dp, top = 10.dp, bottom = 6.dp)
             ) {
                 Text(
-                    text = stringResource(R.string.overview_digest_title),
+                    // 标签行即刊期行:日期/刊名/数据截至收在这一行(原报头日期副标题
+                    // 与本区底部时效 caption 的信息合并上移);日期取数据自身批次
+                    text = digestHeadline(context, digest),
                     style = AppText.caption,
                     fontWeight = FontWeight.SemiBold,
                     color = cs.primary,
-                    letterSpacing = 3.sp
+                    letterSpacing = 1.sp
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
@@ -209,20 +204,12 @@ internal fun OverviewLead(digest: OverviewDigest) {
                             .padding(vertical = 2.dp)
                     )
                 }
-                if (digest.dataFetchedAt > 0) {
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        text = freshnessCaption(context, digest),
-                        style = AppText.caption,
-                        color = cs.onSurfaceVariant
-                    )
-                }
             }
         }
     } else if (digest.dataFetchedAt > 0) {
-        // 旧归档无 digest 字段:退化为纯文本时效 caption,不占版面
+        // 旧归档无 digest 字段:退化为纯文本刊期行,不占版面
         Text(
-            text = freshnessCaption(context, digest),
+            text = digestHeadline(context, digest),
             style = AppText.caption,
             color = cs.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)
@@ -234,47 +221,35 @@ internal fun OverviewLead(digest: OverviewDigest) {
 private const val DIGEST_COLLAPSED_LINES = 6
 
 /**
- * 时效 caption:「刊名 · 数据截至 X · 下一批 Y」。刊名由数据自身 generatedAt 映射
- * 槽位序号(数据是哪批的就是哪刊,不拿当前时刻冒充);下一批由批次唯一真相源
- * [PipelineSchedule.nextBatchEpoch] 算出,按设备时区格式化(与「数据截至」
- * 同口径:北京定义、本地显示);格式化失败退化为不含下一批的短句。
+ * 综述区刊期行:「M月d日 · 周x · 刊名 · 数据截至 HH:mm」。
+ * 日期与刊名取数据自身批次时间(generatedAt,数据是哪批的就是哪天)——历史总览
+ * 日期页复用本组件时显示的是那一天刊期,不拿当前时刻冒充;generatedAt 缺失时
+ * 依次退到 dataFetchedAt。截至时刻来自 dataFetchedAt(≤0 的旧归档省略尾段)。
+ * 原报头日期副标题与综述下时效 caption 的信息都收拢到这一行。
  */
-private fun freshnessCaption(context: Context, digest: OverviewDigest): String {
-    val fetchedAt = formatFetchedAt(context, digest.dataFetchedAt)
-    val nextBatch = runCatching {
-        SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(PipelineSchedule.nextBatchEpoch()))
+private fun digestHeadline(context: Context, digest: OverviewDigest): String {
+    val basis = when {
+        digest.generatedAt > 0 -> digest.generatedAt
+        digest.dataFetchedAt > 0 -> digest.dataFetchedAt
+        else -> System.currentTimeMillis()
+    }
+    val datePart = runCatching {
+        SimpleDateFormat(context.getString(R.string.date_fmt_month_day_week), Locale.getDefault()).format(Date(basis))
     }.getOrDefault("")
-    return if (nextBatch.isNotEmpty()) {
-        val edition = editionLabel(context, PipelineSchedule.slotIndexOn(digest.generatedAt))
-        context.getString(R.string.overview_freshness_caption, edition, fetchedAt, nextBatch)
-    } else {
-        context.getString(R.string.overview_data_until, fetchedAt)
-    }
-}
-
-/** 「Breaking」标签 —— breaking 条目卡内的小胶囊(tertiary 实底,热度强调色)。 */
-@Composable
-private fun BreakingTag(modifier: Modifier = Modifier) {
-    val cs = MaterialTheme.colorScheme
-    Box(
-        modifier = modifier
-            .clip(MaterialTheme.shapes.extraSmall)
-            .background(cs.primary)
-            .padding(horizontal = 6.dp, vertical = 2.dp)
-    ) {
-        Text(
-            text = stringResource(R.string.overview_breaking_tag),
-            style = AppText.caption,
-            fontWeight = FontWeight.Bold,
-            color = cs.onPrimary
-        )
-    }
+    val edition = editionLabel(context, PipelineSchedule.slotIndexOn(basis))
+    val dateEdition = if (datePart.isEmpty()) edition else "$datePart · $edition"
+    if (digest.dataFetchedAt <= 0) return dateEdition
+    val asOf = runCatching {
+        SimpleDateFormat(context.getString(R.string.date_fmt_clock), Locale.getDefault()).format(Date(digest.dataFetchedAt))
+    }.getOrDefault("")
+    return if (asOf.isEmpty()) dateEdition
+    else "$dateEdition · " + context.getString(R.string.overview_data_until, asOf)
 }
 
 /**
- * 平铺热点行(1~10 名):[RankBadge] + 原标题 + AI 一句话 + 来源/指标,无卡片容器。
- * breaking 条目仅以「Breaking」标签提示,不加整行特殊背景;
- * 推荐理由为左侧 2dp 竖条引述块(原「卡中卡」面板随卡片容器一并去除)。
+ * 平铺热点行(1~10 名):[RankBadge] + 原标题 + 描述 + 来源/指标,无卡片容器。
+ * breaking 条目以红色「头条 ·」文字前缀内联在标题行首(随标题折行,不独占一行、无背景);
+ * 其描述位由推荐理由顶替 AI 一句话(独立的引述块不再渲染,行更紧凑)。
  */
 @Composable
 internal fun TopEntryRow(
@@ -286,21 +261,33 @@ internal fun TopEntryRow(
     isRead: Boolean = false
 ) {
     val cs = MaterialTheme.colorScheme
+    // 「头条」内联前缀(读屏可读):纯文字红色 SemiBold +「·」分隔,无背景——
+    // 与全 App 纯文字刊物语言一致,也免去行内背景按行高涂色的留白问题
+    val tagText = stringResource(R.string.overview_breaking_tag)
+    val title = remember(entry.title, entry.breaking, tagText, cs.primary) {
+        buildAnnotatedString {
+            if (entry.breaking) {
+                withStyle(
+                    SpanStyle(
+                        color = cs.primary,
+                        fontWeight = FontWeight.Bold
+                    )
+                ) { append("$tagText · ") }
+            }
+            append(entry.title)
+        }
+    }
     Row(
         modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 18.dp, vertical = 14.dp)
+            .padding(horizontal = 18.dp, vertical = 10.dp)
     ) {
         RankBadge(rank = rank, modifier = Modifier.padding(top = 1.dp))
         Spacer(Modifier.size(12.dp))
         Column(modifier = Modifier.weight(1f)) {
-            if (entry.breaking) {
-                BreakingTag()
-                Spacer(Modifier.height(4.dp))
-            }
             Text(
-                text = entry.title,
+                text = title,
                 style = AppText.body,
                 fontFamily = FontFamily.Serif,
                 // 头条升权:第 1 名 16sp SemiBold(大节头 17 之下、普通条目 14 之上),
@@ -311,48 +298,21 @@ internal fun TopEntryRow(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
-            if (entry.comment.isNotBlank()) {
+            // 描述位:breaking 条目由推荐理由顶替 AI 一句话(信息更锐利,
+            // 原独立引述块随密度优化并入此行)
+            val bodyText = when {
+                entry.breaking && entry.breakingReason.isNotBlank() -> entry.breakingReason
+                else -> entry.comment
+            }
+            if (bodyText.isNotBlank()) {
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    text = entry.comment,
+                    text = bodyText,
                     style = AppText.bodySmall,
                     color = cs.onSurfaceVariant,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
-            }
-            // Breaking 专属「推荐理由」引述块:左侧 2dp tertiary 竖条 + 标签正文单 Text
-            // 顺排(IntrinsicSize.Min 让竖条与文字等高)。
-            // 与 comment 语义区分:comment=为什么重要,推荐理由=为什么是突发。
-            if (entry.breaking && entry.breakingReason.isNotBlank()) {
-                Spacer(Modifier.height(6.dp))
-                val reasonLabel = stringResource(R.string.overview_breaking_reason_label)
-                val reason = remember(entry.breakingReason, cs.tertiary, reasonLabel) {
-                    buildAnnotatedString {
-                        withStyle(SpanStyle(color = cs.tertiary, fontWeight = FontWeight.SemiBold)) {
-                            append("$reasonLabel ")
-                        }
-                        append(entry.breakingReason)
-                    }
-                }
-                Row(modifier = Modifier.height(IntrinsicSize.Min)) {
-                    Box(
-                        modifier = Modifier
-                            .width(2.dp)
-                            .fillMaxHeight()
-                            .clip(MaterialTheme.shapes.small)
-                            .background(cs.tertiary)
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        text = reason,
-                        style = AppText.bodySmall,
-                        color = cs.onSurfaceVariant,
-                        modifier = Modifier.weight(1f),
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
             }
             Spacer(Modifier.height(6.dp))
             // 文末署名行(报纸署名语言):「—— 源名 · 指标」小灰字,破折号前缀把
@@ -412,18 +372,6 @@ internal fun OverviewFooter(digest: OverviewDigest) {
     }
 }
 
-/** 今天日期(系统时区),中文格式「M月d日 · 周x」,与「今天」页报头日期行同规格;模式串走 date_fmt_month_day_week。 */
-internal fun formatToday(context: Context): String =
-    runCatching {
-        SimpleDateFormat(context.getString(R.string.date_fmt_month_day_week), Locale.getDefault()).format(Date())
-    }.getOrDefault("")
-
 /** 生成时刻格式化为「HH:mm」。 */
 private fun formatClock(ms: Long): String =
     runCatching { SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(ms)) }.getOrDefault("")
-
-/** 数据时刻格式化(中文「M月d日 HH:mm」,与摘要卡头同规格);模式串走 date_fmt_month_day_time。 */
-private fun formatFetchedAt(context: Context, ms: Long): String =
-    runCatching {
-        SimpleDateFormat(context.getString(R.string.date_fmt_month_day_time), Locale.getDefault()).format(Date(ms))
-    }.getOrDefault(context.getString(R.string.overview_time_unknown))

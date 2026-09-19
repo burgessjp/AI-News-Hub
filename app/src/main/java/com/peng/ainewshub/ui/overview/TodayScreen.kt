@@ -48,7 +48,6 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.peng.ainewshub.R
-import com.peng.ainewshub.data.PipelineSchedule
 import com.peng.ainewshub.data.repo.SourceSummary
 import com.peng.ainewshub.data.repo.SummaryContent
 import com.peng.ainewshub.data.repo.SummaryRepository
@@ -63,7 +62,6 @@ import com.peng.ainewshub.ui.components.RankRowSkeletonList
 import com.peng.ainewshub.ui.components.SectionHeader
 import com.peng.ainewshub.ui.components.ShimmerBox
 import com.peng.ainewshub.ui.components.ShimmerHost
-import com.peng.ainewshub.ui.components.editionLabel
 import com.peng.ainewshub.ui.components.rememberHaptics
 import com.peng.ainewshub.ui.components.rememberReadUrls
 import com.peng.ainewshub.ui.more.sourceMeta
@@ -128,13 +126,13 @@ fun TodayScreen(
 
     val context = LocalContext.current
     val cs = MaterialTheme.colorScheme
-    val dateText = remember { formatToday(context) }
 
     Scaffold(
         containerColor = cs.surface,
         topBar = {
-            // 纸墨日报报头:居中字标 + 「日期 · 刊名」行 + 右侧本地搜索入口,
-            // 报头下双细线(线收敛后全 App 唯一的结构线);报头不再承担语音/刷新动作
+            // 纸墨日报报头:居中字标 + 右侧热词/本地搜索入口,报头下双细线
+            // (线收敛后全 App 唯一的结构线)。日期/刊名/数据截至移入综述区标签行,
+            // 报头不再承担日期副标题,与关注/更多页报头同构,首屏少占一行
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -145,23 +143,11 @@ fun TodayScreen(
                         .fillMaxWidth()
                         .statusBarsPadding()
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
+                    BrandWordmark(
                         modifier = Modifier
                             .align(Alignment.Center)
-                            .padding(top = 10.dp, bottom = 8.dp)
-                    ) {
-                        BrandWordmark()
-                        Text(
-                            // 「M月d日 · 周x · 刊名」:数据就绪后追加刊名(数据是哪批的就是哪刊)
-                            text = dateText + ((overviewState as? OverviewState.Success)?.let {
-                                " · " + editionLabel(context, PipelineSchedule.slotIndexOn(it.digest.generatedAt))
-                            } ?: ""),
-                            style = AppText.caption,
-                            color = cs.onSurfaceVariant,
-                            maxLines = 1
-                        )
-                    }
+                            .padding(top = 14.dp, bottom = 12.dp)
+                    )
                     // 报头动作位(右侧):热词榜入口 + 本地搜索。
                     // 文字按钮(去图标):纯排版语言,padding 撑足 48dp 触控高;搜索保持最右
                     Row(
@@ -467,7 +453,7 @@ private fun OverviewLoadingHint() {
 }
 
 /** 分源区块最多平铺的摘要条数:更多条目经区块头「查看全部」进源列表页。 */
-private const val SOURCE_SECTION_MAX_ITEMS = 2
+private const val SOURCE_SECTION_MAX_ITEMS = 3
 
 /**
  * 分源摘要区块头 —— 源图标(强调色)+ 源名 + 「新内容」圆点,右侧

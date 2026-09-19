@@ -95,6 +95,7 @@
     <string name="date_fmt_month_day">MMM d</string>
     <string name="date_fmt_month_day_week">EEE, MMM d</string>
     <string name="date_fmt_month_day_time">MMM d, HH:mm</string>
+    <string name="date_fmt_clock">HH:mm</string>
     <string name="date_fmt_full">yyyy-MM-dd</string>
     <string name="date_fmt_month_day_dash">MM-dd</string>
     <string name="date_fmt_month_day_time_dash">MM-dd HH:mm</string>

@@ -34,7 +34,8 @@ import com.peng.ainewshub.ui.theme.TrackingSection
  *  - 8dp 间距 + 标题(labelLarge/Bold + [TrackingSection] 字距 + onSurface)
  *  - 可选 [trailing](weight 撑开后右对齐)
  *
- * padding:默认水平 18dp 跟随各列表既有内容缩进;垂直上 12dp / 下 6dp,组间留白、组内收紧。
+ * padding:默认水平 18dp 跟随各列表既有内容缩进;垂直上 12dp / 下 6dp,组间留白、组内收紧
+ * (large 也用同一垂直节奏,靠字号/竖条区分层级——首屏密度优先)。
  * 调用方内容层已有统一水平边距时(如 ModalBottomSheet 内)传 [contentPadding] 清零
  * 水平缩进,保证与同层内容左对齐。
  *
@@ -42,7 +43,7 @@ import com.peng.ainewshub.ui.theme.TrackingSection
  * @param accent 竖条强调色,默认 primary;分组对照场景可传 secondary/tertiary
  * @param showAccent 是否显示左竖条(默认 true);弹层紧凑场景传 false 只留标题
  * @param large 日报大节头模式:「今日重点 / 我的关注」等版面栏目标题 ——
- *        竖条 3×15dp、衬线 [AppText.sectionHead](17sp SemiBold)、上方留白加大;
+ *        竖条 3×15dp、衬线 [AppText.sectionHead](17sp SemiBold);
  *        默认 false 维持紧凑小节样式(设置分组/弹层等)
  * @param contentPadding 章节条内边距,默认见上;已自带水平边距的场景可清零水平缩进
  * @param trailing 右侧可选内容
@@ -57,11 +58,8 @@ fun SectionHeader(
     contentPadding: PaddingValues? = null,
     trailing: @Composable (RowScope.() -> Unit)? = null
 ) {
-    val padding = contentPadding ?: if (large) {
-        PaddingValues(start = 18.dp, end = 18.dp, top = 20.dp, bottom = 6.dp)
-    } else {
-        PaddingValues(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 6.dp)
-    }
+    val padding = contentPadding
+        ?: PaddingValues(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 6.dp)
     Row(
         modifier = modifier
             .fillMaxWidth()

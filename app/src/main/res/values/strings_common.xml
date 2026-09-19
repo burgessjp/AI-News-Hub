@@ -102,6 +102,7 @@
     <string name="date_fmt_month_day">M月d日</string>
     <string name="date_fmt_month_day_week">M月d日 · E</string>
     <string name="date_fmt_month_day_time">M月d日 HH:mm</string>
+    <string name="date_fmt_clock">HH:mm</string>
     <string name="date_fmt_full">yyyy-MM-dd</string>
     <string name="date_fmt_month_day_dash">MM-dd</string>
     <string name="date_fmt_month_day_time_dash">MM-dd HH:mm</string>
