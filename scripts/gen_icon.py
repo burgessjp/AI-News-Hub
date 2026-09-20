@@ -6,8 +6,9 @@ Design: "星芒" (sparkle on a red seal)
   - Background: solid newspaper red (#B93B1D, LightPrimary of the paper-ink palette).
   - Foreground: paper (#FBFAF7) four-pointed sparkle —— astroid 星形线
     (x = a·cos³t, y = a·sin³t):四个锐利尖端 + 内凹弧边,业界通用的 AI 符号语汇。
-    尖端半径 0.322×size,逼近 adaptive 安全区(中心 66% 圆,半径 0.330×size)
-    边缘,占位最大;任何 launcher 遮罩都不会裁到星芒。
+    尖端半径 0.28×size:距典型圆形遮罩边缘(72dp 圆,半径 0.333×size)留
+    ~0.053×size 清晰红边,且退回 66dp 安全区(半径 0.306×size)之内
+    —— 0.322 的旧值越过了安全区,遮罩边缘只剩 ~1dp,视觉上星芒贴边。
     表意:AI 产品的通用符号;红印章底延续 App 纸墨色彩基因,与满屏蓝紫渐变的
     AI 图标区隔。
 
@@ -47,8 +48,10 @@ RED = (0xB9, 0x3B, 0x1D)          # LightPrimary 报纸红
 PAPER = (0xFB, 0xFA, 0xF7)        # surface 纸白(星芒)
 INK = (0x1B, 0x1A, 0x17)          # onSurface 墨色(debug 印章底)
 
-# 星芒尖端半径(占画布边长比例);adaptive 安全区半径 = 0.330,留 0.008 余量
-TIP = 0.322
+# 星芒尖端半径(占画布边长比例)。几何参照:66dp 安全区半径 = 0.306,
+# 典型圆形遮罩边缘 = 0.333(72dp 圆)。取 0.28 —— 距遮罩边缘留 ~0.053
+# 清晰红边,同时整体退回安全区内(此前 0.322 越界导致星芒视觉贴边)
+TIP = 0.28
 
 # master render resolution (downscaled for crisp anti-aliasing)
 MASTER = 1536
