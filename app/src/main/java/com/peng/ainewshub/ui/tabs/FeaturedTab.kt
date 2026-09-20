@@ -107,11 +107,11 @@ fun FeaturedTab(
             reselectSignal = reselectSignal,
             header = {
                 Column(modifier = Modifier.fillMaxWidth()) {
-                    // 今日热点卡片
+                    // 今日热点区块:通栏(无横向/顶部边距),与纸墨区块语言一致,
+                    // 双细线满幅不做卡片内嵌
                     HotTopicsSection(
                         onOpen = onOpenUrl,
-                        vm = hotVm,
-                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 6.dp)
+                        vm = hotVm
                     )
                     // 「最新精选」区块标题 + 右侧「全部」入口(跳转到全部动态页)
                     Row(

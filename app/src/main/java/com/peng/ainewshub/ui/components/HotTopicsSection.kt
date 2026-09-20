@@ -18,7 +18,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
@@ -36,9 +35,10 @@ import com.peng.ainewshub.ui.theme.AppText
 /**
  * 今日热点模块 —— 精选 tab 顶部的卡片式聚合模块。
  *
- * 视觉(对齐设计稿):
- *  - 一整张卡片,顶部 [BrandGradient] 品牌渐变标题栏(flame 图标 + 「今日热点」+ 右侧来源数小字)
- *  - 卡片内每条热点一行:左序号徽章([RankBadge] 统一分档)+ 标题 + 来源/聚合数
+ * 视觉(纸墨日报):
+ *  - 一整张方角区块(surfaceContainerLow 底,不裁圆角),顶部双细线 + 衬线
+ *    「今日热点」标题 + 右侧来源数小字
+ *  - 区块内每条热点一行:左序号徽章([RankBadge] 统一分档)+ 标题 + 来源/聚合数
  *
  * 交互:
  *  - 点击单条 → 打开内置 WebView(优先 permalink,回退 url)
@@ -63,7 +63,8 @@ fun HotTopicsSection(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(MaterialTheme.shapes.medium)
+                // 不做圆角裁切:纸墨版面方角区块,卡头双细线通栏——圆角会在
+                // 两上角把线削出弧形缺口(用户截图实证),去卡片化后也无需圆润
                 .background(MaterialTheme.colorScheme.surfaceContainerLow)
         ) {
             HotTopicsHeader(count = topics.size)
@@ -91,10 +92,7 @@ fun HotTopicsSection(
     }
 }
 
-/**
- * 卡片顶部标题栏 —— [BrandGradient] 品牌渐变背景 + flame 图标 + 「今日热点」。
- * (渐变单一来源在 theme/Color.kt,与总览 digest Hero 共用;AI 特性专用,不扩散。)
- */
+/** 卡片顶部标题栏:双细线起头 + 衬线「今日热点」+ 来源数,底部粗线收束。 */
 @Composable
 private fun HotTopicsHeader(count: Int) {
     val cs = MaterialTheme.colorScheme
