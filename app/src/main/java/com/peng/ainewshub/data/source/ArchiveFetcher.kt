@@ -80,25 +80,27 @@ internal object ArchiveFetcher {
             throw e
         } catch (e: IOException) {
             // 传输层失败(连不上):读盘兜底(盘上是上次网络成功时落下的旧数据);
-            // networkOnly 探测不兜底,失败即抛
-            if (!allowDiskFallback) throw e
+            // networkOnly 探测不兜底,失败即抛。兜底未命中时带场景与原始异常包成
+            // Network 上抛 —— 诊断报告能看到是哪个文件、什么传输层错误
+            val wrapped = AppException.Network(hint, e)
+            if (!allowDiskFallback) throw wrapped
             val disk = withContext(Dispatchers.IO) { ArchiveDiskCache.read(cacheKey) }
-                ?: throw e
+                ?: throw wrapped
             return runCatching { JSONObject(disk) }
                 .map { parsed -> parsed.also { _offlineMode.value = true } }
-                .getOrElse { throw e }
+                .getOrElse { throw wrapped }
         }
         // AppException(HTTP 错误/空响应)与其他非预期异常不捕获,直接向上抛
         val parsed = runCatching { JSONObject(text) }
-            .getOrElse { throw AppException.ServerError() }
+            .getOrElse { throw AppException.ServerError("JSON 解析失败 · $cacheKey") }
         withContext(Dispatchers.IO) { ArchiveDiskCache.write(cacheKey, text) }
         _offlineMode.value = false
         return parsed
     }
 
     /**
-     * GET 一个 URL,返回响应正文;非 2xx 或空响应抛 [AppException.Network]。
-     * [hint] 仅用于日志诊断(toUiError 会把原始异常记入 logcat)。
+     * GET 一个 URL,返回响应正文;非 2xx 或空响应抛 [AppException.Network]
+     * (message 带 HTTP 状态码与 [hint] 场景,进 logcat 与诊断报告)。
      *
      * [tolerateMissing] 为 true 时 404 → null(语义:文件尚未生成,调用方走 NoData;
      * 仅 trends.json 的「成功才写」暂态语义用),其余非 2xx 照常抛错。
@@ -108,7 +110,7 @@ internal object ArchiveFetcher {
      */
     private suspend fun getRaw(
         url: String,
-        @Suppress("UNUSED_PARAMETER") hint: String,
+        hint: String,
         tolerateMissing: Boolean = false
     ): String? = withContext(Dispatchers.IO) {
         val req = Request.Builder()
@@ -119,9 +121,9 @@ internal object ArchiveFetcher {
         client.newCall(req).execute().use { resp ->
             when {
                 resp.code == 404 && tolerateMissing -> null
-                !resp.isSuccessful -> throw AppException.Network()
+                !resp.isSuccessful -> throw AppException.Network("HTTP ${resp.code} · $hint")
                 else -> resp.body?.string()?.takeIf { it.isNotBlank() }
-                    ?: throw AppException.Network()
+                    ?: throw AppException.Network("空响应 · $hint")
             }
         }
     }

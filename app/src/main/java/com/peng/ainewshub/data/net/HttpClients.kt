@@ -2,6 +2,7 @@ package com.peng.ainewshub.data.net
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.util.concurrent.TimeUnit
@@ -78,7 +79,8 @@ object HttpClients {
      * @param headers 请求头键值对(通常含 User-Agent / Accept 等)
      * @param requireNonBlank true(默认)时空白正文视为网络错误抛 [AppException.Network];
      *                        false 时返回空串(供个别需要区分空响应的场景)
-     * @throws AppException.Network HTTP 非 2xx、响应体为 null 或(默认)空白
+     * @throws AppException.Network HTTP 非 2xx(message 含状态码与目标 host,进诊断
+     *                         报告)、响应体为 null 或(默认)空白
      */
     suspend fun get(
         url: String,
@@ -88,13 +90,15 @@ object HttpClients {
         val builder = Request.Builder().url(url)
         headers.forEach { (k, v) -> builder.header(k, v) }
         base.newCall(builder.build()).execute().use { resp ->
+            // host 取自 URL(不含 query,防敏感参数进日志),与状态码一起作为诊断 detail
+            val host = url.toHttpUrl().host
             if (!resp.isSuccessful) {
-                throw AppException.Network()
+                throw AppException.Network("HTTP ${resp.code} · $host")
             }
             val body = resp.body?.string()
             when {
-                body == null -> throw AppException.Network()
-                requireNonBlank && body.isBlank() -> throw AppException.Network()
+                body == null -> throw AppException.Network("响应体为空 · $host")
+                requireNonBlank && body.isBlank() -> throw AppException.Network("空白响应 · $host")
                 else -> body
             }
         }

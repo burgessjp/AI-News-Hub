@@ -114,7 +114,7 @@ internal class ArchiveSnapshotCache(private val fetcher: ArchiveFetcher) {
             snapshotCache[cacheKey]
                 ?: withContext(Dispatchers.IO) {
                     val snapshot = fetcher.fetchJsonWithDiskFallback(
-                        cacheKey, ArchiveEndpoints.fileUrl(source, relPath), "读取归档快照失败"
+                        cacheKey, ArchiveEndpoints.fileUrl(source, relPath), "读取归档快照失败($cacheKey)"
                     )
                         ?: throw AppException.NoData()
 

@@ -129,7 +129,7 @@ object ArchiveHttpClient {
         // 1) 读 index.json(带缓存 + 并发去重,force 绕过 TTL)拿最新路径
         val index = fetchIndex(force)
         val latest = index.optJSONObject("latest")
-            ?: throw AppException.ServerError()
+            ?: throw AppException.ServerError("index 缺 latest 字段")
         val relPath = latest.optString(source).takeIf { it.isNotBlank() }
             ?: throw AppException.NoData()
 
@@ -328,5 +328,5 @@ object ArchiveHttpClient {
      */
     private suspend fun fetchIndex(force: Boolean = false, allowDiskFallback: Boolean = true): JSONObject =
         indexCache.fetch(force, allowDiskFallback)
-            ?: throw AppException.ServerError()
+            ?: throw AppException.ServerError("index.json 空响应")
 }
