@@ -290,10 +290,6 @@ internal fun TopEntryRow(
                 text = title,
                 style = AppText.body,
                 fontFamily = FontFamily.Serif,
-                // 头条升权:第 1 名 16sp SemiBold(大节头 17 之下、普通条目 14 之上),
-                // 「今日重点」的重点感由它承担;衬线大字是报纸头版语言
-                fontSize = if (rank == 1) 16.sp else AppText.body.fontSize,
-                fontWeight = if (rank == 1) FontWeight.SemiBold else FontWeight.Normal,
                 color = if (isRead) cs.onSurface.copy(alpha = AppAlpha.readDim) else cs.onSurface,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
