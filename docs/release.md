@@ -18,9 +18,9 @@
 versionCode / versionName 的注入见 `app/build.gradle.kts` 的 `defaultConfig`:
 
 ```kotlin
-// 版本号默认 1.3.2(10302),发版时同步此兜底值;release.yml 从 tag 经 -PversionName/-PversionCode 注入
-versionCode = (findProperty("versionCode") as? String)?.toIntOrNull() ?: 10302
-versionName = findProperty("versionName") as? String ?: "1.3.2"
+// 版本号默认 1.4.0(10400),发版时同步此兜底值;release.yml 从 tag 经 -PversionName/-PversionCode 注入
+versionCode = (findProperty("versionCode") as? String)?.toIntOrNull() ?: 10400
+versionName = findProperty("versionName") as? String ?: "1.4.0"
 ```
 
 本地 debug 构建与 `build.yml` 的 PR 构建走上述兜底值(每次发版时同步),**tag 触发的 CI 注入 tag 计算的真实版本号,覆盖兜底**。
