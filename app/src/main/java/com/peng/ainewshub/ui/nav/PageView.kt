@@ -47,7 +47,6 @@ import com.peng.ainewshub.ui.tabs.AllTab
 import com.peng.ainewshub.ui.tabs.FeaturedTab
 import com.peng.ainewshub.ui.webview.WebViewScreen
 import kotlinx.coroutines.launch
-import com.peng.ainewshub.data.prefs.FontChoice
 import com.peng.ainewshub.data.prefs.FontScale
 import com.peng.ainewshub.data.prefs.SettingsStore
 import com.peng.ainewshub.data.prefs.ThemeMode
@@ -75,7 +74,6 @@ internal class PageEnv(
 internal class DisplayControls(
     val prefs: SettingsStore.DisplayPrefs,
     val onSelectTheme: (ThemeMode) -> Unit,
-    val onSelectFont: (FontChoice) -> Unit,
     val onSelectFontScale: (FontScale) -> Unit,
     val onSelectLanguage: (AppLanguage) -> Unit,
     val onToggleDailyNotify: (Boolean) -> Unit
@@ -184,8 +182,6 @@ internal fun PageView(
         Page.Settings -> SettingsScreen(
             themeMode = display.prefs.themeMode,
             onSelectTheme = display.onSelectTheme,
-            fontChoice = display.prefs.fontChoice,
-            onSelectFont = display.onSelectFont,
             fontScale = display.prefs.fontScale,
             onSelectFontScale = display.onSelectFontScale,
             language = display.prefs.language,

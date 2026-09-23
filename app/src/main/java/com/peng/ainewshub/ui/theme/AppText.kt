@@ -33,7 +33,8 @@ import androidx.compose.ui.unit.sp
  * 需要语义命名的场景(详情页标题、紧凑正文、弱化正文等)。
  *
  * 实例化设计(不再是 object):
- *  - 字体族随设置页「字体」选项切换(默认 null = 跟随系统;衬线/等宽为 Compose 内置族)
+ *  - 字体恒纸墨宋体(fontFamily 默认 [FontFamily.Serif],中文回退 Noto Serif CJK;
+ *    字体族设置已删,无切换入口)
  *  - 字号随设置页「字号」档位整体缩放(fontScale 只作用于 fontSize/lineHeight,
  *    字重/字距不动;letterSpacing 不缩放,避免破坏精调的字距)
  *  - 由 [AiNewsHubTheme] 构造并经 [LocalAppTextStyles] 下发;组件经顶层
@@ -41,7 +42,7 @@ import androidx.compose.ui.unit.sp
  */
 @Immutable
 class AppTextStyles(
-    fontFamily: FontFamily? = null,
+    fontFamily: FontFamily = FontFamily.Serif,
     fontScale: Float = 1f
 ) {
 
@@ -133,8 +134,7 @@ class AppTextStyles(
     )
 
     /** 日报大节头 —— 「今日重点 / 我的关注」等版面栏目标题(17/24/SemiBold)。
-     *  使用处通常再覆盖 FontFamily.Serif(报头语言);与 body(14)拉开三档,
-     *  分隔线收敛后大节层级靠它 + 留白承担。 */
+     *  与 body(14)拉开三档,分隔线收敛后大节层级靠它 + 留白承担。 */
     val sectionHead: TextStyle = TextStyle(
         fontFamily = fontFamily,
         fontWeight = FontWeight.SemiBold,

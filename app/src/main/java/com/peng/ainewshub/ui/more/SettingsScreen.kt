@@ -59,7 +59,6 @@ import com.peng.ainewshub.data.diagnostics.DiagnosticsLog
 import com.peng.ainewshub.data.repo.BrowseHistoryRepository
 import com.peng.ainewshub.data.CacheManager
 import com.peng.ainewshub.data.prefs.AppLanguage
-import com.peng.ainewshub.data.prefs.FontChoice
 import com.peng.ainewshub.data.prefs.FontScale
 import com.peng.ainewshub.data.prefs.ThemeMode
 import kotlinx.coroutines.launch
@@ -89,30 +88,7 @@ val ThemeMode.labelRes: Int
     }
 
 /**
- * 字体族 —— 枚举纯值在 [com.peng.ainewshub.data.prefs.FontChoice],此处挂展示映射。
- *
- * 仅用 Compose 内置 FontFamily,无需引入外部字体资源:
- *  - System: 系统默认字体
- *  - Serif:  衬线体(阅读向)
- *  - Mono:   等宽体(代码/技术向)
- */
-@get:StringRes
-val FontChoice.labelRes: Int
-    get() = when (this) {
-        FontChoice.System -> R.string.settings_font_default
-        FontChoice.Serif -> R.string.settings_font_serif
-        FontChoice.Mono -> R.string.settings_font_mono
-    }
-
-/** 字体族的 Compose FontFamily(展示映射;枚举纯值在 data.prefs)。 */
-val FontChoice.fontFamily: FontFamily
-    get() = when (this) {
-        FontChoice.System -> FontFamily.Default
-        FontChoice.Serif -> FontFamily.Serif
-        FontChoice.Mono -> FontFamily.Monospace
-    }
-
-/**
+ * 字号档位 —— 枚举纯值(含 scale)在 [com.peng.ainewshub.data.prefs.FontScale],
  * 字号档位 —— 枚举纯值(含 scale)在 [com.peng.ainewshub.data.prefs.FontScale],
  * 此处挂文案映射;整体缩放语义字号层 AppTextStyles(见 ui/theme/AppText.kt)。
  */
@@ -130,7 +106,7 @@ val FontScale.labelRes: Int
  * 视觉与主列表页同构:章节条 + 扁平行([SettingsRow] 报纸目录行,无图标);
  * 选择器为轨道式 [SegmentedOptionRow]。
  *  - 外观:主题模式三选一(系统/亮/暗;皮肤与动态取色已随 v1.4.0 单一风格移除)
- *  - 字体:字体族三选一(默认/衬线/等宽)+ 字号三档(紧凑/标准/大号)
+ *  - 字体:字号三档(紧凑/标准/大号;字体族选择已删,全 App 恒纸墨宋体)
  *  - 语言:跟随系统 / 简体中文 / English,切换后 Activity 重建生效(见 ui/i18n/AppLocale)
  *  - 通知:每日更新通知开关(WorkManager 本地调度,API 33+ 打开时请求运行时权限)
  *  - 缓存:一键清理网页缓存/Cookie/图片缓存/搜索历史等可恢复数据;
@@ -145,8 +121,6 @@ val FontScale.labelRes: Int
 fun SettingsScreen(
     themeMode: ThemeMode,
     onSelectTheme: (ThemeMode) -> Unit,
-    fontChoice: FontChoice,
-    onSelectFont: (FontChoice) -> Unit,
     fontScale: FontScale,
     onSelectFontScale: (FontScale) -> Unit,
     language: AppLanguage,
@@ -172,7 +146,6 @@ fun SettingsScreen(
     }
 
     val themeOptions = ThemeMode.entries.map { stringResource(it.labelRes) }
-    val fontOptions = FontChoice.entries.map { stringResource(it.labelRes) }
     val fontScaleOptions = FontScale.entries.map { stringResource(it.labelRes) }
 
     Scaffold(
@@ -203,17 +176,8 @@ fun SettingsScreen(
                     modifier = Modifier.padding(horizontal = 18.dp, vertical = 6.dp)
                 )
             }
-            // 字体 section —— 字体族 + 字号两组轨道式选择器,各带小节标签
+            // 字体 section —— 字号轨道式选择器(字体族选择已删,恒系统默认)
             item { SectionHeader(stringResource(R.string.settings_section_font)) }
-            item {
-                GroupLabel(stringResource(R.string.settings_font_family))
-                SegmentedOptionRow(
-                    options = fontOptions,
-                    selectedIndex = fontChoice.ordinal,
-                    onSelect = { idx -> onSelectFont(FontChoice.entries[idx]) },
-                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 4.dp)
-                )
-            }
             item {
                 GroupLabel(stringResource(R.string.settings_font_scale))
                 SegmentedOptionRow(

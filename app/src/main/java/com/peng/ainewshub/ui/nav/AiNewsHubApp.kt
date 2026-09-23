@@ -68,11 +68,9 @@ import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import com.peng.ainewshub.data.prefs.FontChoice
 import com.peng.ainewshub.data.prefs.FontScale
 import com.peng.ainewshub.data.prefs.SettingsStore
 import com.peng.ainewshub.data.prefs.ThemeMode
-import com.peng.ainewshub.ui.more.fontFamily
 
 /** 浅色系统栏 scrim(与 AndroidX enableEdgeToEdge 默认值一致)。ARGB 32 位带符号整数。 */
 private val LIGHT_SCRIM = 0xE6FFFFFF.toInt()
@@ -134,13 +132,12 @@ internal fun AiNewsHubApp(
         FavoritesRepository(AppDatabase.get(appContext).favoriteDao())
     }
 
-    // 主题模式 + 字体族:订阅持久化 Flow。Flow 首帧前用默认值(System),
+    // 主题模式 + 字号档位:订阅持久化 Flow。Flow 首帧前用默认值(System),
     // 读到持久化值后自动切换。设置页改值时写入 store,Flow 回推新值刷新。
     val displayPrefs by settingsStore.prefsFlow.collectAsStateWithLifecycle(
         initialValue = SettingsStore.DisplayPrefs()
     )
     val themeMode = displayPrefs.themeMode
-    val fontChoice = displayPrefs.fontChoice
     val fontScale = displayPrefs.fontScale
     // 每日更新通知自查链上次运行时刻(设置页「上次检查」,排障可观测出口)
     val lastNotifyCheckAt by settingsStore.lastNotifyCheckAtFlow.collectAsStateWithLifecycle(
@@ -151,7 +148,6 @@ internal fun AiNewsHubApp(
         initialValue = AiConfig()
     )
     val onSelectTheme: (ThemeMode) -> Unit = { scope.launch { settingsStore.updateTheme(it) } }
-    val onSelectFont: (FontChoice) -> Unit = { scope.launch { settingsStore.updateFont(it) } }
     val onSelectFontScale: (FontScale) -> Unit = { scope.launch { settingsStore.updateFontScale(it) } }
     // 应用内语言:持久化 + 重建 Activity 生效;小组件同步刷新文案。
     // recreate 会销毁组合并取消 rememberCoroutineScope,故整体包 NonCancellable ——
@@ -425,7 +421,6 @@ internal fun AiNewsHubApp(
     val displayControls = DisplayControls(
         prefs = displayPrefs,
         onSelectTheme = onSelectTheme,
-        onSelectFont = onSelectFont,
         onSelectFontScale = onSelectFontScale,
         onSelectLanguage = onSelectLanguage,
         onToggleDailyNotify = onToggleDailyNotify
@@ -433,7 +428,6 @@ internal fun AiNewsHubApp(
 
     AiNewsHubTheme(
         darkTheme = darkTheme,
-        fontFamily = if (fontChoice == FontChoice.System) null else fontChoice.fontFamily,
         fontScale = fontScale.scale
     ) {
         // 浮动药丸底栏架构:不再用 Scaffold bottomBar 槽,改用 Box 叠层。

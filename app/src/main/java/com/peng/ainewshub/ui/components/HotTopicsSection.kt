@@ -20,7 +20,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -92,11 +91,11 @@ fun HotTopicsSection(
     }
 }
 
-/** 卡片顶部标题栏:双细线起头 + 衬线「今日热点」+ 来源数,底部粗线收束。 */
+/** 卡片顶部标题栏:双细线起头 + 「今日热点」+ 来源数,底部粗线收束。 */
 @Composable
 private fun HotTopicsHeader(count: Int) {
     val cs = MaterialTheme.colorScheme
-    // 纸墨日报:双细线起头 + 衬线标题 + 底部粗线,去渐变卡头
+    // 纸墨日报:双细线起头 + 标题 + 底部粗线,去渐变卡头
     Column(modifier = Modifier.fillMaxWidth()) {
         DoubleRule()
         Row(
@@ -108,7 +107,6 @@ private fun HotTopicsHeader(count: Int) {
             Text(
                 text = stringResource(R.string.hot_topics_title),
                 style = MaterialTheme.typography.titleMedium,
-                fontFamily = FontFamily.Serif,
                 color = cs.onSurface
             )
             Spacer(Modifier.weight(1f))

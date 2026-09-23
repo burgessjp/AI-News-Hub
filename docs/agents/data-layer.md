@@ -4,7 +4,7 @@
 
 ## 取数模式
 
-- **data 层包结构**（2026-08-29 重组）：`data/model`（模型 + 各源 Result）、`data/repo`（领域 Repository）、`data/db`（Room）、`data/net`（OkHttp/AI 客户端/更新检查）、`data/prefs`（SettingsStore/AiConfig/AiUsage + 持久化枚举 ThemeMode/FontChoice/FontScale/AppLanguage）、`data/source`（gitcode 归档体系 + SourceKeys/SourceFreshness）、`data/diagnostics`（本地诊断，见下文专节）；`data/` 根仅留跨切面（AppException/PipelineSchedule/CacheManager/JsonExt/HtmlUtil）。持久化枚举的展示映射（labelRes/fontFamily）在 `ui/more/SettingsScreen.kt`。
+- **data 层包结构**（2026-08-29 重组）：`data/model`（模型 + 各源 Result）、`data/repo`（领域 Repository）、`data/db`（Room）、`data/net`（OkHttp/AI 客户端/更新检查）、`data/prefs`（SettingsStore/AiConfig/AiUsage + 持久化枚举 ThemeMode/FontScale/AppLanguage）、`data/source`（gitcode 归档体系 + SourceKeys/SourceFreshness）、`data/diagnostics`（本地诊断，见下文专节）；`data/` 根仅留跨切面（AppException/PipelineSchedule/CacheManager/JsonExt/HtmlUtil）。持久化枚举的展示映射（labelRes）在 `ui/more/SettingsScreen.kt`。
 - **取数模式恒定归档**：5 个稳定源（HackerNews / GitHub Trending / stormzhang AI / HuggingFace Papers / The Rundown AI）固定读 gitcode 归档快照；原实时抓取路径（LIVE 双模式、jsoup 直抓、`SourceMode` 枚举）已于 2026-08-29 整体删除（决策记录见 docs/tech-roadmap.md），HTML 抓取全部由 `scripts/` 流水线承担。HN 评论树是唯一保留的实时路径（`HackerNewsRepository`，归档快照不含评论）。
 - **Product Hunt 只归档**（Developer Token 是服务端 secret 不进 APK，两种模式都走归档）。
 - 归档走 `ArchiveHttpClient`（gitcode **REST API raw 端点**，**不要**用 raw 直链——背后是 WAF 会 403）。

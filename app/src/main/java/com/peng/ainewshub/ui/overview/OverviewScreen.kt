@@ -28,7 +28,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.res.pluralStringResource
@@ -181,9 +180,8 @@ internal fun OverviewLead(digest: OverviewDigest) {
                 Text(
                     text = digest.digest,
                     style = AppText.body,
-                    fontFamily = FontFamily.Serif,
                     color = cs.onSurface,
-                    lineHeight = 24.sp, // 综述衬线正文行高(纸墨版面规格,有意宽于正文档)
+                    lineHeight = 24.sp, // 综述正文行高(纸墨版面规格,有意宽于正文档)
                     maxLines = if (expanded) Int.MAX_VALUE else DIGEST_COLLAPSED_LINES,
                     overflow = TextOverflow.Ellipsis,
                     onTextLayout = { if (!expanded) digestOverflowed = it.hasVisualOverflow }
@@ -289,7 +287,6 @@ internal fun TopEntryRow(
             Text(
                 text = title,
                 style = AppText.body,
-                fontFamily = FontFamily.Serif,
                 color = if (isRead) cs.onSurface.copy(alpha = AppAlpha.readDim) else cs.onSurface,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis

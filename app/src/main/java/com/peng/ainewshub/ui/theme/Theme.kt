@@ -21,11 +21,9 @@ val LocalAppDarkTheme = staticCompositionLocalOf { false }
  * App 主题入口 —— 「纸墨日报」单一风格(Color.kt 亮/暗双 scheme)。
  *
  * 不做动态取色与多皮肤:编辑色板是固定品牌资产,壁纸派生色会破坏纸墨身份
- * (v1.4.0 随日刊化改版移除,决策记录见 CHANGELOG)。
+ * (v1.4.0 随日刊化改版移除,决策记录见 CHANGELOG)。字体恒纸墨宋体
+ * ([FontFamily.Serif],中文回退 Noto Serif CJK);字体族设置已删,不可切换。
  *
- * @param fontFamily 字体族覆盖。默认 null 跟随系统字体;
- *        设置页"衬线/等宽"选项传 Serif/Monospace 将全 App 文字统一切换。
- *        同时作用于语义字号层 [AppTextStyles](经 [LocalAppTextStyles] 下发)。
  * @param fontScale 字号整体缩放(设置页「字号」档位),同时作用于 [AppTextStyles]
  *        与 [AppTypography](MD3 typography)的 fontSize/lineHeight —— 只缩这两项,
  *        字重/字距不动,避免组件内部错位;此前 typography 不缩放,导致约 80 处
@@ -34,20 +32,18 @@ val LocalAppDarkTheme = staticCompositionLocalOf { false }
 @Composable
 fun AiNewsHubTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    fontFamily: FontFamily? = null,
     fontScale: Float = 1f,
     content: @Composable () -> Unit
 ) {
     val colorScheme = if (darkTheme) DarkColors else LightColors
 
-    // 字体族替换与字号缩放同源应用:fontScale = 1 时 TextStyle.scaled 原样返回,零开销
-    val typography = remember(fontFamily, fontScale) {
-        (if (fontFamily != null) AppTypography.withFontFamily(fontFamily) else AppTypography)
-            .withFontScale(fontScale)
+    // 纸墨宋体 + 字号缩放同源应用:fontScale = 1 时 TextStyle.scaled 原样返回,零开销
+    val typography = remember(fontScale) {
+        AppTypography.withFontFamily(FontFamily.Serif).withFontScale(fontScale)
     }
-    // 语义字号层:字体族与缩放随设置变化,与 typography 同源(fontFamily 缺省 = 跟随系统)
-    val appTextStyles = remember(fontFamily, fontScale) {
-        AppTextStyles(fontFamily = fontFamily, fontScale = fontScale)
+    // 语义字号层:与 typography 同源,同用纸墨宋体
+    val appTextStyles = remember(fontScale) {
+        AppTextStyles(fontScale = fontScale)
     }
 
     CompositionLocalProvider(
@@ -66,7 +62,7 @@ fun AiNewsHubTheme(
 /**
  * 将一个 [Typography] 里每个 [TextStyle] 的 fontFamily 统一替换为 [family]。
  *
- * 字号 / 行高 / 字重 / 字距全部保留,只换字体族 —— 这样「字体设置」只影响字形,
+ * 字号 / 行高 / 字重 / 字距全部保留,只换字体族 —— 纸墨宋体全局应用只改字形,
  * 不破坏 Type.kt 里精调的排版参数。
  */
 private fun Typography.withFontFamily(family: FontFamily): Typography = copy(

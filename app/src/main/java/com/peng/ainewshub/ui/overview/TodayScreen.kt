@@ -40,7 +40,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -481,7 +480,7 @@ private fun SourceSectionHeader(
             .padding(start = 18.dp, end = 18.dp, top = 16.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // 标题槽:恒填满的 weight 容器(默认 fill=true)内部「衬线源名 + 未读圆点」按内容宽
+        // 标题槽:恒填满的 weight 容器(默认 fill=true)内部「源名 + 未读圆点」按内容宽
         // 靠左,让右侧「查看全部」出口钉死行尾 —— 若标题自身挂 weight(fill=false),
         // 未认领的权重份额不占位、尾部会整体左移出一截右侧空白(已踩坑回退)
         Row(
@@ -492,7 +491,6 @@ private fun SourceSectionHeader(
                 text = meta.title,
                 fontSize = 13.sp,
                 lineHeight = 18.sp,
-                fontFamily = FontFamily.Serif,
                 fontWeight = FontWeight.Medium,
                 letterSpacing = 1.sp,
                 color = cs.onSurface,

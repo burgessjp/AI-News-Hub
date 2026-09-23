@@ -36,10 +36,6 @@
     <string name="settings_theme_light">亮色</string>
     <string name="settings_theme_dark">暗色</string>
     <string name="settings_section_font">字体</string>
-    <string name="settings_font_family">字体族</string>
-    <string name="settings_font_default">默认</string>
-    <string name="settings_font_serif">衬线</string>
-    <string name="settings_font_mono">等宽</string>
     <string name="settings_font_scale">字号</string>
     <string name="settings_font_scale_compact">紧凑</string>
     <string name="settings_font_scale_standard">标准</string>

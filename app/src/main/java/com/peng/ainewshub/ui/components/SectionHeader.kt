@@ -17,7 +17,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.peng.ainewshub.ui.theme.AppText
@@ -43,7 +42,7 @@ import com.peng.ainewshub.ui.theme.TrackingSection
  * @param accent 竖条强调色,默认 primary;分组对照场景可传 secondary/tertiary
  * @param showAccent 是否显示左竖条(默认 true);弹层紧凑场景传 false 只留标题
  * @param large 日报大节头模式:「今日重点 / 我的关注」等版面栏目标题 ——
- *        竖条 3×15dp、衬线 [AppText.sectionHead](17sp SemiBold);
+ *        竖条 3×15dp、[AppText.sectionHead](17sp SemiBold);
  *        默认 false 维持紧凑小节样式(设置分组/弹层等)
  * @param contentPadding 章节条内边距,默认见上;已自带水平边距的场景可清零水平缩进
  * @param trailing 右侧可选内容
@@ -77,11 +76,10 @@ fun SectionHeader(
             Spacer(Modifier.width(8.dp))
         }
         if (large) {
-            // 日报大节头:衬线 + sectionHead 档,分隔线收敛后大节层级靠它承担
+            // 日报大节头:sectionHead 档,分隔线收敛后大节层级靠它承担
             Text(
                 text = title,
                 style = AppText.sectionHead,
-                fontFamily = FontFamily.Serif,
                 color = MaterialTheme.colorScheme.onSurface
             )
         } else {

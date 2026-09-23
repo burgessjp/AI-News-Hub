@@ -15,14 +15,6 @@ enum class ThemeMode {
 }
 
 /**
- * 字体族(系统默认 / 衬线 / 等宽),按 [name] 持久化。
- * 仅用 Compose 内置 FontFamily,无需引入外部字体资源。
- */
-enum class FontChoice {
-    System, Serif, Mono
-}
-
-/**
  * 字号档位,整体缩放语义字号层 AppTextStyles(见 ui/theme/AppText.kt)。
  * 只缩放 AppText 档位的 fontSize/lineHeight;MD3 typography 不动,
  * 避免 TopAppBar/Chip 等组件内部布局错位。

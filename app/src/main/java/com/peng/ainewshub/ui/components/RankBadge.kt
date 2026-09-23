@@ -7,16 +7,15 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /**
- * 排名数字 —— 全 App 统一的「左 24dp 序号槽」,纸墨日报的衬线裸数字。
+ * 排名数字 —— 全 App 统一的「左 24dp 序号槽」,纸墨日报的裸数字。
  *
- * 报纸语言:去底衬去描边,系统衬线(FontFamily.Serif;个别 ROM 缺 CJK 衬线时
- * 优雅降级无衬线)大号数字;1-2 名报纸红(primary)强调,其余纸灰(onSurfaceVariant)。
- * 今日重点 Top10 / 热词榜 / 各源列表共用;小组件有独立的迷你版本。
+ * 报纸语言:去底衬去描边,大号数字(字体随全局纸墨宋体);1-2 名报纸红(primary)
+ * 强调,其余纸灰(onSurfaceVariant)。今日重点 Top10 / 热词榜 / 各源列表共用;
+ * 小组件有独立的迷你版本。
  */
 @Composable
 fun RankBadge(rank: Int, modifier: Modifier = Modifier) {
@@ -30,7 +29,6 @@ fun RankBadge(rank: Int, modifier: Modifier = Modifier) {
             text = rank.toString(),
             fontSize = 18.sp,
             lineHeight = 22.sp,
-            fontFamily = FontFamily.Serif,
             color = color
         )
     }

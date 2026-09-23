@@ -32,10 +32,6 @@
     <string name="settings_theme_light">Light</string>
     <string name="settings_theme_dark">Dark</string>
     <string name="settings_section_font">Font</string>
-    <string name="settings_font_family">Font family</string>
-    <string name="settings_font_default">Default</string>
-    <string name="settings_font_serif">Serif</string>
-    <string name="settings_font_mono">Mono</string>
     <string name="settings_font_scale">Font size</string>
     <string name="settings_font_scale_compact">Compact</string>
     <string name="settings_font_scale_standard">Standard</string>

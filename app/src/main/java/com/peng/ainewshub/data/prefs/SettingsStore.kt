@@ -15,16 +15,17 @@ import kotlinx.coroutines.flow.map
 import com.peng.ainewshub.data.source.DEFAULT_SOURCE_ORDER
 
 /**
- * 显示偏好(主题模式 + 动态取色 + 字体族 + 字号档位 + 应用内语言)持久化;
+ * 显示偏好(主题模式 + 动态取色 + 字号档位 + 应用内语言)持久化;
  * 搜索历史([searchHistoryFlow],最近 10 条)与关注关键词([followedKeywordsFlow],
  * 最多 20 个)同存于此文件,与显示偏好语义轻绑定。
  *
- * 此前 [themeMode] / [fontChoice] 仅靠 rememberSaveable 存内存,App 冷启动
+ * 此前 [themeMode] 仅靠 rememberSaveable 存内存,App 冷启动
  * 即丢失回到默认。这里用独立 DataStore 文件 `display_prefs`(与 AI 服务配置
  * `ai_prefs` 分开,语义清晰)持久化,枚举按 [name] 存取。
  *
  * 历史遗留键 `source_mode`(实时/归档双模式)已随 LIVE 模式删除:存量用户
- * 盘上该键的旧值成为不可读残留,无副作用,无需清理迁移。
+ * 盘上该键的旧值成为不可读残留,无副作用,无需清理迁移。历史遗留键
+ * `font_choice`(字体族三选一)同此处理 —— 设置项已删,全 App 恒纸墨宋体。
  *
  * [sourceOrderFlow] 持久化用户在「信息源」页拖拽自定义的 8 源顺序(默认
  * [DEFAULT_SOURCE_ORDER]),摘要 Tab 跟随该顺序;关于页固定默认顺序不跟随。
@@ -45,7 +46,6 @@ class SettingsStore(context: Context) {
 
     data class DisplayPrefs(
         val themeMode: ThemeMode = ThemeMode.System,
-        val fontChoice: FontChoice = FontChoice.System,
         val fontScale: FontScale = FontScale.Standard,
         val language: AppLanguage = AppLanguage.SYSTEM,
         val dailyNotify: Boolean = false
@@ -55,8 +55,6 @@ class SettingsStore(context: Context) {
         DisplayPrefs(
             themeMode = p[KEY_THEME]?.let { name -> runCatching { ThemeMode.valueOf(name) }.getOrNull() }
                 ?: ThemeMode.System,
-            fontChoice = p[KEY_FONT]?.let { name -> runCatching { FontChoice.valueOf(name) }.getOrNull() }
-                ?: FontChoice.System,
             fontScale = p[KEY_FONT_SCALE]?.let { name -> runCatching { FontScale.valueOf(name) }.getOrNull() }
                 ?: FontScale.Standard,
             language = p[KEY_LANGUAGE]?.let { name -> runCatching { AppLanguage.valueOf(name) }.getOrNull() }
@@ -67,10 +65,6 @@ class SettingsStore(context: Context) {
 
     suspend fun updateTheme(mode: ThemeMode) {
         dataStore.edit { it[KEY_THEME] = mode.name }
-    }
-
-    suspend fun updateFont(choice: FontChoice) {
-        dataStore.edit { it[KEY_FONT] = choice.name }
     }
 
     suspend fun updateFontScale(scale: FontScale) {
@@ -284,7 +278,6 @@ class SettingsStore(context: Context) {
 
     private companion object {
         val KEY_THEME = stringPreferencesKey("theme_mode")
-        val KEY_FONT = stringPreferencesKey("font_choice")
         val KEY_FONT_SCALE = stringPreferencesKey("font_scale")
         val KEY_LANGUAGE = stringPreferencesKey("language")
         val KEY_SEARCH_HISTORY = stringPreferencesKey("search_history")
