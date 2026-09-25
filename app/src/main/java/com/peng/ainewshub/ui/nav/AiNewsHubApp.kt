@@ -8,11 +8,8 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.SeekableTransitionState
 import androidx.compose.animation.core.rememberTransition
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -49,6 +46,7 @@ import com.peng.ainewshub.data.repo.FavoritesRepository
 import com.peng.ainewshub.data.PipelineSchedule
 import com.peng.ainewshub.data.source.ArchiveHttpClient
 import com.peng.ainewshub.notify.DailyNotifyScheduler
+import com.peng.ainewshub.ui.anim.PageNavStyle
 import com.peng.ainewshub.ui.anim.pageTransition
 import com.peng.ainewshub.ui.anim.predictivePopTransition
 import com.peng.ainewshub.ui.components.AppBottomBar
@@ -364,7 +362,7 @@ internal fun AiNewsHubApp(
         val to: Screen = if (currentPages.size > 1) {
             Screen.Secondary(currentPages[currentPages.lastIndex - 1])
         } else {
-            Screen.Root(nav.currentTab)
+            Screen.RootShell
         }
         nav.isNavigatingBack = true
         try {
@@ -430,10 +428,12 @@ internal fun AiNewsHubApp(
         darkTheme = darkTheme,
         fontScale = fontScale.scale
     ) {
-        // 浮动药丸底栏架构:不再用 Scaffold bottomBar 槽,改用 Box 叠层。
+        // 双层转场 + 根容器底栏架构:外层 AnimatedContent 只区分根容器(RootShell)
+        // 与二级页,底栏在根容器内随其整屏转场(显隐为结构性结果);tab 间切换
+        // 在根容器内层转场,底栏跨 tab 稳定。
         //  - 内容区 edge-to-edge 全屏,内层各 Tab 的 Scaffold 负责自己的状态栏 inset;
         //    这里只补 statusBarsPadding 防止 AnimatedContent 与系统栏重叠错位。
-        //  - 底栏作为 overlay 浮在内容上(BottomCenter + navigationBarsPadding + 16dp 距底),
+        //  - 底栏作为 overlay 浮在 tab 内容上(BottomCenter + navigationBarsPadding),
         //    由调用方在列表 contentPadding 留出空间避免末项被遮挡。
         Surface {
             Box(modifier = Modifier.fillMaxSize()) {
@@ -461,14 +461,37 @@ internal fun AiNewsHubApp(
                     modifier = Modifier.fillMaxSize()
                 ) { s ->
                     when (s) {
-                        is Screen.Root -> TabRoot(
-                            tab = s.tab,
-                            nav = nav,
-                            reselectTick = nav.reselectTick,
-                            todayListState = todayListState,
-                            followsListState = followsListState,
-                            onOpenUrl = openUrl
-                        )
+                        is Screen.RootShell -> Box(modifier = Modifier.fillMaxSize()) {
+                            // tab 间切换在根容器内层转场:外层 state 无 tab 维度,
+                            // 切 tab 不重组外层 → 底栏跨 tab 稳定。规格沿用原外层
+                            // Root→Root 组合(NONE/NONE,带 delay 的 fade)。
+                            AnimatedContent(
+                                targetState = nav.currentTab,
+                                transitionSpec = {
+                                    pageTransition(PageNavStyle.NONE, PageNavStyle.NONE)
+                                },
+                                modifier = Modifier.fillMaxSize()
+                            ) { tab ->
+                                TabRoot(
+                                    tab = tab,
+                                    nav = nav,
+                                    reselectTick = nav.reselectTick,
+                                    todayListState = todayListState,
+                                    followsListState = followsListState,
+                                    onOpenUrl = openUrl
+                                )
+                            }
+                            // 浮动药丸底栏:根容器的组成部分,随根容器整屏转场;
+                            // 二级页结构上不包含它 —— 显隐是结构性结果,无需
+                            // AnimatedVisibility 手工同步(预测返回 seek 亦自动跟随)。
+                            AppBottomBar(
+                                current = nav.currentTab,
+                                onSelect = { nav.selectTab(it) },
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .navigationBarsPadding()
+                            )
+                        }
                         is Screen.Secondary -> PageView(
                             page = s.page,
                             nav = nav,
@@ -481,21 +504,6 @@ internal fun AiNewsHubApp(
                             darkTheme = darkTheme
                         )
                     }
-                }
-
-                // 浮动药丸底栏:根页显示,进入二级页时向下滑出。
-                // 二级页不显示底栏(沉浸感)。
-                // 可见性跟随转场目标而非仅 isRoot:预测返回手势一开始 seek 向根页,
-                // 底栏即随转场滑入;手势取消则随目标复原滑出——不再在 pop 完成后突兀出现。
-                AnimatedVisibility(
-                    visible = isRoot || navTransitionState.targetState is Screen.Root,
-                    enter = slideInVertically(initialOffsetY = { it }),
-                    exit = slideOutVertically(targetOffsetY = { it }),
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .navigationBarsPadding()
-                ) {
-                    AppBottomBar(current = nav.currentTab, onSelect = { nav.selectTab(it) })
                 }
 
                 // 全局轻提示胶囊宿主:「已是最新批次」/ 离线兜底都从这里浮现,悬浮于

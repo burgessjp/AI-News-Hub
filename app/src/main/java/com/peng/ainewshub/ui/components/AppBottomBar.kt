@@ -67,19 +67,20 @@ val BottomBarReservedHeight = 102.dp
  * 选中态 = 铅字块(inverseSurface 直角实底 + inverseOnSurface 反白字),
  * 像一枚铅字/印章盖在页脚,存在感靠墨块不靠线也不靠彩色(报纸红留给内容层;
  * 发丝线只承担悬浮 overlay 的滚动分界职能,不做装饰);未选中 = onSurfaceVariant
- * 裸文字。挂载方式不变:由 AiNewsHubApp 以 overlay
+ * 裸文字。挂载于根容器(RootShell)内:调用方以 overlay
  * 对齐 BottomCenter 悬浮(内容可滚入其下,各列表 contentPadding 预留
  * [BottomBarPillHeight] + 呼吸空间),自身补 navigationBarsPadding。
  */
 @Composable
 fun AppBottomBar(
     current: AppTab,
-    onSelect: (AppTab) -> Unit
+    onSelect: (AppTab) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val cs = MaterialTheme.colorScheme
     // 报纸页脚条:全宽实底 + 顶部发丝线(悬浮 overlay 的滚动分界,非装饰)
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .background(cs.surface)
     ) {

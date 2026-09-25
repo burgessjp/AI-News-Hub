@@ -52,9 +52,9 @@ internal class AppNavState(
     /** 是否处于根页(当前 tab 栈空)。 */
     val isRoot: Boolean get() = currentPages.isEmpty()
 
-    /** 当前屏幕:根(tab) 或 二级页。用作转场的 currentState/targetState。 */
+    /** 当前屏幕:根容器 或 二级页。用作外层转场的 currentState/targetState(tab 维度在根容器内层)。 */
     val screen: Screen
-        get() = if (isRoot) Screen.Root(currentTab) else Screen.Secondary(currentPages.last())
+        get() = if (isRoot) Screen.RootShell else Screen.Secondary(currentPages.last())
 
     /** 进入二级页:push 到当前 tab 栈(前进方向)。 */
     fun push(page: Page) {

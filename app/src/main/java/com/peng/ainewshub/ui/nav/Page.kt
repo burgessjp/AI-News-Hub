@@ -203,15 +203,19 @@ internal fun stacksFromBundle(b: Bundle, webFallbackTitle: String): Map<AppTab, 
     }.toMap()
 
 /**
- * 顶层屏幕标识:根(tab) 或 二级页。供 [androidx.compose.animation.AnimatedContent] 区分转场策略。
+ * 顶层屏幕标识:根容器 或 二级页。供 [androidx.compose.animation.AnimatedContent] 区分转场策略。
+ *
+ * 外层转场只区分这两级:[RootShell] 是「tab 内容(内层转场)+ 底栏」的根容器,
+ * 二级页整屏替换它 —— 底栏显隐是结构性结果,无需 overlay 手工同步。
+ * 外层 state 不感知 tab:切 tab 只驱动根容器内层转场,底栏跨 tab 稳定。
  *
  * [navStyle] 让 transitionSpec 直接查表,无需类型判断:
- * 根页统一为 [PageNavStyle.NONE],二级页沿用其 [Page.navStyle]。
+ * 根容器统一为 [PageNavStyle.NONE],二级页沿用其 [Page.navStyle]。
  */
 internal sealed interface Screen {
     val navStyle: PageNavStyle
 
-    data class Root(val tab: AppTab) : Screen {
+    data object RootShell : Screen {
         override val navStyle = PageNavStyle.NONE
     }
     data class Secondary(val page: Page) : Screen {
