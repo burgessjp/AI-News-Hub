@@ -26,18 +26,15 @@ internal sealed interface Page {
     /**
      * 该页面的转场风格,由 [pageTransition] 统一消费。
      *
-     * 默认 PUSH(横向推入),绝大多数二级页无需单独声明。
-     * 仅 Web 含 AndroidView(WebView),位移会撕裂 → override 为 FADE(纯淡入淡出)。
-     * 其余页(含 Detail)是纯 Compose,正常 PUSH 即可。
+     * 全部二级页统一 PUSH(横向推入),无需单独声明。Web 页曾因 WebView 位移
+     * 撕裂单独 override 为 FADE,实测无此问题后已统一(见 navigation.md)。
      */
     val navStyle: PageNavStyle get() = PageNavStyle.PUSH
 
     data class Detail(val item: NewsItem) : Page
     // title 无默认值:占位文案随语言取词,两处构造点(openUrl / pageFromBundle)均显式传入
     // source:来源标签(如 "GitHub Trending"),随 Page 传递供收藏落库;可空
-    data class Web(val url: String, val title: String, val source: String? = null) : Page {
-        override val navStyle = PageNavStyle.FADE
-    }
+    data class Web(val url: String, val title: String, val source: String? = null) : Page
     data object DailyArchive : Page
     data class DailyDate(val date: String) : Page
     /** 全部动态 —— 原为独立 tab,现改为从精选页 push 进入的二级页。 */

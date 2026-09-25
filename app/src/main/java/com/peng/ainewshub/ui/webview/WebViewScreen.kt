@@ -177,16 +177,6 @@ fun WebViewScreen(
     // 提取失败/手动退出阅读时清除,避免下次进阅读模式被误触发。
     var pendingTranslate by remember { mutableStateOf(false) }
 
-    // 延迟挂载 WebView:进入转场(FADE,250ms)结束后再创建,避免 factory 的主线程
-    // 重活与转场抢帧(此前实测转场被拉长、且淡入目标是白屏,视觉上像没有动画)。
-    // 转场期间先展示顶栏 + 加载进度条,WebView 创建完成后再接上。
-    // 延迟量对齐 FADE 实际时长 + 30ms 余量(原 MEDIUM+50=350ms 是按 PUSH 时长拍的,
-    // 比实际 FADE 多等 100ms 白白吃进点按→可读的延迟)。
-    var attachWeb by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        delay(280L)
-        attachWeb = true
-    }
 
     // factory 创建的 WebView 引用,供 DisposableEffect 在离开屏幕时 destroy,避免内存泄漏。
     // 注意:必须用普通 Ref(非 mutableStateOf)捕获 —— 若用 State 作 DisposableEffect 的 key,
@@ -515,236 +505,233 @@ fun WebViewScreen(
                     .fillMaxSize()
                     .padding(padding)
             ) {
-                // 转场结束后再创建 WebView(见上方 attachWeb 说明)
-                if (attachWeb) {
-                    AndroidView(
-                        factory = { ctx ->
-                            WebView(ctx).apply {
-                                webViewRef.web = this
-                                configureWebSettings(darkTheme, fontScale)
-                                // 滚动隐现底部栏:按方向累积位移,超阈值切换显隐;方向反转先清零
-                                setOnScrollChangeListener { _, _, scrollY, _, oldScrollY ->
-                                    val dy = scrollY - oldScrollY
-                                    if (dy != 0) {
-                                        if ((scrollAccum > 0) != (dy > 0)) scrollAccum = 0
-                                        scrollAccum += dy
-                                        if (scrollAccum > bottomBarScrollThreshold && webBottomBarVisible) {
-                                            webBottomBarVisible = false
-                                            scrollAccum = 0
-                                        } else if (scrollAccum < -bottomBarScrollThreshold && !webBottomBarVisible) {
-                                            webBottomBarVisible = true
-                                            scrollAccum = 0
-                                        }
-                                    }
-                                    // 阅读进度:节流只写 Ref(阅读模式是另一套内容,不记录)
-                                    if (!readerActive) {
-                                        readingProgressRef.percent = computeReadingPercent(this)
-                                        readingProgressRef.url = currentUrl
-                                    }
-                                }
-                                webViewClient = object : WebViewClient() {
-                                    override fun shouldOverrideUrlLoading(
-                                        view: WebView,
-                                        request: WebResourceRequest
-                                    ): Boolean {
-                                        // 子框架(iframe 等)导航不拦截,交 WebView 自己处理;
-                                        // 主帧按 scheme 分流:
-                                        //  - http(s)/about/data:返回 false 原生加载,保留 POST
-                                        //    与跳转语义(此前 loadUrl+true 会丢 POST 数据);
-                                        //  - blob: 下载由 DownloadListener 托管,导航层忽略;
-                                        //  - javascript: 拒绝执行(防注入);
-                                        //  - 其余 scheme(intent://、weixin://、mailto:、tel:…)
-                                        //    唤起外部 App,失败时优雅降级。
-                                        if (!request.isForMainFrame) return false
-                                        val uri = request.url
-                                        when (uri.scheme?.lowercase()) {
-                                            "http", "https", "about", "data" -> return false
-                                            "blob", "javascript" -> return true
-                                        }
-                                        handleExternalUri(view.context, uri)
-                                        return true
-                                    }
-
-                                    override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
-                                        loading = true
-                                        loadError = null
-                                        // 新页面起始:底部栏复位为可见(浏览器惯例)
+                AndroidView(
+                    factory = { ctx ->
+                        WebView(ctx).apply {
+                            webViewRef.web = this
+                            configureWebSettings(darkTheme, fontScale)
+                            // 滚动隐现底部栏:按方向累积位移,超阈值切换显隐;方向反转先清零
+                            setOnScrollChangeListener { _, _, scrollY, _, oldScrollY ->
+                                val dy = scrollY - oldScrollY
+                                if (dy != 0) {
+                                    if ((scrollAccum > 0) != (dy > 0)) scrollAccum = 0
+                                    scrollAccum += dy
+                                    if (scrollAccum > bottomBarScrollThreshold && webBottomBarVisible) {
+                                        webBottomBarVisible = false
+                                        scrollAccum = 0
+                                    } else if (scrollAccum < -bottomBarScrollThreshold && !webBottomBarVisible) {
                                         webBottomBarVisible = true
-                                        // 离开当前页(站内跳转/进出阅读模式):旧页进度先落库再清空,
-                                        // 防止归到新 URL 头上;恢复提示同时隐藏
-                                        flushReadingProgress()
-                                        resumeProgress = null
-                                        val isReader = url?.endsWith(READER_SENTINEL) == true
-                                        if (!isReader) {
-                                            // 离开阅读页(点链接/回退/退出):清理翻译状态
-                                            translateJobRef.job?.cancel()
-                                            translating = false
-                                            translateProgress = null
-                                            translateOriginals = null
-                                            translateResults = null
-                                            showTranslateSheet = false
-                                        }
-                                        readerActive = isReader
-                                    }
-
-                                    override fun onPageFinished(view: WebView, url: String?) {
-                                        pageTitle = view.title ?: title
-                                        // 阅读页 URL 带哨兵,剥掉后再用于分享/复制/历史
-                                        val finishedUrl = url?.removeSuffix(READER_SENTINEL)
-                                        currentUrl = finishedUrl ?: currentUrl
-                                        loading = false
-                                        // 「翻译直达」接续:阅读页 DOM 就绪后自动开始翻译
-                                        if (readerActive && pendingTranslate) {
-                                            pendingTranslate = false
-                                            startTranslate()
-                                        }
-                                        webCanGoBack = view.canGoBack()
-                                        webCanGoForward = view.canGoForward()
-                                        // 回写真实标题到浏览历史(用最终落地 URL,跟随重定向)
-                                        val resolvedUrl = finishedUrl ?: currentUrl
-                                        val resolvedTitle = view.title?.takeIf { it.isNotBlank() }
-                                        if (resolvedTitle != null) onTitleResolved(resolvedUrl, resolvedTitle)
-                                        // 「继续上次阅读」:查上次进度,深浅适中才提示;每 URL 每会话一次
-                                        if (!readerActive && resolvedUrl.isNotBlank()) {
-                                            scope.launch {
-                                                val saved = browseHistoryRepo.progressOf(resolvedUrl)
-                                                if (saved in RESUME_PROGRESS_MIN..RESUME_PROGRESS_MAX &&
-                                                    resolvedUrl !in resumeShownUrls
-                                                ) {
-                                                    resumeShownUrls += resolvedUrl
-                                                    resumeProgress = saved
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    override fun doUpdateVisitedHistory(view: WebView, url: String?, isReload: Boolean) {
-                                        // 站内跳转/回退都会更新历史栈,同步「可回退/前进」状态
-                                        webCanGoBack = view.canGoBack()
-                                        webCanGoForward = view.canGoForward()
-                                    }
-
-                                    override fun onReceivedError(
-                                        view: WebView,
-                                        request: WebResourceRequest,
-                                        error: WebResourceError
-                                    ) {
-                                        // 只报主帧错误:图片/接口等子资源失败不打扰
-                                        if (request.isForMainFrame) {
-                                            loadError = "(${error.errorCode}) ${error.description}"
-                                            loading = false
-                                        }
-                                    }
-
-                                    override fun onReceivedHttpError(
-                                        view: WebView,
-                                        request: WebResourceRequest,
-                                        errorResponse: WebResourceResponse
-                                    ) {
-                                        // 主帧 HTTP 错误(404/500 等)同样进错误态
-                                        if (request.isForMainFrame) {
-                                            loadError = context.getString(R.string.webview_error_http, errorResponse.statusCode)
-                                        }
+                                        scrollAccum = 0
                                     }
                                 }
-                                webChromeClient = object : WebChromeClient() {
-                                    override fun onProgressChanged(view: WebView?, newProgress: Int) {
-                                        progress = newProgress
-                                        loading = newProgress < 100
-                                    }
-
-                                    override fun onReceivedTitle(view: WebView?, title: String?) {
-                                        if (!title.isNullOrBlank()) {
-                                            pageTitle = title
-                                            // 部分站点在 onPageFinished 之前/之后才设标题,
-                                            // 这里也回写一次,保证历史标题最终是真实标题
-                                            onTitleResolved(currentUrl, title)
-                                        }
-                                    }
-
-                                    // HTML5 视频全屏:把全屏 View 交给 Compose 覆盖层渲染
-                                    override fun onShowCustomView(view: View, callback: CustomViewCallback) {
-                                        fullscreenCallbackRef.cb?.let { runCatching { it.onCustomViewHidden() } }
-                                        fullscreenCallbackRef.cb = callback
-                                        fullscreenView = view
-                                    }
-
-                                    override fun onHideCustomView() {
-                                        fullscreenView = null
-                                        fullscreenCallbackRef.cb?.let { runCatching { it.onCustomViewHidden() } }
-                                        fullscreenCallbackRef.cb = null
-                                    }
+                                // 阅读进度:节流只写 Ref(阅读模式是另一套内容,不记录)
+                                if (!readerActive) {
+                                    readingProgressRef.percent = computeReadingPercent(this)
+                                    readingProgressRef.url = currentUrl
                                 }
-                                // 长按:图片/链接弹操作菜单;文本保持系统默认(长按选择)
-                                setOnLongClickListener {
-                                    val hit = hitTestResult
-                                    val extra = hit.extra
-                                    when {
-                                        extra.isNullOrBlank() -> false
-                                        hit.type == WebView.HitTestResult.IMAGE_TYPE ||
-                                            hit.type == WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE -> {
-                                            longPressTarget = LongPressTarget.Image(extra)
-                                            true
-                                        }
-                                        hit.type == WebView.HitTestResult.SRC_ANCHOR_TYPE -> {
-                                            longPressTarget = LongPressTarget.Link(extra)
-                                            true
-                                        }
-                                        else -> false
-                                    }
-                                }
-                                // 网页发起的下载处理。
-                                //  - blob: URL:DownloadManager 不认 —— 注入 JS 把 blob 读成 base64,
-                                //    经 BlobSaver 接口回传后解码写入文件(网页用 JS 合成图片"保存"时即此路径)。
-                                //  - http(s):走 DownloadManager。
-                                //  - data:(base64):canvas 导出图片的常见形态,解码后同 blob 写文件。
-                                //  - 其它:直接提示无法下载,不再崩溃。
-                                addJavascriptInterface(
-                                    BlobSaver(context) { name, mime, data ->
-                                        scope.launch { saveBlob(context, name, mime, data) }
-                                    },
-                                    "AndroidBlobSaver"
-                                )
-                                setDownloadListener { downloadUrl, userAgent, contentDisposition, mimetype, _ ->
-                                    when {
-                                        downloadUrl.startsWith("blob:", ignoreCase = true) ->
-                                            downloadBlob(this, context, downloadUrl, contentDisposition, mimetype)
-
-                                        downloadUrl.startsWith("http", ignoreCase = true) -> {
-                                            val params = DownloadParams(
-                                                url = downloadUrl,
-                                                userAgent = userAgent,
-                                                contentDisposition = contentDisposition,
-                                                mimetype = mimetype
-                                            )
-                                            handleDownload(context, params, storagePermissionLauncher) {
-                                                pendingDownload = it
-                                            }
-                                        }
-
-                                        downloadUrl.startsWith("data:", ignoreCase = true) ->
-                                            scope.launch { saveDataUrl(context, downloadUrl) }
-
-                                        else -> {
-                                            Toast.makeText(
-                                                context,
-                                                context.getString(R.string.webview_toast_download_unsupported),
-                                                Toast.LENGTH_SHORT
-                                            ).show()
-                                        }
-                                    }
-                                }
-                                loadUrl(url)
                             }
-                        },
-                        update = { web ->
-                            // 运行时切换主题/字号档位:即时生效
-                            applyDarkTheme(web.settings, darkTheme)
-                            web.settings.textZoom = (fontScale.scale * 100).roundToInt()
-                        },
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
+                            webViewClient = object : WebViewClient() {
+                                override fun shouldOverrideUrlLoading(
+                                    view: WebView,
+                                    request: WebResourceRequest
+                                ): Boolean {
+                                    // 子框架(iframe 等)导航不拦截,交 WebView 自己处理;
+                                    // 主帧按 scheme 分流:
+                                    //  - http(s)/about/data:返回 false 原生加载,保留 POST
+                                    //    与跳转语义(此前 loadUrl+true 会丢 POST 数据);
+                                    //  - blob: 下载由 DownloadListener 托管,导航层忽略;
+                                    //  - javascript: 拒绝执行(防注入);
+                                    //  - 其余 scheme(intent://、weixin://、mailto:、tel:…)
+                                    //    唤起外部 App,失败时优雅降级。
+                                    if (!request.isForMainFrame) return false
+                                    val uri = request.url
+                                    when (uri.scheme?.lowercase()) {
+                                        "http", "https", "about", "data" -> return false
+                                        "blob", "javascript" -> return true
+                                    }
+                                    handleExternalUri(view.context, uri)
+                                    return true
+                                }
+
+                                override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
+                                    loading = true
+                                    loadError = null
+                                    // 新页面起始:底部栏复位为可见(浏览器惯例)
+                                    webBottomBarVisible = true
+                                    // 离开当前页(站内跳转/进出阅读模式):旧页进度先落库再清空,
+                                    // 防止归到新 URL 头上;恢复提示同时隐藏
+                                    flushReadingProgress()
+                                    resumeProgress = null
+                                    val isReader = url?.endsWith(READER_SENTINEL) == true
+                                    if (!isReader) {
+                                        // 离开阅读页(点链接/回退/退出):清理翻译状态
+                                        translateJobRef.job?.cancel()
+                                        translating = false
+                                        translateProgress = null
+                                        translateOriginals = null
+                                        translateResults = null
+                                        showTranslateSheet = false
+                                    }
+                                    readerActive = isReader
+                                }
+
+                                override fun onPageFinished(view: WebView, url: String?) {
+                                    pageTitle = view.title ?: title
+                                    // 阅读页 URL 带哨兵,剥掉后再用于分享/复制/历史
+                                    val finishedUrl = url?.removeSuffix(READER_SENTINEL)
+                                    currentUrl = finishedUrl ?: currentUrl
+                                    loading = false
+                                    // 「翻译直达」接续:阅读页 DOM 就绪后自动开始翻译
+                                    if (readerActive && pendingTranslate) {
+                                        pendingTranslate = false
+                                        startTranslate()
+                                    }
+                                    webCanGoBack = view.canGoBack()
+                                    webCanGoForward = view.canGoForward()
+                                    // 回写真实标题到浏览历史(用最终落地 URL,跟随重定向)
+                                    val resolvedUrl = finishedUrl ?: currentUrl
+                                    val resolvedTitle = view.title?.takeIf { it.isNotBlank() }
+                                    if (resolvedTitle != null) onTitleResolved(resolvedUrl, resolvedTitle)
+                                    // 「继续上次阅读」:查上次进度,深浅适中才提示;每 URL 每会话一次
+                                    if (!readerActive && resolvedUrl.isNotBlank()) {
+                                        scope.launch {
+                                            val saved = browseHistoryRepo.progressOf(resolvedUrl)
+                                            if (saved in RESUME_PROGRESS_MIN..RESUME_PROGRESS_MAX &&
+                                                resolvedUrl !in resumeShownUrls
+                                            ) {
+                                                resumeShownUrls += resolvedUrl
+                                                resumeProgress = saved
+                                            }
+                                        }
+                                    }
+                                }
+
+                                override fun doUpdateVisitedHistory(view: WebView, url: String?, isReload: Boolean) {
+                                    // 站内跳转/回退都会更新历史栈,同步「可回退/前进」状态
+                                    webCanGoBack = view.canGoBack()
+                                    webCanGoForward = view.canGoForward()
+                                }
+
+                                override fun onReceivedError(
+                                    view: WebView,
+                                    request: WebResourceRequest,
+                                    error: WebResourceError
+                                ) {
+                                    // 只报主帧错误:图片/接口等子资源失败不打扰
+                                    if (request.isForMainFrame) {
+                                        loadError = "(${error.errorCode}) ${error.description}"
+                                        loading = false
+                                    }
+                                }
+
+                                override fun onReceivedHttpError(
+                                    view: WebView,
+                                    request: WebResourceRequest,
+                                    errorResponse: WebResourceResponse
+                                ) {
+                                    // 主帧 HTTP 错误(404/500 等)同样进错误态
+                                    if (request.isForMainFrame) {
+                                        loadError = context.getString(R.string.webview_error_http, errorResponse.statusCode)
+                                    }
+                                }
+                            }
+                            webChromeClient = object : WebChromeClient() {
+                                override fun onProgressChanged(view: WebView?, newProgress: Int) {
+                                    progress = newProgress
+                                    loading = newProgress < 100
+                                }
+
+                                override fun onReceivedTitle(view: WebView?, title: String?) {
+                                    if (!title.isNullOrBlank()) {
+                                        pageTitle = title
+                                        // 部分站点在 onPageFinished 之前/之后才设标题,
+                                        // 这里也回写一次,保证历史标题最终是真实标题
+                                        onTitleResolved(currentUrl, title)
+                                    }
+                                }
+
+                                // HTML5 视频全屏:把全屏 View 交给 Compose 覆盖层渲染
+                                override fun onShowCustomView(view: View, callback: CustomViewCallback) {
+                                    fullscreenCallbackRef.cb?.let { runCatching { it.onCustomViewHidden() } }
+                                    fullscreenCallbackRef.cb = callback
+                                    fullscreenView = view
+                                }
+
+                                override fun onHideCustomView() {
+                                    fullscreenView = null
+                                    fullscreenCallbackRef.cb?.let { runCatching { it.onCustomViewHidden() } }
+                                    fullscreenCallbackRef.cb = null
+                                }
+                            }
+                            // 长按:图片/链接弹操作菜单;文本保持系统默认(长按选择)
+                            setOnLongClickListener {
+                                val hit = hitTestResult
+                                val extra = hit.extra
+                                when {
+                                    extra.isNullOrBlank() -> false
+                                    hit.type == WebView.HitTestResult.IMAGE_TYPE ||
+                                        hit.type == WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE -> {
+                                        longPressTarget = LongPressTarget.Image(extra)
+                                        true
+                                    }
+                                    hit.type == WebView.HitTestResult.SRC_ANCHOR_TYPE -> {
+                                        longPressTarget = LongPressTarget.Link(extra)
+                                        true
+                                    }
+                                    else -> false
+                                }
+                            }
+                            // 网页发起的下载处理。
+                            //  - blob: URL:DownloadManager 不认 —— 注入 JS 把 blob 读成 base64,
+                            //    经 BlobSaver 接口回传后解码写入文件(网页用 JS 合成图片"保存"时即此路径)。
+                            //  - http(s):走 DownloadManager。
+                            //  - data:(base64):canvas 导出图片的常见形态,解码后同 blob 写文件。
+                            //  - 其它:直接提示无法下载,不再崩溃。
+                            addJavascriptInterface(
+                                BlobSaver(context) { name, mime, data ->
+                                    scope.launch { saveBlob(context, name, mime, data) }
+                                },
+                                "AndroidBlobSaver"
+                            )
+                            setDownloadListener { downloadUrl, userAgent, contentDisposition, mimetype, _ ->
+                                when {
+                                    downloadUrl.startsWith("blob:", ignoreCase = true) ->
+                                        downloadBlob(this, context, downloadUrl, contentDisposition, mimetype)
+
+                                    downloadUrl.startsWith("http", ignoreCase = true) -> {
+                                        val params = DownloadParams(
+                                            url = downloadUrl,
+                                            userAgent = userAgent,
+                                            contentDisposition = contentDisposition,
+                                            mimetype = mimetype
+                                        )
+                                        handleDownload(context, params, storagePermissionLauncher) {
+                                            pendingDownload = it
+                                        }
+                                    }
+
+                                    downloadUrl.startsWith("data:", ignoreCase = true) ->
+                                        scope.launch { saveDataUrl(context, downloadUrl) }
+
+                                    else -> {
+                                        Toast.makeText(
+                                            context,
+                                            context.getString(R.string.webview_toast_download_unsupported),
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
+                                }
+                            }
+                            loadUrl(url)
+                        }
+                    },
+                    update = { web ->
+                        // 运行时切换主题/字号档位:即时生效
+                        applyDarkTheme(web.settings, darkTheme)
+                        web.settings.textZoom = (fontScale.scale * 100).roundToInt()
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
 
                 // 顶部加载进度条(2dp 细线,加载完成淡出)
                 TopProgressBar(loading = loading, progress = { progress / 100f })

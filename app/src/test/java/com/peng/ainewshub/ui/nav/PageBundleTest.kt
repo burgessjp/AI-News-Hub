@@ -118,9 +118,9 @@ class PageBundleTest {
     }
 
     @Test
-    fun `转场风格契约 Web 为 FADE 其余 PUSH`() {
-        // WebView 位移会撕裂,Web 页恒 FADE;该契约被 Motion 查表消费
-        assertEquals(PageNavStyle.FADE, Page.Web("https://e.com", "t").navStyle)
+    fun `转场风格契约 所有二级页统一 PUSH`() {
+        // Web 页曾因 WebView 位移撕裂单独 override FADE,实测无此问题后统一 PUSH
+        assertEquals(PageNavStyle.PUSH, Page.Web("https://e.com", "t").navStyle)
         assertEquals(PageNavStyle.PUSH, Page.Settings.navStyle)
         assertEquals(PageNavStyle.PUSH, Page.Detail(NewsItem(id = "1")).navStyle)
     }
