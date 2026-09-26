@@ -11,8 +11,8 @@
     "generatedAt": <ms>,           # 本次生成时刻
     "dataFetchedAt": <ms>,         # 输入快照里最大的 fetched_at_ms
     "missingSources": [<source_key>, ...],  # 本次未能加载的源
-    "digest": "...",               # 2-3 句跨源今日综述(可能缺省,App 端空串不渲染)
-    "items": [                              # Top10,breaking 排前
+    "digest": "...",               # 3-4 句跨源今日综述(可能缺省,App 端空串不渲染)
+    "items": [                              # Top10,breaking 排前、增量批次新鲜在前
       {
         "source": "hackernews",
         "title": "...", "url": "...", "metrics": "...",
@@ -23,7 +23,7 @@
     ]
   }
 
-设计要点(初版逐行搬自 OverviewRepository.kt,后经准确性优化):
+设计要点(初版逐行搬自 OverviewRepository.kt,后经准确性 + 编辑质量两轮优化):
   - 输入 8 源快照(SOURCE_KEYS,与 App 端一致),每源取前 ITEMS_PER_SOURCE=8 条;
     AI 候选上限 14 条(>10,给数据侧同事件去重留余量);
   - 跨源归一化热度档位:有指标源按自身 top-8 最大原始热度归一化到 10-100%,
@@ -41,17 +41,37 @@
     迁移同事件双条目上榜):① Jaccard ≥0.5 原路径;② 近似包含(短 token 集被长集
     包含/只多 1 个 token,且交集含非泛词锚点——专拦「GLM-5.3」「GPT-6 Astra」式
     裸产品名标题,泛词锚点表防止「两条都提到 OpenAI 的不同新闻」误杀);③ 重合度
-    (交集 ≥3 且 Jaccard ≥0.25)。原「token<3 豁免」已移除——豁免曾让裸产品名
-    标题完全绕过判重;
+    (交集 ≥3 且 Jaccard ≥0.25)。原「token<3 豁免」已移除——豁免曾让裸产品名标题
+    完全绕过判重;
   - 去重后不足 MAX_TOP 时从输入池按归一化热度降序回填(单源 ≤3、7 天时效硬闸、
     同套 URL/标题去重),保证常规批次恒输出 10 条;回填条目无 AI 点评(comment 留
     空,App 端空串不渲染)、恒非 breaking;
+  - 增量批次(2026-09 编辑质量轮):fetch_data.py 把上一期 latest_overview 传入,
+    上一期 digest + Top10 注入 prompt(上一期数据日期与本批同日 → 晚报身份,否则
+    早报),AI 被要求「已报道事件无新进展不再选、有进展换角度写」;数据侧对与上一期
+    同事件(URL 精确命中或标题三规则判重,复用跨源闸)的条目软降位——稳定排序排到
+    全部新鲜条目之后、不参与回填,breaking 条目豁免(重大事件后续进展仍可居首);
+  - breaking 硬校验(同轮):AI 输出 item 增加可选 supportRefs(同事件佐证 ref 列表,
+    仅数据侧核验用、不落盘),佐证源(含主 ref)去重后 ≥2 源且 ≥1 个有指标源才放行
+    breaking,不满足强制降级——prompt 规则从「靠 AI 自觉」变数据侧硬闸;
+    breakingReason 加黑话闸:命中输入字段内部名(权重/档位/日期/score…)整条降级
+    (历史实锤「aihot-featured权重80,日期09-01」曾直接上屏——App 里 breaking 条目的
+    描述位就是它),宁缺毋滥;
+  - 点评-条目对应核验(同轮):AI 须照抄所选条目标题开头(titleEcho),数据侧精确
+    比对——单次调用让模型同时选条+写作,偶发把 A 事件的点评写到 B 的 ref
+    (2026-09-01 回放实锤:Cursor 条目配了芯片点评);错绑保留条目(标题/链接
+    来自真实 ref)但丢弃点评、强制非 breaking,echo 缺失从宽(防整体漏字段误杀);
+    批次日志输出覆盖率 + 错绑数(覆盖塌了说明模型没配合,回放排查);
+  - digest 风格收紧(同轮):3-4 句 ≤180 字,首句直入当天最重要的事,禁盘点式开头
+    与口号式收尾(prompt 内置正反 few-shot);`digest_style_warnings` 供
+    replay_overview.py 回放评读用(告警非硬闸);
   - 失败返回 None,不阻断推送(对齐单源 AI 摘要失败的优雅降级,
     fetch_data.py 会从 previous_index 继承上次的 latest_overview)。
 
 用法(供 fetch_data.py 内部 import):
   from overview_summary import generate_overview
-  overview = generate_overview(out_dir, now_cst())  # 返回 dict 或 None
+  overview = generate_overview(out_dir, now_cst())                    # 首期/无上期
+  overview = generate_overview(out_dir, now_cst(), previous_overview) # 增量批次
 """
 
 import json
@@ -95,6 +115,20 @@ OVERLAP_MIN_SHARED = 3     # 重合度规则:标题 token 交集下限
 OVERLAP_MIN_JACCARD = 0.25 # 重合度规则:Jaccard 下限(跨语言同事件实测 0.32~0.5)
 FRESH_WINDOW_DAYS = 7      # 回填时效硬闸,与 prompt 选条规则同口径
 
+# 有指标源(热度档位来自真实指标;breaking 硬校验要求佐证含至少一个)。
+# 与 SYSTEM_PROMPT「热度档位」一节的有指标源清单保持同口径。
+METRIC_SOURCES = {
+    "hackernews", "github-trending", "huggingface-papers", "producthunt", "aihot-featured",
+}
+
+# breakingReason 内部黑话闸(不区分大小写):命中任一 → 该条降级非 breaking。
+# 历史实锤:AI 曾写出「aihot-featured权重80,日期09-01」直接上屏(App 里 breaking
+# 条目的描述位就是 breakingReason)。佐证只用读者可懂的量级,不引用输入字段名。
+BREAKING_JARGON = ("权重", "档位", "日期", "序号", "score", "ref")
+
+# digest 模板腔告警词(replay_overview.py 评读用,非硬闸——prompt 已禁,此处兜测)
+DIGEST_STYLE_TABOO = ("今日主线集中在", "今日AI领域", "热点集中在", "开发者应关注")
+
 # 英文虚词(2~4 字符):判重前丢弃——「Kimi-K3 on HuggingFace」的 on 会多算一个
 # token 差;the/for 这类 3 字符虚词还会虚增重合度规则的交集数(Flint vs Kronos
 # 论文曾靠 for/the/language 凑满 3 个交集被误杀)。
@@ -136,37 +170,45 @@ TEMPERATURE = 0.3
 MAX_ATTEMPTS = 3
 
 
-# ===== system prompt(初版逐字搬自 OverviewRepository.kt;现为提升生成准确性重写) =====
+# ===== system prompt =====
 
-SYSTEM_PROMPT = """你是「AI News Hub」今日总览栏目的主编。输入是多个资讯源的今日榜单:每源附 AI 要点摘要,以及排名前若干条目(序号、标题、简介、热度档位、原始指标、日期)。请基于全部数据做当天整体研判。
+SYSTEM_PROMPT = """你是「AI News Hub」日刊的主编。输入是多个资讯源的今日榜单:每源附 AI 要点摘要,以及排名前若干条目(序号、标题、简介、热度档位、原始指标、日期);若为增量批次,输入顶部还会附「上一期总览」。请基于全部数据做当天整体研判。
 
 严格输出一个 JSON 对象,不要输出任何解释文字,不要使用 markdown 代码围栏:
-{"digest":"今日综述,见第〇节","items":[{"ref":"源key:序号","analysis":"一句话,不超过40字","breaking":true,"breakingReason":"为什么是突发,40字内"}]}
+{"digest":"今日综述,见第〇节","items":[{"ref":"源key:序号","titleEcho":"该条目标题的前10个字符原文","supportRefs":["源key:序号"],"analysis":"一句话,不超过40字","breaking":true,"breakingReason":"为什么重要,40字内"}]}
 
 〇、先写「今日综述」(digest):
-- 2 到 3 句简体中文,总计不超过 120 字;
-- 跨源归纳当天主线:今天最重要的几件事是什么、集中在哪些领域(模型发布/开源/产品/政策等);
-- 站在「所以怎样」的视角写给开发者,不复述单条标题,不列举全部事件;
+- 3 到 4 句简体中文,总计不超过 180 字;
+- 第一句直接进入当天最重要的一件事,把它说透;其余句子交代其余主线与整体格局;
+- 写判断不写清单:跨源归纳「所以怎样」,不复述单条标题、不罗列全部事件;
+- 禁止套固定框架:不得以「今日主线集中在」「今日AI领域……」之类盘点式开头,不得以「开发者应关注……」之类口号式收尾;
+- 反例(禁止):「今日主线集中在模型开源与生态变动,多家厂商相继发布新模型。开发者应关注开源模型能力跃升带来的工具链重构。」
+- 正例(风格参照):「OpenAI 终止向 Cursor 供模型的余波今天继续扩大,模型转售生意的脆弱性暴露无遗,多家工具厂商被迫转向自研接入层。另一条主线是国产开源模型集中放量:腾讯 Hy4 与智谱 GLM-5.3 同日开源,中档算力可跑的多模态第一次有了真选择。」
 - 没有明显主线时,如实概述当天热点的分布,禁止硬凑主题。
 
-一、先读懂「热度档位」:
+一、增量纪律(输入含「上一期总览」时生效,首期忽略本节):
+- 上一期已报道的事件,没有新进展(无后续事实、指标无跳升)不再选入 items;
+- 仍值得报道的,必须换进展角度:analysis 写「这次新发生了什么」,不重复上期已说过的旧事实;
+- digest 不得复述上期综述的原句与框架;输入标注「晚报」时优先呈现上一期之后的增量,标注「早报」时可承接昨夜至今晨的动态。
+
+二、先读懂「热度档位」:
 - 有指标源(hackernews、github-trending、huggingface-papers、producthunt、aihot-featured):档位由真实指标(得分/star/票数/upvotes/权重)归一化而来,可信,直接按数字比较。
 - 无指标源(rundown-ai、stormzhang-ai、openai-anthropic-news):无真实热度指标,档位只按列表序号线性给出(上限 70%),仅反映站内排序。跨源比较时,无指标源条目默认排在同档位有指标源条目之后。
 - 原始指标量级差异极大(HN 几百、GitHub 几万),禁止直接比较原始数字。
 
-二、选条与排序:
+三、选条与排序:
 1. items 为今日最值得关注的条目,最多 14 条(数据不足按实际给,至少 5 条;数据侧会对跨源同事件去重后截取前 10)。按热度档位从高到低排序;档位差 ≤2% 视为同档,同档时有指标源在前、日期新鲜的在前。
 2. 时效:输入顶部给出「数据日期(北京)」。日期早于数据日期 7 天以上的条目不得入选(档位再高也不行);标注「抓取日期」的条目其日期不代表发布日,不得作为时效依据。
 3. 跨源同事件合并:同一事件(如某新模型发布,含其衍生通稿如「上线某平台」「开源某组件」)在多个源出现时只保留一条,取各报道源中的最高档位参与排序;ref 优先选有指标源的条目,同为有指标源取档位最高者。analysis 里可点出「多家报道」。同一事件不得占多个名额。
 4. 同一来源(ref 源key)最多 3 条;超出时把名额让给其它源的高档位条目。
-5. ref 必须原样照抄输入中的「源key:序号」(如 hackernews:2),不得编造;标题与链接由数据侧按 ref 回填,你不要输出标题和 URL。
-6. analysis 用简体中文,≤40 字,回答「所以怎样」——对开发者/行业意味着什么;禁止复述标题事实,可引用输入中的真实数字(如「HN 899 分」)提升信息密度。
+5. ref 与 supportRefs 必须原样照抄输入中真实存在的「源key:序号」(如 hackernews:2),不得编造;标题与链接由数据侧按 ref 回填,你不要输出标题和 URL。titleEcho 原样照抄该 ref 条目标题的前 10 个字符(不足 10 个抄完整标题,保留原语言、大小写、标点与空格)——数据侧据此核验点评与条目的对应关系,对不上该条点评会被丢弃。
+6. analysis 用简体中文,≤40 字,回答「所以怎样」——对开发者/行业意味着什么;禁止复述标题事实;必须含至少一个具体事实锚点(真实数字、版本号或厂商动作),禁止「推动X发展」「引发热议」「值得持续关注」等空泛收尾。
 
-三、「突发重磅」("breaking":true),须同时满足:
+四、「突发重磅」("breaking":true),须同时满足:
 ① 属于重大发布/行业事件(新模型、重大开源、巨头战略动作等);
-② 至少 2 个源报道同一事件,且其中 ≥1 个是有指标源;
+② 至少 2 个源报道同一事件,且其中 ≥1 个是有指标源——除主 ref 外,把同事件的其它佐证条目 ref 填进 supportRefs(数据侧会逐一核验,佐证不足或编造会被降级为普通条目);
 ③ 佐证条目中至少 1 条的真实日期等于数据日期或前一天(「抓取日期」不算)。
-0 到 2 条,宁缺毋滥,绝不硬凑;任一条件不满足即 "breaking":false。breaking 条目排在 items 最前,计入条目总数。breaking=true 时必须给出 breakingReason:简体中文 ≤40 字,写清具体证据(哪些源报道、什么量级,如「HN 899 分热议 + PH 日榜#4」),禁止「影响面广」「引发热议」等无信息量表述,不复述 analysis;breaking=false 时留空字符串。"""
+0 到 2 条,宁缺毋滥,绝不硬凑;任一条件不满足即 "breaking":false。breaking 条目排在 items 最前,计入条目总数。breaking=true 时必须给出 breakingReason:简体中文 ≤40 字,写给读者看的「为什么重要」;引用佐证只用读者可懂的量级(如「HN 899 分热议」「GitHub 单日 +3.9k star」「PH 日榜#1」),禁止出现输入字段的内部名称(权重、档位、热度、日期编号、score、ref、序号);禁止「影响面广」「引发热议」等无信息量表述,不复述 analysis。breaking=false 时 supportRefs 可省略、breakingReason 留空字符串。"""
 
 
 # ===== 快照读取 =====
@@ -283,13 +325,13 @@ def _extract_items(source, snapshot, limit=ITEMS_PER_SOURCE):
         elif source == "rundown-ai":
             # 2026-08 站点改版后快照带真实 publishedAt(北京时间 yyyy-MM-dd HH:mm);
             # 旧快照无此字段,回退抓取日期(_build_section 里标注「抓取日期」)
-            pub = _s(o, "publishedAt").strip()
+            pub = _s(o, "publishedAt")
             date_key = pub[:10] if len(pub) >= 10 else fallback_date_key
             view = (i, _s(o, "title"), _s(o, "url"), "", _s(o, "subtitle"), date_key)
             raw_heat = 0.0  # 无指标源,按序号归一化
         elif source == "stormzhang-ai":
             # "2026-07-15 20:00" 北京时间无时区,直接取前 10 字符(yyyy-MM-dd)
-            t = _s(o, "time").strip()
+            t = _s(o, "time")
             date_key = t[:10] if len(t) >= 10 else ""
             view = (i, _s(o, "summary"), _s(o, "url"), f"信源 {_s(o, 'source')}",
                     _s(o, "english"), date_key)
@@ -433,6 +475,46 @@ def _build_section(source, snapshot, data_today=""):
     return "\n".join(sb)
 
 
+def _build_previous_section(previous_overview, data_today):
+    """
+    上一期注入段(增量批次的研判基线):早/晚报身份 + 上一期综述 + 上一期 Top10。
+
+    身份判定:上一期数据日期与本批数据日期同日 → 本批为当日第二期(晚报,重点写
+    增量);否则为当日第一期(早报,可承接昨夜今晨)。digest 与 items 均缺时返回
+    空串(上一期残缺,不值得注入,当首期处理)。
+    """
+    if not isinstance(previous_overview, dict):
+        return ""
+    digest = (previous_overview.get("digest") or "").strip()
+    prev_items = [it for it in (previous_overview.get("items") or [])
+                  if isinstance(it, dict) and (it.get("title") or "").strip()]
+    if not digest and not prev_items:
+        return ""
+    prev_date = _beijing_date_key_of_ms(previous_overview.get("dataFetchedAt", 0) or 0)
+    if prev_date and prev_date == data_today:
+        edition = "本批是当日第二期(晚报):重点呈现上一期之后的新进展与增量"
+    else:
+        edition = "本批是当日第一期(早报):可承接昨夜至今晨的动态,不必重复昨日已报"
+    lines = [
+        "# 上一期总览(增量研判基线,不是本期素材,禁止照抄)",
+        f"- {edition};上一期数据日期:{prev_date or '未知'}",
+    ]
+    if digest:
+        lines.append(f"- 上一期综述:{digest}")
+    if prev_items:
+        lines.append("- 上一期 Top10(已报道;无新进展不再选入 items):")
+        for i, it in enumerate(prev_items, 1):
+            lines.append(f"  {i}. [{(it.get('source') or '').strip()}] {(it.get('title') or '').strip()}")
+    return "\n".join(lines)
+
+
+def digest_style_warnings(digest):
+    """digest 模板腔命中清单(replay_overview.py 回放评读用;告警非硬闸,
+    正常情况下 prompt 的禁令 + few-shot 已拦住,这里兜测回归)。"""
+    text = digest or ""
+    return [taboo for taboo in DIGEST_STYLE_TABOO if taboo in text]
+
+
 # ===== AI 调用统一经 ai_client(共享 Session / 429 重试 / 围栏剥离) =====
 # 总览的请求与解析原与 ai_summary 各持一份逐字重复的实现,现已收口到
 # ai_client.call_llm(expect="object");此处仅保留对返回对象的结构校验。
@@ -455,7 +537,7 @@ def _tokenize_title(title):
     判重时 pro 永远匹配不上(DeepSeek V4 Pro 跨语言重复曾因此漏网)。
     """
     tokens = set()
-    for seg in re.split(r"[^a-z0-9\u4e00-\u9fa5]+", title.lower()):
+    for seg in re.split(r"[^a-z0-9一-龥]+", title.lower()):
         if not seg:
             continue
         if re.fullmatch(r"[a-z0-9]+", seg):
@@ -463,7 +545,7 @@ def _tokenize_title(title):
                 tokens.add(seg)
         else:
             for sub in re.split(
-                    r"(?<=[\u4e00-\u9fa5])(?=[a-z0-9])|(?<=[a-z0-9])(?=[\u4e00-\u9fa5])", seg):
+                    r"(?<=[一-龥])(?=[a-z0-9])|(?<=[a-z0-9])(?=[一-龥])", seg):
                 if len(sub) >= 2 and sub not in EN_STOP:
                     tokens.add(sub)
     return tokens
@@ -495,6 +577,21 @@ def _near_containment(ta, tb):
     return len(small - big) <= 1 and any(t not in GENERIC_ANCHORS for t in inter)
 
 
+def _dup_across_sources(tokens, source, prev_source, prev_tokens):
+    """
+    跨源三规则判重(① Jaccard ② 近似包含 ③ 重合度);同源对恒不判重。
+    批内去重(_title_not_duplicate)与跨期 carryover 判定(_is_carryover)共用,
+    语义闸只此一份。
+    """
+    if source == prev_source or not tokens or not prev_tokens:
+        return False
+    jac = _jaccard(tokens, prev_tokens)
+    shared = len(tokens & prev_tokens)
+    return (jac >= TITLE_DUP_THRESHOLD
+            or (shared >= OVERLAP_MIN_SHARED and jac >= OVERLAP_MIN_JACCARD)
+            or _near_containment(tokens, prev_tokens))
+
+
 def _title_not_duplicate(title, history, source=""):
     """
     标题去重(三规则,对 history 逐一比对,命中任一即丢弃;均仅跨源生效):
@@ -515,24 +612,82 @@ def _title_not_duplicate(title, history, source=""):
         history.append((source, tokens))
         return True
     for prev_source, prev in history:
-        if prev_source == source:
-            continue
-        jac = _jaccard(tokens, prev)
-        shared = len(tokens & prev)
-        if (jac >= TITLE_DUP_THRESHOLD
-                or (shared >= OVERLAP_MIN_SHARED and jac >= OVERLAP_MIN_JACCARD)
-                or _near_containment(tokens, prev)):
+        if _dup_across_sources(tokens, source, prev_source, prev):
             return False
     history.append((source, tokens))
     return True
 
 
-def _backfill_items(result, extracted, used_positions, urls_seen, title_history, data_today):
+def _carryover_state(previous_items):
+    """
+    上一期 Top10 → carryover 判定状态:(URL 集合, (source, tokens) 列表)。
+    previous_items 为 None/空时返回空状态(等同首期,不触发任何降位)。
+    """
+    urls = set()
+    titles = []
+    for it in previous_items or []:
+        if not isinstance(it, dict):
+            continue
+        u = (it.get("url") or "").strip()
+        if u:
+            urls.add(u)
+        t = _tokenize_title(it.get("title") or "")
+        if t:
+            titles.append(((it.get("source") or "").strip(), t))
+    return urls, titles
+
+
+def _is_carryover(url, title, source, prev_state):
+    """是否与上一期 Top10 同事件:URL 精确命中,或标题跨源三规则判重命中。"""
+    prev_urls, prev_titles = prev_state
+    if url and url in prev_urls:
+        return True
+    tokens = _tokenize_title(title)
+    return any(_dup_across_sources(tokens, source, ps, pt) for ps, pt in prev_titles)
+
+
+def _valid_support_sources(o, snapshots, extracted):
+    """
+    解析 AI 输出的 supportRefs(同事件佐证 ref 列表),逐个按主 ref 同口径核验
+    (格式 / 源存在 / 序号未越界),返回通过核验的源 key 集合(编造的 ref 静默丢弃,
+    由佐证不足引发的降级兜住)。仅 breaking 硬校验用,不落盘进 latest_overview。
+    """
+    refs = o.get("supportRefs")
+    if not isinstance(refs, list):
+        return set()
+    out = set()
+    for r in refs:
+        ref = str(r or "").strip()
+        cut = ref.rfind(":")
+        if cut <= 0:
+            continue
+        src = ref[:cut].strip().lower()
+        try:
+            index = int(ref[cut + 1:].strip())
+        except ValueError:
+            continue
+        items = extracted.get(src) or []
+        if src in snapshots and 0 <= index < len(items):
+            out.add(src)
+    return out
+
+
+def _breaking_reason_ok(reason):
+    """breakingReason 黑话闸:非空且不命中任何输入字段内部名(不区分大小写)。"""
+    if not reason:
+        return False
+    lowered = reason.lower()
+    return not any(j in lowered for j in BREAKING_JARGON)
+
+
+def _backfill_items(result, extracted, used_positions, urls_seen, title_history, data_today,
+                    prev_state=(set(), [])):
     """
     从输入池按归一化热度降序回填,把热点列表补足到 MAX_TOP。
     触发条件:AI 候选经去重后不足 10 条(AI 候选上限 14 见 SYSTEM_PROMPT,双保险
     保证常规批次恒 10 条)。约束对齐 prompt 选条规则:单源 ≤3 条、7 天时效硬闸、
-    URL/标题去重与 AI 条目共用同一套登记。回填条目 comment 留空(App 端空串不
+    URL/标题去重与 AI 条目共用同一套登记、与上一期同事件(carryover)不回填
+    (增量批次的回填名额留给新鲜条目)。回填条目 comment 留空(App 端空串不
     渲染)、恒非 breaking。
     """
     if not data_today:
@@ -562,6 +717,9 @@ def _backfill_items(result, extracted, used_positions, urls_seen, title_history,
             continue
         if url in urls_seen or not _title_not_duplicate(title, title_history, src):
             continue
+        # 增量闸:上一期已报道的同事件条目不占回填名额
+        if _is_carryover(url, title, src, prev_state):
+            continue
         urls_seen.add(url)
         source_counts[src] += 1
         added.append({
@@ -576,19 +734,24 @@ def _backfill_items(result, extracted, used_positions, urls_seen, title_history,
     return added
 
 
-def _parse_result(ai_data, snapshots, breaking_dates, data_today=""):
+def _parse_result(ai_data, snapshots, breaking_dates, data_today="", previous_items=None):
     """
-    解析 AI 输出为统一的热点列表:ref 回填 + 时效兜底 + 双层去重 + breaking 截断
-    到 MAX_BREAKING + 不足 MAX_TOP 时从输入池按热度回填。
+    解析 AI 输出为统一的热点列表:ref 回填 + 时效兜底 + 双层去重 + breaking 硬校验
+    (佐证 ≥2 源且 ≥1 有指标源、reason 黑话闸)+ 截断到 MAX_BREAKING + 不足 MAX_TOP
+    时从输入池按热度回填 + 增量批次 carryover 软降位。
     breaking_dates: 允许标 breaking 的北京日期集合(数据日期及其前一天——每日
     批次制下,前一日的大事对多数用户仍是新闻)。
     data_today: 数据日期(北京 yyyy-MM-dd),回填时效过滤的基准。
+    previous_items: 上一期 latest_overview 的 items(增量批次注入;None 为首期)。
     返回 [{source, title, url, metrics, comment, breaking, breakingReason}, ...]。
     """
     # 每源条目只抽取一次:ref 回填与回填候选共用同一份(含归一化热度档位)
     extracted = {src: _extract_items(src, snapshots[src]) for src in snapshots}
+    prev_state = _carryover_state(previous_items)
 
     raw_items = ai_data.get("items") or []
+    echo_drop_count = 0  # titleEcho 错绑(echo 与实际标题对不上)丢弃点评的条数
+    echo_present = 0     # 输出里带 titleEcho 的条数(覆盖率高说明模型在配合核验)
     seen_refs = set()
     used_positions = set()  # AI 已点名的 (source, index):含被判重丢弃者,回填不再取
     entries = []
@@ -619,22 +782,45 @@ def _parse_result(ai_data, snapshots, breaking_dates, data_today=""):
         if not url.strip():
             continue
         used_positions.add((source, index))
-        # 时效硬约束:AI 标 breaking 但日期不在允许窗口(数据日期/前一天)的,强制降级
+        # 点评-条目对应核验:AI 须照抄所选条目标题开头(titleEcho);对不上说明
+        # 它把别的条目当成了这个 ref(长列表上偶发错绑,2026-09 回放实锤:Cursor
+        # 条目配了芯片点评)。错绑时保留条目(标题/链接来自真实 ref)但丢弃点评、
+        # 强制非 breaking;echo 缺失从宽(等同旧版,防模型整体漏字段时全量误杀)。
+        echo = str(o.get("titleEcho") or "").strip()
+        if echo:
+            echo_present += 1
+        echo_mismatch = bool(echo) and not title.startswith(echo)
+        if echo_mismatch:
+            echo_drop_count += 1
+        # breaking 三重硬闸:① 时效(数据日期/前一天);② 佐证(supportRefs 含主
+        # ref 去重后 ≥2 源且 ≥1 有指标源——prompt 规则原只靠 AI 自觉,现数据侧
+        # 核验);③ reason 黑话(内部字段名不得上屏)。任一不满足强制降级。
         ai_breaking = bool(o.get("breaking"))
         effective_date = date_key if date_key else _beijing_date_key_of_ms(snapshot.get("fetched_at_ms", 0))
-        is_breaking = ai_breaking and bool(effective_date) and effective_date in breaking_dates
+        support_sources = {source} | _valid_support_sources(o, snapshots, extracted)
+        reason_raw = (o.get("breakingReason") or "").strip()
+        is_breaking = (ai_breaking
+                       and bool(effective_date) and effective_date in breaking_dates
+                       and len(support_sources) >= 2 and bool(support_sources & METRIC_SOURCES)
+                       and _breaking_reason_ok(reason_raw)
+                       and not echo_mismatch)
         entries.append({
             "source": source,
             "title": title,
             "url": url,
             "metrics": metrics,
-            "comment": (o.get("analysis") or "").strip(),
+            "comment": "" if echo_mismatch else (o.get("analysis") or "").strip(),
             "breaking": is_breaking,
-            "breakingReason": (o.get("breakingReason") or "").strip() if is_breaking else "",
+            "breakingReason": reason_raw if is_breaking else "",
         })
 
     if not entries:
         return []
+
+    # 点评核验观测:覆盖率(模型配合度)+ 错绑丢弃数;echo 大面积缺失说明模型
+    # 没配合,核验形同虚设,须回放排查 prompt 遵循度
+    print(f"[OVERVIEW] 点评核验:titleEcho 覆盖 {echo_present}/{len(entries)},"
+          f"错绑丢弃 {echo_drop_count}", file=sys.stderr)
 
     urls_seen = set()
     title_history = []
@@ -660,24 +846,34 @@ def _parse_result(ai_data, snapshots, breaking_dates, data_today=""):
         if _admit(e):
             result.append(e)
 
-    # 去重后不足 MAX_TOP:从输入池按热度回填(AI 条目优先,回填条目殿后)
+    # 去重后不足 MAX_TOP:从输入池按热度回填(先 append 到 AI 条目之后;随后统一
+    # 排序里新鲜回填条目仍排在 carryover 的 AI 条目之前——新鲜优先于承接)
     if len(result) < MAX_TOP:
         result.extend(_backfill_items(
-            result, extracted, used_positions, urls_seen, title_history, data_today))
+            result, extracted, used_positions, urls_seen, title_history, data_today,
+            prev_state=prev_state))
 
-    # breaking 排前,整体截断到 MAX_TOP(稳定排序,不打乱同级次序)
-    result.sort(key=lambda x: 0 if x["breaking"] else 1)
+    # 排序:breaking 居首;增量批次与上一期同事件(carryover)的普通条目软降位到
+    # 全部新鲜条目之后(稳定排序,两组内部保持 AI 次序);breaking 豁免——重大事件
+    # 的后续进展仍可居首。整体截断到 MAX_TOP。
+    result.sort(key=lambda e: (
+        0 if e["breaking"] else 1,
+        0 if e["breaking"] or not _is_carryover(e["url"], e["title"], e["source"], prev_state) else 1,
+    ))
     return result[:MAX_TOP]
 
 
 # ===== 入口 =====
 
-def generate_overview(out_dir, now):
+def generate_overview(out_dir, now, previous_overview=None):
     """
     读本次 out_dir 下 8 源快照,生成今日总览。成功返回 dict(写入 index.json latest_overview),
     失败返回 None(调用方从 previous_index 继承上次的 latest_overview)。
 
     now: datetime(北京时间,带 tzinfo),用于 generatedAt。
+    previous_overview: 上一期 latest_overview dict(增量批次注入:上一期 digest +
+    Top10 进 prompt 做增量研判,数据侧对同事件条目软降位);None = 首期/上期缺失,
+    行为与旧版一致。残缺(无 digest 且无 items)时自动当首期处理。
     """
     if not config_ready():
         missing = [k for k in (ENV_BASE_URL, ENV_MODEL, ENV_API_KEY) if not os.getenv(k)]
@@ -697,13 +893,17 @@ def generate_overview(out_dir, now):
     data_yesterday = _beijing_date_key_of_ms(data_date_ms - 86400000)
     breaking_dates = {d for d in (data_today, data_yesterday) if d}
 
-    # 组 user prompt
+    # 组 user prompt:增量批次先注入「上一期总览」段(残缺上期返回空串,当首期)
+    previous_section = _build_previous_section(previous_overview, data_today)
     user_prompt = (
         f"数据日期(北京):{data_today};breaking 时效窗口:{data_yesterday} 或 {data_today}\n\n"
+        + (previous_section + "\n\n" if previous_section else "")
         + "\n\n".join(
             _build_section(src, snapshots[src], data_today) for src in SOURCE_KEYS if src in snapshots
         )
     )
+    previous_items = (previous_overview.get("items") if isinstance(previous_overview, dict) else None)
+    prev_state = _carryover_state(previous_items)
 
     base_url = os.getenv(ENV_BASE_URL)
     model = os.getenv(ENV_MODEL)
@@ -717,7 +917,8 @@ def generate_overview(out_dir, now):
                 timeout=TIMEOUT, temperature=TEMPERATURE, expect="object",
             )
             _validate_overview_obj(ai_data)
-            items = _parse_result(ai_data, snapshots, breaking_dates, data_today)
+            items = _parse_result(ai_data, snapshots, breaking_dates, data_today,
+                                  previous_items=previous_items)
             if not items:
                 raise RuntimeError("解析后无有效条目")
             overview = {
@@ -728,8 +929,11 @@ def generate_overview(out_dir, now):
                 "digest": (ai_data.get("digest") or "").strip(),
                 "items": items,
             }
+            carry = sum(1 for i in items
+                        if not i["breaking"] and _is_carryover(i["url"], i["title"], i["source"], prev_state))
             print(f"[OVERVIEW] 生成成功:{len(items)} 条(第 {attempt} 次成功),"
-                  f"breaking {sum(1 for i in items if i['breaking'])} 条")
+                  f"breaking {sum(1 for i in items if i['breaking'])} 条,"
+                  f"承接上期 {carry} 条")
             return overview
         except Exception as e:
             last_err = e

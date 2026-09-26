@@ -656,10 +656,12 @@ def main():
     with open(manifest_path, "w", encoding="utf-8") as f:
         json.dump(manifest, f, ensure_ascii=False, indent=2)
 
-    # 今日总览:跨源综合分析(失败仅 warn,不阻断推送;失败时 write_index 继承 previous_overview)
+    # 今日总览:跨源综合分析(失败仅 warn,不阻断推送;失败时 write_index 继承 previous_overview)。
+    # previous_overview 传入做增量批次:上一期 digest + Top10 注入 prompt,数据侧对
+    # 同事件条目软降位(见 overview_summary 模块头「增量批次」)
     overview = None
     if do_summary:
-        overview = overview_summary.generate_overview(args.out_dir, now)
+        overview = overview_summary.generate_overview(args.out_dir, now, previous_overview)
     else:
         print("[OVERVIEW] --no-summary 模式,跳过总览生成", file=sys.stderr)
 
