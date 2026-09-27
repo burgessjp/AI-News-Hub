@@ -1,21 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- My Follows strings (English; Chinese full set in values/strings_follows.xml). -->
 <resources>
-    <!-- Upper section header of the Trending tab (keyword follow hits) -->
+    <!-- Collapsed follows-row label on Today + manage-row label on the Hotwords page -->
     <string name="follows_section_title">My Keywords</string>
-    <!-- Collapsed guide row shown when no keywords exist (tap to open the manage sheet) -->
+    <!-- Guide subtitle on the Hotwords manage row when no keywords exist -->
     <string name="follows_section_guide">Follow keywords to see only what matters to you</string>
-    <!-- Second guide row: browse the Hotwords secondary page -->
-    <string name="follows_guide_trends">Browse trending keywords</string>
-    <!-- Header stats line: %1$d=keyword count, %2$d=today\'s matched items -->
+    <!-- Stats line: %1$d=keyword count, %2$d=today\'s matched items -->
     <string name="follows_stats_caption">Following %1$d keywords · %2$d matches today</string>
+    <!-- Hit count on Today's collapsed follows row: %1$d=today\'s matched items -->
+    <string name="follows_hits_count">%1$d matches today</string>
+    <!-- Chip-preview overflow on the Hotwords manage row: %1$d=hidden keyword count -->
+    <string name="follows_more_count">+%1$d</string>
 
-    <!-- Manage action button (guide row and manage sheet) -->
+    <!-- Manage action button (stats row, empty state, and manage sheet) -->
     <string name="follows_manage_action">Manage keywords</string>
-    <!-- Suggestion section title (shared by onboarding and the manage sheet) -->
+    <!-- Suggestion section title (manage sheet) -->
     <string name="follows_suggestions_title">Today\'s trending keywords</string>
 
-    <!-- Empty state 2: keywords exist but nothing matched today -->
+    <!-- Empty state: keywords exist but nothing matched today -->
     <string name="follows_empty_no_match_title">No matches today</string>
     <string name="follows_empty_no_match_subtitle">Try another keyword, or check back tomorrow</string>
 
@@ -31,7 +33,4 @@
     <string name="follows_remove_cd">Remove keyword %1$s</string>
     <!-- Over-limit toast (matches SettingsStore.MAX_FOLLOWED_KEYWORDS) -->
     <string name="follows_limit_toast">Up to 20 keywords</string>
-
-    <!-- Footer note for sources that failed to load: %1$s=comma-separated source names -->
-    <string name="follows_missing_sources">Some sources failed to load: %1$s</string>
 </resources>

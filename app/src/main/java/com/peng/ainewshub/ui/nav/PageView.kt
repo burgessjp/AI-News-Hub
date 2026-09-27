@@ -357,7 +357,8 @@ internal fun PageView(
             onOpenLocalSearch = { nav.push(Page.LocalSearch(it)) }
         )
         // 热词榜:近 N 天热词二级页(原「热词」根 tab 下段拆出)。复用趋势内容
-        // 渲染与展开区动作;今天页报头 / 关注空态引导 / tab 深链进入。
+        // 渲染与展开区动作;今天页报头 / tab 深链进入;页首「我的关注」管理行
+        // 是关键词管理主入口。
         Page.Hotwords -> HotwordsScreen(
             onBack = onBack,
             onOpenUrl = { url, title, source -> onOpenUrl(url, title, source) },

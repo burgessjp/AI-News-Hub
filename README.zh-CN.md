@@ -110,7 +110,7 @@
 - **断网兜底**：归档数据落盘缓存，断网冷启动仍可查看最近拉取的内容
 - **浏览历史与收藏**（本地 Room 存储；WebView 顶栏星标任意页面即可稍后读）
 - **每日更新通知**（可选、默认关）：流水线有新内容时本地通知提醒，每天至多 1 条；开启后冷启动遇到新数据还会弹出「今日综述」底部提示
-- **App 内检查更新与直装**（关于页，对查 GitHub Releases；「发现新版本」底部弹层内下载 APK（实时进度、可取消）并拉起系统安装器，无安装包或下载失败回退 Release 页）与 `ainewshub://` 深链（`web?url=…`、`tab/<overview|summary|follows|trends|more>`、`settings`，供浏览器/二维码/自动化工具直达）
+- **App 内检查更新与直装**（关于页，对查 GitHub Releases；「发现新版本」底部弹层内下载 APK（实时进度、可取消）并拉起系统安装器，无安装包或下载失败回退 Release 页）与 `ainewshub://` 深链（`web?url=…`、`tab/<today|more>`（旧名永久映射：overview/summary/follows→今天、trends/hotwords→热词页）、`settings`，供浏览器/二维码/自动化工具直达）
 - **主题**：Material You 动态取色（Android 12+）、字体族切换（默认/衬线/等宽）、字号档位、暗色模式
 - **多语言**：简体中文 / English 切换
 

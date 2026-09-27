@@ -158,9 +158,9 @@ class MainActivity : ComponentActivity() {
      * 解析 ainewshub:// 深链(非本 scheme 或路由不认识返回 null):
      *  - ainewshub://web?url=<encoded>&title=<encoded>&source=<encoded> → 内置 WebView
      *    (url 仅接受 http/https,防 file:// 等本地 scheme 注入)
-     *  - ainewshub://tab/<today|follows|more> → 切根 tab;热词已成二级页:
-     *    hotwords(含旧名 trends)直达热词页;旧版名 overview/summary 映射今天、
-     *    follows 映射关注 tab(与新 tab 名重合,恰好恢复语义;均永久兼容,不 404)
+     *  - ainewshub://tab/<today|more> → 切根 tab;热词已成二级页:
+     *    hotwords(含旧名 trends)直达热词页;旧版名 overview/summary/follows
+     *    映射今天(follows 命中流已并入今天页「我的关注」段;均永久兼容,不 404)
      *  - ainewshub://settings → 设置页
      */
     private fun Intent.deepLink(): DeepLink? {
@@ -190,10 +190,10 @@ class MainActivity : ComponentActivity() {
     /** 深链 tab 名 → [AppTab];未知名称返回 null(视为无深链)。 */
     private fun tabOf(name: String?): AppTab? = when (name) {
         "today" -> AppTab.Today
-        "follows" -> AppTab.Follows
         "more" -> AppTab.More
-        // 旧版五 tab 深链名的永久兼容映射(外部短链/书签可能仍用旧名)
-        "overview", "summary" -> AppTab.Today
+        // 旧版多 tab 深链名的永久兼容映射(外部短链/书签可能仍用旧名);
+        // 关注 tab 已降级并入今天页「我的关注」段,语义后继即「今天」
+        "overview", "summary", "follows" -> AppTab.Today
         else -> null
     }
 }

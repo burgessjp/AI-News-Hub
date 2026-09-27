@@ -52,7 +52,7 @@ data class FollowFeedItem(
  * 并发范式同摘要 Tab(SummaryViewModel):总览 + 8 源并行拉取,单源失败记入
  * [FollowCorpus.missingSources] 跳过、不拖累其余;仅当总览与 8 源**全部**失败时
  * 才返回 failure(UI 走错误态)。[SummaryRepository.summarize] 自带的本地搜索
- * 索引回填副作用在此同样生效 —— 关注页也是索引覆盖的日常入口之一。
+ * 索引回填副作用在此同样生效 —— 今天页关注段也是索引覆盖的日常入口之一。
  */
 class FollowsRepository {
 

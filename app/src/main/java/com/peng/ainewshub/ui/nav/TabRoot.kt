@@ -4,7 +4,6 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
 import com.peng.ainewshub.data.source.SourceKeys
 import com.peng.ainewshub.ui.components.AppTab
-import com.peng.ainewshub.ui.follows.FollowsScreen
 import com.peng.ainewshub.ui.more.MoreScreen
 import com.peng.ainewshub.ui.overview.TodayScreen
 
@@ -18,7 +17,6 @@ internal fun TabRoot(
     nav: AppNavState,
     reselectTick: Int,
     todayListState: LazyListState,
-    followsListState: LazyListState,
     onOpenUrl: (String, String, String?) -> Unit
 ) {
     when (tab) {
@@ -31,14 +29,6 @@ internal fun TabRoot(
             // 分源摘要区块头「查看全部」→ 源完整列表二级页
             onOpenSource = { source -> nav.push(sourcePageOf(source)) },
             listState = todayListState,
-            reselectSignal = reselectTick
-        )
-        // 关注 tab 根屏:关键词命中流(热词榜/词云已拆入 Page.Hotwords 二级页)
-        AppTab.Follows -> FollowsScreen(
-            onOpenUrl = onOpenUrl,
-            // 空态引导「去热词页看看趋势」→ 热词榜二级页
-            onOpenTrends = { nav.push(Page.Hotwords) },
-            listState = followsListState,
             reselectSignal = reselectTick
         )
         AppTab.More -> MoreScreen(

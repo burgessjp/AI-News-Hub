@@ -89,7 +89,7 @@ private const val OFFLINE_NOTICE_TAG = "offline"
  * App 顶层路由 —— 多栈底部导航。
  *
  * 模型(详见 [AppNavState]):
- *  - currentTab: 当前选中的 5 个根 tab 之一(总览 / 摘要 / 关注 / 趋势 / 更多)
+ *  - currentTab: 当前选中的根 tab 之一(今天 / 更多)
  *  - pageStacks: 每个 tab 独立的二级页栈(栈空 = 处于根)
  *
  * 行为:
@@ -393,8 +393,6 @@ internal fun AiNewsHubApp(
     // 走 pageListStates.forPage(Page.FeaturedHub),不再上提。
     // 「今天」tab 的列表滚动状态(总览+分源合一的垂直日报)
     val todayListState = rememberLazyListState()
-    // 「关注」tab 的列表滚动状态(关键词命中流;热词榜已拆入 Page.Hotwords 二级页)
-    val followsListState = rememberLazyListState()
     // 二级页滚动状态:以 Page 值(data class,可作 key)索引,页面弹出后清理。
     val pageListStates = remember { mutableMapOf<Page, LazyListState>() }
     // 二级页 Pager 状态(历史摘要按日期页):与列表状态同上提、同清理。
@@ -477,7 +475,6 @@ internal fun AiNewsHubApp(
                                     nav = nav,
                                     reselectTick = nav.reselectTick,
                                     todayListState = todayListState,
-                                    followsListState = followsListState,
                                     onOpenUrl = openUrl
                                 )
                             }

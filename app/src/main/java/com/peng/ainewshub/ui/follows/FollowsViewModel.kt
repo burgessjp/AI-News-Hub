@@ -21,7 +21,7 @@ import kotlinx.coroutines.launch
 import com.peng.ainewshub.data.prefs.SettingsStore
 
 /**
- * 「我的关注」页 UI 模型 —— 过滤结果 + 关键词/推荐词等页面态的快照。
+ * 「我的关注」UI 模型 —— 过滤结果 + 关键词/推荐词等页面态的快照。
  *
  * [items] 为按当前关键词(与单选过滤词)算好的命中条目;关键词增删由
  * [FollowsViewModel] 内部重算,不需要 UI 自己再过滤。
@@ -30,23 +30,22 @@ data class FollowsUi(
     val keywords: List<String>,
     val selectedKeyword: String?,
     val items: List<FollowFeedItem>,
-    val missingSources: List<String>,
-    val dataFetchedAt: Long,
     val suggestions: List<String>
 )
 
 /**
- * 「我的关注」ViewModel —— 关键词订阅 + 当日语料的命中过滤。
+ * 「我的关注」ViewModel —— 关键词订阅 + 当日语料的命中过滤(宿主:「今天」页关注段)。
  *
  * 数据分三层,彼此解耦:
  *  - **语料**([FollowsRepository.loadCorpus]):当日总览 Top10 + 8 源结构化摘要,
- *    全是归档缓存数据;init 拉一次,下拉刷新 force 重拉,单源失败页脚标注;
+ *    全是归档缓存数据(与今天页 overview/summary 两 VM 同缓存);init 拉一次,
+ *    今天页下拉刷新/重击 force 重拉,单源失败只跳过不拖累、全部失败才 Error;
  *  - **关键词**(SettingsStore.followedKeywordsFlow):DataStore 响应式收集,
  *    增删词只触发 [recompute] 重算过滤、不发网络请求;
  *  - **推荐词**([TrendsRepository.loadTrends]):趋势热词 Top N 做一键添加候选,
  *    尽力而为,失败静默(推荐区直接隐藏)。
  *
- * 刷新语义同摘要 Tab:已有内容时刷新不回骨架,失败保留旧内容;指示器最短转
+ * 刷新语义:已有内容时刷新不回骨架,失败保留旧内容;指示器最短转
  * [MIN_REFRESH_SPIN_MS] 一档(防 PullToRefreshBox 卡展示态)。
  */
 class FollowsViewModel(application: Application) : AndroidViewModel(application) {
@@ -60,6 +59,10 @@ class FollowsViewModel(application: Application) : AndroidViewModel(application)
 
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
+    /** 关注行展开态(收起式入口行,默认收起):随 VM 存活跨 tab 保留(同 selectedKeyword)。 */
+    private val _isExpanded = MutableStateFlow(false)
+    val isExpanded: StateFlow<Boolean> = _isExpanded.asStateFlow()
 
     // 重新过滤的输入缓存:corpus 网络成功后才有值;keywords 来自 DataStore 流
     private var corpus: FollowCorpus? = null
@@ -126,6 +129,11 @@ class FollowsViewModel(application: Application) : AndroidViewModel(application)
         recompute()
     }
 
+    /** 收起/展开今天页「我的关注」行。 */
+    fun toggleExpanded() {
+        _isExpanded.value = !_isExpanded.value
+    }
+
     /** 添加关注词(写入 DataStore,流自动触发重算;上限由 SettingsStore 兜底)。 */
     fun addKeyword(keyword: String) {
         viewModelScope.launch { settingsStore.addFollowedKeyword(keyword) }
@@ -158,8 +166,6 @@ class FollowsViewModel(application: Application) : AndroidViewModel(application)
                 keywords = keywords,
                 selectedKeyword = selectedKeyword,
                 items = FollowMatcher.filter(c.entries, keywords, selectedKeyword),
-                missingSources = c.missingSources,
-                dataFetchedAt = c.dataFetchedAt,
                 // 已关注的推荐词不再重复出现在候选区(忽略大小写)
                 suggestions = suggestions.filterNot { s ->
                     keywords.any { it.equals(s, ignoreCase = true) }

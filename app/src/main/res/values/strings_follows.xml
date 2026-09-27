@@ -1,27 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   「我的关注」域文案(中文全集,默认 locale;英文在 values-en/strings_follows.xml)。
-  覆盖:关注 tab 根屏(FollowsScreen)—— 关键词 chips、命中条目、空态、管理弹层;
-  tab 名词条 tab_follows 在 values/strings.xml。
+  覆盖:「今天」页收起式关注行(TodayScreen)—— 收起行、关键词 chips、命中条目、空态;
+  管理弹层(FollowsManageSheet,今天页/热词页共用)与热词页管理行。
   术语遵守 values/strings_common.xml 头注释术语表;共用条(common_*/error_* 等)与
-  overview_data_until / overview_breaking_tag 等复用不重复造。
+  overview_breaking_tag 等复用不重复造。
 -->
 <resources>
-    <!-- 「热词」tab 上段小节条(我的关注命中流) -->
+    <!-- 「今天」页收起式关注行标签 + 热词页管理行标签 -->
     <string name="follows_section_title">我的关注</string>
-    <!-- 无关注词时的收起式引导行(点击展开管理弹层) -->
+    <!-- 热词页管理行 0 词时的引导副文案 -->
     <string name="follows_section_guide">关注关键词，每天只看你想看的</string>
-    <!-- 空态引导行二:去热词二级页逛趋势(与上面管理引导同款行,点击进热词页) -->
-    <string name="follows_guide_trends">去热词页看看趋势</string>
-    <!-- 顶部统计行:%1$d=关注词数,%2$d=今天命中条数 -->
+    <!-- 统计行:%1$d=关注词数,%2$d=今天命中条数 -->
     <string name="follows_stats_caption">已关注 %1$d 个关键词 · 今天命中 %2$d 条</string>
+    <!-- 今天页收起式关注行的命中数:%1$d=今天命中条数 -->
+    <string name="follows_hits_count">今天命中 %1$d 条</string>
+    <!-- 热词页管理行 chips 预览余量:%1$d=未展示的词数 -->
+    <string name="follows_more_count">+%1$d</string>
 
-    <!-- 管理动作按钮(引导行与管理弹层共用) -->
+    <!-- 管理动作按钮(统计区/空态与管理弹层共用) -->
     <string name="follows_manage_action">管理关键词</string>
-    <!-- 推荐词区标题(onboarding 空态与管理弹层共用) -->
+    <!-- 推荐词区标题(管理弹层) -->
     <string name="follows_suggestions_title">今日热词推荐</string>
 
-    <!-- 空态二:有关注词但今天没有命中 -->
+    <!-- 空态:有关注词但今天没有命中 -->
     <string name="follows_empty_no_match_title">今天没有相关内容</string>
     <string name="follows_empty_no_match_subtitle">换个关键词试试,或明天再来看看</string>
 
@@ -37,7 +39,4 @@
     <string name="follows_remove_cd">删除关键词 %1$s</string>
     <!-- 超出上限的提示(与 SettingsStore.MAX_FOLLOWED_KEYWORDS 对应) -->
     <string name="follows_limit_toast">最多关注 20 个关键词</string>
-
-    <!-- 页脚缺失源标注:%1$s=逗号分隔的源名列表 -->
-    <string name="follows_missing_sources">部分源未能加载:%1$s</string>
 </resources>

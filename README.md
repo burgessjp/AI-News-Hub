@@ -110,7 +110,7 @@ Every link in the app opens in-app, never in an external browser:
 - **Offline fallback**: archive data is written through to a disk cache, so a cold start without network still shows the last fetched content
 - **Browsing history & Favorites** (stored locally in Room; star any page from the built-in WebView to read it later)
 - **Daily update notification** (optional, off by default): a local notification when the pipeline publishes new content, at most one per day; with it on, a cold start on new data also shows a brief "today's digest" bottom sheet
-- **In-app update check & install** (About page) against GitHub Releases — the "new version" bottom sheet downloads the APK with live progress (cancellable) and hands off to the system installer, falling back to the Release page on failure; plus `ainewshub://` deep links (`web?url=…`, `tab/<overview|summary|follows|trends|more>`, `settings`) for browsers, QR codes and automation tools
+- **In-app update check & install** (About page) against GitHub Releases — the "new version" bottom sheet downloads the APK with live progress (cancellable) and hands off to the system installer, falling back to the Release page on failure; plus `ainewshub://` deep links (`web?url=…`, `tab/<today|more>` with legacy names permanently mapped — overview/summary/follows→today, trends/hotwords→hotwords page, `settings`) for browsers, QR codes and automation tools
 - **Theme**: Material You dynamic color (Android 12+), font family toggle (default / serif / monospace), size presets, dark mode
 - **Languages**: switch between Simplified Chinese and English
 

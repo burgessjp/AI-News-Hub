@@ -44,9 +44,10 @@ sealed interface TrendsState {
  *  - [refresh]:下拉刷新,绕过缓存强制重读(流水线刚推送立即可见);
  *  - 重击 tab 走 [load] 即可。
  *
- * 另承载展开区「+ 关注」缝合动作:[followedKeywords] 响应式收集关注词集合
- * (小写;按钮已关注态判定),[followKeyword] 一键写入 DataStore(关注页
- * followedKeywordsFlow 自动联动重算),结果经 [FollowNotices] 全局胶囊提示。
+ * 另承载关注词动作:展开区「+ 关注」([followKeyword] 一键写入 DataStore,
+ * 结果经 [FollowNotices] 全局胶囊提示)与管理行/管理弹层([followedKeywordsList]
+ * 原样大小写展示,[unfollowKeyword] 移除)。今天页关注段经 followedKeywordsFlow
+ * 自动联动重算。
  *
  * 加载中保留旧内容(Success 不回落 Loading),只亮下拉刷新指示。
  */
@@ -68,11 +69,16 @@ class TrendsViewModel(application: Application) : AndroidViewModel(application) 
     /** 已关注词集合(小写):展开区「+ 关注」按钮的已关注态判定。 */
     val followedKeywords: StateFlow<Set<String>> = _followedKeywords.asStateFlow()
 
+    /** 已关注词(原样大小写,存储顺序):管理行 chips 预览与管理弹层「已关注」区展示。 */
+    private val _followedKeywordsList = MutableStateFlow<List<String>>(emptyList())
+    val followedKeywordsList: StateFlow<List<String>> = _followedKeywordsList.asStateFlow()
+
     init {
         load()
         viewModelScope.launch {
             settingsStore.followedKeywordsFlow.collect { list ->
                 _followedKeywords.value = list.mapTo(mutableSetOf()) { it.lowercase() }
+                _followedKeywordsList.value = list
             }
         }
     }
@@ -107,6 +113,11 @@ class TrendsViewModel(application: Application) : AndroidViewModel(application) 
                 }
             }
         }
+    }
+
+    /** 管理弹层「移除已关注词」:写 DataStore,集合/展示列表经流自动联动。 */
+    fun unfollowKeyword(keyword: String) {
+        viewModelScope.launch { settingsStore.removeFollowedKeyword(keyword) }
     }
 
     private fun run(force: Boolean) {

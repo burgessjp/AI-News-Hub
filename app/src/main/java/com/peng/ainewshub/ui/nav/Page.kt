@@ -88,8 +88,9 @@ internal sealed interface Page {
     /** 趋势词云 —— 近窗口期热词的词云全景页(趋势 Tab caption 行进入,纯 Canvas 无列表)。 */
     data object TrendsCloud : Page
     /**
-     * 热词榜 —— 近 N 天热词趋势二级页(原「热词」根 tab 下段拆出,v1.4.0 后由
-     * 今天页报头「热词」入口 / 关注 tab 空态引导 / ainewshub://tab/hotwords 深链进入)。
+     * 热词榜 —— 近 N 天热词趋势二级页(原「热词」根 tab 下段拆出,由
+     * 今天页报头「热词」入口 / ainewshub://tab/hotwords 深链进入;页首带
+     * 「我的关注」关键词管理行)。
      */
     data object Hotwords : Page
 }

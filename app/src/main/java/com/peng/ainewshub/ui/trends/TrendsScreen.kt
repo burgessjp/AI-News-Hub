@@ -64,15 +64,17 @@ import java.util.Locale
  */
 
 /**
- * 热词榜内容渲染 —— 趋势 Tab 与「历史热词」日期页共用。
+ * 热词榜内容渲染 —— 热词二级页与「历史热词」日期页共用。
  *
- * [bottomReserve]:根 tab 为 true(末项可停到浮动药丸之上:药丸高 + 16dp 呼吸
- * 空间);二级页为 false(无浮动底栏,不留底部预留)。
- * [onOpenCloud]:词云页入口,仅趋势根 tab 传入(caption 行右侧出现「词云 ›」
+ * [bottomReserve]:根 tab 时代为 true(末项可停到浮动药丸之上);二级页为
+ * false(无浮动底栏,不留底部预留)。
+ * [onOpenCloud]:词云页入口,仅热词页传入(caption 行右侧出现「词云 ›」
  * 链接);历史日期页保持 null 不显示入口。
  * [onFollowKeyword] / [onSearchTerm] / [followedKeywords]:展开区尾部动作行
- * (一键关注 + 带词查全部命中),仅趋势根 tab 传入;历史日期页保持默认 null /
+ * (一键关注 + 带词查全部命中),仅热词页传入;历史日期页保持默认 null /
  * 空集 → 动作行整体不渲染。
+ * [header]:页首自定义行(热词页的「我的关注」管理行),caption 行之上;
+ * 历史日期页保持 null 不渲染。
  */
 @Composable
 internal fun TrendsContent(
@@ -83,7 +85,8 @@ internal fun TrendsContent(
     onFollowKeyword: ((String) -> Unit)? = null,
     onSearchTerm: ((String) -> Unit)? = null,
     followedKeywords: Set<String> = emptySet(),
-    bottomReserve: Boolean = true
+    bottomReserve: Boolean = true,
+    header: (@Composable () -> Unit)? = null
 ) {
     val context = LocalContext.current
     // 当前展开的词条(单展开,再点收起);瞬态 UI 状态,切 tab 丢失可接受
@@ -94,6 +97,11 @@ internal fun TrendsContent(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = if (bottomReserve) BottomBarPillHeight + 16.dp else 0.dp)
     ) {
+        // 页首自定义行(热词页「我的关注」管理行),在时效 caption 之上
+        if (header != null) {
+            item(key = "header", contentType = "header") { header() }
+        }
+
         // 顶部时效 caption:窗口 + 数据截至(归档每日跑批,先交代新鲜度);
         // 根 tab 在行尾带「词云 ›」入口链接(顶栏无 actions,入口收进内容区)
         item(key = "caption", contentType = "caption") {
@@ -412,7 +420,7 @@ private fun KeywordItems(
         }
 
         // 尾部动作行:关注状态取 display 忽略大小写比对(与写入端去重口径一致);
-        // 已关注呈静态「已关注 ✓」不再可点(移除入口在关注页管理弹层)
+        // 已关注呈静态「已关注 ✓」不再可点(移除入口在本页/今天页的管理弹层)
         val display = keyword.display.trim()
         if ((onFollowKeyword != null && display.isNotEmpty()) || onSearchTerm != null) {
             Spacer(Modifier.height(6.dp))

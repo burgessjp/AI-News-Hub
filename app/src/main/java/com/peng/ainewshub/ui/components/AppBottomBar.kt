@@ -26,16 +26,14 @@ import com.peng.ainewshub.R
 import com.peng.ainewshub.ui.theme.AppText
 
 /**
- * 根 tab 集合(今天 / 关注 / 更多,entries 顺序即底栏顺序)。
+ * 根 tab 集合(今天 / 更多,entries 顺序即底栏顺序)。
  *
- * 「今天」是默认首页:一份垂直日报 —— 综述 Hero + Top10 + 分源摘要区块
- * (TodayScreen,合并原 总览/摘要 两个 tab,读完重点顺着读完分源)。
- * 「关注」是关键词命中流(FollowsScreen,原「热词」tab 上段独立成 tab);
- * 热词榜 + 词云拆入 [Page.Hotwords] 二级页,入口在今天页报头「热词」与
- * 关注空态引导。「更多」维持信息源/历史/收藏/设置等 hub 不变。
- * 旧 tab 深链名在 MainActivity 永久映射:overview/summary → 今天、
- * follows → 关注(恰与新 tab 名重合,v1.3.x 存量页栈可无缝恢复)、
- * hotwords/trends → 热词二级页。
+ * 「今天」是默认首页:一份垂直日报 —— 综述 Hero + Top10 +「我的关注」
+ * 命中段 + 分源摘要区块(TodayScreen,合并原 总览/摘要/关注 三个 tab)。
+ * 「更多」维持信息源/历史/收藏/设置等 hub 不变。
+ * 旧 tab 深链名在 MainActivity 永久映射:overview/summary/follows → 今天、
+ * hotwords/trends → 热词二级页;存量 Bundle 里已移除的 tab 名(含 Follows)
+ * 由 AppNavState Saver 兜底回「今天」。
  *
  * @param labelRes 显示文案的 string resource
  */
@@ -43,7 +41,6 @@ enum class AppTab(
     val labelRes: Int
 ) {
     Today(R.string.tab_today),
-    Follows(R.string.tab_follows),
     More(R.string.tab_more)
 }
 
