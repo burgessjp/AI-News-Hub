@@ -28,6 +28,7 @@ import json
 import os
 import re
 import sys
+import threading
 import time
 
 import requests
@@ -48,6 +49,34 @@ _HTTP_BACKOFF_BASE = 2  # 缺省退避基数(秒):2s, 4s
 # 模块级共享 Session:复用连接池 / TLS 会话。requests.Session 在只发请求、
 # 不跨线程修改 cookie/headers 的用法下线程安全(本模块每次调用显式传 headers)。
 _SESSION = requests.Session()
+
+# 进程内 token 用量累计(fetch_data 阶段 2 并发摘要 + 总览共 9 次调用,线程安全)。
+# 只累计、不重置:调用方(fetch_data manifest / trend_keywords 精修日志)在关心
+# 的时点取快照算差值;端点不回 usage 字段时 calls 照计、tokens 不涨。
+_USAGE = {"calls": 0, "prompt_tokens": 0, "completion_tokens": 0}
+_USAGE_LOCK = threading.Lock()
+
+
+def usage_snapshot():
+    """返回当前累计用量的拷贝:{calls, prompt_tokens, completion_tokens}。"""
+    with _USAGE_LOCK:
+        return dict(_USAGE)
+
+
+def _accumulate_usage(data):
+    """从响应体读 usage 字段累计(缺字段/非数字一律按 0 容错,不抛)。"""
+    usage = data.get("usage") if isinstance(data, dict) else None
+    prompt = completion = 0
+    if isinstance(usage, dict):
+        try:
+            prompt = int(usage.get("prompt_tokens") or 0)
+            completion = int(usage.get("completion_tokens") or 0)
+        except (TypeError, ValueError):
+            prompt = completion = 0
+    with _USAGE_LOCK:
+        _USAGE["calls"] += 1
+        _USAGE["prompt_tokens"] += prompt
+        _USAGE["completion_tokens"] += completion
 
 
 def _want_disable_thinking():
@@ -146,6 +175,7 @@ def call_llm(system_prompt, user_prompt, base_url, model, api_key, *,
             time.sleep(wait)
     resp.raise_for_status()
     data = resp.json()
+    _accumulate_usage(data)
     choices = data.get("choices") or []
     if not choices:
         raise RuntimeError(f"AI 响应无 choices:{str(data)[:120]}")

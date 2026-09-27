@@ -203,3 +203,20 @@ def test_retain_recent_保留期截断取最新_n_天():
 
 def test_retain_recent_两侧皆空():
     assert fd._retain_recent(None, None, retention_days=31) == {}
+
+
+# ===== _previous_snapshot_url:摘要继承的上一期快照 URL 推导 =====
+
+def test_previous_snapshot_url_同仓同ref推导():
+    url = fd._previous_snapshot_url(
+        "https://api.gitcode.com/api/v5/repos/X/raw/index.json?ref=news-hub-data",
+        "hackernews", "2026-08-28/22-00-data.json")
+    assert url == ("https://api.gitcode.com/api/v5/repos/X/raw/hackernews/"
+                   "2026-08-28/22-00-data.json?ref=news-hub-data")
+
+
+def test_previous_snapshot_url_无query与非index形态():
+    assert fd._previous_snapshot_url(
+        "https://example.test/index.json", "s", "r") == "https://example.test/s/r"
+    # 不是 <base>/index.json 形态推不出仓库根,返回空串(调用方退回重新摘要)
+    assert fd._previous_snapshot_url("https://example.test/idx", "s", "r") == ""

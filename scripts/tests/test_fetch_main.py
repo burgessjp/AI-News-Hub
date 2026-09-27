@@ -41,12 +41,14 @@ def _fail_fetcher():
     return boom
 
 
-def _run(monkeypatch, tmp_path, sources, extra_args=()):
+def _run(monkeypatch, tmp_path, sources, extra_args=(), no_summary=True):
     """替身源 + 冻结时间 + 去退避跑 main,返回退出码。"""
     import conftest
 
-    monkeypatch.setattr(sys, "argv", ["fetch_data.py", "--out-dir", str(tmp_path),
-                                      "--no-summary", *extra_args])
+    argv = ["fetch_data.py", "--out-dir", str(tmp_path)]
+    if no_summary:
+        argv.append("--no-summary")
+    monkeypatch.setattr(sys, "argv", [*argv, *extra_args])
     monkeypatch.setattr(fd, "SOURCES", dict(sources))
     monkeypatch.setattr(fd, "now_cst", lambda: conftest.FROZEN_NOW)
 
@@ -180,3 +182,120 @@ def test_main_no_previous_index_失败源直接缺省(monkeypatch, tmp_path):
     assert rc == 1
     index = _read(tmp_path / "index.json")
     assert index["latest"] == {}  # 首跑语义:无继承来源,latest 空
+
+
+# ===== 摘要继承:top-N 指纹与上一期快照完全一致时沿用 ai_summary_v2 =====
+#
+# 2026-09 数据仓实测:同日两批(08:00→18:00)top-N (标题,URL) 指纹完全一致的
+# 源占 6/8(命中率 54%~84%),重跑 AI 只会换皮重写 + 白花调用费。继承的任何
+# 环节失败(上一期快照拉不到 / 上期无摘要 / 指纹不符)都必须退回正常摘要。
+
+_PREV_SUMMARY = [{"title": "旧标题", "desc": "旧描述", "url": "https://x.dev/1"}]
+_SAME_ITEMS = [{"id": 1, "title": "t", "url": "https://x.dev/1"}]
+_PREV_SNAP_URL = "https://example.test/hackernews/2026-08-28/22-00-data.json"
+
+
+def _summary_stubs(monkeypatch):
+    """打开摘要阶段:config 放行 + summarize_source 记录调用并返回固定卡片。"""
+    monkeypatch.setattr(fd.ai_summary, "config_ready", lambda: True)
+    calls = []
+
+    def fake_summarize(source, items):
+        calls.append(source)
+        return [{"title": f"新-{source}", "desc": "d", "url": "https://x.dev/new"}]
+
+    monkeypatch.setattr(fd.ai_summary, "summarize_source", fake_summarize)
+    return calls
+
+
+def test_main_摘要继承_指纹一致不调AI(monkeypatch, tmp_path, requests_mock):
+    requests_mock.get(_PREV_SNAP_URL, json={"source": "hackernews",
+                                            "items": list(_SAME_ITEMS),
+                                            "ai_summary_v2": _PREV_SUMMARY})
+    calls = _summary_stubs(monkeypatch)
+    sources = {"hackernews": lambda limit=20: (list(_SAME_ITEMS), {})}
+    rc = _run(monkeypatch, tmp_path, sources,
+              extra_args=_mock_previous(monkeypatch, requests_mock,
+                                        {"hackernews": "2026-08-28/22-00-data.json"}),
+              no_summary=False)
+    assert rc == 0
+    assert calls == []  # 未调 AI
+    snap = _read(tmp_path / "hackernews" / "2026-08-29" / "11-01-data.json")
+    assert snap["ai_summary_v2"] == _PREV_SUMMARY  # 继承落进本次快照
+
+
+def test_main_摘要继承_指纹不符退回重新摘要(monkeypatch, tmp_path, requests_mock):
+    changed = [{"id": 2, "title": "t2", "url": "https://x.dev/2"}]
+    requests_mock.get(_PREV_SNAP_URL, json={"source": "hackernews",
+                                            "items": changed,
+                                            "ai_summary_v2": _PREV_SUMMARY})
+    calls = _summary_stubs(monkeypatch)
+    sources = {"hackernews": lambda limit=20: (list(_SAME_ITEMS), {})}
+    rc = _run(monkeypatch, tmp_path, sources,
+              extra_args=_mock_previous(monkeypatch, requests_mock,
+                                        {"hackernews": "2026-08-28/22-00-data.json"}),
+              no_summary=False)
+    assert rc == 0 and calls == ["hackernews"]
+    snap = _read(tmp_path / "hackernews" / "2026-08-29" / "11-01-data.json")
+    assert snap["ai_summary_v2"][0]["title"] == "新-hackernews"
+
+
+def test_main_摘要继承_上期无摘要退回重新摘要(monkeypatch, tmp_path, requests_mock):
+    # 上期快照无 ai_summary_v2(上次 AI 摘要失败):指纹一致也无从继承
+    requests_mock.get(_PREV_SNAP_URL, json={"source": "hackernews",
+                                            "items": list(_SAME_ITEMS)})
+    calls = _summary_stubs(monkeypatch)
+    sources = {"hackernews": lambda limit=20: (list(_SAME_ITEMS), {})}
+    rc = _run(monkeypatch, tmp_path, sources,
+              extra_args=_mock_previous(monkeypatch, requests_mock,
+                                        {"hackernews": "2026-08-28/22-00-data.json"}),
+              no_summary=False)
+    assert rc == 0 and calls == ["hackernews"]
+
+
+def test_main_摘要继承_上一期快照拉取失败退回(monkeypatch, tmp_path, requests_mock):
+    # 上一期快照 URL 未注册 → 拉取异常:继承是纯优化,任何失败退回正常摘要
+    calls = _summary_stubs(monkeypatch)
+    sources = {"hackernews": lambda limit=20: (list(_SAME_ITEMS), {})}
+    rc = _run(monkeypatch, tmp_path, sources,
+              extra_args=_mock_previous(monkeypatch, requests_mock,
+                                        {"hackernews": "2026-08-27/22-00-data.json"}),
+              no_summary=False)
+    assert rc == 0 and calls == ["hackernews"]
+
+
+# ===== 源健康哨兵:条目数骤降的 stderr 告警(不阻断、不改产物) =====
+
+def test_main_源健康哨兵_条目数骤降告警(monkeypatch, tmp_path, capsys):
+    sources = {"hackernews": lambda limit=20: ([{"id": i, "title": f"t{i}"} for i in range(3)], {})}
+    rc = _run(monkeypatch, tmp_path, sources, extra_args=("--no-previous-index",))
+    assert rc == 0
+    err = capsys.readouterr().err
+    assert "源健康" in err and "hackernews" in err
+    # 快照照常落盘(哨兵只告警不拦截)
+    assert (tmp_path / "hackernews" / "2026-08-29" / "11-01-data.json").is_file()
+
+
+def test_main_源健康哨兵_豁免源零条目不告警(monkeypatch, tmp_path, capsys):
+    sources = {"openai-anthropic-news": lambda: ([], {})}
+    rc = _run(monkeypatch, tmp_path, sources, extra_args=("--no-previous-index",))
+    assert rc == 0
+    assert "源健康" not in capsys.readouterr().err
+
+
+# ===== manifest 的 AI 用量观测 =====
+
+def test_main_manifest记录AI用量(monkeypatch, tmp_path):
+    fake_usage = {"calls": 2, "prompt_tokens": 100, "completion_tokens": 40}
+    monkeypatch.setattr(fd.ai_client, "usage_snapshot", lambda: dict(fake_usage))
+    rc = _run(monkeypatch, tmp_path, ALL_OK_SOURCES, extra_args=("--no-previous-index",))
+    assert rc == 0
+    assert _read(tmp_path / "manifest.json")["ai_usage"] == fake_usage
+
+
+def test_main_manifest无AI调用不写用量字段(monkeypatch, tmp_path):
+    monkeypatch.setattr(fd.ai_client, "usage_snapshot",
+                        lambda: {"calls": 0, "prompt_tokens": 0, "completion_tokens": 0})
+    rc = _run(monkeypatch, tmp_path, ALL_OK_SOURCES, extra_args=("--no-previous-index",))
+    assert rc == 0
+    assert "ai_usage" not in _read(tmp_path / "manifest.json")

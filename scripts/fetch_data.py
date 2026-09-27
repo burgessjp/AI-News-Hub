@@ -58,6 +58,7 @@ from concurrent.futures import ThreadPoolExecutor
 import requests
 
 # AI 总结:每源抓完调一次,失败不阻断(对齐 App SummaryRepository)
+import ai_client
 import ai_summary
 import overview_summary
 
@@ -74,6 +75,22 @@ from sources.producthunt import PH_TOKEN_ENV
 
 # 单源抓取最大重试次数(需求 a:失败重试,最多 3 次)。首次 + 2 次重试。
 FETCH_MAX_ATTEMPTS = 3
+
+# 源健康哨兵:条目数低于下限 → stderr 鲜明告警(不阻断、不改产物)。空结果已有
+# 失败兜底,但「从 20 条跌到 3 条」的部分选择器漂移会静默通过 —— 总览候选池
+# 拿到的是残缺的当日世界,digest 会把数据残缺误判成「今天没新闻」。下限取
+# 2026-09 数据仓近 12 批实测稳定值的约一半;openai-anthropic-news 是 EMPTY_OK
+# 月级更新源(实测 0~14 条波动),不设哨兵。
+SOURCE_MIN_ITEMS = {
+    "hackernews": 10,
+    "github-trending": 8,
+    "stormzhang-ai": 10,
+    "huggingface-papers": 20,
+    "producthunt": 10,
+    "rundown-ai": 8,
+    "aihot-featured": 10,
+    "openai-anthropic-news": 0,
+}
 
 
 class EmptyResultError(RuntimeError):
@@ -270,6 +287,41 @@ def fetch_optional_json(url):
             return None
         raise
     return json.loads(text)
+
+
+def _previous_snapshot_url(index_url, source, relpath):
+    """
+    由 previous index URL 推该源上一期快照的 raw URL;推不出返回空串。
+
+    index_url 形如 <base>/raw/index.json?ref=news-hub-data →
+    <base>/raw/<source>/<relpath>?ref=news-hub-data(同一仓库同一 ref,跟随
+    --previous-index-url 的自定义指向)。非 <base>/index.json 形态推不出仓库根,
+    返回空串(调用方退回重新摘要)。
+    """
+    part, _, query = index_url.partition("?")
+    base = part.rstrip("/").removesuffix("/index.json")
+    if not base or base == part.rstrip("/"):
+        return ""
+    url = f"{base}/{source}/{relpath}"
+    return f"{url}?{query}" if query else url
+
+
+def _fetch_previous_snapshot(url):
+    """
+    best-effort 拉上一期快照 JSON(摘要继承用),失败返回 None。
+
+    继承只是省一次 AI 调用的优化:任何失败(网络/解析/超时)都退回正常重新
+    摘要,单次尝试不加 retry(慢源最坏 8×20s,与拉 index 的 3 次重试相比可接受)。
+    """
+    if not url:
+        return None
+    try:
+        return json.loads(fetch_text(url, extra_headers={"Accept": "application/json"},
+                                     expect_json=True))
+    except Exception as e:
+        print(f"[AI] 拉上一期快照失败(退回重新摘要):{type(e).__name__}: {e}",
+              file=sys.stderr)
+        return None
 
 
 def _fetch_required_json(url, label):
@@ -605,6 +657,13 @@ def main():
             if not items and name not in EMPTY_OK_SOURCES:
                 raise EmptyResultError("抓取结果为空(疑似源站改版/接口异常),按失败处理")
 
+            # 源健康哨兵:只告警不拦截(快照照常落盘,由人工核对是否源站改版)
+            floor = SOURCE_MIN_ITEMS.get(name, 0)
+            if floor and len(items) < floor:
+                print(f"[WARN] {name:<20} 源健康度告警:仅 {len(items)} 条"
+                      f"(健康下限 {floor}),疑似源站改版/部分选择器漂移,请核对快照内容",
+                      file=sys.stderr)
+
             file_path = write_snapshot(args.out_dir, name, items, meta, now)
             print(f"[OK]   {name:<20} {len(items):>4} 条 → {file_path}")
             # manifest 的 file 存相对仓库根的路径(write_snapshot 返回的是带 out 前缀的
@@ -629,32 +688,50 @@ def main():
     # 阶段 2(并发 AI 摘要):P1 优化 —— 8 源的 summarize_source 彼此独立(LLM 调用是
     # IO-bound),用线程池并发跑,把 AI 阶段从串行 ~8× 压到 ~2-3×。summarize_source
     # 内部自带 3 次重试且无共享可变状态,线程安全。并发度限 4 控制对 AI 服务的压力。
+    #
+    # 摘要继承(2026-09):该源 top-N (标题,URL) 指纹与上一期快照完全一致且上期带
+    # ai_summary_v2 时直接沿用,不重跑 AI —— 数据仓实测同日两批 6/8 源指纹一致
+    # (54%~84%),重跑只是换皮重写 + 白花调用费。上一期快照按 previous latest 指针
+    # 从数据仓拉取(懒加载,每源至多一次),任何失败都退回正常摘要。
     if do_summary and pending_summary:
-        with ThreadPoolExecutor(max_workers=4, thread_name_prefix="ai") as pool:
-            # map 保输入/输出顺序一一对应;每个任务返回 (name, ai_v2)
-            ai_results = list(pool.map(
-                lambda t: (t[0], ai_summary.summarize_source(t[0], t[1])),
-                pending_summary,
-            ))
-        for name, ai_v2 in ai_results:
-            if ai_v2:
-                # 找到该源的快照路径并 patch 回写 ai_summary_v2
-                file_path = next(p[2] for p in pending_summary if p[0] == name)
-                patch_ai_summary_v2(file_path, ai_v2)
-                print(f"[AI]   {name:<20} 摘要已回填 {len(ai_v2)} 条 → {file_path}")
-            else:
-                print(f"[AI]   {name:<20} 摘要失败/为空,快照不带 ai_summary_v2",
-                      file=sys.stderr)
+        prev_snapshots = {}  # name → 上一期快照 dict | None
 
-    # manifest:本次运行总览(放输出根,便于 CI 提交后回溯)
-    manifest = {
-        "run_at": now.strftime("%Y-%m-%dT%H:%M:%S%z"),
-        "run_at_ms": int(now.timestamp() * 1000),
-        "sources": results,
-    }
-    manifest_path = os.path.join(args.out_dir, "manifest.json")
-    with open(manifest_path, "w", encoding="utf-8") as f:
-        json.dump(manifest, f, ensure_ascii=False, indent=2)
+        def _prev_snapshot_of(name):
+            if name not in prev_snapshots:
+                relpath = previous_latest.get(name, "")
+                url = ("" if args.no_previous_index or not relpath else
+                       _previous_snapshot_url(args.previous_index_url, name, relpath))
+                prev_snapshots[name] = _fetch_previous_snapshot(url)
+            return prev_snapshots[name]
+
+        to_summarize = []
+        for name, items, file_path in pending_summary:
+            prev = _prev_snapshot_of(name)
+            prev_summary = prev.get("ai_summary_v2") if isinstance(prev, dict) else None
+            if (isinstance(prev_summary, list) and prev_summary
+                    and ai_summary.summary_fingerprint(name, items)
+                    == ai_summary.summary_fingerprint(name, prev.get("items") or [])):
+                patch_ai_summary_v2(file_path, prev_summary)
+                print(f"[AI]   {name:<20} 头部条目未变,继承上一期摘要(省一次 AI 调用)")
+            else:
+                to_summarize.append((name, items, file_path))
+
+        if to_summarize:
+            with ThreadPoolExecutor(max_workers=4, thread_name_prefix="ai") as pool:
+                # map 保输入/输出顺序一一对应;每个任务返回 (name, ai_v2)
+                ai_results = list(pool.map(
+                    lambda t: (t[0], ai_summary.summarize_source(t[0], t[1])),
+                    to_summarize,
+                ))
+            for name, ai_v2 in ai_results:
+                if ai_v2:
+                    # 找到该源的快照路径并 patch 回写 ai_summary_v2
+                    file_path = next(p[2] for p in to_summarize if p[0] == name)
+                    patch_ai_summary_v2(file_path, ai_v2)
+                    print(f"[AI]   {name:<20} 摘要已回填 {len(ai_v2)} 条 → {file_path}")
+                else:
+                    print(f"[AI]   {name:<20} 摘要失败/为空,快照不带 ai_summary_v2",
+                          file=sys.stderr)
 
     # 今日总览:跨源综合分析(失败仅 warn,不阻断推送;失败时 write_index 继承 previous_overview)。
     # previous_overview 传入做增量批次:上一期 digest + Top10 注入 prompt,数据侧对
@@ -668,6 +745,23 @@ def main():
     # 总览生成成功:除内嵌进 index 外,同时按日期归档落盘(不可变文件,支持历史回看)
     if overview:
         print(f"[OVERVIEW] 总览已归档 → {write_overview_snapshot(args.out_dir, overview, now)}")
+
+    # manifest:本次运行总览(放输出根,便于 CI 提交后回溯)。写在总览生成之后,
+    # 连同本进程全部 AI 调用(分源摘要 + 总览)的 token 用量一并落档(观测口径:
+    # 用量来自 ai_client 进程内累计,趋势精修在 push 进程另有日志,不在此聚合)。
+    usage = ai_client.usage_snapshot()
+    manifest = {
+        "run_at": now.strftime("%Y-%m-%dT%H:%M:%S%z"),
+        "run_at_ms": int(now.timestamp() * 1000),
+        "sources": results,
+    }
+    if usage["calls"]:
+        manifest["ai_usage"] = usage
+        print(f"[AI] 本批 AI 用量:{usage['calls']} 次调用,"
+              f"输入 {usage['prompt_tokens']:,} tok,输出 {usage['completion_tokens']:,} tok")
+    manifest_path = os.path.join(args.out_dir, "manifest.json")
+    with open(manifest_path, "w", encoding="utf-8") as f:
+        json.dump(manifest, f, ensure_ascii=False, indent=2)
 
     # index.json(即时字段:updated_at / latest / latest_overview)
     # + 根级独立历史索引文件(拆出 index,不随保留期增长):

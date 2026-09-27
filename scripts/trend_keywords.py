@@ -616,6 +616,24 @@ def _merge_pool_entries(main, absorbed, display):
     }
 
 
+def _alias_candidate_line(pool):
+    """
+    别名表候选报告:候选池里「未入 ALIASES 且含数字的词组」清单(≤10 个)。
+
+    ALIASES 手工维护,而带版本号的模型名(GPT-x/GLM-x/Kimi Kx…)数字侧 token 过
+    不了自由 bigram 的字母约束,不登记就永远上不了榜——新模型发布到补词之间存在
+    结构性滞后。此行只打印到 stderr 供维护者滚动补词(命中数即优先级参考),
+    不做自动登记:别名表错一条,趋势榜就静默错一片。无候选返回空串。
+    """
+    cands = [k for k in pool
+             if k["term"] not in ALIASES and " " in k["term"]
+             and any(ch.isdigit() for ch in k["term"])]
+    if not cands:
+        return ""
+    joined = "/".join(f"{k['term']}({k['total']})" for k in cands[:10])
+    return f"[TRENDS] 别名表候选(未登记的含数字词组,滚动补词参考):{joined}"
+
+
 def refine_keywords_with_ai(trends, pool):
     """
     用 AI 对候选池做一次精修,成功时就地替换 trends["keywords"] 并返回 True。
@@ -632,6 +650,7 @@ def refine_keywords_with_ai(trends, pool):
     model = os.getenv(ENV_MODEL)
     api_key = os.getenv(ENV_API_KEY)
     parsed = None
+    usage_before = ai_client.usage_snapshot()
     for attempt in range(2):  # 业务层重试 1 次(传输层 429/503 重试在 ai_client 内)
         try:
             parsed = ai_client.call_llm(
@@ -688,8 +707,12 @@ def refine_keywords_with_ai(trends, pool):
             if fill:
                 print(f"[TRENDS] AI 精修未选满,按分值序补齐 {len(fill)} 个统计候选")
         trends["keywords"] = entries
+        usage = ai_client.usage_snapshot()
         print(f"[TRENDS] AI 精修完成:{len(entries)} 个热词"
               f"(合并吸收 {absorbed_count} 个候选)")
+        print(f"[TRENDS] AI 精修 token:输入 "
+              f"{usage['prompt_tokens'] - usage_before['prompt_tokens']:,} tok,输出 "
+              f"{usage['completion_tokens'] - usage_before['completion_tokens']:,} tok")
         return True
     except Exception as e:
         print(f"[TRENDS] AI 精修结果校验失败(回退统计回退榜):"
@@ -800,6 +823,10 @@ def write_trends(repo_dir):
         trends, cloud, pool = generated
         # AI 精修(可选增强):成功则替换为精修榜,失败保留统计回退榜
         refine_keywords_with_ai(trends, pool)
+        # 别名表候选报告(见 _alias_candidate_line:登记滞后是榜单漏词的结构性原因)
+        candidate_line = _alias_candidate_line(pool)
+        if candidate_line:
+            print(candidate_line, file=sys.stderr)
         now = now_cst()
         today = now.strftime("%Y-%m-%d")
         # 排名变化:先算基准,再写今日归档(否则会把今日早批当成基准)

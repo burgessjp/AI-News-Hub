@@ -138,3 +138,19 @@ def test_refine_候选池耗尽才允许少于10(monkeypatch):
 
     assert tk.refine_keywords_with_ai(trends, pool) is True
     assert len(trends["keywords"]) == 5  # 池已用尽,不强凑 10
+
+
+# ===== _alias_candidate_line:别名表候选报告(滚动补词参考) =====
+
+def test_alias_candidates_只挑未入表含数字词组():
+    pool = _pool(["gpt 5.6", "glm 5.3", "openai", "kimi k3", "world model", "deploy stuff"])
+    line = tk._alias_candidate_line(pool)
+    # openai 已在 ALIASES;world model/deploy stuff 无数字(自由 bigram 无需登记)
+    assert "gpt 5.6" in line and "glm 5.3" in line and "kimi k3" in line
+    assert "openai" not in line and "world model" not in line
+    # 命中数随 total 附带,供补词优先级参考
+    assert "(3)" in line
+
+
+def test_alias_candidates_无候选返回空串():
+    assert tk._alias_candidate_line(_pool(["openai", "world model"])) == ""

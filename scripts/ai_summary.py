@@ -19,6 +19,13 @@ AI 不输出 URL),替代旧的纯文本 `ai_summary`(已停用,App 端兼容回�
   - temperature=0.5(对齐 App 的 requestSummary);读取超时 30s。
   - 配置走环境变量:AI_NEWS_HUB_AI_BASE_URL / AI_NEWS_HUB_AI_MODEL /
     AI_NEWS_HUB_AI_API_KEY(由 pipeline.sh 在执行前统一检测)。
+  - titleEcho 条目核验(2026-09):AI 须照抄该 ref 输入行标题部分的开头,数据侧
+    startswith 精确比对 —— 单次调用选条+写作,偶发把 A 事件的描述写到 B 条的
+    ref 上(总览侧同款失败模式的分源版),错绑整条丢弃(title/desc 都是 AI 写的,
+    没有数据侧骨架可保留),echo 缺失从宽(防模型整体漏字段时全量误杀);
+  - summary_fingerprint:top-N (标题,URL) 指纹,供 fetch_data 做「摘要继承」——
+    与上一期快照完全一致时直接沿用其 ai_summary_v2,不重跑 AI(2026-09 数据仓
+    实测:同日两批 6/8 源指纹一致,命中率 54%~84%,重写只是换皮 + 白花调用费)。
   - 调用失败仅返回 None,不抛 —— 总结是「锦上添花」,绝不能拖垮抓取主链路。
 
 用法(独立调用,主要供 fetch_data.py 内部 import):
@@ -75,8 +82,8 @@ HACKERNEWS_PROMPT = """你是一位资深技术编辑与 HackerNews 社区观察
 【语言要求】必须输出简体中文。即使输入标题是英文，正文也用中文表达；项目名、公司名、技术术语、人名等专有名词保留原文，不要音译。
 
 【输出格式】只输出一个 JSON 数组，6 到 10 个对象，不要输出任何其它内容。每个对象三个字段：
-{"title": "一句话概括标题", "desc": "用 2-3 句中文说明这件事是什么、为什么值得关注或开发者反应如何", "ref": 对应输入条目的编号}
-ref 必须照抄输入行的 [N] 编号（整数），不得编造；一条合并多条输入时，取最主要一条的编号。
+{"title": "一句话概括标题", "desc": "用 2-3 句中文说明这件事是什么、为什么值得关注或开发者反应如何", "ref": 对应输入条目的编号, "titleEcho": "该条输入行标题部分的前10个字符原文"}
+ref 必须照抄输入行的 [N] 编号（整数），不得编造；一条合并多条输入时，取最主要一条的编号。titleEcho 同样必须照抄：该 ref 对应输入行条目标题部分的前 10 个字符（不足 10 个抄完整标题，保留原语言、大小写、标点与空格）——数据侧据此核验描述与条目的对应关系，对不上该条会被丢弃。
 
 【内容要求】
 - 按得分热度排序，重要的放前面；
@@ -91,8 +98,8 @@ GITHUB_PROMPT = """你是一位开源生态观察者。请把用户提供的 Git
 【语言要求】必须输出简体中文。仓库 owner/name、技术名词保留原文，不要翻译。
 
 【输出格式】只输出一个 JSON 数组，6 到 10 个对象，不要输出任何其它内容。每个对象三个字段：
-{"title": "owner/name（一句话价值定位）", "desc": "用 2-3 句中文说明这个项目解决什么问题、适用场景，以及今日新增 star 反映的热度趋势", "ref": 对应输入条目的编号}
-ref 必须照抄输入行的 [N] 编号（整数），不得编造；一条合并多条输入时，取最主要一条的编号。
+{"title": "owner/name（一句话价值定位）", "desc": "用 2-3 句中文说明这个项目解决什么问题、适用场景，以及今日新增 star 反映的热度趋势", "ref": 对应输入条目的编号, "titleEcho": "该条输入行标题部分的前10个字符原文"}
+ref 必须照抄输入行的 [N] 编号（整数），不得编造；一条合并多条输入时，取最主要一条的编号。titleEcho 同样必须照抄：该 ref 对应输入行条目标题部分的前 10 个字符（不足 10 个抄完整标题，保留原语言、大小写、标点与空格）——数据侧据此核验描述与条目的对应关系，对不上该条会被丢弃。
 
 【内容要求】
 - 结合描述和语言推断项目价值，不要只复述描述；
@@ -106,8 +113,8 @@ PAPERS_PROMPT = """你是一位 AI 研究前沿解读员。请把用户提供的
 【语言要求】必须输出简体中文。论文标题先给中文意译，括号内附英文原标题；模型名、方法名、数据集名等专有名词保留原文。
 
 【输出格式】只输出一个 JSON 数组，6 到 10 个对象，不要输出任何其它内容。每个对象三个字段：
-{"title": "中文标题（English Title，↑upvote）", "desc": "用 2-3 句中文说明这篇论文研究什么问题、方法亮点、可能的影响", "ref": 对应输入条目的编号}
-ref 必须照抄输入行的 [N] 编号（整数），不得编造；一条合并多条输入时，取最主要一条的编号。
+{"title": "中文标题（English Title，↑upvote）", "desc": "用 2-3 句中文说明这篇论文研究什么问题、方法亮点、可能的影响", "ref": 对应输入条目的编号, "titleEcho": "该条输入行标题部分的前10个字符原文"}
+ref 必须照抄输入行的 [N] 编号（整数），不得编造；一条合并多条输入时，取最主要一条的编号。titleEcho 同样必须照抄：该 ref 对应输入行条目标题部分的前 10 个字符（不足 10 个抄完整标题，保留原语言、大小写、标点与空格）——数据侧据此核验描述与条目的对应关系，对不上该条会被丢弃。
 
 【内容要求】
 - upvote 高的排前面；
@@ -121,8 +128,8 @@ STORMZHANG_PROMPT = """你是一位 AI 行业资讯编辑。用户提供的已�
 【语言要求】输出简体中文。
 
 【输出格式】只输出一个 JSON 数组，6 到 10 个对象，不要输出任何其它内容。每个对象三个字段：
-{"title": "事件标题", "desc": "用 2-3 句说明核心事实，并在末尾标注信源（如「（来源：Reddit）」）", "ref": 对应输入条目的编号}
-ref 必须照抄输入行的 [N] 编号（整数），不得编造；一条合并多条输入时，取最主要一条的编号。
+{"title": "事件标题", "desc": "用 2-3 句说明核心事实，并在末尾标注信源（如「（来源：Reddit）」）", "ref": 对应输入条目的编号, "titleEcho": "该条输入行标题部分的前10个字符原文"}
+ref 必须照抄输入行的 [N] 编号（整数），不得编造；一条合并多条输入时，取最主要一条的编号。titleEcho 同样必须照抄：该 ref 对应输入行条目标题部分的前 10 个字符（不足 10 个抄完整标题，保留原语言、大小写、标点与空格）——数据侧据此核验描述与条目的对应关系，对不上该条会被丢弃。
 
 【内容要求】
 - 按主题去重合并：同一事件的多条合成一条，保留最完整的信息；
@@ -136,8 +143,8 @@ PRODUCTHUNT_PROMPT = """你是一位资深产品观察者与 Product Hunt 社区
 【语言要求】必须输出简体中文。产品名、公司名保留原文，不翻译；产品定位（tagline）用中文意译，保留原意。
 
 【输出格式】只输出一个 JSON 数组，6 到 10 个对象，不要输出任何其它内容。每个对象三个字段：
-{"title": "产品名（一句话价值定位）", "desc": "用 2-3 句中文说明它解决什么问题、面向谁、有什么亮点（AI/开发者工具/效率等），并在末尾标注热度（如「（↑upvote，💬评论）」）", "ref": 对应输入条目的编号}
-ref 必须照抄输入行的 [N] 编号（整数），不得编造；一条合并多条输入时，取最主要一条的编号。
+{"title": "产品名（一句话价值定位）", "desc": "用 2-3 句中文说明它解决什么问题、面向谁、有什么亮点（AI/开发者工具/效率等），并在末尾标注热度（如「（↑upvote，💬评论）」）", "ref": 对应输入条目的编号, "titleEcho": "该条输入行标题部分的前10个字符原文"}
+ref 必须照抄输入行的 [N] 编号（整数），不得编造；一条合并多条输入时，取最主要一条的编号。titleEcho 同样必须照抄：该 ref 对应输入行条目标题部分的前 10 个字符（不足 10 个抄完整标题，保留原语言、大小写、标点与空格）——数据侧据此核验描述与条目的对应关系，对不上该条会被丢弃。
 
 【内容要求】
 - 按 upvote 热度排序，重要的放前面；
@@ -154,8 +161,8 @@ RUNDOWN_AI_PROMPT = """你是一位资深 AI 行业观察者与英文 newsletter
 【语言要求】必须输出简体中文。公司名、产品名、模型名、人名等专有名词保留原文，不要音译。
 
 【输出格式】只输出一个 JSON 数组，6 到 10 个对象，不要输出任何其它内容。每个对象三个字段：
-{"title": "事件标题", "desc": "用 2-3 句中文说明这件事是什么、为什么值得关注（结合标题与 PLUS 副标题的信息）", "ref": 对应输入条目的编号}
-ref 必须照抄输入行的 [N] 编号（整数），不得编造；一条合并多条输入时，取最主要一条的编号。
+{"title": "事件标题", "desc": "用 2-3 句中文说明这件事是什么、为什么值得关注（结合标题与 PLUS 副标题的信息）", "ref": 对应输入条目的编号, "titleEcho": "该条输入行标题部分的前10个字符原文"}
+ref 必须照抄输入行的 [N] 编号（整数），不得编造；一条合并多条输入时，取最主要一条的编号。titleEcho 同样必须照抄：该 ref 对应输入行条目标题部分的前 10 个字符（不足 10 个抄完整标题，保留原语言、大小写、标点与空格）——数据侧据此核验描述与条目的对应关系，对不上该条会被丢弃。
 
 【内容要求】
 - 按事件重要性排序，重大发布（新模型、融资、政策、独家访谈）放前面；
@@ -172,8 +179,8 @@ AIHOT_FEATURED_PROMPT = """你是一位资深 AI 行业资讯编辑。用户提�
 【语言要求】输出简体中文。公司名、产品名、模型名、人名等专有名词保留原文。
 
 【输出格式】只输出一个 JSON 数组，6 到 10 个对象，不要输出任何其它内容。每个对象三个字段：
-{"title": "事件标题", "desc": "用 2-3 句说明核心事实，必要时在末尾标注信源（如「（来源：TechCrunch）」）", "ref": 对应输入条目的编号}
-ref 必须照抄输入行的 [N] 编号（整数），不得编造；一条合并多条输入时，取最主要一条的编号。
+{"title": "事件标题", "desc": "用 2-3 句说明核心事实，必要时在末尾标注信源（如「（来源：TechCrunch）」）", "ref": 对应输入条目的编号, "titleEcho": "该条输入行标题部分的前10个字符原文"}
+ref 必须照抄输入行的 [N] 编号（整数），不得编造；一条合并多条输入时，取最主要一条的编号。titleEcho 同样必须照抄：该 ref 对应输入行条目标题部分的前 10 个字符（不足 10 个抄完整标题，保留原语言、大小写、标点与空格）——数据侧据此核验描述与条目的对应关系，对不上该条会被丢弃。
 
 【内容要求】
 - 按主题去重合并：同一事件的多条合成一条，保留最完整的信息；
@@ -190,8 +197,8 @@ OPENAI_ANTHROPIC_NEWS_PROMPT = """你是一位资深 AI 厂商动态观察者。
 【语言要求】必须输出简体中文。公司名、产品名、模型名（如 GPT、Claude、Codex）、人名等专有名词保留原文，不要音译。
 
 【输出格式】只输出一个 JSON 数组，6 到 10 个对象，不要输出任何其它内容。每个对象三个字段：
-{"title": "事件标题", "desc": "用 2-3 句中文说明这是哪家厂商（OpenAI/Anthropic）做了什么、有什么影响，必要时在末尾标注厂商（如「（OpenAI）」）", "ref": 对应输入条目的编号}
-ref 必须照抄输入行的 [N] 编号（整数），不得编造；一条合并多条输入时，取最主要一条的编号。
+{"title": "事件标题", "desc": "用 2-3 句中文说明这是哪家厂商（OpenAI/Anthropic）做了什么、有什么影响，必要时在末尾标注厂商（如「（OpenAI）」）", "ref": 对应输入条目的编号, "titleEcho": "该条输入行标题部分的前10个字符原文"}
+ref 必须照抄输入行的 [N] 编号（整数），不得编造；一条合并多条输入时，取最主要一条的编号。titleEcho 同样必须照抄：该 ref 对应输入行条目标题部分的前 10 个字符（不足 10 个抄完整标题，保留原语言、大小写、标点与空格）——数据侧据此核验描述与条目的对应关系，对不上该条会被丢弃。
 
 【内容要求】
 - 按重要性排序：新模型发布、重大产品更新、融资/政策放前面，常规案例、活动、教程靠后；
@@ -376,6 +383,39 @@ def _item_url(source, item):
     return (item.get("url") or "").strip()
 
 
+def _item_title(source, item):
+    """从原始条目取「输入行标题部分」(titleEcho 核验的锚定口径)。
+
+    与各 _fmt_* builder 写进输入行的标题字段一致:github-trending 是 owner/name、
+    stormzhang-ai 是 summary(该源无独立标题字段),其余源是 title。
+    """
+    if not isinstance(item, dict):
+        return ""
+    if source == "github-trending":
+        owner = (item.get("owner") or "").strip()
+        name = (item.get("name") or "").strip()
+        return f"{owner}/{name}" if owner or name else ""
+    if source == "stormzhang-ai":
+        return (item.get("summary") or "").strip()
+    if source == "producthunt":
+        return (item.get("name") or "").strip()
+    return (item.get("title") or "").strip()
+
+
+def summary_fingerprint(source, items):
+    """摘要继承指纹:top SOURCE_TOP_N 条的 (标题,URL) 序列。
+
+    相等 = AI 看到的条目集合与顺序都没变,重跑摘要只会换皮重写 → 调用方
+    (fetch_data)直接继承上一期 ai_summary_v2,省一次 AI 调用。刻意不含得分等
+    指标:指标随时段涨落,含进去指纹永远不等,继承永不生效;继承的 desc 里
+    偶有的旧指标数字属可接受误差(App 端指标位另有实时数据)。
+    """
+    if not isinstance(items, list):
+        return ()
+    return tuple((_item_title(source, o), _item_url(source, o))
+                 for o in items[:SOURCE_TOP_N.get(source, 15)])
+
+
 def _parse_ref(obj, upper):
     """解析 AI 返回的 ref 编号:容忍 int / 数字字符串;缺失、非法、越界返回 None。"""
     try:
@@ -383,6 +423,45 @@ def _parse_ref(obj, upper):
     except (TypeError, ValueError):
         return None
     return idx if 0 <= idx < upper else None
+
+
+def _clean_entries(parsed, source, sliced):
+    """
+    业务清洗 AI 返回的卡片数组:过滤 title/desc 为空的项 + titleEcho 核验 +
+    按 ref 回填 url。返回 (cleaned, echo_present, echo_drop);清洗后为空抛
+    RuntimeError(由 summarize_source 的业务层重试捕获)。
+
+    titleEcho 核验(与 overview_summary 同范式):AI 须照抄该 ref 输入行标题
+    部分的前 10 个字符,数据侧对锚定标题做 startswith 精确比对 —— 单次调用
+    选条+写作,偶发把 A 事件的描述写到 B 条的 ref 上(总览侧 2026-09 回放实锤
+    过同款错绑)。错绑整条丢弃:这里 title/desc 都是 AI 写的,没有数据侧骨架
+    可保留(总览侧还能留标题+链接,这里整卡都是错的);echo 缺失从宽(防模型
+    整体漏字段时全量误杀);无效 ref 锚定条目不存在,无从核验,从宽保留
+    (url 留空,端侧该条仅不可点)。
+    """
+    cleaned = []
+    echo_present = 0
+    echo_drop = 0
+    for obj in parsed:
+        if not isinstance(obj, dict):
+            continue
+        title = (obj.get("title") or "").strip()
+        desc = (obj.get("desc") or "").strip()
+        if not (title and desc):
+            continue
+        idx = _parse_ref(obj, len(sliced))
+        echo = str(obj.get("titleEcho") or "").strip()
+        if echo and idx is not None:
+            echo_present += 1
+            anchored = _item_title(source, sliced[idx])
+            if anchored and not anchored.startswith(echo):
+                echo_drop += 1
+                continue
+        url = _item_url(source, sliced[idx]) if idx is not None else ""
+        cleaned.append({"title": title, "desc": desc, "url": url})
+    if not cleaned:
+        raise RuntimeError("AI 响应解析后无有效条目(无 title/desc 非空项或全部错绑)")
+    return cleaned, echo_present, echo_drop
 
 
 def summarize_source(source, items):
@@ -396,6 +475,8 @@ def summarize_source(source, items):
     - url 回填:AI 只返回 ref(输入条目编号),数据侧按编号从切片后的 items 取 URL
       (与 overview_summary.py 的 ref 回填同范式);ref 缺失/非法/越界 → url 留空,
       条目保留(端侧该条仅不可点)。
+    - titleEcho 核验:错绑(描述与 ref 指向的条目对不上)整条丢弃,见 _clean_entries;
+      覆盖率与错绑数随成功日志输出(覆盖塌了说明模型没配合,回放排查)。
 
     AI 请求/解析(含 markdown 围栏剥离、429 限流快速重试、thinking 开关)统一经
     `ai_client.call_llm`;本函数只做该源的业务校验:过滤掉 title/desc 为空的项,
@@ -426,22 +507,12 @@ def summarize_source(source, items):
                 system_prompt, user_prompt, base_url, model, api_key,
                 timeout=TIMEOUT, temperature=TEMPERATURE, expect="array",
             )
-            # 业务校验:过滤掉 title/desc 为空的项(ai_client 只保证是非空数组);
-            # 顺带按 ref 回填 url(无效 ref 不丢条目,只留空 url)
-            cleaned = []
-            for obj in parsed:
-                if not isinstance(obj, dict):
-                    continue
-                title = (obj.get("title") or "").strip()
-                desc = (obj.get("desc") or "").strip()
-                if not (title and desc):
-                    continue
-                idx = _parse_ref(obj, len(sliced))
-                url = _item_url(source, sliced[idx]) if idx is not None else ""
-                cleaned.append({"title": title, "desc": desc, "url": url})
-            if not cleaned:
-                raise RuntimeError("AI 响应解析后无有效条目(无 title/desc 非空项)")
-            print(f"[AI]   {source:<20} 摘要 {len(cleaned)} 条(第 {attempt} 次成功)")
+            cleaned, echo_present, echo_drop = _clean_entries(parsed, source, sliced)
+            # 核验观测:覆盖率(模型配合度)+ 错绑丢弃数;echo 大面积缺失说明模型
+            # 没配合,核验形同虚设,回放排查 prompt 遵循度
+            print(f"[AI]   {source:<20} 摘要 {len(cleaned)} 条(第 {attempt} 次成功),"
+                  f"titleEcho 覆盖 {echo_present}/{len(cleaned) + echo_drop},"
+                  f"错绑丢弃 {echo_drop}")
             return cleaned
         except Exception as e:
             last_err = e
