@@ -101,6 +101,42 @@ def test_clean_锚定口径_github取owner_name_stormzhang取summary():
     assert len(ok2[0]) == 1
 
 
+def test_clean_echo带源前缀放行():
+    # oai 输入行是「[0] [OpenAI] Title(category):summary」形态,模型常把 [OpenAI]
+    # 连带当标题开头照抄(2026-09-29 生产实锤:3/3 全败皆因 echo 带 vendor 前缀
+    # 被整批判错绑)。核验须认可「行内前缀 + 标题」形态——前缀由数据侧按
+    # builder 行形态预拼,不靠猜
+    oai_items = [{"title": "The Lenfest Institute grows", "url": "https://x.dev/a",
+                  "vendor": "OpenAI", "category": "Company", "summary": "s",
+                  "publishedAt": "2026-09-29"}]
+    parsed = [{"title": "t", "desc": "d", "ref": 0, "titleEcho": "[OpenAI] T"}]
+    cleaned, present, dropped = asm._clean_entries(parsed, "openai-anthropic-news", oai_items)
+    assert len(cleaned) == 1 and present == 1 and dropped == 0
+
+    sz_items = [{"summary": "中文条目当标题", "url": "https://x.dev/s", "source": "X",
+                 "english": "e", "time": "2026-09-29 10:00"}]
+    parsed2 = [{"title": "t", "desc": "d", "ref": 0, "titleEcho": "[X] 中文条"}]
+    cleaned2, p2, d2 = asm._clean_entries(parsed2, "stormzhang-ai", sz_items)
+    assert len(cleaned2) == 1 and d2 == 0
+
+
+def test_clean_echo带源前缀的错绑仍拦截():
+    # echo 抄的是 OpenAI 条目开头(带前缀),ref 却指向 Anthropic 条目 → 依旧丢弃
+    # (配一条合法卡:单卡全丢按契约抛 RuntimeError,两卡才能观测到选择性丢弃)
+    oai_items = [
+        {"title": "The Lenfest grows", "url": "https://x.dev/a", "vendor": "OpenAI"},
+        {"title": "Giving companies control", "url": "https://x.dev/b", "vendor": "Anthropic"},
+    ]
+    parsed = [
+        {"title": "错绑卡", "desc": "d", "ref": 1, "titleEcho": "[OpenAI] T"},
+        {"title": "合法卡", "desc": "d", "ref": 0, "titleEcho": "[OpenAI] T"},
+    ]
+    cleaned, present, dropped = asm._clean_entries(parsed, "openai-anthropic-news", oai_items)
+    assert [c["title"] for c in cleaned] == ["合法卡"] and dropped == 1
+
+
+
+
 # ===== summary_fingerprint:摘要继承指纹 =====
 
 def test_fingerprint_同topN相等_超出部分不影响():

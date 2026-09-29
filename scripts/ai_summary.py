@@ -425,6 +425,23 @@ def _parse_ref(obj, upper):
     return idx if 0 <= idx < upper else None
 
 
+def _echo_line_prefix(source, item):
+    """输入行里排在标题前的源标注前缀(仅两个源有:oai 的「[vendor] 」、
+    stormzhang 的「[source] 」)。
+
+    模型常把它连带当标题开头照抄进 titleEcho(2026-09-29 生产实锤:oai 摘要
+    3/3 全败,皆因 echo 带 "[OpenAI] " 前缀被整批判错绑)。核验时按 builder
+    行形态预拼该前缀再比一次;其余源返回空串(行内无源标注)。
+    """
+    if source == "openai-anthropic-news":
+        v = (item.get("vendor") or "").strip()
+        return f"[{v}] " if v else ""
+    if source == "stormzhang-ai":
+        s = (item.get("source") or "").strip()
+        return f"[{s}] " if s else ""
+    return ""
+
+
 def _clean_entries(parsed, source, sliced):
     """
     业务清洗 AI 返回的卡片数组:过滤 title/desc 为空的项 + titleEcho 核验 +
@@ -454,7 +471,11 @@ def _clean_entries(parsed, source, sliced):
         if echo and idx is not None:
             echo_present += 1
             anchored = _item_title(source, sliced[idx])
-            if anchored and not anchored.startswith(echo):
+            # 双形态匹配:裸标题,或「行内源标注前缀 + 标题」(oai/stormzhang 行有
+            # "[OpenAI] "/"[X] " 前缀,模型常照抄它)。前缀由数据侧按 builder 行
+            # 形态预拼,错绑场景在两种形态下都不会是前缀,不因此放水
+            line_form = _echo_line_prefix(source, sliced[idx]) + anchored
+            if anchored and not (anchored.startswith(echo) or line_form.startswith(echo)):
                 echo_drop += 1
                 continue
         url = _item_url(source, sliced[idx]) if idx is not None else ""
