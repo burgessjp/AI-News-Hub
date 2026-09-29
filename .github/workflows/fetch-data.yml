@@ -1,16 +1,19 @@
 name: Fetch Hub Data
 
-# 每天北京时间 18:00 抓一次「Hub」tab 浏览区域的 8 个数据源,解析成
+# 每天北京时间 18:17 抓一次「Hub」tab 浏览区域的 8 个数据源,解析成
 # JSON 后提交到 gitcode 数据仓库的 news-hub-data 分支。
 #
-# cron 用 UTC:北京 18:00 = UTC 10:00。
+# cron 用 UTC:北京 18:17 = UTC 10:17。
 #
-# GitHub cron 不保证准点,脚本内部按 TZ=Asia/Shanghai 取「真正执行时」的北京时间
-# 生成文件名日期/时间,因此即便延迟到 18:15 才跑,目录名仍是当天的 18-15,不会错位。
+# 刻意避开整点分钟:GitHub 对 schedule 事件的排队延迟在整点(尤其 10:00 UTC
+# 全球高峰窗口)最重——cron 曾配 '0 10 * * *',2026-09 实测连续 28 天实际触发
+# 迟 3~8 小时,晚班落到北京 21:00~次日 01:50;非整点分钟负载显著更低。
+# cron 仍不保证准点,脚本内部按 TZ=Asia/Shanghai 取「真正执行时」的北京时间
+# 生成文件名日期/时间,因此即便延迟到 18:40 才跑,目录名仍是当天的 18-40,不会错位。
 #
-# 18:00 批对 Product Hunt 无时机约束:「Product of the Day」每天 PT 00:01(夏令时
-# UTC 07:01/北京 15:01,冬令时 UTC 08:01/北京 16:01)上线,北京 18:00(UTC 10:00)
-# 跑时当日榜单已上线 2~3 小时。postedAfter 恒用 PT 当日 0 点(见
+# 18 点档对 Product Hunt 无时机约束:「Product of the Day」每天 PT 00:01(夏令时
+# UTC 07:01/北京 15:01,冬令时 UTC 08:01/北京 16:01)上线,北京 18:17(UTC 10:17)
+# 跑时当日榜单已上线 3 小时以上。postedAfter 恒用 PT 当日 0 点(见
 # scripts/sources/producthunt.py 的 _ph_today_pt_start,勿改回 UTC 边界——北京 08:00 批
 # = UTC 00:00 整会拿空)。
 #
@@ -24,7 +27,7 @@ name: Fetch Hub Data
 
 on:
   schedule:
-    - cron: '0 10 * * *'   # UTC 10:00 = 北京 18:00(PH 当日榜单 15:01/16:01 上线,已就绪 2~3 小时)
+    - cron: '17 10 * * *'  # UTC 10:17 = 北京 18:17(避开整点分钟,防 GitHub schedule 排队数小时;PH 当日榜单已上线 3h+)
   workflow_dispatch:       # 支持手动触发,便于首次验证 / 临时补抓
 
 # 定时与手动撞车时排队而非双双失败(push 非快进会报错丢本轮)
