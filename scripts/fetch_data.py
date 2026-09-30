@@ -162,12 +162,16 @@ def patch_ai_summary_v2(file_path, ai_summary_v2):
     P1 优化:抓取阶段先不带摘要落盘(快),拿到 8 源 items 后再并发调 AI 总结;
     本函数把并发产出的摘要 patch 回各自快照文件,避免重写整个快照。
     ai_summary_v2 为 None/空时跳过(保持无摘要时的结构兼容)。
+    同时写入快照顶层 summary_prompt_version(= ai_summary.PROMPT_VERSION):摘要
+    继承要求上一期快照记录的版本与当前相同,prompt 升级后旧摘要不再被继承
+    (防止新旧写作风格混排);该字段对 App 是纯增量,端侧可忽略。
     """
     if not ai_summary_v2:
         return
     with open(file_path, "r", encoding="utf-8") as f:
         payload = json.load(f)
     payload["ai_summary_v2"] = ai_summary_v2
+    payload["summary_prompt_version"] = ai_summary.PROMPT_VERSION
     with open(file_path, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2)
 
@@ -692,7 +696,9 @@ def main():
     # 摘要继承(2026-09):该源 top-N (标题,URL) 指纹与上一期快照完全一致且上期带
     # ai_summary_v2 时直接沿用,不重跑 AI —— 数据仓实测同日两批 6/8 源指纹一致
     # (54%~84%),重跑只是换皮重写 + 白花调用费。上一期快照按 previous latest 指针
-    # 从数据仓拉取(懒加载,每源至多一次),任何失败都退回正常摘要。
+    # 从数据仓拉取(懒加载,每源至多一次),任何失败都退回正常摘要。继承另要求上期
+    # 快照的 summary_prompt_version 与当前 ai_summary.PROMPT_VERSION 相同 —— prompt
+    # 升级后旧摘要不继承,一次性全量重写(首次上线版本闸的批次会多花 ≤8 次调用)。
     if do_summary and pending_summary:
         prev_snapshots = {}  # name → 上一期快照 dict | None
 
@@ -709,6 +715,7 @@ def main():
             prev = _prev_snapshot_of(name)
             prev_summary = prev.get("ai_summary_v2") if isinstance(prev, dict) else None
             if (isinstance(prev_summary, list) and prev_summary
+                    and prev.get("summary_prompt_version") == ai_summary.PROMPT_VERSION
                     and ai_summary.summary_fingerprint(name, items)
                     == ai_summary.summary_fingerprint(name, prev.get("items") or [])):
                 patch_ai_summary_v2(file_path, prev_summary)

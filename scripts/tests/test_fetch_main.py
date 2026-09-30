@@ -188,7 +188,8 @@ def test_main_no_previous_index_失败源直接缺省(monkeypatch, tmp_path):
 #
 # 2026-09 数据仓实测:同日两批(08:00→18:00)top-N (标题,URL) 指纹完全一致的
 # 源占 6/8(命中率 54%~84%),重跑 AI 只会换皮重写 + 白花调用费。继承的任何
-# 环节失败(上一期快照拉不到 / 上期无摘要 / 指纹不符)都必须退回正常摘要。
+# 环节失败(上一期快照拉不到 / 上期无摘要 / 指纹不符 / 上期 prompt 版本与当前
+# 不同,快照顶层 summary_prompt_version)都必须退回正常摘要。
 
 _PREV_SUMMARY = [{"title": "旧标题", "desc": "旧描述", "url": "https://x.dev/1"}]
 _SAME_ITEMS = [{"id": 1, "title": "t", "url": "https://x.dev/1"}]
@@ -211,7 +212,8 @@ def _summary_stubs(monkeypatch):
 def test_main_摘要继承_指纹一致不调AI(monkeypatch, tmp_path, requests_mock):
     requests_mock.get(_PREV_SNAP_URL, json={"source": "hackernews",
                                             "items": list(_SAME_ITEMS),
-                                            "ai_summary_v2": _PREV_SUMMARY})
+                                            "ai_summary_v2": _PREV_SUMMARY,
+                                            "summary_prompt_version": fd.ai_summary.PROMPT_VERSION})
     calls = _summary_stubs(monkeypatch)
     sources = {"hackernews": lambda limit=20: (list(_SAME_ITEMS), {})}
     rc = _run(monkeypatch, tmp_path, sources,
@@ -222,13 +224,15 @@ def test_main_摘要继承_指纹一致不调AI(monkeypatch, tmp_path, requests_
     assert calls == []  # 未调 AI
     snap = _read(tmp_path / "hackernews" / "2026-08-29" / "11-01-data.json")
     assert snap["ai_summary_v2"] == _PREV_SUMMARY  # 继承落进本次快照
+    assert snap["summary_prompt_version"] == fd.ai_summary.PROMPT_VERSION
 
 
 def test_main_摘要继承_指纹不符退回重新摘要(monkeypatch, tmp_path, requests_mock):
     changed = [{"id": 2, "title": "t2", "url": "https://x.dev/2"}]
     requests_mock.get(_PREV_SNAP_URL, json={"source": "hackernews",
                                             "items": changed,
-                                            "ai_summary_v2": _PREV_SUMMARY})
+                                            "ai_summary_v2": _PREV_SUMMARY,
+                                            "summary_prompt_version": fd.ai_summary.PROMPT_VERSION})
     calls = _summary_stubs(monkeypatch)
     sources = {"hackernews": lambda limit=20: (list(_SAME_ITEMS), {})}
     rc = _run(monkeypatch, tmp_path, sources,
@@ -251,6 +255,24 @@ def test_main_摘要继承_上期无摘要退回重新摘要(monkeypatch, tmp_pa
                                         {"hackernews": "2026-08-28/22-00-data.json"}),
               no_summary=False)
     assert rc == 0 and calls == ["hackernews"]
+
+
+def test_main_摘要继承_上期prompt版本不符退回重新摘要(monkeypatch, tmp_path, requests_mock):
+    # prompt 升级后(PROMPT_VERSION bump):旧快照无版本字段(或版本不同)时即使指纹
+    # 一致也不继承 —— 旧摘要按旧 prompt 写成,沿用会让新旧风格在同批快照间混排
+    requests_mock.get(_PREV_SNAP_URL, json={"source": "hackernews",
+                                            "items": list(_SAME_ITEMS),
+                                            "ai_summary_v2": _PREV_SUMMARY})  # 无版本字段
+    calls = _summary_stubs(monkeypatch)
+    sources = {"hackernews": lambda limit=20: (list(_SAME_ITEMS), {})}
+    rc = _run(monkeypatch, tmp_path, sources,
+              extra_args=_mock_previous(monkeypatch, requests_mock,
+                                        {"hackernews": "2026-08-28/22-00-data.json"}),
+              no_summary=False)
+    assert rc == 0 and calls == ["hackernews"]
+    snap = _read(tmp_path / "hackernews" / "2026-08-29" / "11-01-data.json")
+    assert snap["ai_summary_v2"][0]["title"] == "新-hackernews"
+    assert snap["summary_prompt_version"] == fd.ai_summary.PROMPT_VERSION  # 新摘要带当前版本
 
 
 def test_main_摘要继承_上一期快照拉取失败退回(monkeypatch, tmp_path, requests_mock):

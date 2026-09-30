@@ -120,6 +120,41 @@ def test_clean_echo带源前缀放行():
     assert len(cleaned2) == 1 and d2 == 0
 
 
+def test_clean_echo带行尾统计段放行():
+    # PH 行形态「[0] Pexo（↑283，💬12）：tagline」:模型把「标题+统计开头」连着抄
+    # (2026-10-01 生产实锤:15 张卡 11 张 echo 形如 "Pexo（↑283" 被整批判错绑),
+    # 核验须认可「标题 + 行尾统计段开头」形态 —— 与 oai "[OpenAI] " 行前缀同族
+    ph_items = [{"name": "Pexo", "url": "https://x.dev/p", "votesCount": 283,
+                 "commentsCount": 12, "tagline": "t"}]
+    parsed = [{"title": "t", "desc": "d", "ref": 0, "titleEcho": "Pexo（↑283"}]
+    cleaned, present, dropped = asm._clean_entries(parsed, "producthunt", ph_items)
+    assert len(cleaned) == 1 and present == 1 and dropped == 0
+
+    # HN/GH 同族:标题后紧跟「（得分 X」「（今日 +N★」
+    hn = [{"title": "Pexo", "target_url": "https://x.dev/h", "score": 456, "descendants": 9}]
+    ok = asm._clean_entries([{"title": "t", "desc": "d", "ref": 0,
+                              "titleEcho": "Pexo（得分 456"}], "hackernews", hn)
+    assert len(ok[0]) == 1 and ok[2] == 0
+    gh = [{"owner": "o", "name": "repo", "url": "https://x.dev/g", "starsToday": 39}]
+    ok2 = asm._clean_entries([{"title": "t", "desc": "d", "ref": 0,
+                               "titleEcho": "o/repo（今日 +39★"}], "github-trending", gh)
+    assert len(ok2[0]) == 1 and ok2[2] == 0
+
+
+def test_clean_echo带行尾统计段的错绑仍拦截():
+    # echo 抄的是 B 条「标题+统计」而 ref 指向 A 条 → 任何形态都不匹配,依旧丢弃
+    ph_items = [
+        {"name": "Pexo", "url": "https://x.dev/a", "votesCount": 283},
+        {"name": "Ferndesk", "url": "https://x.dev/b", "votesCount": 1},
+    ]
+    parsed = [
+        {"title": "错绑卡", "desc": "d", "ref": 0, "titleEcho": "Ferndesk（↑1"},
+        {"title": "合法卡", "desc": "d", "ref": 0, "titleEcho": "Pexo（↑283"},
+    ]
+    cleaned, _, dropped = asm._clean_entries(parsed, "producthunt", ph_items)
+    assert [c["title"] for c in cleaned] == ["合法卡"] and dropped == 1
+
+
 def test_clean_echo带源前缀的错绑仍拦截():
     # echo 抄的是 OpenAI 条目开头(带前缀),ref 却指向 Anthropic 条目 → 依旧丢弃
     # (配一条合法卡:单卡全丢按契约抛 RuntimeError,两卡才能观测到选择性丢弃)

@@ -98,10 +98,14 @@ def main():
     earlier = [s for s in snaps if (s[0], s[1]) < (date, time_str)]
     if earlier:
         with open(earlier[-1][2], "r", encoding="utf-8") as f:
-            prev_items = json.load(f).get("items") or []
-        same = (ai_summary.summary_fingerprint(args.source, items)
+            prev_snap = json.load(f)
+        prev_items = prev_snap.get("items") or []
+        # 继承的真实条件 = 指纹一致 且 prompt 版本相同(快照顶层 summary_prompt_version)
+        same = (prev_snap.get("summary_prompt_version") == ai_summary.PROMPT_VERSION
+                and ai_summary.summary_fingerprint(args.source, items)
                 == ai_summary.summary_fingerprint(args.source, prev_items))
-        note = "一致(正式流水线会继承,不重跑 AI)" if same else "不一致(会重新生成)"
+        note = ("一致且 prompt 版本相同(正式流水线会继承,不重跑 AI)" if same
+                else "不一致或 prompt 版本不同(会重新生成)")
         print(f"[REPLAY] 与上一笔({earlier[-1][0]} {earlier[-1][1]})的 top-N 指纹:{note}")
 
     _print_cards("旧摘要(快照产物)", old_cards)
