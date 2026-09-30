@@ -109,7 +109,6 @@
 - **已读状态**：打开过的条目在各列表自动弱化，动态列表支持「只看未读」过滤（删除对应浏览历史即可恢复未读）
 - **断网兜底**：归档数据落盘缓存，断网冷启动仍可查看最近拉取的内容
 - **浏览历史与收藏**（本地 Room 存储；WebView 顶栏星标任意页面即可稍后读）
-- **每日更新通知**（可选、默认关）：流水线有新内容时本地通知提醒，每天至多 1 条；开启后冷启动遇到新数据还会弹出「今日综述」底部提示
 - **App 内检查更新与直装**（关于页，对查 GitHub Releases；「发现新版本」底部弹层内下载 APK（实时进度、可取消）并拉起系统安装器，无安装包或下载失败回退 Release 页）与 `ainewshub://` 深链（`web?url=…`、`tab/<today|more>`（旧名永久映射：overview/summary/follows→今天、trends/hotwords→热词页）、`settings`，供浏览器/二维码/自动化工具直达）
 - **主题**：Material You 动态取色（Android 12+）、字体族切换（默认/衬线/等宽）、字号档位、暗色模式
 - **多语言**：简体中文 / English 切换
@@ -192,7 +191,6 @@ app/                       唯一 Android 模块
   src/main/java/com/peng/ainewshub/
     MainActivity.kt        Activity 壳（深链解析）；自实现多栈导航在 ui/nav/（不用 Navigation Compose）
     data/                  Repository、数据模型、Room、DataStore、数据源模式
-    notify/                每日更新本地通知（WorkManager）
     playback/              语音速报：预生成音频/系统 TTS 双通道前台服务 + 通知栏控制
     ui/                    ViewModel + Compose Screen，按功能分包
       nav/                 自实现多栈导航（页面路由 / 状态机 / 应用壳）
@@ -254,7 +252,6 @@ bash scripts/pipeline.sh
 | Coil | 2.7.0 |
 | Room | 2.6.1 |
 | DataStore | 1.1.1 |
-| WorkManager（每日通知） | 2.10.0 |
 | Glance（桌面小组件） | 1.1.1 |
 | KSP | 2.0.21-1.0.28 |
 | minSdk | 24 (Android 7.0) |
@@ -291,7 +288,6 @@ bash scripts/pipeline.sh
 | [Activity-Compose](https://developer.android.com/jetpack/androidx/releases/activity) | Compose 集成（含预测返回手势） | Apache-2.0 |
 | [Lifecycle](https://developer.android.com/jetpack/androidx/releases/lifecycle) + [ViewModel](https://developer.android.com/topic/libraries/architecture/viewmodel) | 生命周期与状态管理 | Apache-2.0 |
 | [DataStore](https://developer.android.com/topic/libraries/architecture/datastore) | 偏好持久化 | Apache-2.0 |
-| [WorkManager](https://developer.android.com/topic/libraries/architecture/workmanager) | 每日更新通知调度 | Apache-2.0 |
 | [Room](https://developer.android.com/jetpack/androidx/releases/room) | SQLite 抽象层（浏览历史） | Apache-2.0 |
 | [Glance](https://developer.android.com/jetpack/androidx/releases/glance) | 桌面小组件 | Apache-2.0 |
 | [WebKit](https://developer.android.com/jetpack/androidx/releases/webkit) | 内置 WebView 能力增强 | Apache-2.0 |

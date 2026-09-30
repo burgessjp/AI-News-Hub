@@ -61,18 +61,13 @@ internal object ArchiveFetcher {
      * 解析失败抛 [AppException.ServerError] —— 服务端故障不能伪装成「离线」拿旧数据
      * 顶上,须如实走 Error 态。
      *
-     * [allowDiskFallback] 为 false(通知自查的 networkOnly 探测)时:
-     * 传输层失败也不读盘,直接抛 —— 调用方拿「失败」当信号走补查/放弃,绝不把盘上
-     * 旧数据当成新批次。
-     *
      * @param cacheKey 磁盘缓存键(与内存缓存同键:index.json / source/relPath / 根级文件名)
      */
     suspend fun fetchJsonWithDiskFallback(
         cacheKey: String,
         url: String,
         hint: String,
-        tolerateMissing: Boolean = false,
-        allowDiskFallback: Boolean = true
+        tolerateMissing: Boolean = false
     ): JSONObject? {
         val text = try {
             getRaw(url, hint, tolerateMissing) ?: return null
@@ -80,10 +75,9 @@ internal object ArchiveFetcher {
             throw e
         } catch (e: IOException) {
             // 传输层失败(连不上):读盘兜底(盘上是上次网络成功时落下的旧数据);
-            // networkOnly 探测不兜底,失败即抛。兜底未命中时带场景与原始异常包成
-            // Network 上抛 —— 诊断报告能看到是哪个文件、什么传输层错误
+            // 兜底未命中时带场景与原始异常包成 Network 上抛 —— 诊断报告能看到
+            // 是哪个文件、什么传输层错误
             val wrapped = AppException.Network(hint, e)
-            if (!allowDiskFallback) throw wrapped
             val disk = withContext(Dispatchers.IO) { ArchiveDiskCache.read(cacheKey) }
                 ?: throw wrapped
             return runCatching { JSONObject(disk) }

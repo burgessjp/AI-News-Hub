@@ -61,8 +61,6 @@ internal class PageEnv(
     val usageStore: AiUsageStore,
     /** AI 服务全局配置:WebView 整页翻译读取(开关/就绪态判定)。 */
     val aiConfig: AiConfig,
-    /** 每日更新通知自查链上次运行时刻(设置页「上次检查」)。 */
-    val lastNotifyCheckAt: Long,
     val browseHistoryRepo: BrowseHistoryRepository,
     val favoritesRepo: FavoritesRepository
 )
@@ -75,8 +73,7 @@ internal class DisplayControls(
     val prefs: SettingsStore.DisplayPrefs,
     val onSelectTheme: (ThemeMode) -> Unit,
     val onSelectFontScale: (FontScale) -> Unit,
-    val onSelectLanguage: (AppLanguage) -> Unit,
-    val onToggleDailyNotify: (Boolean) -> Unit
+    val onSelectLanguage: (AppLanguage) -> Unit
 )
 
 /**
@@ -186,9 +183,6 @@ internal fun PageView(
             onSelectFontScale = display.onSelectFontScale,
             language = display.prefs.language,
             onSelectLanguage = display.onSelectLanguage,
-            dailyNotify = display.prefs.dailyNotify,
-            lastNotifyCheckAt = env.lastNotifyCheckAt,
-            onToggleDailyNotify = display.onToggleDailyNotify,
             settingsStore = env.settingsStore,
             browseHistoryRepo = env.browseHistoryRepo,
             onBack = onBack

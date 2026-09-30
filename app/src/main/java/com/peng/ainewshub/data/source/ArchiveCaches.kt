@@ -43,23 +43,17 @@ internal class ArchiveJsonCache(
      * 拉取(带缓存与并发去重)。
      *
      * @param force true 绕过 TTL 强制打网络(手动刷新路径),锁内去重窗口仍生效
-     * @param allowDiskFallback false(index/总览的 networkOnly 探测)时:跳过内存缓存
-     *        早退(缓存里可能混有断网时读盘写入的旧 index),传输层失败也不读盘兜底,
-     *        保证「要么真实网络数据、要么失败」
      * @return 解析后的 JSON;[absentAsNull] 且文件 404(尚未生成)时返回 null
      */
-    suspend fun fetch(force: Boolean = false, allowDiskFallback: Boolean = true): JSONObject? = mutex.withLock {
-        if (allowDiskFallback) {
-            val c = cached
-            val freshWithin = if (force) FORCE_DEDUP_MS else TTL_MS
-            if (c != null && System.currentTimeMillis() - cachedAt < freshWithin) {
-                return@withLock c
-            }
+    suspend fun fetch(force: Boolean = false): JSONObject? = mutex.withLock {
+        val c = cached
+        val freshWithin = if (force) FORCE_DEDUP_MS else TTL_MS
+        if (c != null && System.currentTimeMillis() - cachedAt < freshWithin) {
+            return@withLock c
         }
         val parsed = fetcher.fetchJsonWithDiskFallback(
             cacheKey, url(), hint,
-            tolerateMissing = absentAsNull,
-            allowDiskFallback = allowDiskFallback
+            tolerateMissing = absentAsNull
         )
             ?: return@withLock null
         cached = parsed

@@ -45,7 +45,6 @@ import com.peng.ainewshub.data.repo.BrowseHistoryRepository
 import com.peng.ainewshub.data.repo.FavoritesRepository
 import com.peng.ainewshub.data.PipelineSchedule
 import com.peng.ainewshub.data.source.ArchiveHttpClient
-import com.peng.ainewshub.notify.DailyNotifyScheduler
 import com.peng.ainewshub.ui.anim.PageNavStyle
 import com.peng.ainewshub.ui.anim.pageTransition
 import com.peng.ainewshub.ui.anim.predictivePopTransition
@@ -137,10 +136,6 @@ internal fun AiNewsHubApp(
     )
     val themeMode = displayPrefs.themeMode
     val fontScale = displayPrefs.fontScale
-    // 每日更新通知自查链上次运行时刻(设置页「上次检查」,排障可观测出口)
-    val lastNotifyCheckAt by settingsStore.lastNotifyCheckAtFlow.collectAsStateWithLifecycle(
-        initialValue = 0L
-    )
     // AI 服务全局配置:除设置页外,WebView 整页翻译也读取(开关/就绪态判定)
     val aiConfig by configStore.configFlow.collectAsStateWithLifecycle(
         initialValue = AiConfig()
@@ -162,14 +157,6 @@ internal fun AiNewsHubApp(
 
     // 缓存占用统计与清理:状态已下沉到 SettingsScreen —— 全 cacheDir 递归 walk 是
     // 重活,随冷启动白做(多数用户根本不进设置页),改为首次进入设置页时才计算。
-
-    // 每日更新通知:持久化开关 + 同步 WorkManager 自查链调度(见 notify/DailyUpdateNotifier.kt)
-    val onToggleDailyNotify: (Boolean) -> Unit = { enabled ->
-        scope.launch {
-            settingsStore.updateDailyNotify(enabled)
-            DailyNotifyScheduler.sync(appContext, enabled)
-        }
-    }
 
     val darkTheme = when (themeMode) {
         ThemeMode.System -> isSystemInDarkTheme()
@@ -410,7 +397,6 @@ internal fun AiNewsHubApp(
         configStore = configStore,
         usageStore = usageStore,
         aiConfig = aiConfig,
-        lastNotifyCheckAt = lastNotifyCheckAt,
         browseHistoryRepo = browseHistoryRepo,
         favoritesRepo = favoritesRepo
     )
@@ -418,8 +404,7 @@ internal fun AiNewsHubApp(
         prefs = displayPrefs,
         onSelectTheme = onSelectTheme,
         onSelectFontScale = onSelectFontScale,
-        onSelectLanguage = onSelectLanguage,
-        onToggleDailyNotify = onToggleDailyNotify
+        onSelectLanguage = onSelectLanguage
     )
 
     AiNewsHubTheme(
@@ -523,7 +508,7 @@ internal fun AiNewsHubApp(
 
             // 远程配置同步(app_config.json → 批次时刻表):无 UI,每次进程启动
             // 拉一次并应用到 PipelineSchedule,失败静默回退内置默认表
-            AppConfigSyncHost(settingsStore = settingsStore)
+            AppConfigSyncHost()
         }
     }
 }

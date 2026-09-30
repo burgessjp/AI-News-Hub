@@ -193,13 +193,9 @@ object ArchiveHttpClient {
      * (语义:今日总览尚未生成,UI 走 NoData 态)。OverviewRepository 据此反序列化为 OverviewDigest。
      *
      * @param force true 绕过缓存(手动刷新路径)
-     * @param networkOnly true 时为「网络探测」语义(每日更新 Worker):
-     *        跳过内存缓存与磁盘兜底,必须真实打网络,传输层/HTTP/解析失败一律抛 ——
-     *        调用方拿失败当信号(档内补查/放弃弹窗),绝不能把盘上旧数据当成新批次。
-     *        总览 Tab / 小组件等展示路径不要传(需要断网兜底)。
      */
-    suspend fun fetchLatestOverview(force: Boolean = false, networkOnly: Boolean = false): JSONObject? = withContext(Dispatchers.IO) {
-        fetchIndex(force, allowDiskFallback = !networkOnly).optJSONObject("latest_overview")
+    suspend fun fetchLatestOverview(force: Boolean = false): JSONObject? = withContext(Dispatchers.IO) {
+        fetchIndex(force).optJSONObject("latest_overview")
             ?.takeIf { it.has("items") }
     }
 
@@ -323,10 +319,10 @@ object ArchiveHttpClient {
         snapshotCache.fetch(source, relPath, arrayField)
 
     /**
-     * 拉 index.json(带缓存与并发去重;force/networkOnly 语义见 [ArchiveJsonCache.fetch])。
+     * 拉 index.json(带缓存与并发去重;force 语义见 [ArchiveJsonCache.fetch])。
      * tolerateMissing=false 时不会返回 null,elvis 仅为类型兜底。
      */
-    private suspend fun fetchIndex(force: Boolean = false, allowDiskFallback: Boolean = true): JSONObject =
-        indexCache.fetch(force, allowDiskFallback)
+    private suspend fun fetchIndex(force: Boolean = false): JSONObject =
+        indexCache.fetch(force)
             ?: throw AppException.ServerError("index.json 空响应")
 }

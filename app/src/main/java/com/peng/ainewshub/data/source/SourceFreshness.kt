@@ -17,7 +17,7 @@ import java.time.ZoneId
  */
 object SourceFreshness {
 
-    /** 北京时间(对齐 scripts/common.py 的 BEIJING_TZ 与 DailyUpdateNotifier 的 BEIJING)。 */
+    /** 北京时间(对齐 scripts/common.py 的 BEIJING_TZ 与 PipelineSchedule 的 BEIJING)。 */
     private val BEIJING: ZoneId = ZoneId.of("Asia/Shanghai")
 
     /**

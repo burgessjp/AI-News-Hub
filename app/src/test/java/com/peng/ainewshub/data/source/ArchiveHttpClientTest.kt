@@ -26,8 +26,7 @@ import java.nio.charset.StandardCharsets.UTF_8
  * 覆盖四组语义:
  *  1. index 寻址 → 快照拉取 → items 映射(fetchItemsList)
  *  2. 缓存与刷新:TTL 缓存复用 / force 的锁内去重窗口 / 窗口外真实重打
- *  3. 错误分野:HTTP 错误直接抛(不兜底)vs 传输层失败读盘兜底并置 offlineMode;
- *     networkOnly 探测永远不兜底
+ *  3. 错误分野:HTTP 错误直接抛(不兜底)vs 传输层失败读盘兜底并置 offlineMode
  *  4. 根级独立文件:trends「成功才写」404 → null;history 三索引结构映射
  */
 @RunWith(RobolectricTestRunner::class)
@@ -172,18 +171,6 @@ class ArchiveHttpClientTest {
         val snapshot = ArchiveHttpClient.fetchLatestSnapshot("hackernews", force = true)
         assertEquals(5, snapshot.optJSONArray("items")!!.length())
         assertTrue(ArchiveHttpClient.offlineMode.value)
-    }
-
-    @Test
-    fun `networkOnly 探测跳过缓存与磁盘兜底失败即抛`() = runBlocking {
-        ArchiveHttpClient.fetchLatestOverview() // 正常路径先写入磁盘
-        assertTrue(ArchiveHttpClient.fetchLatestOverview() != null)
-        ArchiveHttpClient.reconfigureForTest(deadBaseUrl)
-        // 探测语义:盘上有旧数据也绝不能当新批次,必须失败
-        val error = runCatching {
-            ArchiveHttpClient.fetchLatestOverview(networkOnly = true)
-        }.exceptionOrNull()
-        assertNotNull(error)
     }
 
     // ===== 4. 根级独立文件 =====

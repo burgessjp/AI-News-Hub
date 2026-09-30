@@ -218,7 +218,7 @@ class UpdateDownloadService : Service() {
             .setContentIntent(contentIntent)
             .setAutoCancel(true)
             .build()
-        // 通知权限未授权时系统静默丢弃(同 DailyUpdateNotifier 口径),不另行检查
+        // 通知权限未授权时系统静默丢弃,不另行检查(弹窗内有完整下载控制,通知仅锦上添花)
         NotificationManagerCompat.from(this).notify(NOTIFY_ID, notification)
     }
 

@@ -1,11 +1,5 @@
 package com.peng.ainewshub.ui.more
 
-import android.Manifest
-import android.content.pm.PackageManager
-import android.os.Build
-import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -34,7 +28,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -53,7 +46,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
 import com.peng.ainewshub.R
 import com.peng.ainewshub.data.diagnostics.DiagnosticsLog
 import com.peng.ainewshub.data.repo.BrowseHistoryRepository
@@ -70,9 +62,6 @@ import com.peng.ainewshub.ui.components.SectionHeader
 import com.peng.ainewshub.ui.components.SettingsRow
 import com.peng.ainewshub.ui.components.shareText
 import com.peng.ainewshub.ui.theme.AppText
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import com.peng.ainewshub.data.prefs.SettingsStore
 
 /**
@@ -108,7 +97,6 @@ val FontScale.labelRes: Int
  *  - 外观:主题模式三选一(系统/亮/暗;皮肤与动态取色已随 v1.4.0 单一风格移除)
  *  - 字体:字号三档(紧凑/标准/大号;字体族选择已删,全 App 恒纸墨宋体)
  *  - 语言:跟随系统 / 简体中文 / English,切换后 Activity 重建生效(见 ui/i18n/AppLocale)
- *  - 通知:每日更新通知开关(WorkManager 本地调度,API 33+ 打开时请求运行时权限)
  *  - 缓存:一键清理网页缓存/Cookie/图片缓存/搜索历史等可恢复数据;
  *    翻译缓存与浏览历史为保护性勾选项,默认保留
  *  - 诊断:本地诊断报告(最近一次崩溃 + 最近 20 条错误 + 环境信息),
@@ -125,9 +113,6 @@ fun SettingsScreen(
     onSelectFontScale: (FontScale) -> Unit,
     language: AppLanguage,
     onSelectLanguage: (AppLanguage) -> Unit,
-    dailyNotify: Boolean,
-    lastNotifyCheckAt: Long,
-    onToggleDailyNotify: (Boolean) -> Unit,
     settingsStore: SettingsStore,
     browseHistoryRepo: BrowseHistoryRepository,
     onBack: () -> Unit
@@ -206,17 +191,6 @@ fun SettingsScreen(
                 )
             }
 
-            // 通知 section —— 每日更新通知开关(WorkManager 本地调度;API 33+ 需运行时权限);
-            // 开启后副标题追加「上次检查」时刻与厂商后台限制引导(排障可观测出口)
-            item { SectionHeader(stringResource(R.string.settings_section_notify)) }
-            item {
-                DailyNotifyRow(
-                    dailyNotify = dailyNotify,
-                    lastNotifyCheckAt = lastNotifyCheckAt,
-                    onToggle = onToggleDailyNotify
-                )
-            }
-
             // 数据清理 section —— 一键清理已加载的网页/图片/浏览历史/搜索历史等可恢复数据
             item { SectionHeader(stringResource(R.string.settings_section_data_cleanup)) }
             item {
@@ -239,85 +213,6 @@ private fun GroupLabel(text: String) {
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(start = 18.dp, top = 6.dp)
     )
-}
-
-/**
- * 每日更新通知开关行。
- *
- * Android 13+(TIRAMISU)通知需运行时权限:打开开关时请求,允许才生效;
- * 拒绝(含「不再询问」)Toast 引导去系统设置,开关保持关。已授权或 API < 33 直接生效。
- * 开关状态持久化与 WorkManager 调度同步由调用方(onToggle 回调)完成。
- *
- * 开启后副标题追加两行排障信息:
- *  - 「上次检查」时刻(Worker 每次运行记录)—— 区分「链被系统后台限制拦住没跑」
- *    和「跑了但档内没新数据」;
- *  - 已知拦截后台执行的厂商(One UI 休眠列表等)引导文案,见 [notifyBgRestrictionHintRes]。
- */
-@Composable
-private fun DailyNotifyRow(dailyNotify: Boolean, lastNotifyCheckAt: Long, onToggle: (Boolean) -> Unit) {
-    val context = LocalContext.current
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (granted) {
-            onToggle(true)
-        } else {
-            Toast.makeText(context, R.string.settings_daily_notify_permission_denied, Toast.LENGTH_LONG).show()
-        }
-    }
-    val lastCheckLine = lastNotifyCheckAt.takeIf { dailyNotify && it > 0L }?.let { ts ->
-        val time = SimpleDateFormat(
-            context.getString(R.string.date_fmt_month_day_time_dash), Locale.getDefault()
-        ).format(Date(ts))
-        stringResource(R.string.settings_daily_notify_last_check, time)
-    }
-    val hintRes = notifyBgRestrictionHintRes().takeIf { dailyNotify }
-    val subtitle = listOfNotNull(
-        stringResource(R.string.settings_daily_notify_subtitle),
-        lastCheckLine,
-        hintRes?.let { stringResource(it) }
-    ).joinToString("\n")
-    SettingsRow(
-        title = stringResource(R.string.settings_daily_notify),
-        subtitle = subtitle,
-        trailing = {
-            Switch(
-                checked = dailyNotify,
-                onCheckedChange = { enabled ->
-                    val needsPermission = enabled &&
-                        Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                        ContextCompat.checkSelfPermission(
-                            context, Manifest.permission.POST_NOTIFICATIONS
-                        ) != PackageManager.PERMISSION_GRANTED
-                    if (needsPermission) {
-                        permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                    } else {
-                        onToggle(enabled)
-                    }
-                }
-            )
-        },
-        showChevron = false
-    )
-}
-
-/**
- * 已知会拦截 WorkManager 后台执行的厂商 → 设置页引导文案;null = 无需提示。
- *
- * 三星 One UI 的「休眠/深度休眠」列表最典型(会直接掐掉 JobScheduler),单独给准确路径;
- * 其余国产 ROM(MIUI / 鸿蒙 / ColorOS / OriginOS 等)统一引导允许后台运行/自启动。
- * Pixel 等原生系无此问题,不提示(避免无谓打扰)。
- */
-private fun notifyBgRestrictionHintRes(): Int? {
-    val manufacturer = Build.MANUFACTURER.lowercase()
-    return when {
-        "samsung" in manufacturer -> R.string.settings_daily_notify_hint_samsung
-        listOf(
-            "xiaomi", "redmi", "huawei", "honor", "oppo", "vivo",
-            "oneplus", "meizu", "realme", "iqoo"
-        ).any { it in manufacturer } -> R.string.settings_daily_notify_hint_oem
-        else -> null
-    }
 }
 
 /**

@@ -109,7 +109,6 @@ Every link in the app opens in-app, never in an external browser:
 - **Read state**: opened items dim across every feed, with an "Unread only" filter on the items list (delete a history entry to un-read)
 - **Offline fallback**: archive data is written through to a disk cache, so a cold start without network still shows the last fetched content
 - **Browsing history & Favorites** (stored locally in Room; star any page from the built-in WebView to read it later)
-- **Daily update notification** (optional, off by default): a local notification when the pipeline publishes new content, at most one per day; with it on, a cold start on new data also shows a brief "today's digest" bottom sheet
 - **In-app update check & install** (About page) against GitHub Releases — the "new version" bottom sheet downloads the APK with live progress (cancellable) and hands off to the system installer, falling back to the Release page on failure; plus `ainewshub://` deep links (`web?url=…`, `tab/<today|more>` with legacy names permanently mapped — overview/summary/follows→today, trends/hotwords→hotwords page, `settings`) for browsers, QR codes and automation tools
 - **Theme**: Material You dynamic color (Android 12+), font family toggle (default / serif / monospace), size presets, dark mode
 - **Languages**: switch between Simplified Chinese and English
@@ -192,7 +191,6 @@ app/                       the single Android module
   src/main/java/com/peng/ainewshub/
     MainActivity.kt        Activity shell only (deep-link extras); custom multi-stack navigation in ui/nav/ (no Navigation Compose)
     data/                  Repository, data models, Room, DataStore, source modes
-    notify/                daily-update local notification (WorkManager)
     playback/              voice briefing: prebuilt-audio/system-TTS dual-channel foreground service + notification controls
     ui/                    ViewModel + Compose Screen, split by feature
       nav/                 custom multi-stack navigation (pages, nav state, app scaffold)
@@ -254,7 +252,6 @@ The pipeline is orchestrated by `scripts/pipeline.sh`; missing any hard-required
 | Coil | 2.7.0 |
 | Room | 2.6.1 |
 | DataStore | 1.1.1 |
-| WorkManager (daily notification) | 2.10.0 |
 | Glance (home widget) | 1.1.1 |
 | KSP | 2.0.21-1.0.28 |
 | minSdk | 24 (Android 7.0) |
@@ -291,7 +288,6 @@ This project is built on these excellent open-source components:
 | [Activity-Compose](https://developer.android.com/jetpack/androidx/releases/activity) | Compose integration (incl. predictive back gesture) | Apache-2.0 |
 | [Lifecycle](https://developer.android.com/jetpack/androidx/releases/lifecycle) + [ViewModel](https://developer.android.com/topic/libraries/architecture/viewmodel) | Lifecycle and state management | Apache-2.0 |
 | [DataStore](https://developer.android.com/topic/libraries/architecture/datastore) | Preference persistence | Apache-2.0 |
-| [WorkManager](https://developer.android.com/topic/libraries/architecture/workmanager) | Daily-update notification scheduling | Apache-2.0 |
 | [Room](https://developer.android.com/jetpack/androidx/releases/room) | SQLite abstraction (browsing history) | Apache-2.0 |
 | [Glance](https://developer.android.com/jetpack/androidx/releases/glance) | Home-screen widget | Apache-2.0 |
 | [WebKit](https://developer.android.com/jetpack/androidx/releases/webkit) | Built-in WebView enhancements | Apache-2.0 |

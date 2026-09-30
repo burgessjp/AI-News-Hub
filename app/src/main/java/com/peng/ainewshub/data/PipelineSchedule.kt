@@ -9,9 +9,7 @@ import java.util.TimeZone
  * 实际生效表 = 内置默认 [DEFAULT_BATCH_SLOTS](08:00 / 18:00,与流水线调度
  * 一致,见 docs/agents/pipeline.md),可被数据仓库根级 `app_config.json` 的
  * `batch_slots` 远程覆盖(见 [com.peng.ainewshub.data.source.AppConfigSync]:
- * 每次 App 启动与每日通知 Worker 运行前尝试刷新,拉取/解析失败静默保持当前值)。
- *  - 每日通知的检查时刻(notify/DailyUpdateNotifier 的 CHECK_SLOTS)由
- *    [batchSlots] + 40 分钟余量派生;
+ * 每次 App 启动尝试刷新,拉取/解析失败静默保持当前值)。
  *  - 总览页「下一批」展示与「已是最新」胶囊文案经 [nextBatchEpoch] 计算。
  */
 object PipelineSchedule {

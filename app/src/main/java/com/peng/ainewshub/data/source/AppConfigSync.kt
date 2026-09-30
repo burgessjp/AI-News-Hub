@@ -12,9 +12,8 @@ import org.json.JSONObject
  * schema 向前兼容:未知字段忽略;缺失 batch_slots 视为「暂无远程配置」,保持
  * [PipelineSchedule] 当前生效表(内置默认或上次成功值)。
  *
- * 触发点(都经 ArchiveJsonCache 的 2 分钟 TTL + 并发去重,重复调用廉价):
- *  - 每次进程启动(ui/nav 的 AppConfigSyncHost,进程级闸门);
- *  - 每日通知 Worker 运行前(覆盖进程被杀后 WorkManager 唤醒的无 UI 入口)。
+ * 触发点(经 ArchiveJsonCache 的 2 分钟 TTL + 并发去重,重复调用廉价):
+ *  - 每次进程启动(ui/nav 的 AppConfigSyncHost,进程级闸门)。
  *
  * 失败一律静默 —— 配置拉不到不是错误,内置默认表兜底,不打扰用户(对齐冷启动
  * 探测类动作的既有哲学)。
@@ -27,8 +26,7 @@ internal object AppConfigSync {
     /**
      * 拉取并应用远程配置;任何失败静默保持现状。
      *
-     * @return true 表示生效批次表发生了变化(调用方可据此重排依赖时刻表的任务,
-     *         如每日通知的 WorkManager 检查链)
+     * @return true 表示生效批次表发生了变化(目前仅诊断意义,无调用方消费)
      */
     suspend fun refresh(): Boolean {
         val json = try {
