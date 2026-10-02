@@ -14,16 +14,17 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 /**
- * 历史摘要 ViewModel —— 「更多 → 历史摘要」两级页共用。
+ * 历史摘要 ViewModel —— 「过刊」页(ui/more/HistoryHubScreen)宿主。
  *
  * 数据走 index.json 的 `history` 索引按日期寻址(见 [SummaryRepository]),
  * 纯归档语义。
  *
- * 两级页各取一流:
-     *  - [dates]:可选日期列表(全源 history 的日期并集,附当天有数据的源数);
-     *  - [dateStates]:指定日期的全源摘要,按源独立 Loading/Error/Success。
- *    日期详情页用 `viewModel(key = "summary-date-$date")` 按日期隔离实例
- *    (同 DailyDateScreen 套路),避免换日期时闪现上一日期内容。
+ * 两流:
+ *  - [dates]:可选日期列表(全源 history 的日期并集,附当天有数据的源数;
+ *    过刊页用作 31 天摘要窗口判定——选中日不在键集内则不渲染分源段);
+ *  - [dateStates]:指定日期的全源摘要,按源独立 Loading/Error/Success。
+ *    单实例宿主换日期前须 [clearDate] 清幂等守卫再 [loadDate](按日期隔离
+ *    实例的历史用法已随三段式 hub 删除)。
  */
 class SummaryArchiveViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -47,6 +48,14 @@ class SummaryArchiveViewModel(application: Application) : AndroidViewModel(appli
                 onFailure = { it.toUiError(getApplication<Application>().localized()) }
             )
         }
+    }
+
+    /**
+     * 清空当前日期的分源状态 —— 单实例宿主(「过刊」页)切换日期前调用,
+     * 使 [loadDate] 的幂等守卫放行新日期重新拉取(按日期隔离实例的详情页无需调用)。
+     */
+    fun clearDate() {
+        _dateStates.value = emptyMap()
     }
 
     /** 并发拉取指定日期的全源摘要。每源独立失败,不互相拖累。 */

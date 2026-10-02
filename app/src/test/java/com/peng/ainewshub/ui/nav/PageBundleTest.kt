@@ -54,8 +54,6 @@ class PageBundleTest {
         Page.BrowseHistory,
         Page.Favorites,
         Page.HistoryHub,
-        Page.SummaryDate("2026-08-01"),
-        Page.OverviewDate("2026-08-01"),
         Page.TrendsDate("2026-08-01"),
         Page.TrendsCloud,
         Page.Hotwords
@@ -102,10 +100,15 @@ class PageBundleTest {
         // v1.4.0 五 tab 并三、热词/关注先后让位:升级用户的存量 Bundle 里,
         // 已移除的 tab 名(Overview/Summary/Trends/Follows)按 AppTab.entries
         // 名取不到键 → 旧栈整体丢弃(数据会重拉),不得抛异常。
+        // SummaryDate 为已删除的旧 Page 子类 tag:Bundle 里残页经 pageFromBundle
+        // 未知名返回 null 被丢,同样不得抛异常。
         // currentTab 兜底逻辑在 appNavStateSaver,不在本函数
         val legacy = Bundle().apply {
             putParcelableArrayList("Overview", arrayListOf(Page.Settings.toBundle()))
-            putParcelableArrayList("Summary", arrayListOf(Page.SummaryDate("2026-08-01").toBundle()))
+            putParcelableArrayList("Summary", arrayListOf(
+                // tag 冒充 v1.4.x 前的历史摘要日期页(子类已删,内容原样)
+                Page.TrendsDate("2026-08-01").toBundle().apply { putString("t", "SummaryDate") }
+            ))
             putParcelableArrayList("Trends", arrayListOf(Page.TrendsCloud.toBundle()))
             putParcelableArrayList("Follows", arrayListOf(Page.Hotwords.toBundle()))
         }

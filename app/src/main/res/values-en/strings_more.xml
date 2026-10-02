@@ -8,13 +8,14 @@
         <item quantity="other">%1$d AI news sources aggregated</item>
     </plurals>
     <string name="more_section_history">History</string>
-    <!-- History hub: entry row and hub page share one title -->
-    <string name="history_hub_title">History</string>
-    <string name="more_history_hub_subtitle">Overview, digests and keywords by date</string>
-    <!-- History hub (HistoryHubScreen) segment labels -->
-    <string name="history_hub_seg_overview">Overview</string>
-    <string name="history_hub_seg_summary">Digest</string>
-    <string name="history_hub_seg_trends">Keywords</string>
+    <!-- Past issues page (HistoryHubScreen): entry row and page top bar share one title -->
+    <string name="history_hub_title">Past Issues</string>
+    <string name="more_history_hub_subtitle">Re-read any day\'s full daily issue</string>
+    <!-- Past issues page -->
+    <string name="history_hub_focus_section">Top stories</string>
+    <string name="history_hub_more_dates">More dates</string>
+    <string name="history_hub_pick_date">Pick a date</string>
+    <string name="history_hub_summary_window">Per-source summaries keep the last 31 days only; this day shows the overview and top stories</string>
     <string name="more_browse_history_title">Browsing History</string>
     <string name="more_browse_history_subtitle">Pages you\'ve opened</string>
     <string name="more_favorites_title">Favorites</string>

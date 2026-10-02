@@ -87,7 +87,7 @@ fun editionLabel(context: Context, slotIndex: Int): String = when {
 
 /**
  * 归档日期(YYYY-MM-DD)→ 列表行日期标签:「今天/昨天/前天/M月d日 · 周X」。
- * 历史回顾 hub 各段日期列表行同规格(SummaryArchiveList / OverviewArchiveList / TrendsArchiveList 共用)。
+ * 过刊页刊期条与日期弹层、热词页历史日期弹层、日报/热词日期页顶栏同规格共用。
  * 解析失败原样返回日期串。
  */
 fun archiveDateLabel(context: Context, date: String): String {

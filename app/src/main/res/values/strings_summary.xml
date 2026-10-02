@@ -18,17 +18,4 @@
     <!-- AI 摘要缺失降级态:快照 items 完好,仅 AI 生成失败(区别于上面的错误态) -->
     <string name="summary_unavailable_title">本批未生成 AI 摘要</string>
     <string name="summary_unavailable_subtitle">原始列表不受影响，可直接查看完整列表</string>
-
-    <!-- ===== 历史摘要 ===== -->
-    <string name="summary_archive_title">历史摘要</string>
-    <string name="summary_archive_load_failed">历史摘要加载失败</string>
-    <string name="summary_archive_empty_title">暂无历史摘要</string>
-    <!-- 批次时刻由远程 app_config.json 动态下发,文案不写死时刻(对齐 onboarding 泛化约定) -->
-    <string name="summary_archive_empty_subtitle">每天定时批量更新(北京时间)\n历史记录自功能上线起累积(最近 31 天)</string>
-    <plurals name="summary_sources_with_digest">
-        <item quantity="other">%1$d 个源有当日摘要</item>
-    </plurals>
-    <!-- 按日期页:顶栏标题(%1$s = yyyy-MM-dd)与顶部提示行 -->
-    <string name="summary_date_title">%1$s 摘要</string>
-    <string name="summary_date_hint">当日 AI 精选</string>
 </resources>

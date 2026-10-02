@@ -12,13 +12,14 @@
         <item quantity="other">%1$d 个 AI 资讯源聚合</item>
     </plurals>
     <string name="more_section_history">历史</string>
-    <!-- 历史回顾 hub:更多页入口行与 hub 页顶栏共用标题 -->
-    <string name="history_hub_title">历史回顾</string>
-    <string name="more_history_hub_subtitle">总览 · 摘要 · 热词,按日期回看</string>
-    <!-- 历史回顾 hub(HistoryHubScreen)三段分段名 -->
-    <string name="history_hub_seg_overview">总览</string>
-    <string name="history_hub_seg_summary">摘要</string>
-    <string name="history_hub_seg_trends">热词</string>
+    <!-- 过刊页(HistoryHubScreen):更多页入口行与页顶栏共用标题 -->
+    <string name="history_hub_title">过刊</string>
+    <string name="more_history_hub_subtitle">回看任意一天的完整日报</string>
+    <!-- 过刊页 -->
+    <string name="history_hub_focus_section">当日重点</string>
+    <string name="history_hub_more_dates">更多日期</string>
+    <string name="history_hub_pick_date">选择日期</string>
+    <string name="history_hub_summary_window">分源摘要仅保留近 31 天,该日仅展示总览与当日重点</string>
     <string name="more_browse_history_title">浏览历史</string>
     <string name="more_browse_history_subtitle">打开过的网页</string>
     <string name="more_favorites_title">收藏</string>

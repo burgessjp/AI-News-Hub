@@ -1,7 +1,6 @@
 package com.peng.ainewshub.ui.nav
 
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.pager.PagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.res.stringResource
@@ -38,8 +37,6 @@ import com.peng.ainewshub.ui.more.ChangelogScreen
 import com.peng.ainewshub.ui.more.HistoryHubScreen
 import com.peng.ainewshub.ui.more.SettingsScreen
 import com.peng.ainewshub.ui.more.SourcesScreen
-import com.peng.ainewshub.ui.overview.OverviewDateScreen
-import com.peng.ainewshub.ui.summary.SummaryDateScreen
 import com.peng.ainewshub.ui.trends.HotwordsScreen
 import com.peng.ainewshub.ui.trends.TrendsCloudScreen
 import com.peng.ainewshub.ui.trends.TrendsDateScreen
@@ -87,7 +84,6 @@ internal fun PageView(
     onOpenUrl: (String, String, String?) -> Unit,
     onTitleResolved: (String, String) -> Unit,
     listStates: MutableMap<Page, LazyListState>,
-    pagerStates: MutableMap<Page, PagerState>,
     env: PageEnv,
     display: DisplayControls,
     darkTheme: Boolean
@@ -310,34 +306,15 @@ internal fun PageView(
             onOpenUrl = { url, title, source -> onOpenUrl(url, title, source) },
             listState = listStates.forPage(page)
         )
-        // 历史回顾 hub:总览/摘要/热词三段日期列表(替代原三个独立历史入口),
-        // 顶部分段切换、段懒加载;点日期进对应详情页。单个上提 listState 由
-        // 当前段独占复用(切段即换列表滚回顶)。
+        // 过刊页:刊期条选一天,同页渲染「那天的日报」(综述 Hero + Top10 +
+        // 分源摘要区块,与今天页同构);原三段式 hub 已废弃。热词历史入口在热词页。
         Page.HistoryHub -> HistoryHubScreen(
-            onSelectOverviewDate = { nav.push(Page.OverviewDate(it)) },
-            onSelectSummaryDate = { nav.push(Page.SummaryDate(it)) },
-            onSelectTrendsDate = { nav.push(Page.TrendsDate(it)) },
-            onBack = onBack,
-            listState = listStates.forPage(page)
-        )
-        // 历史摘要指定日期:当日全源摘要卡页(复用摘要卡片)。
-        // 纯归档语义;卡片无「查看完整列表」出口。
-        is Page.SummaryDate -> SummaryDateScreen(
-            date = page.date,
-            onBack = onBack,
-            onOpenUrl = { url, title, source -> onOpenUrl(url, title, source) },
-            pagerState = pagerStates.forPagePager(page)
-        )
-        // 历史总览指定日期:当日总览页(复用总览内容)。
-        // 纯归档语义;二级页无下拉刷新。
-        is Page.OverviewDate -> OverviewDateScreen(
-            date = page.date,
             onBack = onBack,
             onOpenUrl = { url, title, source -> onOpenUrl(url, title, source) },
             listState = listStates.forPage(page)
         )
-        // 历史热词指定日期:当日热词榜页(复用趋势内容)。
-        // 纯归档语义;二级页无下拉刷新。
+        // 历史热词指定日期:当日热词榜页(复用趋势内容渲染)。
+        // 纯归档语义;二级页无下拉刷新;入口 = 热词页「历史热词」弹层。
         is Page.TrendsDate -> TrendsDateScreen(
             date = page.date,
             onBack = onBack,
@@ -358,6 +335,7 @@ internal fun PageView(
             onOpenUrl = { url, title, source -> onOpenUrl(url, title, source) },
             onOpenCloud = { nav.push(Page.TrendsCloud) },
             onOpenLocalSearch = { nav.push(Page.LocalSearch(it)) },
+            onOpenTrendsDate = { nav.push(Page.TrendsDate(it)) },
             listState = listStates.forPage(page)
         )
     }

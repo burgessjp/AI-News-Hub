@@ -39,7 +39,7 @@ import com.peng.ainewshub.data.source.DEFAULT_SOURCE_ORDER
  * 结构(自顶向下,简洁直入):
      *  - 信息源入口:点开 [SourcesScreen] 二级页(Hub 浏览区,8 个源全集,
      *    原内嵌在更多页的「浏览」组,现独立成页)
- *  - 历史组(tertiary 强调):历史回顾(总览/摘要/热词三段 hub)/ 浏览历史 / 收藏
+ *  - 历史组(tertiary 强调):过刊(按日回看完整日报,刊期条直达)/ 浏览历史 / 收藏
  *    —— 彩色图标块行
  *  - 偏好组(secondary 强调):AI 服务 / 设置 / 关于 —— 浅灰图标块行
  *
@@ -103,7 +103,7 @@ fun MoreScreen(
                 )
             }
 
-            // 历史组(tertiary 强调)—— 历史回顾(总览/摘要/热词按日期回看 hub,单入口)/
+            // 历史组(tertiary 强调)—— 过刊(按日回看「那天的日报」,单入口)/
             // 浏览历史 / 收藏
             item { SectionHeader(stringResource(R.string.more_section_history)) }
             item {

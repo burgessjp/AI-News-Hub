@@ -22,6 +22,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -42,6 +43,9 @@ import com.peng.ainewshub.ui.components.AppTopBarDefaults
 import com.peng.ainewshub.ui.components.RankRowSkeletonList
 import com.peng.ainewshub.ui.follows.FollowsManageSheet
 import com.peng.ainewshub.ui.theme.AppText
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.ModalBottomSheet
+import com.peng.ainewshub.ui.UiState
 
 /**
  * 「热词」二级页 —— 近 N 天热词榜 + 词云入口(原「热词」根 tab 下段拆出;
@@ -65,6 +69,8 @@ fun HotwordsScreen(
     onOpenCloud: () -> Unit,
     // 展开区「查看全部命中」带词进本地搜索(查设备内索引的全部命中)
     onOpenLocalSearch: (String) -> Unit,
+    // 历史热词日期页入口(「历史热词」行选日期进入)
+    onOpenTrendsDate: (String) -> Unit,
     listState: LazyListState,
     trendsVm: TrendsViewModel = viewModel()
 ) {
@@ -74,6 +80,11 @@ fun HotwordsScreen(
     // 已关注词(原样大小写):管理行 chips 预览与管理弹层「已关注」区
     val followedKeywordsList by trendsVm.followedKeywordsList.collectAsStateWithLifecycle()
     var showManage by rememberSaveable { mutableStateOf(false) }
+    // 历史热词日期弹层(原历史回顾 hub 热词段迁移至此:热词上下文里回看历史榜单)
+    var showHistory by rememberSaveable { mutableStateOf(false) }
+    val historyVm: TrendsArchiveViewModel = viewModel()
+    val historyDates by historyVm.dates.collectAsStateWithLifecycle()
+    LaunchedEffect(showHistory) { if (showHistory) historyVm.loadDates() }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
@@ -118,10 +129,13 @@ fun HotwordsScreen(
                     followedKeywords = followedKeywords,
                     bottomReserve = false,
                     header = {
-                        FollowsManageRow(
-                            keywords = followedKeywordsList,
-                            onClick = { showManage = true }
-                        )
+                        Column {
+                            FollowsManageRow(
+                                keywords = followedKeywordsList,
+                                onClick = { showManage = true }
+                            )
+                            HistoryTrendsRow(onClick = { showHistory = true })
+                        }
                     }
                 )
             }
@@ -146,6 +160,50 @@ fun HotwordsScreen(
             // 添加走 followKeyword:与展开区「+ 关注」同路,带胶囊反馈与上限兜底
             onAdd = { trendsVm.followKeyword(it) },
             onRemove = { trendsVm.unfollowKeyword(it) }
+        )
+    }
+
+    // 历史热词日期弹层:复用趋势归档日期列表(TrendsArchiveContent,自持滚动状态);
+    // 选日期进 Page.TrendsDate 历史榜单页(复用趋势内容渲染)
+    if (showHistory) {
+        ModalBottomSheet(onDismissRequest = { showHistory = false }) {
+            TrendsArchiveContent(
+                state = historyDates,
+                listState = rememberLazyListState(),
+                onSelectDate = {
+                    showHistory = false
+                    onOpenTrendsDate(it)
+                },
+                onRetry = { historyVm.loadDates() }
+            )
+        }
+    }
+}
+
+/**
+ * 「历史热词」入口行 —— 页首管理行之下的轻量文字行(无底衬,与关注管理行
+ * 的浅底长条拉开主次):标签 + 尾随 ›,点击开日期弹层。
+ */
+@Composable
+private fun HistoryTrendsRow(onClick: () -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 30.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = stringResource(R.string.trends_history_row),
+            style = AppText.bodySmall,
+            color = cs.onSurfaceVariant,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            text = "›",
+            style = MaterialTheme.typography.titleMedium,
+            color = cs.onSurfaceVariant
         )
     }
 }

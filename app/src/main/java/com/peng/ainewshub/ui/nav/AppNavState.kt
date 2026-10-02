@@ -132,7 +132,3 @@ private fun appNavStateSaver(webFallbackTitle: String) = Saver<AppNavState, Bund
 /** 取某个二级页持有的列表滚动状态(上提原因见 AiNewsHubApp 内说明)。 */
 internal fun MutableMap<Page, LazyListState>.forPage(page: Page): LazyListState =
     getOrPut(page) { LazyListState() }
-
-/** 取某个二级页持有的 Pager 状态(历史摘要按日期页;上提原因同列表状态)。 */
-internal fun MutableMap<Page, PagerState>.forPagePager(page: Page): PagerState =
-    getOrPut(page) { PagerState { SummaryRepository.SOURCE_KEYS.size } }

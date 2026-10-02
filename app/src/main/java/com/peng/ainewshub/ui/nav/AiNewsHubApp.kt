@@ -382,12 +382,9 @@ internal fun AiNewsHubApp(
     val todayListState = rememberLazyListState()
     // 二级页滚动状态:以 Page 值(data class,可作 key)索引,页面弹出后清理。
     val pageListStates = remember { mutableMapOf<Page, LazyListState>() }
-    // 二级页 Pager 状态(历史摘要按日期页):与列表状态同上提、同清理。
-    val pagePagerStates = remember { mutableMapOf<Page, PagerState>() }
     LaunchedEffect(nav.pageStacks) {
         val alive = nav.pageStacks.values.flatten().toSet()
         pageListStates.keys.removeAll { it !in alive }
-        pagePagerStates.keys.removeAll { it !in alive }
     }
 
     // 二级页共用环境 + 显示偏好控制:构造一次分组下传 PageView,
@@ -480,7 +477,6 @@ internal fun AiNewsHubApp(
                             onOpenUrl = openUrl,
                             onTitleResolved = onTitleResolved,
                             listStates = pageListStates,
-                            pagerStates = pagePagerStates,
                             env = pageEnv,
                             display = displayControls,
                             darkTheme = darkTheme

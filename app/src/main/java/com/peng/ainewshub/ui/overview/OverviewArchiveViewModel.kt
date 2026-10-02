@@ -14,16 +14,16 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 /**
- * 历史总览 ViewModel —— 「更多 → 历史总览」两级页共用。
+ * 历史总览 ViewModel —— 「过刊」页(ui/more/HistoryHubScreen)宿主。
  *
  * 数据走 index.json 的 `overview_history` 索引按日期寻址(见 [OverviewRepository]),
  * 纯归档语义:总览由流水线逐批次归档(overview/<date>/ 目录)并经一次性回填补齐
  * 历史日期,此处只读。
  *
- * 两级页各取一流(同 [com.peng.ainewshub.ui.SummaryArchiveViewModel] 套路):
- *  - [dates]:可选日期列表(索引键,倒序);
- *  - [digest]:指定日期的总览,日期详情页用 `viewModel(key = "overview-date-$date")`
- *    按日期隔离实例,避免换日期时闪现上一日期内容。
+ * 两流(同 [com.peng.ainewshub.ui.SummaryArchiveViewModel] 套路):
+ *  - [dates]:可选日期列表(索引键,倒序;过刊页日期全集,90 天);
+ *  - [digest]:指定日期的总览。单实例宿主换日期直接走 [retryDigest]
+ *    (绕过幂等守卫强制重载;按日期隔离实例的历史用法已随三段式 hub 删除)。
  */
 class OverviewArchiveViewModel(application: Application) : AndroidViewModel(application) {
 

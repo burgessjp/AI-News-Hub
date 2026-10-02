@@ -23,8 +23,8 @@
     <string name="trends_rank_flat">Flat</string>
     <string name="trends_rank_new">New</string>
 
-    <!-- Trends history (More → Trends History secondary pages) -->
-    <string name="trends_archive_title">Trends History</string>
+    <!-- Trends history (sheet on the Hotwords page; date rows lead to the date page) -->
+    <string name="trends_history_row">Keyword history</string>
     <string name="trends_archive_load_failed">Failed to load trends history</string>
     <string name="trends_archive_empty_title">No trends history yet</string>
     <string name="trends_archive_empty_subtitle">Daily keyword boards are archived as they are generated\nwith the last 90 days available</string>

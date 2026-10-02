@@ -5,17 +5,12 @@ import androidx.compose.ui.platform.LocalContext
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
@@ -40,10 +35,8 @@ import com.peng.ainewshub.data.repo.OverviewDigest
 import com.peng.ainewshub.data.repo.OverviewEntry
 import com.peng.ainewshub.data.PipelineSchedule
 import com.peng.ainewshub.data.repo.SummaryRepository
-import com.peng.ainewshub.ui.components.BottomBarPillHeight
 import com.peng.ainewshub.ui.components.editionLabel
 import com.peng.ainewshub.ui.components.RankBadge
-import com.peng.ainewshub.ui.components.rememberReadUrls
 import com.peng.ainewshub.ui.theme.AppAlpha
 import com.peng.ainewshub.ui.theme.AppText
 import java.text.SimpleDateFormat
@@ -51,13 +44,12 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * 总览内容共享件 —— 「今天」根屏(TodayScreen)与「历史总览」日期页(OverviewDateScreen)
+ * 总览内容共享件 —— 「今天」根屏(TodayScreen)与「过刊」页(HistoryHubScreen)
  * 共用的渲染实现。
  *
  * 原 OverviewScreen 根屏已随 v1.4.0 日刊化并入 [TodayScreen](综述 Hero + Top10 +
- * 分源摘要区块的垂直日报);本文件只保留共享渲染件:
- *  - [OverviewContent]:历史总览日期页的整页渲染(hero + Top10 + 页脚,自持 LazyColumn)
- *  - [OverviewLead] / [TopEntryRow] / [OverviewFooter] 等:TodayScreen 逐 item 复用
+ * 分源摘要区块的垂直日报);本文件只保留逐 item 共享渲染件:
+ *  - [OverviewLead] / [TopEntryRow] / [OverviewFooter]:TodayScreen 与过刊页逐 item 复用
  *
  * 结构(编辑风,去卡片化):
  *  - 首屏 digest Hero:刊期标签行(日期/刊名/数据截至)+ 衬线 digest 正文
@@ -67,74 +59,6 @@ import java.util.Locale
  *    breaking 条目带红色「头条 ·」内联前缀,描述位由推荐理由顶替 AI 一句话
  *  - 页脚:生成时间 / 基于源数 / 缺源标注(刊名/「数据截至」已由首屏 Hero 承载,不重复)
  */
-
-/**
- * 总览内容列表(digest Hero + Top10 平铺 + 页脚)。
- *
- * 「今天」页与「历史总览」日期页共用(后者复用同一渲染,仅差底部预留):
- *
- * @param bottomReserve true 预留浮动药丸底栏高度(根 tab);false 为二级页
- *        (无悬浮底栏),只留呼吸空间
- */
-@Composable
-internal fun OverviewContent(
-    digest: OverviewDigest,
-    listState: LazyListState,
-    onOpenUrl: (url: String, title: String, source: String) -> Unit,
-    bottomReserve: Boolean = true
-) {
-    // LocalContext.current 只能在 @Composable 上下文取,提前取出供回调内复用
-    val context = LocalContext.current
-    // 已读判定:打开过的条目(entry.url 命中浏览历史)标题弱化
-    val readUrls = rememberReadUrls()
-    // Top10 稳定 key:url 优先(breaking 前移等排序变化时走 move 复用而非销毁重建),
-    // 重复/空 url 以出现序号消歧保证唯一(重复 key 会直接崩溃)
-    val topKeys = remember(digest.items) {
-        val seen = mutableMapOf<String, Int>()
-        digest.items.map { e ->
-            val base = e.url.ifBlank { "top" }
-            val dup = seen.getOrPut(base) { 0 }
-            seen[base] = dup + 1
-            base + if (dup == 0) "" else "#$dup"
-        }
-    }
-    LazyColumn(
-        state = listState,
-        modifier = Modifier.fillMaxSize(),
-        // 根 tab 末项可停到药丸之上(药丸高 + 16dp 呼吸空间,列表本身可滚入药丸之下,
-        // 容器已按药丸底缘裁剪);二级页无悬浮底栏,只留呼吸空间
-        contentPadding = PaddingValues(
-            bottom = if (bottomReserve) BottomBarPillHeight + 16.dp else 24.dp
-        )
-    ) {
-        // 首屏 digest Hero:综述正文 + 刊期标签行(两者都缺失时不占位)
-        if (digest.dataFetchedAt > 0 || digest.digest.isNotBlank()) {
-            item(key = "lead", contentType = "lead") {
-                OverviewLead(digest = digest)
-            }
-        }
-
-        // Top10 全量平铺(去卡片,无头条特殊位;breaking 条目数据层已排最前,
-        // 由「头条」内联标签承接强调)。行间不画线,靠行自身 10dp 纵向 padding 留白分层
-        val items = digest.items
-        itemsIndexed(
-            items,
-            key = { i, _ -> topKeys[i] },
-            contentType = { _, e -> if (e.breaking) "top10-breaking" else "top10" }
-        ) { index, entry ->
-            TopEntryRow(
-                rank = index + 1,
-                entry = entry,
-                isRead = entry.url in readUrls,
-                onClick = { onOpenUrl(entry.url, entry.title, SummaryRepository.titleOf(context, entry.source)) }
-            )
-        }
-
-        item(key = "footer", contentType = "footer") {
-            OverviewFooter(digest = digest)
-        }
-    }
-}
 
 /**
  * 首屏 digest Hero —— 跨源「今日综述」的页面焦点区(权重反转:原头条渐变 Hero 已去除,
