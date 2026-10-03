@@ -26,6 +26,8 @@
 设计要点(初版逐行搬自 OverviewRepository.kt,后经准确性 + 编辑质量两轮优化):
   - 输入 8 源快照(SOURCE_KEYS,与 App 端一致),每源取前 ITEMS_PER_SOURCE=8 条;
     AI 候选上限 14 条(>10,给数据侧同事件去重留余量);
+    每源字段提取(title/url/metrics/blurb/日期/原始热度)委托各源适配层
+    sources/<name>.overview_fields 与 raw_heat(2026-10 收口,字段口径与抓取器同文件);
   - 跨源归一化热度档位:有指标源按自身 top-8 最大原始热度归一化到 10-100%,
     让 AI 跨源比较的是相对档位而非量级悬殊的原始数字;
     无指标源(rundown-ai/stormzhang-ai/openai-anthropic-news)无真实指标,按列表序号
@@ -81,18 +83,19 @@
 """
 
 import json
-import math
 import os
 import re
 import sys
 import time
 from collections import Counter
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import ai_client
-from common import SOURCE_KEYS, BEIJING_TZ, now_cst
+from common import SOURCE_KEYS
+from common import beijing_date_key_of_ms as _beijing_date_key_of_ms
+from sources import SOURCE_META, SOURCE_MODULES
 
 # 复用 ai_summary 的配置入口(同一套 AI_NEWS_HUB_AI_* 环境变量 + config_ready)
 from ai_summary import ENV_BASE_URL, ENV_MODEL, ENV_API_KEY, config_ready
@@ -100,17 +103,8 @@ from ai_summary import ENV_BASE_URL, ENV_MODEL, ENV_API_KEY, config_ready
 
 # ===== 常量(对齐 OverviewRepository.kt companion) =====
 
-# 源 key → 展示标题(对齐 App SummaryRepository.titleOf)
-SOURCE_TITLES = {
-    "hackernews": "HackerNews",
-    "github-trending": "GitHub Trending",
-    "openai-anthropic-news": "OpenAI × Anthropic",
-    "huggingface-papers": "HuggingFace Papers",
-    "producthunt": "Product Hunt",
-    "rundown-ai": "The Rundown AI",
-    "aihot-featured": "AIHot 精选",
-    "stormzhang-ai": "stormzhang AI",
-}
+# 源 key → 展示标题(值收口在各源模块 META["display_title"])
+SOURCE_TITLES = {k: m["display_title"] for k, m in SOURCE_META.items()}
 
 ITEMS_PER_SOURCE = 8       # 每源喂 AI 的条目数
 MIN_SOURCES = 4            # 低于此源数不生成(数据太少,分析无意义)
@@ -122,10 +116,9 @@ OVERLAP_MIN_JACCARD = 0.25 # 重合度规则:Jaccard 下限(跨语言同事件�
 FRESH_WINDOW_DAYS = 7      # 回填时效硬闸,与 prompt 选条规则同口径
 
 # 有指标源(热度档位来自真实指标;breaking 硬校验要求佐证含至少一个)。
-# 与 SYSTEM_PROMPT「热度档位」一节的有指标源清单保持同口径。
-METRIC_SOURCES = {
-    "hackernews", "github-trending", "huggingface-papers", "producthunt", "aihot-featured",
-}
+# 与 SYSTEM_PROMPT「热度档位」一节的有指标源清单保持同口径;值收口在各源
+# 模块 META["has_metrics"]。
+METRIC_SOURCES = {k for k, m in SOURCE_META.items() if m["has_metrics"]}
 
 # breakingReason 内部黑话闸(不区分大小写):命中任一 → 该条降级非 breaking。
 # 历史实锤:AI 曾写出「aihot-featured权重80,日期09-01」直接上屏(App 里 breaking
@@ -257,39 +250,9 @@ def _load_snapshots(out_dir):
     return snapshots
 
 
-# ===== 每源原始热度公式(搬自 OverviewRepository.kt rawHeatXxx) =====
-
-def _raw_heat_hackernews(o):
-    """HN 综合热度:得分 + 评论数 * 0.3。"""
-    return _as_int(o, "score") + _as_int(o, "descendants") * 0.3
-
-
-def _raw_heat_github(o):
-    """GitHub 综合热度:今日新增 star * 3 + 累计 star 对数权重。"""
-    today = _as_int(o, "starsToday")
-    total = _as_int(o, "totalStars")
-    return today * 3.0 + (math.log10(total) * 10 if total > 0 else 0.0)
-
-
-def _raw_heat_producthunt(o):
-    """Product Hunt 综合热度:票数 + 评论 * 0.5 + 日榜前 5 加成。"""
-    votes = _as_int(o, "votesCount")
-    comments = _as_int(o, "commentsCount")
-    rank = _as_int(o, "dailyRank")
-    rank_boost = (6 - rank) * 30.0 if 1 <= rank <= 5 else 0.0
-    return votes + comments * 0.5 + rank_boost
-
-
-def _as_int(o, key, default=0):
-    """JSONObject 兼容取 int(字符串数字也接受)。"""
-    v = o.get(key, default)
-    try:
-        return int(v)
-    except (TypeError, ValueError):
-        return default
-
-
-# ===== extract_items(搬自 OverviewRepository.kt extractItems) =====
+# ===== extract_items(搬自 OverviewRepository.kt extractItems;每源字段分支
+# 已收口到 sources/<name>.overview_fields / raw_heat,此处只做切片、空标题
+# 过滤与第二遍归一化) =====
 
 def _extract_items(source, snapshot, limit=ITEMS_PER_SOURCE):
     """
@@ -302,65 +265,22 @@ def _extract_items(source, snapshot, limit=ITEMS_PER_SOURCE):
     n = min(limit, len(items))
     fallback_date_key = _beijing_date_key_of_ms(snapshot.get("fetched_at_ms", 0))
 
-    # 第一遍:抽取原始字段 + 原始热度
+    # 第一遍:抽取原始字段 + 原始热度(委托各源适配层,未知源无分支返回空)
+    mod = SOURCE_MODULES.get(source)
+    meta = SOURCE_META.get(source)
+    if mod is None or meta is None:
+        return []
     raws = []  # 每项: (index, title, url, metrics, blurb, date_key, raw_heat)
     for i in range(n):
         o = items[i]
         if not isinstance(o, dict):
             continue
-        if source == "hackernews":
-            view = (i, _s(o, "title"), _s(o, "target_url"),
-                    f"得分 {_as_int(o, 'score')} · 评论 {_as_int(o, 'descendants')}", "",
-                    _beijing_date_key_of_ms(_as_int(o, "time") * 1000))
-            raw_heat = _raw_heat_hackernews(o)
-        elif source == "github-trending":
-            view = (i, f"{_s(o, 'owner')}/{_s(o, 'name')}", _s(o, "url"),
-                    f"今日 star +{_as_int(o, 'starsToday')} · 累计 {_fmt_count(_as_int(o, 'totalStars'))}",
-                    _s(o, "description"), fallback_date_key)
-            raw_heat = _raw_heat_github(o)
-        elif source == "huggingface-papers":
-            view = (i, _s(o, "title"), _s(o, "url"),
-                    f"upvotes {_as_int(o, 'upvotes')}", _s(o, "summary"),
-                    _beijing_date_key_of_en_date(_s(o, "published")))
-            raw_heat = float(_as_int(o, "upvotes"))
-        elif source == "producthunt":
-            metrics = f"票 {_as_int(o, 'votesCount')} · 评论 {_as_int(o, 'commentsCount')}"
-            rank = _as_int(o, "dailyRank")
-            if rank > 0:
-                metrics += f" · 日榜#{rank}"
-            view = (i, _s(o, "name"), _s(o, "url"), metrics, _s(o, "tagline"),
-                    _beijing_date_key_of_iso(_s(o, "createdAt")))
-            raw_heat = _raw_heat_producthunt(o)
-        elif source == "rundown-ai":
-            # 2026-08 站点改版后快照带真实 publishedAt(北京时间 yyyy-MM-dd HH:mm);
-            # 旧快照无此字段,回退抓取日期(_build_section 里标注「抓取日期」)
-            pub = _s(o, "publishedAt")
-            date_key = pub[:10] if len(pub) >= 10 else fallback_date_key
-            view = (i, _s(o, "title"), _s(o, "url"), "", _s(o, "subtitle"), date_key)
-            raw_heat = 0.0  # 无指标源,按序号归一化
-        elif source == "stormzhang-ai":
-            # "2026-07-15 20:00" 北京时间无时区,直接取前 10 字符(yyyy-MM-dd)
-            t = _s(o, "time")
-            date_key = t[:10] if len(t) >= 10 else ""
-            view = (i, _s(o, "summary"), _s(o, "url"), f"信源 {_s(o, 'source')}",
-                    _s(o, "english"), date_key)
-            raw_heat = 0.0
-        elif source == "aihot-featured":
-            view = (i, _s(o, "title"), _s(o, "permalink") or _s(o, "url"),
-                    f"权重 {_as_int(o, 'score')} · {_s(o, 'source')}", _s(o, "summary"),
-                    _beijing_date_key_of_iso(_s(o, "publishedAt")))
-            raw_heat = float(_as_int(o, "score"))
-        elif source == "openai-anthropic-news":
-            view = (i, _s(o, "title"), _s(o, "url"),
-                    f"厂商 {_s(o, 'vendor')} · {_s(o, 'category')}", _s(o, "summary"),
-                    _beijing_date_key_of_iso(_s(o, "publishedAt")))
-            raw_heat = 0.0
-        else:
-            continue
+        title, url, metrics, blurb, date_key = mod.overview_fields(o, fallback_date_key)
+        raw_heat = mod.raw_heat(o) if meta["has_metrics"] else 0.0
         # 标题空的丢弃
-        if not view[1].strip():
+        if not title.strip():
             continue
-        raws.append(view + (raw_heat,))
+        raws.append((i, title, url, metrics, blurb, date_key, raw_heat))
 
     if not raws:
         return []
@@ -378,57 +298,6 @@ def _extract_items(source, snapshot, limit=ITEMS_PER_SOURCE):
             pct = 70 if len(raws) == 1 else max(10, min(70, int(70 - pos * 60.0 / (len(raws) - 1))))
         result.append((index, title, url, metrics, blurb, date_key, pct))
     return result
-
-
-def _s(o, key, default=""):
-    """安全取字符串,剥白边,None 转空串。"""
-    v = o.get(key, default)
-    return str(v).strip() if v is not None else default
-
-
-def _fmt_count(n):
-    return f"{n:,}"
-
-
-# ===== 日期辅助(搬自 OverviewRepository.kt) =====
-
-def _beijing_date_key_of_ms(epoch_ms):
-    """Unix 毫秒 → 北京日期(yyyy-MM-dd);0 或负数返回空串。"""
-    if not epoch_ms or epoch_ms <= 0:
-        return ""
-    try:
-        return datetime.fromtimestamp(epoch_ms / 1000, tz=BEIJING_TZ).strftime("%Y-%m-%d")
-    except Exception:
-        return ""
-
-
-def _beijing_date_key_of_iso(iso):
-    """ISO UTC 字符串(如 2026-07-18T07:01:00Z)→ 北京日期;解析失败返回空串。"""
-    s = (iso or "").strip()
-    if not s:
-        return ""
-    try:
-        # fromisoformat 不认 Z,替换成 +00:00
-        dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        return dt.astimezone(BEIJING_TZ).strftime("%Y-%m-%d")
-    except Exception:
-        return ""
-
-
-def _beijing_date_key_of_en_date(text):
-    """英文月份格式日期(如 "Jul 8, 2026")→ 北京日期;解析失败返回空串。"""
-    s = (text or "").strip()
-    if not s:
-        return ""
-    for fmt in ("%b %d, %Y", "%B %d, %Y"):
-        try:
-            dt = datetime.strptime(s, fmt).replace(tzinfo=BEIJING_TZ)
-            return dt.strftime("%Y-%m-%d")
-        except ValueError:
-            continue
-    return ""
 
 
 # ===== prompt 组装(搬自 OverviewRepository.kt buildSection + readAiSummary) =====
