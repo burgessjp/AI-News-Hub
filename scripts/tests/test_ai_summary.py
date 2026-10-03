@@ -238,3 +238,15 @@ def test_fingerprint_顺序标题URL变化均不等():
 def test_fingerprint_空与非列表():
     assert asm.summary_fingerprint("hackernews", []) == ()
     assert asm.summary_fingerprint("hackernews", None) == ()
+
+
+# ===== SYSTEM_PROMPTS 组合完整性(2026-10 组合化后钉住) =====
+
+def test_共享规则段在八份_prompt_中各恰出现一次():
+    """共享段单点维护后,每份 prompt 必须恰含一次防幻觉规则与 ref 规则——
+    0 次 = 组装漏挂(核验/防幻觉静默失效),≥2 次 = 手工往 spec 里复制了旧
+    全文(两份漂移的起点)。"""
+    for src, text in asm.SYSTEM_PROMPTS.items():
+        assert text.count(asm._ANTI_HALLUCINATION_RULE) == 1, src
+        assert text.count(asm._ECHO_REF_RULE) == 1, src
+        assert "只输出一个 JSON 数组，6 到 10 个对象" in text, src

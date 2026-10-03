@@ -39,8 +39,9 @@ scripts/tests/test_sources_registry.py 把两套顺序分别钉死。
   2. 新建 sources/<name>.py:SOURCE_KEY + fetch_<name> + fetch 别名 + META(五键)
      + item_url/item_title/overview_fields/trend_fields(指标源另加 raw_heat),
      在本文件 _SOURCE_MODULES 列表按承重序注册;空结果合法的源 META["empty_ok"]=True;
-  3. ai_summary.py:SYSTEM_PROMPTS 加 prompt + USER_PROMPT_BUILDERS 加 builder
-     (经 _emit 构行,titleEcho 锚点自动登记);
+  3. ai_summary.py:加一条 _spec_<name>(…)(经 _compose_prompt 组装,共享规则段
+     自动带入)+ USER_PROMPT_BUILDERS 加 builder(经 _emit 构行,titleEcho 锚点
+     自动登记);
   4. App 端:data/source/SourceKeys.kt、ui/more/SourceMeta.kt(顺序/图标/名称)、
      SourceBrandColors.kt、对应 ArchiveRepository + model fromJson、总览/榜单 UI
      分支、values/ + values-en/ 双语词条;
