@@ -21,8 +21,9 @@ clone 下来的数据仓库含全部历史日期目录(快照是文件,git --dep
 是唯一免费拿到全部历史的环节。
 
 抽取与归一规则:
-  - 每源取哪些字段做文本,见 _item_text(对齐 overview_summary._extract_items 的
-    字段映射;aihot-featured 优先 titleEn,stormzhang-ai 优先 english);
+  - 每源取哪些字段做文本,见各源模块 trend_fields(与 overview_fields /
+    item_url 同在 sources/<name>.py 定义;aihot-featured 优先 titleEn,
+    stormzhang-ai 优先 english);
   - 英文:小写化 → [a-z0-9]+ 分词 → 去停用词(STOPWORDS)→ unigram + 相邻 bigram
     (bigram 任一侧为停用词则丢弃;unigram 必须含字母,纯数字只活在 bigram 里,
     如 "gpt 5");
@@ -61,6 +62,8 @@ from datetime import datetime, timedelta
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from common import SOURCE_KEYS, BEIJING_TZ, now_cst
+from common import str_field as _s
+from sources import SOURCE_MODULES
 
 # AI 精修复用 ai_summary 的配置单点(环境变量名 + config_ready),调用统一走
 # ai_client.call_llm(围栏剥离 / 429 快速重试 / thinking 开关都已收口在内)
@@ -228,56 +231,22 @@ def _iter_daily_snapshots(repo_dir):
     return result
 
 
-# ===== 每源文本/标题/URL 字段映射(对齐 overview_summary._extract_items) =====
-
-def _s(o, key, default=""):
-    """安全取字符串,剥白边,None 转空串。"""
-    v = o.get(key, default)
-    return str(v).strip() if v is not None else default
-
+# ===== 每源文本/标题/URL 字段映射(委托各源适配层 sources/<name>.trend_fields;
+# 与 overview_fields / item_url 同在源模块定义,2026-10 收口) =====
 
 def _item_fields(source, o):
     """
     从一条快照 item 提取 (text_for_matching, title_for_display, url)。
     text_for_matching: 参与词频统计的文本(英文优先,中文标题也带上供 CJK 变体匹配);
-    标题/URL 为空串的条目返回 None(调用方丢弃)。
+    标题/URL 为空串的条目返回 None(调用方丢弃);空值判定收口在此共享。
     """
-    if source == "hackernews":
-        text, title = _s(o, "title"), _s(o, "title")
-        url = _s(o, "target_url") or _s(o, "url")
-    elif source == "github-trending":
-        name = f"{_s(o, 'owner')}/{_s(o, 'name')}".strip("/")
-        # 多字段拼接一律用换行而非空格:拼接边界是假相邻,若用空格会把
-        # "…Flash" + "Google DeepMind…" 拼成 "flash google" 这类跨界词组
-        # (自由 bigram 的间隔校验不认换行,见 _extract_terms)
-        text = f"{name}\n{_s(o, 'description')}"
-        title, url = name, _s(o, "url")
-    elif source == "huggingface-papers":
-        text, title = _s(o, "title"), _s(o, "title")
-        url = _s(o, "url")
-    elif source == "producthunt":
-        text = f"{_s(o, 'name')}\n{_s(o, 'tagline')}"
-        title, url = _s(o, "name"), _s(o, "url")
-    elif source == "rundown-ai":
-        text, title = _s(o, "title"), _s(o, "title")
-        url = _s(o, "url")
-    elif source == "aihot-featured":
-        # titleEn 英文原文优先;中文 title 一并带上(供 CJK 变体子串匹配)
-        text = f"{_s(o, 'titleEn')}\n{_s(o, 'title')}"
-        title = _s(o, "title")
-        url = _s(o, "permalink") or _s(o, "url")
-    elif source == "openai-anthropic-news":
-        text, title = _s(o, "title"), _s(o, "title")
-        url = _s(o, "url")
-    elif source == "stormzhang-ai":
-        # english 英文原文优先;中文 summary 一并带上(供 CJK 变体子串匹配)。
-        # english 尾部常带 TLDR 赞助行("PLUS: <软广> <作者>, +N"),且赞助条目整条
-        # english 就是 "PLUS: ...";partition 两种都覆盖,避免作者名/赞助商混进词频
-        english = _s(o, "english").partition("PLUS:")[0]
-        text = f"{english}\n{_s(o, 'summary')}"
-        title, url = _s(o, "summary"), _s(o, "url")
-    else:
+    mod = SOURCE_MODULES.get(source)
+    if mod is None:
         return None
+    fields = mod.trend_fields(o)
+    if fields is None:
+        return None
+    text, title, url = fields
     if not text.strip() or not title.strip() or not url.strip():
         return None
     return text, title, url
