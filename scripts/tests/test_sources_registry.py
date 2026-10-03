@@ -4,10 +4,14 @@ SOURCES(抓取/索引键序,流水线概念)与 common.SOURCE_KEYS(展示序,App
 DEFAULT_SOURCE_ORDER)刻意不同;任何一头被"顺手对齐"到另一头都会悄悄改变
 index.json latest 键序或 App 展示序,必须在有意识决策下进行,所以分别钉死。
 SOURCE_KEYS 展示序本体已在 test_common.py 钉过,此处只钉 SOURCES 侧 + 集合相等。
+2026-10 起另钉五张分源配置表的覆盖完整性(新增源漏配点位在此红),见下方 coverage 测试。
 """
 
+import ai_summary as asm
 import common
 import fetch_data as fd
+import overview_summary as ovs
+import trend_keywords as tk
 from sources import EMPTY_OK_SOURCES, SOURCES
 
 
@@ -58,3 +62,57 @@ def test_fetch_with_retry_统一入口与_limit_分派():
     items, meta = fd.fetch_with_retry("rundown-ai", plain_stub)
     assert calls == [5, "plain"]
     assert items == [] and meta == {"feedTitle": "x"}
+
+
+# 每源最小可接受条目(字段对齐各源 fetcher 契约):钉住总览/趋势的字段映射
+# 对每个注册源都有分支 —— 两处的 else 分支都是静默跳过(该源悄悄退出候选池/
+# 统计,无任何告警),新增源漏配分支只有这条测试当场红。
+MINIMAL_ITEMS = {
+    "hackernews": {"title": "T", "target_url": "https://x.dev/a",
+                   "score": 1, "descendants": 0, "time": 0},
+    "github-trending": {"owner": "o", "name": "r", "url": "https://x.dev/g"},
+    "stormzhang-ai": {"summary": "中文标题", "url": "https://x.dev/s",
+                      "source": "X", "time": ""},
+    "huggingface-papers": {"title": "T", "url": "https://x.dev/p",
+                           "upvotes": 1, "published": ""},
+    "producthunt": {"name": "App", "url": "https://x.dev/p",
+                    "votesCount": 1, "commentsCount": 0},
+    "rundown-ai": {"title": "T", "url": "https://x.dev/r", "subtitle": ""},
+    "aihot-featured": {"title": "T", "url": "https://x.dev/f", "score": 1},
+    "openai-anthropic-news": {"title": "T", "url": "https://x.dev/o",
+                              "vendor": "OpenAI"},
+}
+
+
+def test_分源配置表覆盖全部源():
+    """五张按源 key 索引的配置表,少一个源 = 该源在对应环节静默缺失/崩溃:
+
+      - SYSTEM_PROMPTS / USER_PROMPT_BUILDERS 缺 key → summarize_source 里
+        KeyError 穿透线程池,整批 fetch 直接失败(过响);
+      - SOURCE_TOP_N 缺 key → 静默回落 15(与校准值不符);
+      - SOURCE_MIN_ITEMS 缺 key → 静默回落 0,健康哨兵对该源失效;
+      - SOURCE_TITLES 缺 key → prompt 里该源标题兜底为 key 本身(质量静默降级)。
+    多一个 key = 拼错,永不被消费,同样当场红。
+    """
+    keys = set(common.SOURCE_KEYS)
+    assert set(asm.SYSTEM_PROMPTS) == keys
+    assert set(asm.USER_PROMPT_BUILDERS) == keys
+    assert set(asm.SOURCE_TOP_N) == keys
+    assert set(fd.SOURCE_MIN_ITEMS) == keys
+    assert set(ovs.SOURCE_TITLES) == keys
+
+
+def test_metric_sources_钉死当前五个有指标源():
+    """与 SYSTEM_PROMPT「热度档位」一节的有指标源清单同口径;多/少一个都会
+    改变 breaking 硬校验语义,必须是有意识决策。"""
+    assert ovs.METRIC_SOURCES == {
+        "hackernews", "github-trending", "huggingface-papers",
+        "producthunt", "aihot-featured",
+    }
+
+
+def test_每源最小条目能被总览与趋势字段映射接收():
+    for src, item in MINIMAL_ITEMS.items():
+        snap = {"items": [item], "fetched_at_ms": 1}
+        assert ovs._extract_items(src, snap), f"overview._extract_items 无 {src} 分支或产出为空"
+        assert tk._item_fields(src, item) is not None, f"trend._item_fields 无 {src} 分支"
