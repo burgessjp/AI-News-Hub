@@ -13,7 +13,7 @@
 ./gradlew assembleRelease      # 需签名配置，见「安全红线」
 ```
 
-**无仪器测试、无 lint**（`app/src` 下为 `main` + `test`）。改动后至少跑 `testDebugUnitTest` + `assembleDebug` 确认通过，再真机手测。工具链版本一律以 `gradle/libs.versions.toml` 为准，不在此重复。
+**无仪器测试、无 lint**（`app/src` 下为 `main` + `test` + `debug`，`debug` 源集仅放 debug 图标资源）。改动后至少跑 `testDebugUnitTest` + `assembleDebug` 确认通过，再真机手测。工具链版本一律以 `gradle/libs.versions.toml` 为准，不在此重复。
 
 ## 编码约定（与默认不同，务必遵守）
 
@@ -23,15 +23,15 @@
 - 字号一律 `AppText.xxx`、透明度一律 `AppAlpha.xxx`、圆角一律 `MaterialTheme.shapes` 或 `CircleShape`、颜色只走 `colorScheme`——不散落 `.sp`/`.alpha`/hex 字面量（hex 仅两处集中例外：源品牌色 `ui/more/SourceBrandColors.kt`、词云调色板 `ui/trends/CloudWordColors.kt`）。列表排名/统计/章节条/骨架屏统一复用 `ui/components/` 现有组件，不新建私有拷贝。
 - **UI 文案一律走 string 资源，不写硬编码字面量**，新 feature 必须同步 `values/`（中文全集）+ `values-en/` 双语；语言切换机制与共用词条约定见「深入文档」i18n 篇。
 - 协程 + Flow：`StateFlow` 驱动 UI，`collectAsStateWithLifecycle` 订阅；网络在 Repository 内切 `Dispatchers.IO`；并发去重用 `Mutex.withLock`。
-- release 开启 R8 + shrinkResources；数据层**无**整包 keep（`app/proguard-rules.pro` 仅按 `@Parcelize` 注解限定保留），新增依赖反射/序列化的类时必须同步补 keep 规则。
+- release 开启 R8 + shrinkResources；数据层**无**整包 keep（`app/proguard-rules.pro` 仅 `@Parcelize` 数据类与 widget 包两处限定保留），新增依赖反射/序列化的类时必须同步补 keep 规则。
 
 ## 深入文档（动对应领域前先读）
 
 | 任务领域 | 文档 | 内含关键强约束 |
 |---|---|---|
-| 导航 / 新增二级页 / WebView / 深链 | [docs/agents/navigation.md](docs/agents/navigation.md) | 新页三处同步、列表状态上提、`openUrl` 唯一入口、WebView 页 FADE 转场 |
+| 导航 / 新增二级页 / WebView / 深链 | [docs/agents/navigation.md](docs/agents/navigation.md) | 新页三处同步、列表状态上提、`openUrl` 唯一入口、二级页统一 PUSH 转场 |
 | 文案 / 双语资源 / 语言切换 | [docs/agents/i18n.md](docs/agents/i18n.md) | 双语同步、`AppLocale.kt` 单点机制、流水线内容恒中文 |
-| 数据源 / Repository / 小组件 / 通知 | [docs/agents/data-layer.md](docs/agents/data-layer.md) | 恒定归档（实时路径已删除）、归档禁 raw 直链（WAF）、批次表经数据仓库 `app_config.json` 远程覆盖、`SourceKeys.kt` 唯一真相源 |
+| 数据源 / Repository / 小组件 | [docs/agents/data-layer.md](docs/agents/data-layer.md) | 恒定归档（实时路径已删除）、归档禁 raw 直链（WAF）、批次表经数据仓库 `app_config.json` 远程覆盖、`SourceKeys.kt` 唯一真相源 |
 | DataStore / Room / 缓存 | [docs/agents/persistence.md](docs/agents/persistence.md) | prefs 键清单、favorites 表迁移与清理红线 |
 | 单元测试 / fixture / Robolectric | [docs/agents/testing.md](docs/agents/testing.md) | 必测层清单、fixture 存放与裁剪、object 单例重置 |
 | `scripts/` 流水线 / CI/CD | [docs/agents/pipeline.md](docs/agents/pipeline.md) | 4 个必需环境变量、失败继承语义、日期统一北京时间 |

@@ -7,7 +7,7 @@
 
 ## 更新频率
 
-- **定时**:每天两个批次(北京时间 08:00 / 18:00)。其中 18:00 批由本仓库 GitHub Actions 触发(cron 不保证准点,通常 ±15 分钟内);08:00 批由仓库外机器调度,不在本仓库 workflow 内
+- **定时**:每天两个批次(北京时间 08:00 / 18:00)。其中晚批由本仓库 GitHub Actions 触发,cron 刻意配在 UTC 10:17(北京 18:17)避开整点——GitHub 对整点 schedule 的排队延迟曾实测连续 28 天达 3~8 小时;产品档期仍是 18:00(数据仓 `app_config.json` 的 batch_slots 不跟 cron 错位);08:00 批由仓库外机器调度,不在本仓库 workflow 内
 - **手动**:workflow 支持 `workflow_dispatch`,可随时手动触发补抓
 - 任何源抓取失败会自动重试最多 3 次(间隔 2s/4s);3 次全败才跳过,不影响其余源
 - 失败源的 `index.json` latest 指针会保留上一次成功的指向(见下「失败保留机制」)
@@ -16,13 +16,13 @@
 
 ```
 news-hub-data 分支/
-├── index.json                          ← 入口:即时字段(updated_at / latest /
-│                                         latest_overview / latest_audio)
+├── index.json                          ← 入口:即时字段(updated_at / updated_at_ms /
+│                                         latest / latest_overview / latest_audio)
 ├── history.json                        ← 摘要历史索引:{源名: {日期: relpath}}(每源 31 天)
 ├── overview_history.json               ← 总览归档索引:{日期: relpath}(保留 90 天)
 ├── trends.json                         ← 热词趋势榜(纯统计,每次批次整文件覆盖)
 ├── trends_cloud.json                   ← 趋势词云(纯统计 top ~60 词云候选,专用文件,不归档)
-├── trends_history.json                 ← 趋势归档索引:{日期: relpath}(保留 90 天;App「历史热词」页按日期寻址,流水线亦用作排名变化基准)
+├── trends_history.json                 ← 趋势归档索引:{日期: relpath}(保留 90 天;App 热词页「历史热词」按日期寻址,流水线亦用作排名变化基准)
 ├── manifest.json                       ← 最近一次运行总览(成功/失败状态)
 ├── overview/                           ← 今日总览按日归档(内容与 index 的 latest_overview 同构)
 │   └── 2026-08-15/
@@ -30,7 +30,7 @@ news-hub-data 分支/
 ├── trends/                             ← 热词趋势榜按日归档(内容与当期 trends.json 同构)
 │   └── 2026-08-15/
 │       └── 18-00-data.json
-├── audio/                              ← 语音速报预生成 MP3(单声道 24kHz 48kbps,按日目录,保留 14 天)
+├── audio/                              ← 语音速报预生成 MP3(单声道 24kHz 48kbps,按日目录,保留 14 天;2026-09-19 起停产)
 │   └── 2026-08-15/
 │       └── broadcast.mp3
 ├── hackernews/
@@ -95,13 +95,13 @@ news-hub-data 分支/
 }
 ```
 
-`index.json` 只含**即时字段**(每次批次整体刷新,体量有界不随保留期增长)。其余内容在根级独立文件按需拉取:`trends.json`(热词趋势)、`history.json`(摘要历史索引)与 `overview_history.json`(总览归档索引),详见下文对应章节。另有 `trends_history.json`(趋势归档索引,App「更多 → 历史热词」页经其按日期寻址,流水线以「昨日最后一期」归档为排名变化基准,详见「趋势历史归档」)。
+`index.json` 只含**即时字段**(每次批次整体刷新,体量有界不随保留期增长)。其余内容在根级独立文件按需拉取:`trends.json`(热词趋势)、`history.json`(摘要历史索引)与 `overview_history.json`(总览归档索引),详见下文对应章节。另有 `trends_history.json`(趋势归档索引,App 热词页「历史热词」经其按日期寻址,流水线以「昨日最后一期」归档为排名变化基准,详见「趋势历史归档」)。
 
 `latest` 里的路径是**相对于源目录**的。设计行为:某源当天抓取失败时,`index.json` 会保留它最后一次成功的指向(可能落在前一天),客户端永远能拿到有效数据。
 
-`latest_overview` 是**今日总览**(流水线预生成的跨源综合分析,详见下文「今日总览 latest_overview」)。App 首页「总览」tab 直接读这个字段,不再端侧调 AI。
+`latest_overview` 是**今日总览**(流水线预生成的跨源综合分析,详见下文「今日总览 latest_overview」)。App「今天」页(综述 Hero + 今日重点)直接读这个字段,不再端侧调 AI。
 
-`latest_audio` 是**语音速报预生成音频描述**(流水线 `tts_broadcast.py` 用 Qwen3-TTS 按当日总览综述预合成的单段 MP3(仅 digest),详见下文「语音速报音频」章节)。App「语音速报」优先流式播放该音频,描述缺失/批次滞后时回落系统 TTS。
+`latest_audio` 是**语音速报预生成音频描述**(流水线 `tts_broadcast.py` 用 Qwen3-TTS 按当日总览综述预合成的单段 MP3(仅 digest),详见下文「语音速报音频」章节)。**当前停产**(2026-09-19 起,见该章节顶部注记),新批次不再产出该字段;App 端「语音速报」功能亦已随 v1.4.0 移除,以下为格式备查。
 
 按日期回看的数据走根级独立索引文件(不在 index.json 里,按需拉取):`history.json`(摘要历史,`{源名: {日期: relpath}}`,详见「按日期取历史快照」)与 `overview_history.json`(总览归档,`{日期: relpath}`,详见「历史总览归档」)。
 
@@ -181,11 +181,11 @@ print(hn['items'][0]['title'])
 - **日期 → 当日最后一次快照**:键为北京时间日期(`YYYY-MM-DD`);一天抓多次时,当天较早的那份不进索引。
 - **每源只保留最近 31 天,且不早于 2026-07-18**(历史摘要功能起始日;更早的快照源覆盖不全,日期目录已从仓库删除——`backfill_history.py --prune` 执行,推送的 `_overlay` 只增不删,删除只能显式做)。
 - `relpath` 与 `latest` 一样是**相对于源目录**的,消费方式相同:拼上 `<源>/` 前缀后走 gitcode raw API(见上「文件直链」),如 `hackernews/2026-07-19/10-12-data.json`。
-- **用途**:App「历史摘要」按日期查看当日快照与 `ai_summary_v2`;其它消费方亦可据此按日回溯。
+- **用途**:App「过刊」页的分源摘要段按日期查看当日快照与 `ai_summary_v2`(受每源 31 天窗口限制);其它消费方亦可据此按日回溯。
 
 ## 今日总览(latest_overview 字段)
 
-`index.json` 顶层还有 `latest_overview` 字段——**今日总览**,流水线在抓取后做跨源综合分析预生成,App 首页「总览」tab 直接读这个字段(不再端侧调 AI)。
+`index.json` 顶层还有 `latest_overview` 字段——**今日总览**,流水线在抓取后做跨源综合分析预生成,App「今天」页直接读这个字段(不再端侧调 AI)。
 
 ```json
 {
@@ -214,7 +214,7 @@ print(hn['items'][0]['title'])
 | `generatedAt` | 流水线生成时刻,Unix 毫秒时间戳 |
 | `dataFetchedAt` | 输入快照里最大的 `fetched_at_ms`(「数据截至」) |
 | `missingSources` | 本次生成时未能加载的源 key 数组(页脚标注用) |
-| `digest` | 跨源「今日综述」(2-3 句简体中文,≤120 字,AI 生成)。可能为空串(AI 未返回/旧数据无此字段),消费方空串不渲染 |
+| `digest` | 跨源「今日综述」(3-4 句简体中文,AI 生成;长度上限演变:初版 ≤120 字 → 2026-09-26 收紧 3-4 句/≤180 → 2026-10-01 放宽 ≤300 字符,现产出 262-295 字)。可能为空串(AI 未返回/旧数据无此字段),消费方空串不渲染 |
 | `items` | 今日热点 Top10,breaking 条目排最前。每项含 `source`/`title`/`url`/`metrics`(从快照回填的最终值) + `comment`(AI 写的一句话) + `breaking` + `breakingReason`(仅 breaking=true 有) |
 
 **与单源 `ai_summary_v2` 的区别**:`ai_summary_v2` 是各源快照内的分源要点(8 个独立摘要);`latest_overview` 是跨 8 源的综合研判(1 个总榜),AI 会按跨源归一化热度档位排序、合并同事件、标 breaking。
@@ -236,11 +236,11 @@ print(hn['items'][0]['title'])
 - **保留最近 90 天,且不早于 2026-07-18**。归档文件每份数 KB,历史日期可追至 2026-07-28(总览功能上线日,更早的总览未留痕;2026-08 之前的归档由 `backfill_overview.py` 从 git 历史一次性回填)。
 - **relpath 相对 `overview/` 目录**,拼前缀后走 gitcode raw API(同 history 消费方式),如 `overview/2026-08-15/11-49-data.json`。
 - **归档文件内容与当日 `latest_overview` 完全同构**(同一对象两处落盘):`generatedAt` / `dataFetchedAt` / `missingSources` / `digest`(2026-08-10 前生成的旧总览可能无此字段,空串不渲染)/ `items`。
-- **用途**:App「更多 → 历史总览」按日期回看;总览是流水线唯一花钱调 AI 且覆盖即失的产物(AI 摘要随快照留痕、趋势可从快照重算),归档即它的历史。
+- **用途**:App「过刊」页的总览段按日期回看;总览是流水线唯一花钱调 AI 且覆盖即失的产物(AI 摘要随快照留痕、趋势可从快照重算),归档即它的历史。
 
 ## 热词趋势(trends.json 独立文件)
 
-根级独立文件 `trends.json` ——**跨源热词趋势榜**,流水线(`scripts/trend_keywords.py`)在 push 阶段扫近 14 天各源快照做**词频统计 + 每批至多一次 AI 精修**(统计部分确定性可全量重算;AI 精修只做合并同话题/剔除泛词/规范 display,失败零降级回退统计榜),每次批次整文件覆盖,App「趋势」tab 直接读这个文件(内容与原 index 内联 `latest_trends` 字段同构)。
+根级独立文件 `trends.json` ——**跨源热词趋势榜**,流水线(`scripts/trend_keywords.py`)在 push 阶段扫近 14 天各源快照做**词频统计 + 每批至多一次 AI 精修**(统计部分确定性可全量重算;AI 精修只做合并同话题/剔除泛词/规范 display,失败零降级回退统计榜),每次批次整文件覆盖,App 热词二级页直接读这个文件(内容与原 index 内联 `latest_trends` 字段同构)。
 
 ```json
 {
@@ -293,7 +293,7 @@ print(hn['items'][0]['title'])
 
 ## 趋势词云(trends_cloud.json 独立文件)
 
-根级独立文件 `trends_cloud.json` ——**趋势词云候选词表**,App「趋势词云」页(趋势 Tab caption 行进入)的数据源。流水线(`trend_keywords.py` 的 `write_trends`)与 `trends.json` **同批生成**:词频统计口径、入榜门槛(total ≥ 3 且 daysActive ≥ 2)、动量分值排序完全一致,取护栏词 top **60** 个(护栏词不足才用自由 unigram 补位)——榜单看头部,词云看全景。**恒为纯统计产出,AI 精修只作用于 `keywords`,不触碰词云**;不进按日归档(词云是即时全景可视化,无历史回看),每次批次整文件覆盖。
+根级独立文件 `trends_cloud.json` ——**趋势词云候选词表**,App「趋势词云」页(热词页 caption 行进入)的数据源。流水线(`trend_keywords.py` 的 `write_trends`)与 `trends.json` **同批生成**:词频统计口径、入榜门槛(total ≥ 3 且 daysActive ≥ 2)、动量分值排序完全一致,取护栏词 top **60** 个(护栏词不足才用自由 unigram 补位)——榜单看头部,词云看全景。**恒为纯统计产出,AI 精修只作用于 `keywords`,不触碰词云**;不进按日归档(词云是即时全景可视化,无历史回看),每次批次整文件覆盖。
 
 ```json
 {
@@ -332,9 +332,11 @@ print(hn['items'][0]['title'])
 - **历史日期可追至 2026-08-10**(趋势功能上线日,更早无数据)。存量历史由 `backfill_trends.py` 从数据仓库 git 历史一次性回填(遍历每次提交的 `trends.json`,拆分前回退读 index.json 内联 `latest_trends`,按 `generatedAt` 去重)。
 - **relpath 相对 `trends/` 目录**,拼前缀后走 gitcode raw API(同 history / overview_history 消费方式)。
 - **归档文件内容与当期 `trends.json` 完全同构**(同一对象两处落盘)。
-- **用途**:① 每期 `rankChange` / `isNewEntry` 以「昨日最后一期」归档为基准计算(基准读取失败只是少这两个字段,不影响榜单本身);② App「更多 → 历史热词」按日期回看(经 `trends_history.json` 寻址,复用 `fetchSnapshot` 路径缓存,归档内容与当期榜单同构渲染)。
+- **用途**:① 每期 `rankChange` / `isNewEntry` 以「昨日最后一期」归档为基准计算(基准读取失败只是少这两个字段,不影响榜单本身);② App 热词页「历史热词」按日期回看(经 `trends_history.json` 寻址,复用 `fetchSnapshot` 路径缓存,归档内容与当期榜单同构渲染)。
 
 ## 语音速报音频(audio/ 目录 + index.json 顶层 latest_audio 字段)
+
+> ⚠️ **当前停产**(2026-09-19 起):App 端语音速报已随 v1.4.0 移除,本仓库 workflow 以 `AI_NEWS_HUB_TTS_DISABLE=1` 跳过整个 TTS 阶段,新批次不再产出 `latest_audio` 与 `audio/` 文件(存量文件仍可按下文格式消费)。引擎与缓存链路完好,恢复仅需去掉该环境变量;以下格式说明保留备查。
 
 App「语音速报」的预生成神经语音:流水线(`scripts/tts_broadcast.py`,fetch 与 push 之间)按当日 `latest_overview` 的**综述 digest**(仅综述,不含 Top10 条目明细;文本与 App 端兜底朗读一致)用 Qwen3-TTS(Qwen3-TTS-12Hz-0.6B-CustomVoice,Apache-2.0,音色 serena,经 qwentts.cpp 纯 C++ 推理)合成为**单段 MP3**落盘 `audio/<YYYY-MM-DD>/broadcast.mp3`(北京时间),并把描述写进 `index.json` 顶层即时字段 `latest_audio`:
 
@@ -393,6 +395,7 @@ App「语音速报」的预生成神经语音:流水线(`scripts/tts_broadcast.p
 | `count` | `items` 数组长度 |
 | `items` | 该源的条目数组,结构因源而异(见下) |
 | `ai_summary_v2` | 本次数据的简体中文 AI 要点,JSON 数组(6-10 个对象,每个含 `title` 加粗导语 + `desc` 2-3 句正文 + `url` 对应原始条目链接)。`url` 由数据侧按 AI 返回的条目编号回填(AI 不输出 URL);编号无效时为空串,消费方应把空串条目按只读处理(App 端即不可点)。8 个稳定源都有(hackernews / github-trending / openai-anthropic-news / huggingface-papers / stormzhang-ai / producthunt / rundown-ai / aihot-featured);AI 调用失败时该字段缺省。**新快照只写 `ai_summary_v2`**;旧快照仅有 `ai_summary`(纯文本 `• **标题**：描述` 串),App 兼容回退 |
+| `summary_prompt_version` | 分源摘要 prompt 版本号(2026-10-01 起,additive)。流水线「摘要继承」的版本闸——仅当上一期快照该值与当前版本一致才沿用旧摘要,不一致则该源全量重写;消费方可忽略 |
 
 部分源会有额外顶层字段(如 stormzhang-ai 带 `pageDate`)。
 
@@ -534,11 +537,12 @@ The Rundown AI(beehiiv 托管的头部英文 AI 日更 newsletter)文章列表,�
   "sources": {
     "hackernews": {"status": "ok", "count": 20, "file": "..."},
     "producthunt": {"status": "fail", "error": "HTTPError: 401 ..."}
-  }
+  },
+  "ai_usage": {"calls": 9, "prompt_tokens": 20467, "completion_tokens": 8325}
 }
 ```
 
-`status` 取值:`ok`(成功,带 count/file)/ `fail`(失败,带 error,此时该源 3 次重试已全败)。每天会被覆盖,只保留最近一次。`file` 为相对仓库根的路径(如 `hackernews/2026-07-15/08-00-data.json`)。
+`status` 取值:`ok`(成功,带 count/file)/ `fail`(失败,带 error,此时该源 3 次重试已全败)。每天会被覆盖,只保留最近一次。`file` 为相对仓库根的路径(如 `hackernews/2026-07-15/08-00-data.json`)。`ai_usage` 为本次 fetch 进程的 AI 用量汇总(2026-09-27 起,additive):`calls` / `prompt_tokens` / `completion_tokens`,由 `ai_client.py` 进程内累计、`fetch_data.py` 写入,供成本观测;push 阶段的趋势精修用量另有单独日志,不在此字段。
 
 ## 失败保留机制
 

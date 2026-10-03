@@ -39,33 +39,24 @@
 
 ## 截图
 
-| 总览 | 摘要 | 关注 | 趋势 |
-|:---:|:---:|:---:|:---:|
-| <img src="docs/screenshots/01-overview.png" width="160" alt="总览"> | <img src="docs/screenshots/03-summary.png" width="160" alt="摘要"> | <img src="docs/screenshots/11-follows.png" width="160" alt="关注"> | <img src="docs/screenshots/02-trends.png" width="160" alt="趋势"> |
-
-| 信息源 | HackerNews | GitHub Trending | OpenAI × Anthropic |
-|:---:|:---:|:---:|:---:|
-| <img src="docs/screenshots/04-sources.png" width="160" alt="信息源"> | <img src="docs/screenshots/05-hackernews.png" width="160" alt="HackerNews"> | <img src="docs/screenshots/06-github-trending.png" width="160" alt="GitHub Trending"> | <img src="docs/screenshots/07-openai-anthropic.png" width="160" alt="OpenAI × Anthropic"> |
-
-| The Rundown AI | 网页 | 词云 | 设置 |
-|:---:|:---:|:---:|:---:|
-| <img src="docs/screenshots/08-the-rundown-ai.png" width="160" alt="The Rundown AI"> | <img src="docs/screenshots/09-webview.png" width="160" alt="网页"> | <img src="docs/screenshots/12-wordcloud.png" width="160" alt="词云"> | <img src="docs/screenshots/10-settings.png" width="160" alt="设置"> |
+| 今天 | 热词 | 更多 |
+|:---:|:---:|:---:|
+| <img src="docs/screenshots/01-today.png" width="200" alt="今天"> | <img src="docs/screenshots/02-hotwords.png" width="200" alt="热词"> | <img src="docs/screenshots/03-more.png" width="200" alt="更多"> |
 
 ---
 
 ## ✨ 核心功能
 
-### 五大根 Tab
+### 双根 Tab
 
 | Tab | 做什么 |
 |-----|--------|
-| **总览** | 当日跨源「今日综述」导读（2-3 句 hero）+「今日热点 Top10」——均由流水线预生成；AI 判定为「突发重磅」的条目带 Breaking 标签、特殊样式，排最前。打开即看、零等待。长综述默认折叠，时效行显示下一批时刻。 |
-| **摘要** | 8 个归档源当日的 AI 中文要点（流水线预生成），条目整行可点、经内置 WebView 直达原文。打开即看、无需等待。源 chips 有未看新内容时亮「新内容」小圆点，查看后熄灭。 |
-| **关注** | 关键词订阅流：订阅 ≤20 个关键词（手动输入或从今日热词一键添加），把当日总览 Top10 与 8 源摘要中的命中条目聚合成专属流；纯端上过滤，增删关键词即时生效。 |
-| **趋势** | 跨源热词排行榜——流水线对近 14 天快照的纯统计词频（不调 AI）：窗口命中数、迷你趋势曲线、涨跌箭头；点击词条展开代表文章——展开区可一键关注该热词或查看全部命中，词云词条也可点击直达搜索。 |
-| **更多** | 设置、AI 服务配置、信息源聚合入口、收藏（稍后读）、历史回顾（总览/摘要/热词按日期回看）、AI 日报归档、关于页等。 |
+| **今天** | 一份垂直日报。综述 Hero 以刊期行（日期 · 早/晚刊 · 数据截至）开场，接「今日重点」Top10——均由流水线预生成；AI 判定为「头条」的条目带红色内联前缀、排最前，长综述默认折叠。Top10 之下是收起式「我的关注」行（关键词订阅命中流，点开原地展开；无关注词时不渲染），再往下是 8 个归档源的分源 AI 要点区块——每源平铺最多 3 条，带「查看全部」出口，未查看的源亮「新内容」小圆点。条目整行可点、经内置 WebView 直达原文，打开即看。 |
+| **更多** | 设置、AI 服务配置、信息源聚合入口、收藏（稍后读）、过刊（选一天，同页读完那天的完整日报）、AI 日报归档、关于页等。 |
 
-四个内容 Tab（总览 / 摘要 / 关注 / 趋势）支持**下拉刷新**，绕过归档缓存立即拉取流水线最新批次。
+**热词页**（今天页报头进入的二级页）：跨源热词排行榜——流水线对近 14 天快照做词频统计、每批至多一次 AI 精修（失败零降级回退统计榜）：窗口命中数、迷你趋势曲线、涨跌与排名变化标记；点击词条展开代表文章——展开区可一键关注该热词或查看全部命中；词云与按日期回看的历史热词也在此页。
+
+「今天」页与热词页支持**下拉刷新**，绕过归档缓存立即拉取流水线最新批次。
 
 ### 浏览区（更多 → 信息源）
 
@@ -79,7 +70,7 @@
 - **The Rundown AI**、**stormzhang AI 资讯** —— 英文/中文 AI Newsletter
 - **AIHot 精选** —— 第三方服务 aihot.virxact.com 的「今日热点 + 精选 TOP20」
 
-5 个稳定源（HackerNews / GitHub Trending / HuggingFace Papers / The Rundown AI / stormzhang AI）恒定读取配套数据流水线生成的归档快照（代码内保留了实时抓取模式但未开放入口）。
+5 个稳定源（HackerNews / GitHub Trending / HuggingFace Papers / The Rundown AI / stormzhang AI）恒定读取配套数据流水线生成的归档快照。
 
 ### AI 能力
 
@@ -103,14 +94,13 @@
 ### 其他
 
 - **AI 日报** 与 **历史归档**（按日期回溯）
-- **本地搜索**：独立搜索页（总览页顶栏 🔍 进入），查设备内索引——联网浏览各源时自动建立，可搜标题与摘要；已读条目弱化，点击直达原文；趋势「查看全部命中」与词云词条点击会把该词直接带入本地搜索自动查询
+- **本地搜索**：独立搜索页（今天页报头「搜索」入口进入），查设备内索引——联网浏览各源时自动建立，可搜标题与摘要；已读条目弱化，点击直达原文；热词「查看全部命中」与词云词条点击会把该词直接带入本地搜索自动查询
 - **联网搜索**：「全部动态」页顶栏进入（AIHot 第三方 API），本地搜索历史 + 今日热点热词引导
-- **语音速报**：总览页顶栏播报入口，仅朗读今日综述（不含 Top10 条目明细），通勤/睡前场景适用；优先播放数据流水线预生成的神经语音（Qwen3-TTS，真暂停/原地续播），不可用时自动回落系统 TTS；前台服务通知栏与应用内悬浮胶囊提供播放控制，背景音乐压低而非打断；零新增依赖
 - **已读状态**：打开过的条目在各列表自动弱化，动态列表支持「只看未读」过滤（删除对应浏览历史即可恢复未读）
 - **断网兜底**：归档数据落盘缓存，断网冷启动仍可查看最近拉取的内容
 - **浏览历史与收藏**（本地 Room 存储；WebView 顶栏星标任意页面即可稍后读）
 - **App 内检查更新与直装**（关于页，对查 GitHub Releases；「发现新版本」底部弹层内下载 APK（实时进度、可取消）并拉起系统安装器，无安装包或下载失败回退 Release 页）与 `ainewshub://` 深链（`web?url=…`、`tab/<today|more>`（旧名永久映射：overview/summary/follows→今天、trends/hotwords→热词页）、`settings`，供浏览器/二维码/自动化工具直达）
-- **主题**：Material You 动态取色（Android 12+）、字体族切换（默认/衬线/等宽）、字号档位、暗色模式
+- **主题**：暗色模式、字号档位（全 App 锁定衬线「纸墨」排印风格）
 - **多语言**：简体中文 / English 切换
 
 ---
@@ -176,8 +166,8 @@ AI News Hub 的整页翻译等运行时 AI 能力**不内置任何 key**，由�
 | 类别 | 来源 | 说明 |
 |------|------|------|
 | 第三方 API | `aihot.virxact.com` 公开 API | AIHot 精选（今日热点 + TOP20）、AI 日报与归档 |
-| 第三方 · 实时（局部） | HackerNews 评论 | 应用内实时拉自 Firebase API；各源列表一律读归档快照（实时模式未开放入口） |
-| 第三方 · 归档 | 配套数据流水线 | 每天多批次（北京时间；仓库 CI 承载 22:00 批）抓取 + AI 总结 + 推送到 [gitcode 数据仓库](https://gitcode.com/peng1818/AI-News-Hub-Data) |
+| 第三方 · 实时（局部） | HackerNews 评论 | 应用内实时拉自 Firebase API；各源列表一律读归档快照 |
+| 第三方 · 归档 | 配套数据流水线 | 每天两批（北京时间 08:00 / 18:00；仓库 CI 承载晚批，刻意定在 18:17 避开 GitHub 整点排队延迟）抓取 + AI 总结 + 推送到 [gitcode 数据仓库](https://gitcode.com/peng1818/AI-News-Hub-Data) |
 | 运行时 AI（用户自配 key） | 用户填入 | 网页整页翻译、系统选中翻译 |
 
 数据仓库格式详见 [`docs/news-hub-data-usage.md`](docs/news-hub-data-usage.md)。
@@ -190,15 +180,14 @@ AI News Hub 的整页翻译等运行时 AI 能力**不内置任何 key**，由�
 app/                       唯一 Android 模块
   src/main/java/com/peng/ainewshub/
     MainActivity.kt        Activity 壳（深链解析）；自实现多栈导航在 ui/nav/（不用 Navigation Compose）
-    data/                  Repository、数据模型、Room、DataStore、数据源模式
-    playback/              语音速报：预生成音频/系统 TTS 双通道前台服务 + 通知栏控制
+    data/                  Repository、数据模型、Room、DataStore、归档数据源
     ui/                    ViewModel + Compose Screen，按功能分包
       nav/                 自实现多栈导航（页面路由 / 状态机 / 应用壳）
       tabs/                AIHot「全部动态 / 精选」二级页
-      overview/            今日总览（读流水线预生成的跨源分析）
-      summary/             摘要 Tab + 历史摘要
-      trends/              趋势 Tab + 词云 + 历史热词
-      follows/             「我的关注」关键词订阅流（第 3 个根 tab）
+      overview/            「今天」日报：综述 Hero + Top10 + 分源摘要区块
+      summary/             摘要富文本渲染 + 历史归档寻址
+      trends/              热词页 + 词云 + 历史热词
+      follows/             关注关键词共享渲染件（今天页收起行）
       items/               各信息源详情页（HackerNews、GitHub Trending……）+ 搜索 + 浏览历史
       daily/               AI 日报与归档
       more/                更多页 / 信息源 / 关于 / 应用内更新日志
@@ -248,7 +237,6 @@ bash scripts/pipeline.sh
 | Material 3 | — |
 | AGP | 8.7.3 |
 | OkHttp | 4.12.0 |
-| jsoup | 1.18.3 |
 | Coil | 2.7.0 |
 | Room | 2.6.1 |
 | DataStore | 1.1.1 |
@@ -257,13 +245,13 @@ bash scripts/pipeline.sh
 | minSdk | 24 (Android 7.0) |
 | targetSdk / compileSdk | 35 |
 
-不引入 Retrofit / Gson / Moshi，网络统一走 `OkHttp`，JSON 用内置 `org.json`，HTML 解析用 jsoup。
+不引入 Retrofit / Gson / Moshi，网络统一走 `OkHttp`，JSON 用内置 `org.json`，HTML 抓取全部由 Python 流水线承担，App 端不做。
 
 ---
 
 ## ⚠️ 已知限制
 
-- **Product Hunt 仅归档** — Developer Token 是服务端 secret 不进 APK，两种模式都走归档。
+- **Product Hunt 仅归档** — Developer Token 是服务端 secret 不进 APK，恒定读取流水线归档快照。
 - **翻译依赖用户自配 key** — 未配置 AI 服务时整页翻译、选中翻译不可用（摘要、今日热点等预生成内容不受影响）。
 - **归档失败不回退实时** — 归档模式抓取失败直接显示 Error 态，设计上不自动降级。
 - **桌面小组件无错误交互入口** — 拉取失败保留旧数据不清空（小组件无法展示错误态）。
@@ -298,7 +286,6 @@ bash scripts/pipeline.sh
 | 库 | 用途 | License |
 |---|---|---|
 | [OkHttp](https://square.github.io/okhttp/) | HTTP 客户端 | Apache-2.0 |
-| [jsoup](https://jsoup.org/) | HTML 抓取与解析 | MIT |
 | [Coil](https://coil-kt.github.io/coil/) | 图片加载 | Apache-2.0 |
 
 ### 交互
