@@ -67,3 +67,65 @@ def fetch_stormzhang_ai():
     m = SZ_TITLE_DATE_RE.search(title)
     page_date = m.group(0) if m else ""
     return items, {"pageDate": page_date}
+
+
+# ===== 源身份与下游适配配置(2026-10 收口:fetch_data/ai_summary/
+# overview_summary/trend_keywords 的分源配置表与字段映射全部由此派生) =====
+
+SOURCE_KEY = "stormzhang-ai"
+
+# 注册表统一入口别名(sources/__init__.SOURCES 经它组装)
+fetch = fetch_stormzhang_ai
+
+# 五键契约(缺失会被 test_sources_registry 的适配契约测试当场红):
+#   display_title 总览 prompt 源段标题 / empty_ok 空结果是否合法 /
+#   min_items 抓取健康哨兵下限 / top_n 摘要喂 AI 条数 / has_metrics 热度档位有无真实指标
+META = {
+    "display_title": "stormzhang AI",
+    "empty_ok": False,
+    "min_items": 10,
+    "top_n": 15,
+    "has_metrics": False,
+}
+
+
+def item_url(o):
+    """落地页 URL(摘要回填 / trend / overview 共用口径)。"""
+    return (o.get("url") or "").strip()
+
+
+def item_title(o):
+    """标题字段(fingerprint 口径):该源无独立标题字段,取 summary。"""
+    return (o.get("summary") or "").strip()
+
+
+# ===== overview 适配(总览候选池字段提取,原 overview_summary._extract_items 分支) =====
+
+from common import str_field  # noqa: E402(适配段自含 import)
+
+
+def overview_fields(o, fallback_date_key):
+    """总览输入行字段:(title, url, metrics, blurb, date_key)。
+
+    time 形如 "2026-07-15 20:00"(北京时间无时区),直接取前 10 字符(yyyy-MM-dd)。
+    """
+    t = str_field(o, "time")
+    return (
+        item_title(o),
+        item_url(o),
+        f"信源 {str_field(o, 'source')}",
+        str_field(o, "english"),
+        t[:10] if len(t) >= 10 else "",
+    )
+
+
+# ===== trend 适配(趋势统计字段提取,原 trend_keywords._item_fields 分支) =====
+
+def trend_fields(o):
+    """趋势统计字段:(text, title, url)。
+
+    english 尾部常带 TLDR 赞助行("PLUS: <软广> <作者>, +N"),且赞助条目整条
+    english 就是 "PLUS: ...";partition 两种都覆盖,避免作者名/赞助商混进词频。
+    """
+    english = str_field(o, "english").partition("PLUS:")[0]
+    return f"{english}\n{item_title(o)}", item_title(o), item_url(o)

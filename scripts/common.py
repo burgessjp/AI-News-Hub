@@ -69,3 +69,59 @@ def retry(fn, *, attempts=3, backoff_base=2, log_tag="RETRY", on_exhausted=None)
         on_exhausted(last_exc)
     else:
         raise last_exc
+
+
+# ===== 字段/日期共享 helper(2026-10 收口:原 overview_summary 与 trend_keywords
+# 各持一份的 _s/_as_int,及 overview 的三个日期 key 函数;现供各源适配层共用) =====
+
+def str_field(o, key, default=""):
+    """安全取字符串,剥白边,None 转默认值(原 overview/trend 各持一份的 _s)。"""
+    v = o.get(key, default)
+    return str(v).strip() if v is not None else default
+
+
+def int_field(o, key, default=0):
+    """兼容取 int,字符串数字也接受(原 overview_summary 的 _as_int)。"""
+    v = o.get(key, default)
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return default
+
+
+def beijing_date_key_of_ms(epoch_ms):
+    """Unix 毫秒 → 北京日期(yyyy-MM-dd);0 或负数返回空串。"""
+    if not epoch_ms or epoch_ms <= 0:
+        return ""
+    try:
+        return datetime.fromtimestamp(epoch_ms / 1000, tz=BEIJING_TZ).strftime("%Y-%m-%d")
+    except Exception:
+        return ""
+
+
+def beijing_date_key_of_iso(iso):
+    """ISO UTC 字符串(如 2026-07-18T07:01:00Z)→ 北京日期;解析失败返回空串。"""
+    s = (iso or "").strip()
+    if not s:
+        return ""
+    try:
+        dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(BEIJING_TZ).strftime("%Y-%m-%d")
+    except Exception:
+        return ""
+
+
+def beijing_date_key_of_en_date(text):
+    """英文月份格式日期(如 "Jul 8, 2026")→ 北京日期;解析失败返回空串。"""
+    s = (text or "").strip()
+    if not s:
+        return ""
+    for fmt in ("%b %d, %Y", "%B %d, %Y"):
+        try:
+            dt = datetime.strptime(s, fmt).replace(tzinfo=BEIJING_TZ)
+            return dt.strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+    return ""

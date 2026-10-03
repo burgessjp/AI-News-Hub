@@ -195,3 +195,57 @@ def fetch_rundown_ai():
     if not items:
         items = _rundown_items_from_dom(BeautifulSoup(html, "lxml"))
     return items, {}
+
+
+# ===== 源身份与下游适配配置(2026-10 收口:fetch_data/ai_summary/
+# overview_summary/trend_keywords 的分源配置表与字段映射全部由此派生) =====
+
+SOURCE_KEY = "rundown-ai"
+
+# 注册表统一入口别名(sources/__init__.SOURCES 经它组装)
+fetch = fetch_rundown_ai
+
+# 五键契约(缺失会被 test_sources_registry 的适配契约测试当场红):
+#   display_title 总览 prompt 源段标题 / empty_ok 空结果是否合法 /
+#   min_items 抓取健康哨兵下限 / top_n 摘要喂 AI 条数 / has_metrics 热度档位有无真实指标
+META = {
+    "display_title": "The Rundown AI",
+    "empty_ok": False,
+    "min_items": 8,
+    "top_n": 15,
+    "has_metrics": False,
+}
+
+
+def item_url(o):
+    """落地页 URL(摘要回填 / trend / overview 共用口径)。"""
+    return (o.get("url") or "").strip()
+
+
+def item_title(o):
+    """标题字段(fingerprint 口径)。"""
+    return (o.get("title") or "").strip()
+
+
+# ===== overview 适配(总览候选池字段提取,原 overview_summary._extract_items 分支) =====
+
+from common import str_field  # noqa: E402(适配段自含 import)
+
+
+def overview_fields(o, fallback_date_key):
+    """总览输入行字段:(title, url, metrics, blurb, date_key)。
+
+    2026-08 站点改版后快照带真实 publishedAt(北京时间 yyyy-MM-dd HH:mm);
+    旧快照无此字段,回退抓取日期(消费方标注「抓取日期」)。
+    """
+    pub = str_field(o, "publishedAt")
+    date_key = pub[:10] if len(pub) >= 10 else fallback_date_key
+    return (item_title(o), item_url(o), "", str_field(o, "subtitle"), date_key)
+
+
+# ===== trend 适配(趋势统计字段提取,原 trend_keywords._item_fields 分支) =====
+
+def trend_fields(o):
+    """趋势统计字段:(text, title, url)。"""
+    title = item_title(o)
+    return title, title, item_url(o)

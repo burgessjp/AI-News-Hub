@@ -92,3 +92,66 @@ def fetch_huggingface_papers():
             "githubUrl": github_url,
         })
     return items, {}
+
+
+# ===== 源身份与下游适配配置(2026-10 收口:fetch_data/ai_summary/
+# overview_summary/trend_keywords 的分源配置表与字段映射全部由此派生) =====
+
+SOURCE_KEY = "huggingface-papers"
+
+# 注册表统一入口别名(sources/__init__.SOURCES 经它组装)
+fetch = fetch_huggingface_papers
+
+# 五键契约(缺失会被 test_sources_registry 的适配契约测试当场红):
+#   display_title 总览 prompt 源段标题 / empty_ok 空结果是否合法 /
+#   min_items 抓取健康哨兵下限 / top_n 摘要喂 AI 条数 / has_metrics 热度档位有无真实指标
+META = {
+    "display_title": "HuggingFace Papers",
+    "empty_ok": False,
+    "min_items": 20,
+    "top_n": 10,
+    "has_metrics": True,
+}
+
+
+def item_url(o):
+    """落地页 URL(摘要回填 / trend / overview 共用口径)。"""
+    return (o.get("url") or "").strip()
+
+
+def item_title(o):
+    """标题字段(fingerprint 口径)。"""
+    return (o.get("title") or "").strip()
+
+
+# ===== overview 适配(总览候选池字段提取,原 overview_summary._extract_items 分支) =====
+
+from common import (str_field, int_field,  # noqa: E402(适配段自含 import)
+                    beijing_date_key_of_en_date)
+
+
+def overview_fields(o, fallback_date_key):
+    """总览输入行字段:(title, url, metrics, blurb, date_key)。
+
+    published 是英文月份格式(如 "Jul 8, 2026",站点本地时间按北京处理)。
+    """
+    return (
+        item_title(o),
+        item_url(o),
+        f"upvotes {int_field(o, 'upvotes')}",
+        str_field(o, "summary"),
+        beijing_date_key_of_en_date(str_field(o, "published")),
+    )
+
+
+def raw_heat(o):
+    """总览原始热度:upvotes。"""
+    return float(int_field(o, "upvotes"))
+
+
+# ===== trend 适配(趋势统计字段提取,原 trend_keywords._item_fields 分支) =====
+
+def trend_fields(o):
+    """趋势统计字段:(text, title, url)。"""
+    title = item_title(o)
+    return title, title, item_url(o)

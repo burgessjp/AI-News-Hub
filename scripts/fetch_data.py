@@ -68,7 +68,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from common import BEIJING_TZ as CST, now_cst, retry
 
 # 8 源抓取器注册表(顺序承重,契约见包 docstring)+ 抓取层公共件
-from sources import SOURCES, EMPTY_OK_SOURCES
+from sources import SOURCES, EMPTY_OK_SOURCES, SOURCE_META
 from sources.httpio import fetch_text
 from sources.producthunt import PH_TOKEN_ENV
 
@@ -79,18 +79,9 @@ FETCH_MAX_ATTEMPTS = 3
 # 源健康哨兵:条目数低于下限 → stderr 鲜明告警(不阻断、不改产物)。空结果已有
 # 失败兜底,但「从 20 条跌到 3 条」的部分选择器漂移会静默通过 —— 总览候选池
 # 拿到的是残缺的当日世界,digest 会把数据残缺误判成「今天没新闻」。下限取
-# 2026-09 数据仓近 12 批实测稳定值的约一半;openai-anthropic-news 是 EMPTY_OK
-# 月级更新源(实测 0~14 条波动),不设哨兵。
-SOURCE_MIN_ITEMS = {
-    "hackernews": 10,
-    "github-trending": 8,
-    "stormzhang-ai": 10,
-    "huggingface-papers": 20,
-    "producthunt": 10,
-    "rundown-ai": 8,
-    "aihot-featured": 10,
-    "openai-anthropic-news": 0,
-}
+# 2026-09 数据仓近 12 批实测稳定值的约一半,值收口在各源模块 META["min_items"]
+# (2026-10 起;openai-anthropic-news 是 EMPTY_OK 月级更新源,不设哨兵=0)。
+SOURCE_MIN_ITEMS = {k: m["min_items"] for k, m in SOURCE_META.items()}
 
 
 class EmptyResultError(RuntimeError):
