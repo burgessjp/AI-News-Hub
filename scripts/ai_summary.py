@@ -49,6 +49,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import ai_client
 from common import SOURCE_KEYS
+from sources import SOURCE_META, SOURCE_MODULES
 
 
 # ===== 环境变量 =====
@@ -66,18 +67,10 @@ MAX_ATTEMPTS = 3
 # App 端只对这 8 个源做摘要(对齐 common.SOURCE_KEYS;保留别名供既有 import 引用)
 SUMMARY_SOURCES = SOURCE_KEYS
 
-# 每源喂给 AI 的条目数上限(对齐原各 builder 内 [:N] 切片;切片统一在 summarize_source
-# 做一次,builder 只负责格式化,保证 AI 看到的编号与回填 url 时的下标口径一致)
-SOURCE_TOP_N = {
-    "hackernews": 15,
-    "github-trending": 10,
-    "huggingface-papers": 10,
-    "stormzhang-ai": 15,
-    "producthunt": 15,
-    "rundown-ai": 15,
-    "aihot-featured": 15,
-    "openai-anthropic-news": 15,
-}
+# 每源喂给 AI 的条目数上限(值收口在各源模块 META["top_n"];切片统一在
+# summarize_source 做一次,builder 只负责格式化,保证 AI 看到的编号与回填
+# url 时的下标口径一致)
+SOURCE_TOP_N = {k: m["top_n"] for k, m in SOURCE_META.items()}
 
 
 # 分源摘要 prompt 版本号:任何 SYSTEM_PROMPT 的语义性修改(规则/字段规格/口味)须 +1。
@@ -416,35 +409,28 @@ def config_ready():
 
 
 def _item_url(source, item):
-    """从原始条目取落地页 URL(回填用;字段名对齐各源 fetcher 的 items 结构)。"""
+    """从原始条目取落地页 URL(委托各源适配层;未知源兜底 url 字段)。"""
     if not isinstance(item, dict):
         return ""
-    if source == "hackernews":
-        # HN 外链优先(target_url 为原文,url 为 HN 讨论页兜底)
-        return (item.get("target_url") or "").strip() or (item.get("url") or "").strip()
-    if source == "aihot-featured":
-        return (item.get("permalink") or "").strip() or (item.get("url") or "").strip()
-    return (item.get("url") or "").strip()
+    mod = SOURCE_MODULES.get(source)
+    if mod is None:
+        return (item.get("url") or "").strip()
+    return mod.item_url(item)
 
 
 def _item_title(source, item):
-    """摘要继承指纹用的标题字段映射(summary_fingerprint 消费)。
+    """摘要继承指纹用的标题字段映射(委托各源适配层;未知源兜底 title)。
 
-    与各 _fmt_* builder 写进输入行的标题字段一致:github-trending 是 owner/name、
-    stormzhang-ai 是 summary(该源无独立标题字段),其余源是 title。titleEcho
-    核验已改由 builder 构行时登记的锚点驱动(见 _emit),不再消费本函数。
+    各源标题口径见 sources/<name>.item_title(github-trending 是 owner/name、
+    stormzhang-ai 是 summary、producthunt 是 name,其余是 title)。titleEcho
+    核验由 builder 构行时登记的锚点驱动(见 _emit),不消费本函数。
     """
     if not isinstance(item, dict):
         return ""
-    if source == "github-trending":
-        owner = (item.get("owner") or "").strip()
-        name = (item.get("name") or "").strip()
-        return f"{owner}/{name}" if owner or name else ""
-    if source == "stormzhang-ai":
-        return (item.get("summary") or "").strip()
-    if source == "producthunt":
-        return (item.get("name") or "").strip()
-    return (item.get("title") or "").strip()
+    mod = SOURCE_MODULES.get(source)
+    if mod is None:
+        return (item.get("title") or "").strip()
+    return mod.item_title(item)
 
 
 def summary_fingerprint(source, items):
