@@ -7,7 +7,5 @@ beautifulsoup4>=4.12
 # 缺失时该子源直接 FeatureNotFound 失败(CI 曾因此长期静默跳过,latest 指针停更)
 lxml>=5.0
 
-# 设计资源生成脚本依赖(gen_icon.py / gen_icon_svg.py 使用 PIL/NumPy 跑本地图像生成;
-# fontTools 的唯一消费方 gen_wordmark.py 已随 v1.4.0 删除,该依赖已无引用、待移除)
-fontTools>=4.50
+# 设计资源生成脚本依赖(gen_icon.py / gen_icon_svg.py 使用 PIL/NumPy 跑本地图像生成)
 pillow>=10.0
