@@ -83,7 +83,7 @@ internal fun OverviewLead(digest: OverviewDigest) {
         // 折叠态检测溢出:仅在折叠布局回调里读 hasVisualOverflow,展开后不回写
         var digestOverflowed by remember { mutableStateOf(false) }
         Column(modifier = Modifier.fillMaxWidth()) {
-            // 纸墨日报 Hero:红色 letterspaced 栏目名 → 衬线正文 → 时效 caption,
+            // 纸墨日报 Hero:红色 letterspaced 刊期行 → 衬线正文,
             // 无起收边线(线收敛:结构线只留各页报头一处;正文用系统衬线,
             // 缺 CJK 衬线的 ROM 优雅降级无衬线)
             Column(

@@ -58,17 +58,19 @@ internal fun sourceAccentOf(source: String): Color {
 }
 
 /**
- * 把单条摘要条目拼成 [AnnotatedString]:title(SemiBold)+ desc(Normal)。
+ * 把单条摘要条目拼成 [AnnotatedString]:title(SemiBold)+ desc(以传入 [SpanStyle] 降档)。
  *
- * title 与 desc 之间用全角冒号「：」连接,视觉上对齐 v1 纯文本「**标题**：描述」的观感,
- * 保证新旧格式切换时用户感知一致。
+ * title 与 desc 之间用全角冒号「：」连接,冒号随 desc 一起以 descStyle 降档
+ * (灰字 + 小一号,对齐「今日重点」描述行的层级语言),从冒号起视觉渐弱。
  */
-internal fun renderItemLine(title: String, desc: String): AnnotatedString {
+internal fun renderItemLine(title: String, desc: String, descStyle: SpanStyle): AnnotatedString {
     val boldStyle = SpanStyle(fontWeight = FontWeight.SemiBold)
     return buildAnnotatedString {
         withStyle(boldStyle) { append(title) }
-        append("：")
-        append(desc)
+        withStyle(descStyle) {
+            append("：")
+            append(desc)
+        }
     }
 }
 

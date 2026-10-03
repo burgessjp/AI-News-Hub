@@ -152,17 +152,20 @@ fun NewsCardSkeletonList(
 
 /**
  * 排名行骨架 —— 匹配 Hub 四源屏(HN/GitHub/stormzhang/HF)的真实行结构:
- * 左 24dp 排名徽章 + 右侧标题两行 + meta 统计行(padding 18h/14v、间距 12dp 对齐
- * 各屏真实行),避免加载→内容切换时的结构跳变。
+ * 左 24dp 排名徽章 + 右侧标题两行 + meta 统计行(padding 18h + [rowVertical]、
+ * 间距 12dp 对齐各屏真实行),避免加载→内容切换时的结构跳变。
  */
 @Composable
 fun RankRowSkeleton(
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    // 行内上下 padding:对齐调用方真实行节奏(默认 14dp 为 Hub 屏;「今天」页
+    // Top10 真实行 10dp,经 [RankRowSkeletonList] 透传覆盖)
+    rowVertical: Dp = 14.dp
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 18.dp, vertical = 14.dp),
+            .padding(horizontal = 18.dp, vertical = rowVertical),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = androidx.compose.ui.Alignment.Top
     ) {
@@ -191,12 +194,14 @@ fun RankRowSkeleton(
 @Composable
 fun RankRowSkeletonList(
     count: Int = 8,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    // 透传行距给 [RankRowSkeleton](默认 14dp 维持 Hub 屏现状)
+    rowVertical: Dp = 14.dp
 ) {
     ShimmerHost {
         Column(modifier = modifier.fillMaxWidth().padding(vertical = 8.dp)) {
             repeat(count) {
-                RankRowSkeleton()
+                RankRowSkeleton(rowVertical = rowVertical)
             }
         }
     }

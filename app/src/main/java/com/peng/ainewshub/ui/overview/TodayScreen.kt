@@ -39,6 +39,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -77,8 +78,8 @@ import com.peng.ainewshub.ui.theme.AppText
  * 关注根 tab 降级并入;默认收起,点开原地展开命中流,无关注词时不渲染)
  * → 分源摘要区块 ×8(按用户
  * `source_order` 顺序,每源最多平铺 [SOURCE_SECTION_MAX_ITEMS] 条,余量经
- * 区块头「查看全部 N 条 ›」进源完整列表)→ 页脚。读完重点顺着往下扫完分源,
- * 不再横向切页 —— 「今天」页是日报导览,不是全量流。
+ * 区块头「查看全部 N 条 ›」进源完整列表)→ 终章符(整份日报读完的完稿记号)。
+ * 读完重点顺着往下扫完分源,不再横向切页 —— 「今天」页是日报导览,不是全量流。
  *
  * 渐进渲染:[OverviewViewModel](综述+Top10)、[SummaryViewModel](8 源摘要)与
  * [FollowsViewModel](关注语料,同缓存近零成本)并存、互不阻塞 —— overview
@@ -240,7 +241,7 @@ fun TodayScreen(
 
 /**
  * 日报主体:单 LazyColumn 自上而下 = 总览段(Hero / 骨架 / 内嵌提示 + Top10)
- * → 我的关注收起行(展开时接命中流)→ 终章符 → 分源摘要区块 ×8 → 页脚。
+ * → 我的关注收起行(展开时接命中流)→ 分源摘要区块 ×8 → 终章符。
  * 各段状态独立分支,互不阻塞。
  */
 @Composable
@@ -311,7 +312,14 @@ private fun TodayContent(
                         }
                     }
                 }
-                item(key = "rows_skeleton", contentType = "skeleton") { RankRowSkeletonList(count = 5) }
+                // 大节头用真实 SectionHeader 占位:标题文字已知,数据到位后不跳现
+                item(key = "focus_head", contentType = "focus-head") {
+                    SectionHeader(title = stringResource(R.string.today_focus_section), large = true)
+                }
+                // 行距 10dp 对齐 TopEntryRow(共享骨架默认 14dp 是 Hub 屏节奏)
+                item(key = "rows_skeleton", contentType = "skeleton") {
+                    RankRowSkeletonList(count = 5, rowVertical = 10.dp)
+                }
                 item(key = "loading_hint", contentType = "skeleton") { OverviewLoadingHint() }
             }
             is OverviewState.NoData -> item(key = "overview_empty", contentType = "notice") {
@@ -415,19 +423,6 @@ private fun TodayContent(
             }
         }
 
-        // ===== 终章符:刊物完稿记号(日报读完的版面收尾) =====
-        item(key = "end_mark", contentType = "end-mark") {
-            Text(
-                text = "■",
-                style = AppText.caption,
-                color = cs.onSurfaceVariant,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 20.dp),
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-            )
-        }
-
         // ===== 分源摘要段:按用户 source_order 逐源一节 =====
         sourceKeys.forEach { key ->
             val state = sourceStates[key] ?: UiState.Loading
@@ -459,7 +454,7 @@ private fun TodayContent(
                 }
                 is UiState.Success -> when (val content = state.data.content) {
                     is SummaryContent.Structured -> {
-                        // 每源最多平铺 2 条:「今天」页是日报不是全量流,长尾交给
+                        // 每源最多平铺 3 条:「今天」页是日报不是全量流,长尾交给
                         //「查看全部」进源列表页(区块头文字链承载计数与出口)
                         val items = content.items.take(SOURCE_SECTION_MAX_ITEMS)
                         // 源内条目稳定 key:url 优先,重复/空以出现序号消歧。
@@ -490,7 +485,7 @@ private fun TodayContent(
                         }
                     }
                     is SummaryContent.Plain -> {
-                        // v1 纯文本:按行切分渲染(历史快照兼容;同上不做 remember、同样截 2 条)
+                        // v1 纯文本:按行切分渲染(历史快照兼容;同上不做 remember、同样截 3 条)
                         val lines = content.text.lines().filter { it.isNotBlank() }.take(SOURCE_SECTION_MAX_ITEMS)
                         itemsIndexed(
                             lines,
@@ -515,6 +510,19 @@ private fun TodayContent(
                 }
             }
         }
+
+        // ===== 终章符:刊物完稿记号(整份日报——重点/关注/分源摘要——读完的版面收尾) =====
+        item(key = "end_mark", contentType = "end-mark") {
+            Text(
+                text = "■",
+                style = AppText.titleCompact,
+                color = cs.onSurfaceVariant,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 20.dp),
+                textAlign = TextAlign.Center
+            )
+        }
     }
 }
 
@@ -534,7 +542,8 @@ private fun FollowsToggleRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 18.dp, vertical = 4.dp)
+            // top 12:与上方 Top10 的段分界拉到 22dp(≈源间 21dp),匹配大段分界权重
+            .padding(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 4.dp)
             .clip(MaterialTheme.shapes.small)
             .background(cs.surfaceContainerLow)
             .clickable(onClick = onToggle)

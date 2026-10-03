@@ -88,12 +88,8 @@ internal fun FollowsHeaderRow(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = stringResource(
-                    R.string.follows_stats_caption,
-                    ui.keywords.size,
-                    // 单选过滤时以当前过滤结果计数,与列表所见一致
-                    ui.items.size
-                ),
+                // 命中数不在此重复:收起入口行已展示「今天命中 N 条」
+                text = stringResource(R.string.follows_stats_caption, ui.keywords.size),
                 style = AppText.caption,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,

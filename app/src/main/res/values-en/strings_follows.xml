@@ -6,7 +6,7 @@
     <!-- Guide subtitle on the Hotwords manage row when no keywords exist -->
     <string name="follows_section_guide">Follow keywords to see only what matters to you</string>
     <!-- Stats line: %1$d=keyword count, %2$d=today\'s matched items -->
-    <string name="follows_stats_caption">Following %1$d keywords · %2$d matches today</string>
+    <string name="follows_stats_caption">Following %1$d keywords</string>
     <!-- Hit count on Today's collapsed follows row: %1$d=today\'s matched items -->
     <string name="follows_hits_count">%1$d matches today</string>
     <!-- Chip-preview overflow on the Hotwords manage row: %1$d=hidden keyword count -->
