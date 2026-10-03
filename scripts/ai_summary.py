@@ -22,9 +22,11 @@ AI 不输出 URL),替代旧的纯文本 `ai_summary`(已停用,App 端兼容回�
   - titleEcho 条目核验(2026-09):AI 须照抄该 ref 输入行标题部分的开头,数据侧
     startswith 精确比对 —— 单次调用选条+写作,偶发把 A 事件的描述写到 B 条的
     ref 上(总览侧同款失败模式的分源版),错绑整条丢弃(title/desc 都是 AI 写的,
-    没有数据侧骨架可保留),echo 缺失从宽(防模型整体漏字段时全量误杀);核验按
-    「裸标题 / 行前缀+标题 / 标题+行尾统计段」多形态匹配 —— 模型常把行内连续
-    片段当标题照抄(oai "[OpenAI] " 前缀、producthunt "（↑283" 统计尾,均生产实锤);
+    没有数据侧骨架可保留),echo 缺失从宽(防模型整体漏字段时全量误杀);宽容
+    形态(裸标题 / 行前缀+标题 / 标题+完整行尾)由 builder 构行时登记的
+    (prefix, title, tail) 锚点单点推导(2026-10 收口,见 _emit)—— 模型常把
+    行内连续片段当标题照抄(oai "[OpenAI] " 前缀、producthunt "（↑283" 统计尾,
+    均生产实锤);
   - summary_fingerprint:top-N (标题,URL) 指纹,供 fetch_data 做「摘要继承」——
     与上一期快照完全一致时直接沿用其 ai_summary_v2,不重跑 AI(2026-09 数据仓
     实测:同日两批 6/8 源指纹一致,命中率 54%~84%,重写只是换皮 + 白花调用费)。继承另要求 prompt 版本相同,见 PROMPT_VERSION。
@@ -253,60 +255,81 @@ SYSTEM_PROMPTS = {
 #
 # 条数切片统一在 summarize_source 按 SOURCE_TOP_N 完成,builder 收到的即最终列表。
 # 每行带 [N] 编号(列表下标),供 AI 在输出的 ref 字段照抄,数据侧据其回填 url。
+# builder 一律经 _emit 构行并登记 titleEcho 核验锚点,返回 (user_prompt, anchors)。
+
+def _emit(lines, anchors, idx, prefix, title, tail, anchor_title=None):
+    """构造一条输入行 f"[{idx}] {prefix}{title}{tail}",并登记 titleEcho 核验锚点。
+
+    行形态知识单点在此:prefix = 标题前紧邻的源标注段(如 oai 的「[OpenAI] 」),
+    tail = 标题后紧跟的统计/标注段(含其后全部行尾)。核验侧(_clean_entries)
+    由 (prefix, title, tail) 预拼宽容形态,不再另行复刻行格式 —— 此前 _fmt_*
+    拼行与 _echo_line_prefix/_suffix 复刻是三份平行知识,2026-09/2026-10 两次
+    生产实锤(漏同步 → echo 整批判错绑)皆源于此。
+
+    anchor_title:覆盖登记进锚点的核验标题(缺省 = title)。仅 github
+    owner/name 双空的病态条目用 —— 行照发 f"{owner}/{name}" 的 "/" 保持字节
+    不变,核验标题归一为空串走从宽(对齐旧 _item_title 返回 "" 的语义)。
+    """
+    lines.append(f"[{idx}] {prefix}{title}{tail}")
+    anchors[idx] = (prefix, title if anchor_title is None else anchor_title, tail)
+
 
 def _fmt_hackernews(items):
     """每条「[N] <title>（得分 X，评论 Y）」(对齐 App 的 HACKERNEWS.load)。"""
-    lines = []
+    lines, anchors = [], {}
     for i, s in enumerate(items):
         title = (s.get("title") or "").strip()
         if not title:
             continue
-        lines.append(f"[{i}] {title}（得分 {s.get('score', 0)}，评论 {s.get('descendants', 0)}）")
-    return "以下是今日 HackerNews 热门（按得分排序）：\n" + "\n".join(lines)
+        _emit(lines, anchors, i, "", title,
+              f"（得分 {s.get('score', 0)}，评论 {s.get('descendants', 0)}）")
+    return "以下是今日 HackerNews 热门（按得分排序）：\n" + "\n".join(lines), anchors
 
 
 def _fmt_github_trending(items):
     """每条「[N] owner/name（今日 +N★，共 M★，lang）：desc」(对齐 App 的 GITHUB_TRENDING.load)。"""
-    lines = []
+    lines, anchors = [], {}
     for i, r in enumerate(items):
         owner = r.get("owner", "")
         name = r.get("name", "")
         desc = (r.get("description") or "").strip() or "（无描述）"
         lang = (r.get("language") or "").strip() or "未知语言"
-        lines.append(
-            f"[{i}] {owner}/{name}（今日 +{r.get('starsToday', 0)}★，"
-            f"共 {r.get('totalStars', 0)}★，{lang}）：{desc}"
-        )
-    return "以下是今日 GitHub Trending（按今日新增 star 排序）：\n" + "\n".join(lines)
+        # owner/name 双空的病态条目:行照发 f"{owner}/{name}" 的 "/"(字节不变),
+        # 核验锚点标题经 anchor_title 归一为空串 → 从宽(对齐旧 _item_title 语义)
+        anchor_title = f"{owner}/{name}" if (owner or name) else ""
+        _emit(lines, anchors, i, "", f"{owner}/{name}",
+              f"（今日 +{r.get('starsToday', 0)}★，共 {r.get('totalStars', 0)}★，{lang}）：{desc}",
+              anchor_title=anchor_title)
+    return "以下是今日 GitHub Trending（按今日新增 star 排序）：\n" + "\n".join(lines), anchors
 
 
 def _fmt_huggingface_papers(items):
     """每条「[N] <title>（↑upvotes）：summary」(对齐 App 的 HUGGINGFACE_PAPERS.load)。"""
-    lines = []
+    lines, anchors = [], {}
     for i, p in enumerate(items):
         title = (p.get("title") or "").strip()
         if not title:
             continue
         summary = (p.get("summary") or "").strip() or "（无摘要）"
-        lines.append(f"[{i}] {title}（↑{p.get('upvotes', 0)}）：{summary}")
-    return "以下是今日 HuggingFace 热门论文（按 upvote 排序）：\n" + "\n".join(lines)
+        _emit(lines, anchors, i, "", title, f"（↑{p.get('upvotes', 0)}）：{summary}")
+    return "以下是今日 HuggingFace 热门论文（按 upvote 排序）：\n" + "\n".join(lines), anchors
 
 
 def _fmt_stormzhang_ai(items):
-    """每条「[N] [source] summary」(对齐 App 的 STORMZHANG_AI.load)。"""
-    lines = []
+    """每条「[N] [source] summary」(对齐 App 的 STORMZHANG_AI.load;summary 即行标题)。"""
+    lines, anchors = [], {}
     for i, n in enumerate(items):
         src = (n.get("source") or "").strip() or "未知来源"
         summary = (n.get("summary") or "").strip()
         if not summary:
             continue
-        lines.append(f"[{i}] [{src}] {summary}")
-    return "以下是今日聚合的 AI 资讯（含多个信源）：\n" + "\n".join(lines)
+        _emit(lines, anchors, i, f"[{src}] ", summary, "")
+    return "以下是今日聚合的 AI 资讯（含多个信源）：\n" + "\n".join(lines), anchors
 
 
 def _fmt_producthunt(items):
-    """每条「[N] name(↑votes,💬comments)：tagline」(对齐 App PRODUCTHUNT.load)。"""
-    lines = []
+    """每条「[N] name(↑votes,💬comments)：[topics] tagline」(对齐 App PRODUCTHUNT.load)。"""
+    lines, anchors = [], {}
     for i, p in enumerate(items):
         name = (p.get("name") or "").strip()
         if not name:
@@ -314,58 +337,53 @@ def _fmt_producthunt(items):
         tagline = (p.get("tagline") or "").strip() or "（无定位）"
         topics = p.get("topics") or []
         topic_str = f"[{','.join(topics[:2])}] " if topics else ""
-        lines.append(
-            f"[{i}] {name}（↑{p.get('votesCount', 0)}，💬{p.get('commentsCount', 0)}）：{topic_str}{tagline}"
-        )
-    return "以下是今日 Product Hunt 热门产品（按 upvote 排序）：\n" + "\n".join(lines)
+        _emit(lines, anchors, i, "", name,
+              f"（↑{p.get('votesCount', 0)}，💬{p.get('commentsCount', 0)}）：{topic_str}{tagline}")
+    return "以下是今日 Product Hunt 热门产品（按 upvote 排序）：\n" + "\n".join(lines), anchors
 
 
 def _fmt_rundown_ai(items):
-    """每条「[N] title：subtitle」(对齐 App RUNDOWN_AI.load)。
+    """每条「[N] title（PLUS：subtitle）」(对齐 App RUNDOWN_AI.load;无副标题不带尾段)。
 
     The Rundown AI 每篇 newsletter 含一个主标题 + 一个 PLUS 副标题(次要工具/技巧),
     合并成一行喂给 AI,无统计字段(列表页无 upvote/comments)。
     """
-    lines = []
+    lines, anchors = [], {}
     for i, n in enumerate(items):
         title = (n.get("title") or "").strip()
         if not title:
             continue
         subtitle = (n.get("subtitle") or "").strip()
-        if subtitle:
-            lines.append(f"[{i}] {title}（PLUS：{subtitle}）")
-        else:
-            lines.append(f"[{i}] {title}")
-    return "以下是近期 The Rundown AI 的 newsletter 标题（按时间倒序）：\n" + "\n".join(lines)
+        _emit(lines, anchors, i, "", title,
+              f"（PLUS：{subtitle}）" if subtitle else "")
+    return "以下是近期 The Rundown AI 的 newsletter 标题（按时间倒序）：\n" + "\n".join(lines), anchors
 
 
 def _fmt_aihot_featured(items):
-    """每条「[N] title(score)：summary」(对齐 App AIHOT_FEATURED.load)。
+    """每条「[N] title（score N）：summary」(对齐 App AIHOT_FEATURED.load)。
 
     AIHot 精选是中文 AI 资讯(后端已聚合多源),输入含标题和中文摘要,
     无需翻译。附 score 让 AI 感知后端筛选权重(不强制按 score 排序)。
     """
-    lines = []
+    lines, anchors = [], {}
     for i, n in enumerate(items):
         title = (n.get("title") or "").strip()
         if not title:
             continue
         summary = (n.get("summary") or "").strip()
         score = n.get("score", 0) or 0
-        if summary:
-            lines.append(f"[{i}] {title}（score {score}）：{summary}")
-        else:
-            lines.append(f"[{i}] {title}（score {score}）")
-    return "以下是今日 AIHot 精选热门（按后端 score 排序）：\n" + "\n".join(lines)
+        _emit(lines, anchors, i, "", title,
+              f"（score {score}）" + (f"：{summary}" if summary else ""))
+    return "以下是今日 AIHot 精选热门（按后端 score 排序）：\n" + "\n".join(lines), anchors
 
 
 def _fmt_openai_anthropic_news(items):
-    """每条「[N] [vendor] title（category）：summary」(对齐 App OPENAI_ANTHROPIC_NEWS.load)。
+    """每条「[N] [vendor] title（category）：summary」(对齐 App OPENAI_ANTHROPIC_NEWS.load;vendor/category/summary 可缺省)。
 
     OpenAI(RSS)与 Anthropic(HTML)合并源,输入含英文标题/摘要 + vendor/category 标注。
     附 vendor/category 让 AI 感知厂商归属与分类(不强制按某字段排序,本身已按时间倒序)。
     """
-    lines = []
+    lines, anchors = [], {}
     for i, n in enumerate(items):
         title = (n.get("title") or "").strip()
         if not title:
@@ -373,13 +391,10 @@ def _fmt_openai_anthropic_news(items):
         vendor = (n.get("vendor") or "").strip()
         category = (n.get("category") or "").strip()
         summary = (n.get("summary") or "").strip()
-        prefix = f"[{i}] [{vendor}]" if vendor else f"[{i}]"
-        meta = f"（{category}）" if category else ""
-        if summary:
-            lines.append(f"{prefix} {title}{meta}：{summary}")
-        else:
-            lines.append(f"{prefix} {title}{meta}")
-    return "以下是近期 OpenAI / Anthropic 的官方动态（按发布时间倒序）：\n" + "\n".join(lines)
+        prefix = f"[{vendor}] " if vendor else ""
+        tail = (f"（{category}）" if category else "") + (f"：{summary}" if summary else "")
+        _emit(lines, anchors, i, prefix, title, tail)
+    return "以下是近期 OpenAI / Anthropic 的官方动态（按发布时间倒序）：\n" + "\n".join(lines), anchors
 
 
 USER_PROMPT_BUILDERS = {
@@ -413,10 +428,11 @@ def _item_url(source, item):
 
 
 def _item_title(source, item):
-    """从原始条目取「输入行标题部分」(titleEcho 核验的锚定口径)。
+    """摘要继承指纹用的标题字段映射(summary_fingerprint 消费)。
 
     与各 _fmt_* builder 写进输入行的标题字段一致:github-trending 是 owner/name、
-    stormzhang-ai 是 summary(该源无独立标题字段),其余源是 title。
+    stormzhang-ai 是 summary(该源无独立标题字段),其余源是 title。titleEcho
+    核验已改由 builder 构行时登记的锚点驱动(见 _emit),不再消费本函数。
     """
     if not isinstance(item, dict):
         return ""
@@ -454,51 +470,6 @@ def _parse_ref(obj, upper):
     return idx if 0 <= idx < upper else None
 
 
-def _echo_line_prefix(source, item):
-    """输入行里排在标题前的源标注前缀(仅两个源有:oai 的「[vendor] 」、
-    stormzhang 的「[source] 」)。
-
-    模型常把它连带当标题开头照抄进 titleEcho(2026-09-29 生产实锤:oai 摘要
-    3/3 全败,皆因 echo 带 "[OpenAI] " 前缀被整批判错绑)。核验时按 builder
-    行形态预拼该前缀再比一次;其余源返回空串(行内无源标注)。
-    """
-    if source == "openai-anthropic-news":
-        v = (item.get("vendor") or "").strip()
-        return f"[{v}] " if v else ""
-    if source == "stormzhang-ai":
-        s = (item.get("source") or "").strip()
-        return f"[{s}] " if s else ""
-    return ""
-
-
-def _echo_line_suffix(source, item):
-    """输入行里紧跟标题后的统计标注开头(仅 builder 在标题后拼统计/标注段的源)。
-
-    与 _echo_line_prefix 对偶:模型常把行内「标题+统计」连续片段当标题照抄
-    (2026-10-01 生产实锤:producthunt 15 张卡 11 张 echo 形如 "Pexo（↑283",
-    标题后粘着「（↑票数」被整批判错绑)。取值逐字段对齐各 _fmt_* builder 的拼接,
-    预拼「标题+统计开头」形态再比对;标题位于行尾或无统计段的源返回空串。
-    """
-    if not isinstance(item, dict):
-        return ""
-    if source == "hackernews":
-        return f"（得分 {item.get('score', 0)}"          # title（得分 X，评论 Y）
-    if source == "github-trending":
-        return f"（今日 +{item.get('starsToday', 0)}★"   # owner/name（今日 +N★…）
-    if source == "huggingface-papers":
-        return f"（↑{item.get('upvotes', 0)}"            # title（↑upvotes）：summary
-    if source == "producthunt":
-        return f"（↑{item.get('votesCount', 0)}"         # name（↑votes，💬comments）：tagline
-    if source == "aihot-featured":
-        return f"（score {item.get('score', 0) or 0}"    # title（score N）：summary
-    if source == "openai-anthropic-news":
-        c = (item.get("category") or "").strip()
-        return f"（{c}" if c else ""                     # title（category）：summary
-    if source == "rundown-ai":
-        return "（PLUS：" if (item.get("subtitle") or "").strip() else ""
-    return ""
-
-
 def _clean_entries(parsed, source, sliced):
     """
     业务清洗 AI 返回的卡片数组:过滤 title/desc 为空的项 + titleEcho 核验 +
@@ -506,13 +477,18 @@ def _clean_entries(parsed, source, sliced):
     RuntimeError(由 summarize_source 的业务层重试捕获)。
 
     titleEcho 核验(与 overview_summary 同范式):AI 须照抄该 ref 输入行标题
-    部分的前 10 个字符,数据侧对锚定标题做 startswith 精确比对 —— 单次调用
-    选条+写作,偶发把 A 事件的描述写到 B 条的 ref 上(总览侧 2026-09 回放实锤
-    过同款错绑)。错绑整条丢弃:这里 title/desc 都是 AI 写的,没有数据侧骨架
-    可保留(总览侧还能留标题+链接,这里整卡都是错的);echo 缺失从宽(防模型
-    整体漏字段时全量误杀);无效 ref 锚定条目不存在,无从核验,从宽保留
+    部分的前 10 个字符,数据侧做 startswith 精确比对 —— 单次调用选条+写作,
+    偶发把 A 事件的描述写到 B 条的 ref 上(总览侧 2026-09 回放实锤过同款
+    错绑)。错绑整条丢弃:这里 title/desc 都是 AI 写的,没有数据侧骨架可保留
+    (总览侧还能留标题+链接,这里整卡都是错的)。宽容形态由 builder 构行时
+    登记的 (prefix, title, tail) 锚点单点推导(2026-10 收口,见 _emit),tail
+    为标题后的完整行尾 —— 比「统计段开头截断」的旧形态更宽容:模型把同一条
+    行的更长连续片段抄进 echo 是更强的同条绑定证据,应放行;错绑(抄别条
+    标题)在任何形态下都不是前缀,拦截力不变。echo 缺失从宽(防模型整体漏
+    字段时全量误杀);无效 ref 锚定条目不存在,无从核验,从宽保留
     (url 留空,端侧该条仅不可点)。
     """
+    _, anchors = USER_PROMPT_BUILDERS[source](sliced)
     cleaned = []
     echo_present = 0
     echo_drop = 0
@@ -527,20 +503,21 @@ def _clean_entries(parsed, source, sliced):
         echo = str(obj.get("titleEcho") or "").strip()
         if echo and idx is not None:
             echo_present += 1
-            anchored = _item_title(source, sliced[idx])
+            anchor = anchors.get(idx)
             # 多形态匹配:模型对「标题部分」的取界常漂移到整行形态 —— 裸标题 /
-            # 「行内源标注前缀 + 标题」(oai/stormzhang,2026-09 实锤)/「标题 + 行尾
-            # 统计标注开头」(producthunt 等,2026-10 实锤 echo "Pexo（↑283")。
-            # 各形态由数据侧按 builder 行形态预拼;错绑场景抄的是别条的标题,
-            # 在任何形态下都不会成为其前缀,不因此放水
-            prefix = _echo_line_prefix(source, sliced[idx])
-            suffix = _echo_line_suffix(source, sliced[idx])
-            forms = [anchored, prefix + anchored]
-            if suffix:
-                forms += [anchored + suffix, prefix + anchored + suffix]
-            if anchored and not any(f.startswith(echo) for f in forms):
-                echo_drop += 1
-                continue
+            # 「行内源标注前缀 + 标题」(oai/stormzhang)/「标题 + 行尾」(producthunt
+            # 等)。形态由 builder 构行时登记的 (prefix, title, tail) 单点推导;
+            # 错绑场景抄的是别条标题,在任何形态下都不会成为其前缀,不因此放水。
+            # 锚定条目无标题(builder 跳过空标题行,或 github owner/name 双空归一
+            # 为空串)时无从核验,从宽保留 —— 对齐旧 _item_title 返回空的从宽语义。
+            if anchor and anchor[1]:
+                prefix, anchored, tail = anchor
+                forms = [anchored, prefix + anchored]
+                if tail:
+                    forms += [anchored + tail, prefix + anchored + tail]
+                if not any(f.startswith(echo) for f in forms):
+                    echo_drop += 1
+                    continue
         url = _item_url(source, sliced[idx]) if idx is not None else ""
         cleaned.append({"title": title, "desc": desc, "url": url})
     if not cleaned:
@@ -582,7 +559,8 @@ def summarize_source(source, items):
     model = os.getenv(ENV_MODEL)
     api_key = os.getenv(ENV_API_KEY)
     system_prompt = SYSTEM_PROMPTS[source]
-    user_prompt = USER_PROMPT_BUILDERS[source](sliced)
+    # anchors 由 _clean_entries 内部从同一 builder 取(同一 sliced,确定性纯函数)
+    user_prompt, _ = USER_PROMPT_BUILDERS[source](sliced)
 
     last_err = None
     for attempt in range(1, MAX_ATTEMPTS + 1):

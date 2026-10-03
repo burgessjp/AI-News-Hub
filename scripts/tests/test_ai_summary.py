@@ -172,6 +172,51 @@ def test_clean_echo带源前缀的错绑仍拦截():
 
 
 
+# ===== builder 行形态锚点:_emit 单点登记,锚点与行文本不得漂移 =====
+
+_ANCHOR_CASES = {
+    "hackernews": [_hn("Pexo", "https://x.dev/a", score=456)],
+    "github-trending": [{"owner": "o", "name": "repo", "url": "https://x.dev/g",
+                         "starsToday": 39, "totalStars": 1200, "language": "Rust",
+                         "description": "d"}],
+    "stormzhang-ai": [{"summary": "中文条目", "url": "https://x.dev/s", "source": "X"}],
+    "huggingface-papers": [{"title": "Paper", "url": "https://x.dev/p",
+                            "upvotes": 12, "summary": "s"}],
+    "producthunt": [{"name": "Pexo", "url": "https://x.dev/p", "votesCount": 283,
+                     "commentsCount": 12, "tagline": "t"}],
+    "rundown-ai": [{"title": "Newsletter", "url": "https://x.dev/r",
+                    "subtitle": "sub"}],
+    "aihot-featured": [{"title": "精选", "url": "https://x.dev/f", "score": 80,
+                        "summary": "s"}],
+    "openai-anthropic-news": [{"title": "The Lenfest Institute grows",
+                               "url": "https://x.dev/a", "vendor": "OpenAI",
+                               "category": "Company", "summary": "s"}],
+}
+
+
+def test_builder_锚点与行文本自洽():
+    """每个登记锚点拼出的 (prefix+title+tail) / (title+tail) 必须是真实输入行的
+    后缀 —— 行文本与锚点在 _emit 单点生成,任何一侧漂移当场红。"""
+    for src, items in _ANCHOR_CASES.items():
+        text, anchors = asm.USER_PROMPT_BUILDERS[src](items)
+        assert anchors, src
+        for idx, (prefix, title, tail) in anchors.items():
+            line = next(l for l in text.splitlines() if l.startswith(f"[{idx}] "))
+            assert line.endswith(prefix + title + tail), (src, line)
+            assert line.endswith(title + tail), (src, line)
+
+
+def test_clean_echo抄到行尾深处同条仍放行():
+    # tail 为标题后的完整行尾(不再截断到统计段开头):模型把同一条行的更长
+    # 连续片段抄进 echo 是更强的同条绑定证据,应放行;错绑(抄别条标题)仍拦。
+    ph_items = [{"name": "Pexo", "url": "https://x.dev/p", "votesCount": 283,
+                 "commentsCount": 12, "tagline": "AI 工具"}]
+    parsed = [{"title": "t", "desc": "d", "ref": 0,
+               "titleEcho": "Pexo（↑283，💬12）：AI 工具"}]
+    cleaned, _, dropped = asm._clean_entries(parsed, "producthunt", ph_items)
+    assert len(cleaned) == 1 and dropped == 0
+
+
 # ===== summary_fingerprint:摘要继承指纹 =====
 
 def test_fingerprint_同topN相等_超出部分不影响():
