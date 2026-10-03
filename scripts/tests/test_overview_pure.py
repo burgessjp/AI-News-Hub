@@ -15,6 +15,8 @@ _parse_result 的「去重后不足 10 条按热度回填」契约——常规�
 from collections import Counter
 from datetime import datetime
 
+import pytest
+
 from common import BEIJING_TZ
 
 import overview_summary as ov
@@ -586,3 +588,67 @@ def test_增量_carryover的AI条目排在新鲜回填条目之后():
         "Pool fresh spare",      # 新鲜回填条目(无点评)仍在前
         "Carryover AI story",    # carryover AI 条目殿后
     ]
+
+
+# ===== _extract_items:每源字段提取(2026-10 迁入各源 overview_fields 后钉住) =====
+
+_EXTRACT_CASES = {
+    "hackernews": ({"title": "T", "target_url": "https://x.dev/a", "score": 456,
+                    "descendants": 9, "time": 1780000000},
+                   ("T", "https://x.dev/a", "得分 456 · 评论 9", "")),
+    "github-trending": ({"owner": "o", "name": "repo", "url": "https://x.dev/g",
+                         "starsToday": 39, "totalStars": 12345, "description": "A tool"},
+                        ("o/repo", "https://x.dev/g", "今日 star +39 · 累计 12,345", "A tool")),
+    "huggingface-papers": ({"title": "Paper", "url": "https://x.dev/p", "upvotes": 12,
+                            "summary": "s", "published": "Jul 8, 2026"},
+                           ("Paper", "https://x.dev/p", "upvotes 12", "s")),
+    "producthunt": ({"name": "App", "url": "https://x.dev/p", "votesCount": 283,
+                     "commentsCount": 12, "dailyRank": 2, "tagline": "tag",
+                     "createdAt": "2026-09-29T07:01:00Z"},
+                    ("App", "https://x.dev/p", "票 283 · 评论 12 · 日榜#2", "tag")),
+    "stormzhang-ai": ({"summary": "中文标题", "url": "https://x.dev/s", "source": "Reddit",
+                       "english": "e", "time": "2026-08-29 10:00"},
+                      ("中文标题", "https://x.dev/s", "信源 Reddit", "e")),
+    "rundown-ai": ({"title": "News", "url": "https://x.dev/r", "subtitle": "sub",
+                    "publishedAt": "2026-09-30 08:05"},
+                   ("News", "https://x.dev/r", "", "sub")),
+    "aihot-featured": ({"title": "精选", "permalink": "https://x.dev/perma", "score": 80,
+                        "summary": "s", "source": "TC"},
+                       ("精选", "https://x.dev/perma", "权重 80 · TC", "s")),
+    "openai-anthropic-news": ({"title": "News", "url": "https://x.dev/o", "vendor": "OpenAI",
+                               "category": "Company", "summary": "s"},
+                              ("News", "https://x.dev/o", "厂商 OpenAI · Company", "s")),
+}
+
+_FIXED_DATES = {
+    "rundown-ai": "2026-09-30",       # publishedAt 前 10 字符
+    "stormzhang-ai": "2026-08-29",    # time 前 10 字符
+}
+
+
+@pytest.mark.parametrize("src", sorted(_EXTRACT_CASES))
+def test_extract_items_每源字段提取钉死(src):
+    from common import (beijing_date_key_of_ms, beijing_date_key_of_iso,
+                        beijing_date_key_of_en_date)
+
+    item, expected = _EXTRACT_CASES[src]
+    snap = {"items": [item], "fetched_at_ms": 1780000000000}
+    got = ov._extract_items(src, snap)
+    assert len(got) == 1
+    index, title, url, metrics, blurb, date_key, pct = got[0]
+    assert index == 0 and (title, url, metrics, blurb) == expected
+    # 日期口径逐源钉:各分支用对的 helper / 字段,错配当场红
+    if src in _FIXED_DATES:
+        assert date_key == _FIXED_DATES[src]
+    elif src == "hackernews":
+        assert date_key == beijing_date_key_of_ms(1780000000 * 1000)
+    elif src == "huggingface-papers":
+        assert date_key == beijing_date_key_of_en_date("Jul 8, 2026")
+    elif src == "producthunt":
+        assert date_key == beijing_date_key_of_iso("2026-09-29T07:01:00Z")
+    else:
+        # github(fallback 抓取日)/ aihot-featured / oai(无日期字段,空串)
+        assert date_key in ("", beijing_date_key_of_ms(1780000000000))
+    # 单条目归一化:指标源 pct=100(指标非零),无指标源单条线性给 70
+    expected_pct = 100 if src in ov.METRIC_SOURCES else 70
+    assert pct == expected_pct

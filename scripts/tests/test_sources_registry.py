@@ -116,3 +116,21 @@ def test_每源最小条目能被总览与趋势字段映射接收():
         snap = {"items": [item], "fetched_at_ms": 1}
         assert ovs._extract_items(src, snap), f"overview._extract_items 无 {src} 分支或产出为空"
         assert tk._item_fields(src, item) is not None, f"trend._item_fields 无 {src} 分支"
+
+
+def test_源模块适配契约齐备():
+    """每个注册源模块必须导出五键 META 与适配函数(raw_heat 仅指标源):
+    缺一项 = 某消费方 KeyError/AttributeError(过响)或静默缺省(过轻)。"""
+    from sources import SOURCE_MODULES
+
+    required_meta = {"display_title", "empty_ok", "min_items", "top_n", "has_metrics"}
+    required_fns = ("item_url", "item_title", "overview_fields", "trend_fields")
+    for name, mod in SOURCE_MODULES.items():
+        assert required_meta <= set(mod.META), (name, sorted(mod.META))
+        for fn in required_fns:
+            assert callable(getattr(mod, fn, None)), f"{name}.{fn} 缺失"
+        assert callable(getattr(mod, "fetch", None)), f"{name}.fetch 缺失"
+        if mod.META["has_metrics"]:
+            assert callable(getattr(mod, "raw_heat", None)), f"{name}.raw_heat 缺失(指标源必配)"
+        # SOURCE_KEY 必须与注册 key 一致(注册表 key 即由它派生,断言防手滑改表)
+        assert mod.SOURCE_KEY == name
