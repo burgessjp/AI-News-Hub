@@ -1,12 +1,13 @@
 # 数据抓取脚本依赖(fetch_data.py 编排层 + scripts/sources/ 各源抓取器)
 # 与 scripts/gen_icon.py 不同 —— 后者只用 PIL/NumPy 跑本地图像生成;
-# 抓取需要 requests 做 HTTP,beautifulsoup4 解析 HTML(对齐 App 端 jsoup)。
+# 抓取需要 requests 做 HTTP,beautifulsoup4 解析 HTML(App 端不做 HTML 抓取,jsoup 依赖已删)。
 requests>=2.31
 beautifulsoup4>=4.12
 # lxml:bs4 的 "xml" 解析器由它提供(openai-anthropic-news 源的 OpenAI RSS 子源使用);
 # 缺失时该子源直接 FeatureNotFound 失败(CI 曾因此长期静默跳过,latest 指针停更)
 lxml>=5.0
 
-# 设计资源生成脚本依赖(gen_wordmark.py:字体轮廓 → 矢量路径;gen_icon*.py 同用 PIL)
+# 设计资源生成脚本依赖(gen_icon.py / gen_icon_svg.py 使用 PIL/NumPy 跑本地图像生成;
+# fontTools 的唯一消费方 gen_wordmark.py 已随 v1.4.0 删除,该依赖已无引用、待移除)
 fontTools>=4.50
 pillow>=10.0
