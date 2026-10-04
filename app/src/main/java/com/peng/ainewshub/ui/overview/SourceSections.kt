@@ -131,7 +131,8 @@ internal fun SourceSectionHeader(
                 style = AppText.caption,
                 fontWeight = FontWeight.SemiBold,
                 color = cs.primary,
-                maxLines = 1
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
             Text(
                 text = "›",
@@ -209,6 +210,7 @@ internal fun SourceSummaryItemRow(
         )
         Spacer(Modifier.size(12.dp))
         Text(
+            // 不限行数:摘要条目在本区块即全文,完整可读(长尾靠「查看全部」承接)
             text = line,
             style = AppText.body,
             color = if (isRead) cs.onSurface.copy(alpha = AppAlpha.readDim) else cs.onSurface

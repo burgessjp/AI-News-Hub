@@ -152,7 +152,7 @@ private fun HackerNewsRow(
         verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // 序号徽章:全 App 统一 RankBadge(1 名 tertiary / 2-3 tertiaryContainer / 其余低对比)
+        // 序号徽章:全 App 统一 RankBadge(1-2 名 primary / 其余 onSurfaceVariant)
         RankBadge(rank = rank)
 
         Column(modifier = Modifier.weight(1f)) {

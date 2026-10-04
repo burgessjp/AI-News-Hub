@@ -16,8 +16,8 @@ enum class ThemeMode {
 
 /**
  * 字号档位,整体缩放语义字号层 AppTextStyles(见 ui/theme/AppText.kt)。
- * 只缩放 AppText 档位的 fontSize/lineHeight;MD3 typography 不动,
- * 避免 TopAppBar/Chip 等组件内部布局错位。
+ * AppText 档位与 MD3 typography 在 Theme.kt 双侧同源构造、同步缩放,
+ * 两侧档位数值保持一致,避免组件内外字号脱节。
  */
 enum class FontScale(val scale: Float) {
     Compact(0.9f),

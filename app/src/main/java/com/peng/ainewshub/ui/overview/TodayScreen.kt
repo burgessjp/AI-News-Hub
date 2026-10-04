@@ -297,7 +297,8 @@ private fun TodayContent(
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 18.dp, vertical = 14.dp)
+                                    // 对齐真实 Hero 的 10/6:加载完成顶部不跳 4dp
+                                    .padding(start = 18.dp, end = 18.dp, top = 10.dp, bottom = 6.dp)
                             ) {
                                 ShimmerBox(modifier = Modifier.size(64.dp, 10.dp), cornerRadius = 4.dp)
                                 Spacer(Modifier.height(10.dp))

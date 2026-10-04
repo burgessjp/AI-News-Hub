@@ -26,10 +26,13 @@ fun RankBadge(rank: Int, modifier: Modifier = Modifier) {
         contentAlignment = Alignment.Center
     ) {
         Text(
+            // 单行不折行:系统字体放大时两位数宁可横向微溢出,也不竖排/换行破相
             text = rank.toString(),
             fontSize = 18.sp,
             lineHeight = 22.sp,
-            color = color
+            color = color,
+            maxLines = 1,
+            softWrap = false
         )
     }
 }

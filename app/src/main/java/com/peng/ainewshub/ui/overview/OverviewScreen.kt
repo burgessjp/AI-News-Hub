@@ -39,6 +39,7 @@ import com.peng.ainewshub.ui.components.editionLabel
 import com.peng.ainewshub.ui.components.RankBadge
 import com.peng.ainewshub.ui.theme.AppAlpha
 import com.peng.ainewshub.ui.theme.AppText
+import com.peng.ainewshub.ui.theme.TrackingWide
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -98,7 +99,7 @@ internal fun OverviewLead(digest: OverviewDigest) {
                     style = AppText.caption,
                     fontWeight = FontWeight.SemiBold,
                     color = cs.primary,
-                    letterSpacing = 1.sp
+                    letterSpacing = TrackingWide
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
@@ -123,7 +124,8 @@ internal fun OverviewLead(digest: OverviewDigest) {
                         modifier = Modifier
                             .clip(MaterialTheme.shapes.small)
                             .clickable(onClickLabel = toggleLabel) { expanded = !expanded }
-                            .padding(vertical = 2.dp)
+                            // 8dp 触控边距:caption 文字裸 padding 仅 ~20dp 高,撑到可用下限
+                            .padding(horizontal = 8.dp, vertical = 8.dp)
                     )
                 }
             }
