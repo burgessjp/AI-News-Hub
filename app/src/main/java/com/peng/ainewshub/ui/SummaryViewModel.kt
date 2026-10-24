@@ -68,10 +68,14 @@ class SummaryViewModel(application: Application) : AndroidViewModel(application)
     val states: StateFlow<Map<String, UiState<SourceSummary>>> = _states.asStateFlow()
 
     /**
-     * 刷新进行中(下拉刷新转圈 + 防重复)。任一源在跑即为 true。
+     * 下拉刷新指示:仅用户主动强刷置位(顶部指示器);自动加载不亮指示,
+     * 反馈由各源骨架承担。防重不在此,见 [inFlight]。
      */
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
+    /** 防重复守卫:任一加载(自动/强刷)进行中即拒绝新请求,不驱动 UI。 */
+    private var inFlight = false
 
     init {
         loadAll()
@@ -86,8 +90,14 @@ class SummaryViewModel(application: Application) : AndroidViewModel(application)
      * @param keepContent true 保留各源现有内容(刷新只亮指示器);false 重置骨架(init)
      */
     private fun loadAll(force: Boolean, keepContent: Boolean) {
-        if (_isRefreshing.value) return
-        _isRefreshing.value = true
+        // 撞上在途加载早退;用户下拉(onRefresh 已消费)仍亮指示器,随在途加载一并收起
+        if (inFlight) {
+            if (force) _isRefreshing.value = true
+            return
+        }
+        inFlight = true
+        // 指示器只跟用户主动强刷,冷启动/重试等自动加载不转圈
+        if (force) _isRefreshing.value = true
         if (!keepContent) {
             // 全集 8 源置 Loading(让 UI 显骨架)
             _states.value = SummaryRepository.SOURCE_KEYS.associateWith { UiState.Loading as UiState<SourceSummary> }
@@ -121,10 +131,12 @@ class SummaryViewModel(application: Application) : AndroidViewModel(application)
                 }
             } finally {
                 // finally 复位:非预期异常也不能让刷新态永久卡 true。
-                // 复位前保证最小转一档:index 去重窗口 + 快照路径缓存双双命中时刷新会
-                // 瞬间完成(如 2 秒内连拉两次),isRefreshing 同帧 true→false 会让
-                // PullToRefreshBox 指示器卡在展示态不收起
-                ensureMinRefreshSpin(startedAt)
+                // 复位前保证最小转一档(仅强刷):index 去重窗口 + 快照路径缓存双双命中时
+                // 刷新会瞬间完成(如 2 秒内连拉两次),isRefreshing 同帧 true→false 会让
+                // PullToRefreshBox 指示器卡在展示态不收起;自动加载无指示器要收,无需等满。
+                // 复位无条件执行:早退分支为跟随在途加载而点亮的指示器也由这里收掉
+                if (force) ensureMinRefreshSpin(startedAt)
+                inFlight = false
                 _isRefreshing.value = false
             }
         }

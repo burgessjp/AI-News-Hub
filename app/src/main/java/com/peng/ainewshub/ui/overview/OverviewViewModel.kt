@@ -49,9 +49,12 @@ class OverviewViewModel(application: Application) : AndroidViewModel(application
     private val _state = MutableStateFlow<OverviewState>(OverviewState.Loading)
     val state: StateFlow<OverviewState> = _state.asStateFlow()
 
-    /** 读取进行中(下拉刷新指示 + 防重复)。 */
+    /** 下拉刷新指示:仅用户主动强刷置位;自动加载不亮指示(反馈由骨架/提示行承担)。 */
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
+    /** 防重复守卫:任一加载(自动/强刷)进行中即拒绝新请求,不驱动 UI。 */
+    private var inFlight = false
 
     init {
         load()
@@ -64,8 +67,14 @@ class OverviewViewModel(application: Application) : AndroidViewModel(application
     fun refresh() = run(true)
 
     private fun run(force: Boolean) {
-        if (_isRefreshing.value) return
-        _isRefreshing.value = true
+        // 撞上在途加载早退;用户下拉(onRefresh 已消费)仍亮指示器,随在途加载一并收起
+        if (inFlight) {
+            if (force) _isRefreshing.value = true
+            return
+        }
+        inFlight = true
+        // 指示器只跟用户主动强刷,冷启动/重试等自动加载不转圈
+        if (force) _isRefreshing.value = true
         // 已有内容时保留展示,后台重读;否则进 Loading
         if (_state.value !is OverviewState.Success) _state.value = OverviewState.Loading
         // 强刷前的批次指纹:Success 保留旧内容,天然提供「刷新前」参照
@@ -101,9 +110,12 @@ class OverviewViewModel(application: Application) : AndroidViewModel(application
                 )
             } finally {
                 // finally 复位:非预期异常(JSON OOM 等)也不能让刷新态永久卡 true。
-                // 复位前保证最小转一档:命中 force 去重窗口时刷新会瞬间完成,isRefreshing
-                // 同帧 true→false 会让 PullToRefreshBox 指示器卡在展示态不收起
-                ensureMinRefreshSpin(startedAt)
+                // 复位前保证最小转一档(仅强刷):命中 force 去重窗口时刷新会瞬间完成,
+                // isRefreshing 同帧 true→false 会让 PullToRefreshBox 指示器卡在展示态不收起;
+                // 自动加载无指示器要收,无需等满。复位无条件执行:早退分支为跟随在途
+                // 加载而点亮的指示器也由这里收掉
+                if (force) ensureMinRefreshSpin(startedAt)
+                inFlight = false
                 _isRefreshing.value = false
             }
         }
