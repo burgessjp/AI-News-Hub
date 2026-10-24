@@ -64,10 +64,6 @@ class FollowsViewModel(application: Application) : AndroidViewModel(application)
     /** 防重复守卫:任一加载(自动/强刷)进行中即拒绝新请求,不驱动 UI。 */
     private var inFlight = false
 
-    /** 关注行展开态(收起式入口行,默认收起):随 VM 存活跨 tab 保留(同 selectedKeyword)。 */
-    private val _isExpanded = MutableStateFlow(false)
-    val isExpanded: StateFlow<Boolean> = _isExpanded.asStateFlow()
-
     // 重新过滤的输入缓存:corpus 网络成功后才有值;keywords 来自 DataStore 流
     private var corpus: FollowCorpus? = null
     private var keywords: List<String> = emptyList()
@@ -139,11 +135,6 @@ class FollowsViewModel(application: Application) : AndroidViewModel(application)
     fun selectKeyword(keyword: String) {
         selectedKeyword = if (selectedKeyword == keyword) null else keyword
         recompute()
-    }
-
-    /** 收起/展开今天页「我的关注」行。 */
-    fun toggleExpanded() {
-        _isExpanded.value = !_isExpanded.value
     }
 
     /** 添加关注词(写入 DataStore,流自动触发重算;上限由 SettingsStore 兜底)。 */

@@ -1,19 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   「我的关注」域文案(中文全集,默认 locale;英文在 values-en/strings_follows.xml)。
-  覆盖:「今天」页收起式关注行(TodayScreen)—— 收起行、关键词 chips、命中条目、空态;
-  管理弹层(FollowsManageSheet,今天页/热词页共用)与热词页管理行。
+  覆盖:「今天」页关注入口行与命中弹层(TodayScreen / FollowsHitsDialog)——
+  入口行、关键词 chips、命中条目、空态;管理弹层(FollowsManageSheet,今天页/
+  热词页共用)与热词页管理行。
   术语遵守 values/strings_common.xml 头注释术语表;共用条(common_*/error_* 等)与
   overview_breaking_tag 等复用不重复造。
 -->
 <resources>
-    <!-- 「今天」页收起式关注行标签 + 热词页管理行标签 -->
+    <!-- 「今天」页关注入口行/命中弹层标题 + 热词页管理行标签 -->
     <string name="follows_section_title">我的关注</string>
     <!-- 热词页管理行 0 词时的引导副文案 -->
     <string name="follows_section_guide">关注关键词，每天只看你想看的</string>
     <!-- 统计行:%1$d=关注词数,%2$d=今天命中条数 -->
     <string name="follows_stats_caption">已关注 %1$d 个关键词</string>
-    <!-- 今天页收起式关注行的命中数:%1$d=今天命中条数 -->
+    <!-- 今天页关注入口行的命中数:%1$d=今天命中条数 -->
     <string name="follows_hits_count">今天命中 %1$d 条</string>
     <!-- 热词页管理行 chips 预览余量:%1$d=未展示的词数 -->
     <string name="follows_more_count">+%1$d</string>

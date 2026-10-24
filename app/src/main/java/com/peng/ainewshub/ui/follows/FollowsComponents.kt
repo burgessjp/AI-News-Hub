@@ -31,6 +31,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -58,6 +59,7 @@ import com.peng.ainewshub.R
 import com.peng.ainewshub.data.repo.FollowFeedItem
 import com.peng.ainewshub.data.repo.FollowsRepository
 import com.peng.ainewshub.data.repo.SummaryRepository
+import com.peng.ainewshub.ui.SectionNotice
 import com.peng.ainewshub.ui.components.SectionHeader
 import com.peng.ainewshub.ui.theme.AppAlpha
 import com.peng.ainewshub.ui.theme.AppText
@@ -65,13 +67,14 @@ import com.peng.ainewshub.data.prefs.MAX_FOLLOWED_KEYWORDS
 
 /**
  * 「我的关注」域共享渲染件:关键词区([FollowsHeaderRow])、命中条目行
- * ([FollowItemRow])与管理弹层([FollowsManageSheet])。
+ * ([FollowItemRow])、命中对话框([FollowsHitsDialog])与管理弹层
+ * ([FollowsManageSheet])。
  *
- * 原独立「关注」根 tab 已降级:命中流并入「今天」页的「我的关注」段
- * (TodayScreen 宿主 [FollowsViewModel]),管理弹层由「今天」段与热词页
- * (HotwordsScreen 管理行)两处宿主共用同一弹层。语料与过滤仍在
- * [FollowsViewModel] 内完成(当日总览 Top10 + 8 源结构化摘要,见
- * FollowsRepository)。
+ * 原独立「关注」根 tab 已降级:命中流并入「今天」页的「我的关注」入口行
+ * (TodayScreen 宿主 [FollowsViewModel]),点开经 [FollowsHitsDialog] 对话框
+ * 呈现(不在页内原地展开);管理弹层由「今天」页与热词页(HotwordsScreen
+ * 管理行)两处宿主共用同一弹层。语料与过滤仍在 [FollowsViewModel] 内完成
+ * (当日总览 Top10 + 8 源结构化摘要,见 FollowsRepository)。
  */
 
 /** 关键词区:统计行 + 管理入口 + 关键词 chips(点选单选过滤,再点恢复全部)。 */
@@ -229,6 +232,72 @@ internal fun FollowItemRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
+        }
+    }
+}
+
+/**
+ * 关注命中底部弹层 —— 「今天」页关注入口行点开的承载层(原页内原地展开改为
+ * 弹层呈现):关键词 chips(单选过滤)+ 管理入口 + 当日命中条目/空态。
+ * 结构对齐 [FollowsManageSheet]:标题行 + 滚动内容列,点遮罩/下拉关闭;
+ * 全屏展开([skipPartiallyExpanded] = true,命中条目较多需要展示空间)。
+ * chips 区与条目行原样复用 [FollowsHeaderRow] / [FollowItemRow],过滤与
+ * 管理动作由宿主接线(同页内展开时的逻辑)。
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun FollowsHitsDialog(
+    ui: FollowsUi,
+    // 已读判定:打开过的条目(url 命中浏览历史)整行弱化
+    readUrls: Set<String>,
+    onDismiss: () -> Unit,
+    onSelectKeyword: (String) -> Unit,
+    onManage: () -> Unit,
+    onOpenUrl: (url: String, title: String, source: String) -> Unit
+) {
+    val context = LocalContext.current
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ) {
+        // 命中上限 ~34 条(Top10 + 8 源 × 3),Column 整列滚动(同 FollowsManageSheet);
+        // 水平边距不在列上统一加:chips 区/条目行自带 18dp,标题与空态单独补齐对齐
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 24.dp)
+        ) {
+            // 弹层标题对齐全 App 弹层惯例 titleSection(20sp),与 FollowsManageSheet 同构
+            Text(
+                text = stringResource(R.string.follows_section_title),
+                style = AppText.titleSection,
+                modifier = Modifier.padding(horizontal = 18.dp)
+            )
+            Spacer(Modifier.height(12.dp))
+            FollowsHeaderRow(ui = ui, onSelect = onSelectKeyword, onManage = onManage)
+            if (ui.items.isEmpty()) {
+                // 有关注词但今天没有命中:保留 chips,给换词/管理出口
+                SectionNotice(
+                    title = stringResource(R.string.follows_empty_no_match_title),
+                    message = stringResource(R.string.follows_empty_no_match_subtitle),
+                    actionLabel = stringResource(R.string.follows_manage_action),
+                    onAction = onManage,
+                    modifier = Modifier.padding(horizontal = 18.dp)
+                )
+            } else {
+                ui.items.forEachIndexed { i, feedItem ->
+                    val entry = feedItem.entry
+                    val sourceLabel = followsSourceLabel(context, entry.source)
+                    FollowItemRow(
+                        index = i,
+                        item = feedItem,
+                        sourceLabel = sourceLabel,
+                        isRead = entry.url.isNotEmpty() && entry.url in readUrls,
+                        onClick = { onOpenUrl(entry.url, entry.title, sourceLabel) }
+                    )
+                }
+            }
         }
     }
 }
