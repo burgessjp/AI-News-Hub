@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   「我的关注」域文案(中文全集,默认 locale;英文在 values-en/strings_follows.xml)。
-  覆盖:「今天」页关注入口行与命中弹层(TodayScreen / FollowsHitsDialog)——
+  覆盖:「今天」页关注入口行与命中弹层(TodayScreen / FollowsHitsSheet)——
   入口行、关键词 chips、命中条目、空态;管理弹层(FollowsManageSheet,今天页/
   热词页共用)与热词页管理行。
   术语遵守 values/strings_common.xml 头注释术语表;共用条(common_*/error_* 等)与

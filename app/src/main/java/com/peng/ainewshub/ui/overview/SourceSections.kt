@@ -12,9 +12,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -32,6 +37,7 @@ import com.peng.ainewshub.R
 import com.peng.ainewshub.data.repo.SourceSummary
 import com.peng.ainewshub.data.repo.SummaryContent
 import com.peng.ainewshub.data.repo.SummaryItem
+import com.peng.ainewshub.data.repo.SummaryRepository
 import com.peng.ainewshub.data.source.SourceFreshness
 import com.peng.ainewshub.ui.UiState
 import com.peng.ainewshub.ui.components.ShimmerBox
@@ -139,6 +145,68 @@ internal fun SourceSectionHeader(
                 style = MaterialTheme.typography.titleMedium,
                 color = cs.primary
             )
+        }
+    }
+}
+
+/**
+ * 分源全量弹层 —— 「今天」页区块头「查看全部 N 条 ›」点开的承载层(原 push 源
+ * 完整列表二级页改为弹层呈现):数据即区块摘要的全量条目(区块只平铺 3 条,
+ * [SummaryContent.Structured] / [SummaryContent.Plain] 本就持有当批完整列表),
+ * 零新增取数。结构对齐关注命中弹层(FollowsHitsSheet):titleSection 标题 +
+ * 滚动内容列,点遮罩/下拉关闭,全屏展开(条目多需要展示空间);条目行原样
+ * 复用 [SourceSummaryItemRow] / [SourcePlainLineRow](源强调色/已读弱化/点开
+ * 原文同今天页)。Loading/Error/摘要缺失仍走源二级页,不经本弹层。
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun SourceListSheet(
+    source: String,
+    content: SummaryContent,
+    // 已读判定:打开过的条目(url 命中浏览历史)整行弱化
+    readUrls: Set<String>,
+    onDismiss: () -> Unit,
+    onOpenUrl: (url: String, title: String, source: String) -> Unit
+) {
+    val context = LocalContext.current
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ) {
+        // 水平边距不在列上统一加:条目行自带 18dp,标题单独补齐对齐(同 FollowsHitsSheet)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 24.dp)
+        ) {
+            // 弹层标题对齐全 App 弹层惯例 titleSection(20sp),与 FollowsHitsSheet 同构
+            Text(
+                text = sourceMeta(source).title,
+                style = AppText.titleSection,
+                modifier = Modifier.padding(horizontal = 18.dp)
+            )
+            Spacer(Modifier.height(12.dp))
+            val accent = sourceAccentOf(source)
+            when (content) {
+                is SummaryContent.Structured -> content.items.forEachIndexed { i, item ->
+                    SourceSummaryItemRow(
+                        index = i,
+                        item = item,
+                        accent = accent,
+                        isRead = item.url.isNotBlank() && item.url in readUrls,
+                        onClick = {
+                            onOpenUrl(item.url, item.title, SummaryRepository.titleOf(context, source))
+                        }
+                    )
+                }
+                is SummaryContent.Plain -> content.text.lines()
+                    .filter { it.isNotBlank() }
+                    .forEachIndexed { i, line ->
+                        SourcePlainLineRow(index = i, line = line, accent = accent)
+                    }
+                is SummaryContent.Unavailable -> Unit
+            }
         }
     }
 }

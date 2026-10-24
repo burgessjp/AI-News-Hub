@@ -67,11 +67,11 @@ import com.peng.ainewshub.data.prefs.MAX_FOLLOWED_KEYWORDS
 
 /**
  * 「我的关注」域共享渲染件:关键词区([FollowsHeaderRow])、命中条目行
- * ([FollowItemRow])、命中对话框([FollowsHitsDialog])与管理弹层
+ * ([FollowItemRow])、命中底部弹层([FollowsHitsSheet])与管理弹层
  * ([FollowsManageSheet])。
  *
  * 原独立「关注」根 tab 已降级:命中流并入「今天」页的「我的关注」入口行
- * (TodayScreen 宿主 [FollowsViewModel]),点开经 [FollowsHitsDialog] 对话框
+ * (TodayScreen 宿主 [FollowsViewModel]),点开经 [FollowsHitsSheet] 弹层
  * 呈现(不在页内原地展开);管理弹层由「今天」页与热词页(HotwordsScreen
  * 管理行)两处宿主共用同一弹层。语料与过滤仍在 [FollowsViewModel] 内完成
  * (当日总览 Top10 + 8 源结构化摘要,见 FollowsRepository)。
@@ -246,7 +246,7 @@ internal fun FollowItemRow(
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun FollowsHitsDialog(
+internal fun FollowsHitsSheet(
     ui: FollowsUi,
     // 已读判定:打开过的条目(url 命中浏览历史)整行弱化
     readUrls: Set<String>,

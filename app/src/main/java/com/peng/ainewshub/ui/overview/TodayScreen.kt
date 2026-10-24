@@ -60,7 +60,7 @@ import com.peng.ainewshub.ui.components.ShimmerBox
 import com.peng.ainewshub.ui.components.ShimmerHost
 import com.peng.ainewshub.ui.components.rememberHaptics
 import com.peng.ainewshub.ui.components.rememberReadUrls
-import com.peng.ainewshub.ui.follows.FollowsHitsDialog
+import com.peng.ainewshub.ui.follows.FollowsHitsSheet
 import com.peng.ainewshub.ui.follows.FollowsManageSheet
 import com.peng.ainewshub.ui.follows.FollowsUi
 import com.peng.ainewshub.ui.follows.FollowsViewModel
@@ -76,7 +76,7 @@ import com.peng.ainewshub.ui.theme.AppText
  * 关注根 tab 降级并入;点开经底部弹层呈现命中流,无关注词时不渲染)
  * → 分源摘要区块 ×8(按用户
  * `source_order` 顺序,每源最多平铺 [SOURCE_SECTION_MAX_ITEMS] 条,余量经
- * 区块头「查看全部 N 条 ›」进源完整列表)→ 终章符(整份日报读完的完稿记号)。
+ * 区块头「查看全部 N 条 ›」弹 [SourceListSheet] 呈现全量)→ 终章符(整份日报读完的完稿记号)。
  * 读完重点顺着往下扫完分源,不再横向切页 —— 「今天」页是日报导览,不是全量流。
  *
  * 渐进渲染:[OverviewViewModel](综述+Top10)、[SummaryViewModel](8 源摘要)与
@@ -85,7 +85,8 @@ import com.peng.ainewshub.ui.theme.AppText
  * 失败不拖累分源、反之亦然)。下拉刷新刷全部。
  *
  * 分源区块头的「新内容未查看」语义(承自原摘要 chips 圆点):区块头进入视口即写入该源
- * 当前指纹(圆点熄灭,下一批重新亮起);「查看全部 ›」进源完整列表页。
+ * 当前指纹(圆点熄灭,下一批重新亮起);「查看全部 ›」在摘要就绪且有条目时弹
+ * [SourceListSheet](Loading/Error/摘要缺失仍进源完整列表二级页兜底)。
  * 条目行渲染复用 [com.peng.ainewshub.ui.summary.SummaryRender] 的富文本实现
  * (renderItemLine / 源强调色)。
  */
@@ -97,7 +98,7 @@ fun TodayScreen(
     onOpenSearch: () -> Unit = {},
     // 报头「热词」→ 热词榜二级页(近 N 天热词 + 词云入口)
     onOpenTrends: () -> Unit = {},
-    // 分源摘要区块头「查看全部」→ 源完整列表二级页
+    // 进源完整列表二级页(Loading/Error/摘要缺失时的兜底出口;更多→信息源 hub 同往)
     onOpenSource: (String) -> Unit,
     // 列表状态由 AiNewsHubApp 上提持有:切 tab / 进二级页返回后保持滚动位置
     listState: LazyListState,
@@ -120,6 +121,8 @@ fun TodayScreen(
     var showManage by rememberSaveable { mutableStateOf(false) }
     // 关注命中弹层开关(入口行点开;内容不在页内原地展开)
     var showFollows by rememberSaveable { mutableStateOf(false) }
+    // 分源「查看全部」弹层的源 key(null = 关闭;区块头点开)
+    var sheetSource by rememberSaveable { mutableStateOf<String?>(null) }
 
     // 重击当前 tab:滚回顶部 + 三 VM 缓存感知刷新(指纹未变零开销)。
     // lastHandled 防「重新进入组合就自动刷新」。
@@ -217,6 +220,7 @@ fun TodayScreen(
                     onRetrySource = { summaryVm.retry(it) },
                     onSeen = { source, fingerprint -> summaryVm.markSeen(source, fingerprint) },
                     onOpenSource = onOpenSource,
+                    onOpenSourceSheet = { sheetSource = it },
                     onOpenFollows = { showFollows = true }
                 )
             }
@@ -226,7 +230,7 @@ fun TodayScreen(
     // 关注命中弹层:入口行点开承载命中流(chips 过滤/管理/打开原文同接线);
     // 与管理弹层可叠放(管理 sheet 后开在上层,关 sheet 回到本弹层)
     if (showFollows && followsUi != null) {
-        FollowsHitsDialog(
+        FollowsHitsSheet(
             ui = followsUi,
             readUrls = rememberReadUrls(),
             onDismiss = { showFollows = false },
@@ -245,6 +249,21 @@ fun TodayScreen(
             onAdd = { followsVm.addKeyword(it) },
             onRemove = { followsVm.removeKeyword(it) }
         )
+    }
+
+    // 分源「查看全部」弹层:区块头点开(仅 Success 且有条目才会置位,分流见
+    // 区块头 onOpen;Loading/Error/摘要缺失仍走源完整列表二级页)
+    sheetSource?.let { key ->
+        val content = (sourceStates[key] as? UiState.Success)?.data?.content
+        if (content != null) {
+            SourceListSheet(
+                source = key,
+                content = content,
+                readUrls = rememberReadUrls(),
+                onDismiss = { sheetSource = null },
+                onOpenUrl = onOpenUrl
+            )
+        }
     }
 }
 
@@ -267,6 +286,8 @@ private fun TodayContent(
     onRetrySource: (String) -> Unit,
     onSeen: (String, Long) -> Unit,
     onOpenSource: (String) -> Unit,
+    // 分源区块头「查看全部」→ 全量弹层(弹层由 TodayScreen 层托管)
+    onOpenSourceSheet: (String) -> Unit,
     // 关注入口行点击 → 命中弹层(弹层由 TodayScreen 层托管)
     onOpenFollows: () -> Unit
 ) {
@@ -395,7 +416,17 @@ private fun TodayContent(
                     source = key,
                     state = state,
                     hasUnseen = hasUnseenDigest(state, seen[key]),
-                    onOpen = { onOpenSource(key) }
+                    onOpen = {
+                        // 摘要就绪且有条目 → 弹层呈现全量(数据已在手);
+                        // Loading/Error/空摘要 → 源完整列表二级页兜底(页面自带加载/错误态)
+                        val content = (state as? UiState.Success)?.data?.content
+                        val openInSheet = when (content) {
+                            is SummaryContent.Structured -> content.items.isNotEmpty()
+                            is SummaryContent.Plain -> content.text.lines().any { it.isNotBlank() }
+                            else -> false
+                        }
+                        if (openInSheet) onOpenSourceSheet(key) else onOpenSource(key)
+                    }
                 )
                 // 区块进入视口 = 已查看该源:写入当前指纹(圆点熄灭);同指纹去重
                 val fingerprint = (state as? UiState.Success)?.data?.fetchedAtMs
@@ -491,7 +522,7 @@ private fun TodayContent(
 
 /**
  * 「我的关注」入口行 —— 浅底长条(同热词页管理行视觉语言):标签 + 今日命中数 +
- * 尾随「查看」文字动作。点击整行弹出命中底部弹层([FollowsHitsDialog]),
+ * 尾随「查看」文字动作。点击整行弹出命中底部弹层([FollowsHitsSheet]),
  * 今天页正文不直接展示关注内容。
  */
 @Composable
