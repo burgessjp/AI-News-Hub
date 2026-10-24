@@ -51,3 +51,6 @@ todo-docs/
 .superpowers/
 # 设计过程稿(superpowers specs 等,仓库政策:功能设计文档不入库)
 docs/superpowers/
+
+# 图标/视觉提案稿(design/*.html,仓库政策:设计文档不入库,见 docs/superpowers 同款约定)
+design/
