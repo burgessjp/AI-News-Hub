@@ -40,7 +40,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -66,6 +65,7 @@ import com.peng.ainewshub.ui.follows.FollowsUi
 import com.peng.ainewshub.ui.follows.FollowsViewModel
 import com.peng.ainewshub.ui.summary.hasUnseenDigest
 import com.peng.ainewshub.ui.summary.sourceAccentOf
+import com.peng.ainewshub.ui.weekly.WeeklyViewModel
 import com.peng.ainewshub.ui.theme.AppAlpha
 import com.peng.ainewshub.ui.theme.AppText
 
@@ -98,6 +98,8 @@ fun TodayScreen(
     onOpenSearch: () -> Unit = {},
     // 报头「热词」→ 热词榜二级页(近 N 天热词 + 词云入口)
     onOpenTrends: () -> Unit = {},
+    // 「AI 周刊」入口行 → 周刊二级页(仅最新一期就绪时渲染入口行)
+    onOpenWeekly: () -> Unit = {},
     // 进源完整列表二级页(Loading/Error/摘要缺失时的兜底出口;更多→信息源 hub 同往)
     onOpenSource: (String) -> Unit,
     // 列表状态由 AiNewsHubApp 上提持有:切 tab / 进二级页返回后保持滚动位置
@@ -105,7 +107,8 @@ fun TodayScreen(
     reselectSignal: Int = 0,
     overviewVm: OverviewViewModel = viewModel(),
     summaryVm: SummaryViewModel = viewModel(),
-    followsVm: FollowsViewModel = viewModel()
+    followsVm: FollowsViewModel = viewModel(),
+    weeklyVm: WeeklyViewModel = viewModel()
 ) {
     val overviewState by overviewVm.state.collectAsStateWithLifecycle()
     val overviewRefreshing by overviewVm.isRefreshing.collectAsStateWithLifecycle()
@@ -117,6 +120,9 @@ fun TodayScreen(
     val followsRefreshing by followsVm.isRefreshing.collectAsStateWithLifecycle()
     // 语料就绪(Success)才有关注行与两个弹层;Loading/Error 整段静默跳过
     val followsUi = (followsState as? UiState.Success)?.data
+    // 周刊最新期(与周刊页共用单实例 VM):仅 Success 渲染入口行,首屏不为它等待
+    val weeklyState by weeklyVm.latest.collectAsStateWithLifecycle()
+    val weeklyDigest = (weeklyState as? UiState.Success)?.data
     val haptics = rememberHaptics()
     var showManage by rememberSaveable { mutableStateOf(false) }
     // 关注命中弹层开关(入口行点开;内容不在页内原地展开)
@@ -161,6 +167,20 @@ fun TodayScreen(
                             .align(Alignment.Center)
                             .padding(top = 14.dp, bottom = 12.dp)
                     )
+                    // 报头动作位(左侧):AI 周刊入口,与右侧动作同款文字按钮。
+                    // 周刊是每周一更的边车内容,最新一期未就绪(Loading/缺刊/错误)
+                    // 时整位不渲染,首屏不为它等待
+                    if (weeklyDigest != null) {
+                        Text(
+                            text = stringResource(R.string.weekly_entry_title),
+                            style = AppText.caption,
+                            color = cs.onSurfaceVariant,
+                            modifier = Modifier
+                                .align(Alignment.CenterStart)
+                                .clickable(onClick = onOpenWeekly)
+                                .padding(start = 18.dp, end = 12.dp, top = 16.dp, bottom = 16.dp)
+                        )
+                    }
                     // 报头动作位(右侧):热词榜入口 + 本地搜索。
                     // 文字按钮(去图标):纯排版语言,padding 撑足 48dp 触控高;搜索保持最右
                     Row(
@@ -206,6 +226,7 @@ fun TodayScreen(
                     overviewVm.refresh()
                     summaryVm.refresh()
                     followsVm.refresh()
+                    weeklyVm.loadLatest(true)
                 }
             ) {
                 TodayContent(

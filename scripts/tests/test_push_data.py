@@ -143,13 +143,17 @@ def _git(*args, cwd=None):
     subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True)
 
 
-def _e2e_setup(monkeypatch, tmp_path, trend_calls):
+def _e2e_setup(monkeypatch, tmp_path, trend_calls, weekly_calls=None):
     """建本地 bare 远端(含历史文件与新旧音频)+ out 产物;注入 e2e 桩。"""
     monkeypatch.setenv(pd.ENV_GITCODE_TOKEN, "e2e-token")
     # 本地 plain-path 远端没有 https 可注入,恒等直通;token 注入/脱敏已由单测钉死
     monkeypatch.setattr(pd, "_inject_token", lambda repo_url, token: repo_url)
     monkeypatch.setattr(trend_keywords, "write_trends",
                         lambda repo_dir: trend_calls.append(repo_dir) or True)
+    if weekly_calls is not None:
+        import weekly_digest
+        monkeypatch.setattr(weekly_digest, "write_weekly",
+                            lambda repo_dir: weekly_calls.append(repo_dir) or True)
 
     remote = tmp_path / "remote.git"
     _git("init", "--bare", str(remote))
@@ -185,8 +189,8 @@ def _remote_count(remote):
 
 
 def test_push_e2e_完整链路推送并清理过期音频(frozen_push_datetime, monkeypatch, tmp_path):
-    trend_calls = []
-    remote, out = _e2e_setup(monkeypatch, tmp_path, trend_calls)
+    trend_calls, weekly_calls = [], []
+    remote, out = _e2e_setup(monkeypatch, tmp_path, trend_calls, weekly_calls)
 
     assert pd.push(str(out), str(remote), "news-hub-data") == 0
 
@@ -196,6 +200,7 @@ def test_push_e2e_完整链路推送并清理过期音频(frozen_push_datetime, 
     assert "audio/2026-08-20/fresh.mp3" in tree                      # 9 天:保留
     assert "audio/2026-08-10/old.mp3" not in tree                    # 19 天:随本批清走
     assert len(trend_calls) == 1 and trend_calls[0].endswith("repo")  # 趋势挂钩在 overlay 后的 checkout 上
+    assert len(weekly_calls) == 1 and weekly_calls[0].endswith("repo")  # 周刊同款挂载
 
     msg = subprocess.run(
         ["git", "-C", str(remote), "log", "-1", "--format=%s", "news-hub-data"],

@@ -26,6 +26,8 @@ internal fun TabRoot(
             onOpenSearch = { nav.push(Page.LocalSearch()) },
             // 报头「热词」→ 热词榜二级页(近 N 天热词 + 词云入口)
             onOpenTrends = { nav.push(Page.Hotwords) },
+            // 「AI 周刊」入口行 → 周刊二级页(杂志式周度读物,期次条切换往期)
+            onOpenWeekly = { nav.push(Page.Weekly) },
             // 分源摘要区块头「查看全部」→ 源完整列表二级页
             onOpenSource = { source -> nav.push(sourcePageOf(source)) },
             listState = todayListState,

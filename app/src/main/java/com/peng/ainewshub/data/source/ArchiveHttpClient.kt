@@ -97,6 +97,25 @@ object ArchiveHttpClient {
         absentAsNull = true
     )
 
+    // weekly.json / weekly_history.json 与 trends 同款「成功才写」语义:周刊是
+    // 每周一首批 push 生成的上周刊(幂等,失败缺刊下批自愈),404 = 尚未生成
+    // 的正常暂态 → absentAsNull 返回 null(weekly.json 缺失时 Today 入口行隐藏)
+    private val weeklyFileCache = ArchiveJsonCache(
+        fetcher = ArchiveFetcher,
+        cacheKey = "weekly.json",
+        url = { ArchiveEndpoints.rootUrl("weekly.json") },
+        hint = "读取周刊失败",
+        absentAsNull = true
+    )
+
+    private val weeklyHistoryFileCache = ArchiveJsonCache(
+        fetcher = ArchiveFetcher,
+        cacheKey = "weekly_history.json",
+        url = { ArchiveEndpoints.rootUrl("weekly_history.json") },
+        hint = "读取周刊索引失败",
+        absentAsNull = true
+    )
+
     private val snapshotCache = ArchiveSnapshotCache(ArchiveFetcher)
 
     /** 公开只读离线状态(UI 订阅,断网切换时提示「正在展示缓存数据」)。 */
@@ -116,6 +135,8 @@ object ArchiveHttpClient {
         trendsFileCache.clearForTest()
         trendsCloudFileCache.clearForTest()
         appConfigFileCache.clearForTest()
+        weeklyFileCache.clearForTest()
+        weeklyHistoryFileCache.clearForTest()
         snapshotCache.clearForTest()
     }
 
@@ -301,6 +322,36 @@ object ArchiveHttpClient {
      */
     suspend fun fetchAppConfig(force: Boolean = false): JSONObject? = withContext(Dispatchers.IO) {
         appConfigFileCache.fetch(force)
+    }
+
+    /**
+     * 拉根级独立文件 `weekly.json`(最新一期周刊,流水线 weekly_digest.py 每周
+     * 一首批 push 生成上周刊;Today 页入口行的数据源)。
+     *
+     * 与 [fetchLatestTrends] 同款「成功才写」语义:404(尚未生成/缺刊)返回
+     * null(UI 走 NoData 空态,Today 入口行隐藏);文件存在但无 sections 同样
+     * 返回 null;其余网络/解析失败照常抛错(UI 错误态)。
+     *
+     * @param force true 绕过缓存(Today 页下拉刷新联动)
+     */
+    suspend fun fetchLatestWeekly(force: Boolean = false): JSONObject? = withContext(Dispatchers.IO) {
+        weeklyFileCache.fetch(force)?.takeIf { it.has("sections") }
+    }
+
+    /**
+     * 读根级独立索引文件 `weekly_history.json`(周刊往期按周寻址)。
+     *
+     * @return weekStart(周一日期)→ 相对 weekly/ 目录的归档文件路径,倒序
+     *         (最新期在前);索引缺失(周刊上线前)或为空返回空 map(UI 空态)
+     */
+    suspend fun fetchWeeklyHistory(): Map<String, String> = withContext(Dispatchers.IO) {
+        val history = weeklyHistoryFileCache.fetch() ?: return@withContext emptyMap()
+        val result = mutableMapOf<String, String>()
+        history.keys().forEach { week ->
+            val rel = history.optString(week)
+            if (rel.isNotBlank()) result[week] = rel
+        }
+        result
     }
 
     /**

@@ -23,6 +23,8 @@ news-hub-data 分支/
 ├── trends.json                         ← 热词趋势榜(纯统计,每次批次整文件覆盖)
 ├── trends_cloud.json                   ← 趋势词云(纯统计 top ~60 词云候选,专用文件,不归档)
 ├── trends_history.json                 ← 趋势归档索引:{日期: relpath}(保留 90 天;App 热词页「历史热词」按日期寻址,流水线亦用作排名变化基准)
+├── weekly.json                         ← AI 周刊最新一期(每周一首批生成上周刊,成功才写)
+├── weekly_history.json                 ← 周刊归档索引:{周一日期: relpath}(倒序,保留 52 期;App 周刊页往期按周寻址)
 ├── manifest.json                       ← 最近一次运行总览(成功/失败状态)
 ├── overview/                           ← 今日总览按日归档(内容与 index 的 latest_overview 同构)
 │   └── 2026-08-15/
@@ -30,6 +32,9 @@ news-hub-data 分支/
 ├── trends/                             ← 热词趋势榜按日归档(内容与当期 trends.json 同构)
 │   └── 2026-08-15/
 │       └── 18-00-data.json
+├── weekly/                             ← AI 周刊按周归档(目录名 = 周一日期,内容与 weekly.json 同构)
+│   └── 2026-10-12/
+│       └── 21-40-data.json
 ├── audio/                              ← 语音速报预生成 MP3(单声道 24kHz 48kbps,按日目录,保留 14 天;2026-09-19 起停产)
 │   └── 2026-08-15/
 │       └── broadcast.mp3
@@ -95,7 +100,7 @@ news-hub-data 分支/
 }
 ```
 
-`index.json` 只含**即时字段**(每次批次整体刷新,体量有界不随保留期增长)。其余内容在根级独立文件按需拉取:`trends.json`(热词趋势)、`history.json`(摘要历史索引)与 `overview_history.json`(总览归档索引),详见下文对应章节。另有 `trends_history.json`(趋势归档索引,App 热词页「历史热词」经其按日期寻址,流水线以「昨日最后一期」归档为排名变化基准,详见「趋势历史归档」)。
+`index.json` 只含**即时字段**(每次批次整体刷新,体量有界不随保留期增长)。其余内容在根级独立文件按需拉取:`trends.json`(热词趋势)、`history.json`(摘要历史索引)与 `overview_history.json`(总览归档索引),详见下文对应章节。另有 `trends_history.json`(趋势归档索引,App 热词页「历史热词」经其按日期寻址,流水线以「昨日最后一期」归档为排名变化基准,详见「趋势历史归档」)与 `weekly.json` / `weekly_history.json`(AI 周刊最新期与往期索引,详见「AI 周刊」章节)。
 
 `latest` 里的路径是**相对于源目录**的。设计行为:某源当天抓取失败时,`index.json` 会保留它最后一次成功的指向(可能落在前一天),客户端永远能拿到有效数据。
 
@@ -333,6 +338,74 @@ print(hn['items'][0]['title'])
 - **relpath 相对 `trends/` 目录**,拼前缀后走 gitcode raw API(同 history / overview_history 消费方式)。
 - **归档文件内容与当期 `trends.json` 完全同构**(同一对象两处落盘)。
 - **用途**:① 每期 `rankChange` / `isNewEntry` 以「昨日最后一期」归档为基准计算(基准读取失败只是少这两个字段,不影响榜单本身);② App 热词页「历史热词」按日期回看(经 `trends_history.json` 寻址,复用 `fetchSnapshot` 路径缓存,归档内容与当期榜单同构渲染)。
+
+## AI 周刊(weekly.json 独立文件)
+
+根级独立文件 `weekly.json` ——**AI 周刊最新一期**,杂志式周度读物:一期 = 北京时间周一 00:00 ~ 周日 24:00,含 AI 总综述(`digest`)+ 3-6 个主题板块(`sections`,每板块 AI 短评 + 精选条目)。流水线(`scripts/weekly_digest.py`)在每周一首批 push 时读上周 7 天 `overview/` 归档(每日 digest + Top10,即现有日报数据,零新增抓取)生成「上周刊」——AI 只产出综述/短评/候选 URL 引用,数据侧逐字符核验后把条目按 URL 回填成完整对象嵌入(条目字段逐字来自归档原文,防幻觉)。幂等:索引已含该周即跳过,周中后续批次不重复生成;AI 失败本期缺刊,下批自动重试(无降级)。
+
+```json
+{
+  "schemaVersion": 1,
+  "promptVersion": 1,
+  "weekStart": "2026-10-12",
+  "weekEnd": "2026-10-18",
+  "coverageStart": "2026-10-12",
+  "coverageEnd": "2026-10-18",
+  "coverageDays": 7,
+  "issueNo": 4,
+  "generatedAt": 1792831420659,
+  "digest": "本周主线是……(3-5 句总综述,AI 生成)",
+  "sections": [
+    {
+      "title": "模型发布",
+      "summary": "这条线本周怎么演进、意味着什么……(2-4 句板块短评,AI 生成)",
+      "items": [
+        {
+          "title": "Kimi K3.1 Pro and K3.1 Pro Highspeed",
+          "url": "https://www.kimi.ai/blog/kimi-k3-1-pro",
+          "source": "hackernews",
+          "date": "2026-10-15",
+          "metrics": "得分 892 · 评论 524",
+          "comment": "AI 写的一句话点评(来自日报总览)",
+          "breaking": false,
+          "daysSeen": 3
+        }
+      ]
+    }
+  ]
+}
+```
+
+| 字段 | 说明 |
+|------|------|
+| `schemaVersion` / `promptVersion` | 数据契约版本 / 周刊 prompt 版本(语义性改 prompt 必须 +1;消费方可忽略) |
+| `weekStart` / `weekEnd` | 本期周一/周日日期(yyyy-MM-dd,北京时间;`weekStart` 即归档目录名与索引键) |
+| `coverageStart` / `coverageEnd` / `coverageDays` | 实际读到归档的天数范围与天数(overview 缺日的周 <7,如实标注) |
+| `issueNo` | 期号,自纪元周 2026-09-21 起确定性推算(`(weekStart-纪元)/7+1`) |
+| `generatedAt` | 流水线生成时刻,Unix 毫秒时间戳 |
+| `digest` | 本周总综述(3-5 句简体中文,AI 生成;空串消费方不渲染) |
+| `sections` | 主题板块 3-6 个,每板块 `title`(≤12 字)+ `summary`(≤200 字短评,空串不渲染)+ `items`(3-6 条精选条目,全刊 URL 唯一) |
+| `items[].daysSeen` | 该条目本周在 overview Top10 的在榜天数(持续主线信号,≥2 优先入选) |
+| `items[].date` | 条目所在 overview 归档日(「哪天上的榜」) |
+
+**失败语义**:与 `trends.json` 同款「成功才写」——生成失败(含上周归档 <5 天的 coverage 闸)的批次 `weekly.json` 暂缺,404 是正常暂态,下次批次(最迟次日)自愈;App 今天页「AI 周刊」入口行随之隐藏,不显示占位。
+
+## 周刊历史归档(weekly/ 目录 + weekly_history.json 独立索引)
+
+`weekly.json` 只保留最新一期,历史版本以**按周归档文件**留痕:流水线生成成功时把同一对象落盘到 `weekly/<weekStart>/<HH-MM>-data.json`(目录名 = 周一日期,北京时间),并在根级独立文件 `weekly_history.json` 维护索引(结构与 `overview_history.json` 同构,键为周一日期):
+
+```json
+{
+  "2026-10-12": "2026-10-12/21-40-data.json",
+  "2026-10-05": "2026-10-05/21-40-data.json"
+}
+```
+
+- **倒序保留最近 52 期(一年)**;旧归档目录只增不删,超出保留期的周仅不再被索引指向。
+- **relpath 相对 `weekly/` 目录**,拼前缀后走 gitcode raw API(同 history / overview_history 消费方式)。
+- **归档文件内容与当期 `weekly.json` 完全同构**(同一对象两处落盘)。
+- **历史期次可追至 2026-09-21 周**(周刊纪元;2026-10-24 上线时的往期由 `backfill_weekly.py` 一次性回填)。
+- **用途**:App 周刊页期次条切换往期(经 `weekly_history.json` 寻址,归档按路径不可变,切换零重复下载)。
 
 ## 语音速报音频(audio/ 目录 + index.json 顶层 latest_audio 字段)
 

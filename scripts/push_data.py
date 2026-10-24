@@ -34,6 +34,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from common import BEIJING_TZ as CST
 
 import trend_keywords
+import weekly_digest
 
 ENV_GITCODE_TOKEN = "GITCODE_TOKEN"
 
@@ -139,6 +140,10 @@ def _clone_overlay_commit_push(data_dir, repo_dir, authed_url, branch, repo_url,
     # 热词趋势:overlay 后仓库 checkout 含全部历史快照,是唯一能免费拿到全部
     # 历史的环节;纯统计不调 AI,失败只告警不阻断推送(文件暂缺,App 走空态)
     trend_keywords.write_trends(repo_dir)
+
+    # AI 周刊:同款 push 阶段挂载理由(这里才有上周的 overview 归档);
+    # 每周一首批自动生成上周刊,幂等(索引已含该周则跳过);失败只告警不阻断
+    weekly_digest.write_weekly(repo_dir)
 
     # 语音速报音频滚动清理:overlay 只增不删,过期日期目录在这里显式删除,
     # 随后的 git add -A 捕获删除并随本次提交推走(工作区稳定 ≈34MB)

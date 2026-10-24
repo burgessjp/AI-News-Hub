@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- AI Weekly strings (English; Chinese full set in values/strings_weekly.xml). -->
+<resources>
+    <string name="weekly_page_title">AI Weekly</string>
+    <string name="weekly_entry_title">Weekly</string>
+    <string name="weekly_entry_range">%1$s – %2$s</string>
+    <string name="weekly_issue_label">Issue %1$d</string>
+    <string name="weekly_coverage_partial">Based on %1$d days of data</string>
+    <string name="weekly_generated_at">Generated %1$s</string>
+    <string name="weekly_digest_heading">The Week</string>
+    <string name="weekly_no_data_title">Weekly not ready yet</string>
+    <string name="weekly_no_data_subtitle">A new issue is published every Monday covering the previous week</string>
+    <string name="weekly_error_title">Failed to load weekly</string>
+</resources>

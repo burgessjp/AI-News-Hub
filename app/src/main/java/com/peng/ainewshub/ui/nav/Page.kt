@@ -89,6 +89,11 @@ internal sealed interface Page {
      * 「我的关注」关键词管理行)。
      */
     data object Hotwords : Page
+    /**
+     * AI 周刊 —— 杂志式周度读物二级页(总综述 + 主题板块短评 + 精选条目,
+     * 顶部期次条切换往期),由今天页「AI 周刊」入口行进入。
+     */
+    data object Weekly : Page
 }
 
 /**
@@ -127,6 +132,7 @@ internal fun Page.toBundle(): Bundle = Bundle().apply {
         Page.HistoryHub -> putString("t", "HistoryHub")
         is Page.TrendsCloud -> putString("t", "TrendsCloud")
         is Page.Hotwords -> putString("t", "Hotwords")
+        Page.Weekly -> putString("t", "Weekly")
     }
 }
 
@@ -163,6 +169,7 @@ internal fun pageFromBundle(b: Bundle, webFallbackTitle: String): Page? {
         "HistoryHub" -> Page.HistoryHub
         "TrendsCloud" -> Page.TrendsCloud
         "Hotwords" -> Page.Hotwords
+        "Weekly" -> Page.Weekly
         else -> null
     }
 }

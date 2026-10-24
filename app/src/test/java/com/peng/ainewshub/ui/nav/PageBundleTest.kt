@@ -56,7 +56,8 @@ class PageBundleTest {
         Page.HistoryHub,
         Page.TrendsDate("2026-08-01"),
         Page.TrendsCloud,
-        Page.Hotwords
+        Page.Hotwords,
+        Page.Weekly
     )
 
     @Test

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- AI 周刊文案(中文全集,默认 locale;英文在 values-en/strings_weekly.xml)。 -->
+<resources>
+    <!-- 二级页标题 / 今天页报头动作位标签 -->
+    <string name="weekly_page_title">AI 周刊</string>
+    <string name="weekly_entry_title">周刊</string>
+    <!-- 周区间(入口行/刊头):%1$s=起,%2$s=止(已本地化的日期) -->
+    <string name="weekly_entry_range">%1$s – %2$s</string>
+    <!-- 刊头期号:%1$d=期号 -->
+    <string name="weekly_issue_label">第 %1$d 期</string>
+    <!-- 覆盖不足注记(coverageDays<7):%1$d=实际覆盖天数 -->
+    <string name="weekly_coverage_partial">本期覆盖 %1$d 天数据</string>
+    <!-- 刊头生成时间:%1$s=已本地化的时间 -->
+    <string name="weekly_generated_at">生成于 %1$s</string>
+    <!-- 总综述节头 -->
+    <string name="weekly_digest_heading">本周综述</string>
+    <!-- 空态:weekly.json 尚未生成(周一发布上周刊) -->
+    <string name="weekly_no_data_title">周刊尚未生成</string>
+    <string name="weekly_no_data_subtitle">每周一发布上周的 AI 周刊,请稍后再来</string>
+    <!-- 错误态标题 -->
+    <string name="weekly_error_title">周刊加载失败</string>
+</resources>

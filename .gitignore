@@ -37,8 +37,9 @@ Thumbs.db
 out/
 # 语音速报引擎动态资产(tts_broadcast.py 自举:qwentts.cpp 源码 + build + ≈1.2GB GGUF)
 third_party/
-# 数据仓库浅克隆目录(scripts/push_data.py 推送前 clone 到 repo/,临时产物)
-repo/
+# 数据仓库浅克隆目录(scripts/push_data.py 推送前 clone 到根目录 repo/,临时产物)。
+# 锚定根路径:裸 repo/ 会连带误伤 app 源码里的 data/repo/ 包(新增文件被静默忽略)
+/repo/
 
 # Python 字节码缓存(本地运行脚本产生,不入库)
 __pycache__/

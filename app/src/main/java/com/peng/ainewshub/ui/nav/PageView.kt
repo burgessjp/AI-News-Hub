@@ -39,6 +39,7 @@ import com.peng.ainewshub.ui.more.SettingsScreen
 import com.peng.ainewshub.ui.more.SourcesScreen
 import com.peng.ainewshub.ui.trends.HotwordsScreen
 import com.peng.ainewshub.ui.trends.TrendsCloudScreen
+import com.peng.ainewshub.ui.weekly.WeeklyScreen
 import com.peng.ainewshub.ui.trends.TrendsDateScreen
 import com.peng.ainewshub.ui.tabs.AllTab
 import com.peng.ainewshub.ui.tabs.FeaturedTab
@@ -336,6 +337,13 @@ internal fun PageView(
             onOpenCloud = { nav.push(Page.TrendsCloud) },
             onOpenLocalSearch = { nav.push(Page.LocalSearch(it)) },
             onOpenTrendsDate = { nav.push(Page.TrendsDate(it)) },
+            listState = listStates.forPage(page)
+        )
+        // AI 周刊:杂志式周度读物二级页(期次条切换往期);今天页入口行进入,
+        // 与入口行共用单实例 WeeklyViewModel(进页秒回缓存)。
+        Page.Weekly -> WeeklyScreen(
+            onBack = onBack,
+            onOpenUrl = { url, title, source -> onOpenUrl(url, title, source) },
             listState = listStates.forPage(page)
         )
     }
