@@ -1,8 +1,6 @@
 package com.peng.ainewshub.ui.weekly
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -13,15 +11,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -33,7 +30,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
@@ -65,15 +61,16 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * 「AI 周刊」二级页 —— 杂志式周度读物(承 [com.peng.ainewshub.ui.more.HistoryHubScreen]
- * 的「期次条 + 同页换刊」范式)。
+ * 「AI 周刊」二级页 —— 杂志式周度读物,默认呈现最新一期(承
+ * [com.peng.ainewshub.ui.more.HistoryHubScreen] 的「同页换刊 + 日期弹层」范式)。
  *
- * 结构:顶部期次条(周一日期 chips,选即切)→ 刊头(期号 + 周区间 + 覆盖注记
- * + 双细线)→「本周综述」总综述 → 主题板块 ×N(SectionHeader + AI 短评 +
- * 精选条目行,条目点击经 openUrl 进内置 WebView)→ 终章符(与今天页同款)。
+ * 结构:刊头(期号 + 周区间 + 覆盖注记 + 双细线)→「本周综述」总综述 →
+ * 主题板块 ×N(SectionHeader + AI 短评 + 精选条目行,条目点击经 openUrl 进
+ * 内置 WebView)→ 终章符(与今天页同款)。顶栏右上角「往期」动作弹期次
+ * 选择层,选即整页换刊(默认选最新一期,弹层首行即「回到最新」)。
  *
  * 数据/状态:
- *  - 单实例 [WeeklyViewModel](与今天页入口行共用,进页秒回缓存);
+ *  - 单实例 [WeeklyViewModel](与今天页报头动作共用,进页秒回缓存);
  *  - 期次全集 = `weekly_history.json` 索引键;选中期经索引按周归档寻址
  *    (路径不可变缓存,来回切换零重复下载);
  *  - [listState] 由 AiNewsHubApp 按 Page 值上提持有,换期滚回顶部。
@@ -106,16 +103,45 @@ fun WeeklyScreen(
         vm.retryIssue(week)
     }
 
+    // 往期选择弹层(顶栏右上角「往期」点开)
+    var showHistory by rememberSaveable { mutableStateOf(false) }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
+            val context = LocalContext.current
+            // 顶栏即刊期身份:主标题 = 期号,副标题 = 周区间(换刊即时反馈读了哪期);
+            // 正文未就绪(Loading/Error)回落静态页名
+            val issue = (digestState as? UiState.Success)?.data
             AppTopBar(
-                title = stringResource(R.string.weekly_page_title),
+                title = issue?.let { stringResource(R.string.weekly_issue_label, it.issueNo) }
+                    ?: stringResource(R.string.weekly_page_title),
+                subtitle = issue?.let {
+                    stringResource(
+                        R.string.weekly_entry_range,
+                        archiveDateLabel(context, it.weekStart),
+                        archiveDateLabel(context, it.weekEnd)
+                    )
+                },
                 titleFontSize = AppTopBarDefaults.secondaryTitleFontSize,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack,
                              contentDescription = stringResource(R.string.common_back))
+                    }
+                },
+                actions = {
+                    // 往期入口文字按钮(去图标,同词云页布局切换动作语言);
+                    // 索引就绪且有多期才值得切,单期时隐藏
+                    if (dates.size > 1) {
+                        Text(
+                            text = stringResource(R.string.weekly_history_action),
+                            style = AppText.caption,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .clickable { showHistory = true }
+                                .padding(horizontal = 14.dp, vertical = 14.dp)
+                        )
                     }
                 }
             )
@@ -146,59 +172,66 @@ fun WeeklyScreen(
                             title = stringResource(R.string.weekly_no_data_title),
                             subtitle = stringResource(R.string.weekly_no_data_subtitle)
                         )
+                    } else if (week == null) {
+                        NewsCardSkeletonList(count = 6)
                     } else {
-                        WeeklyIssueStrip(
-                            weeks = dates,
-                            selected = week,
-                            onSelect = { selectedWeek = it }
+                        WeeklyIssueContent(
+                            digestState = digestState,
+                            listState = listState,
+                            onRetry = { vm.retryIssue(week) },
+                            onOpenUrl = onOpenUrl
                         )
-                        if (week == null) {
-                            NewsCardSkeletonList(count = 6)
-                        } else {
-                            WeeklyIssueContent(
-                                digestState = digestState,
-                                listState = listState,
-                                onRetry = { vm.retryIssue(week) },
-                                onOpenUrl = onOpenUrl
-                            )
-                        }
                     }
                 }
             }
         }
     }
-}
 
-/**
- * 期次条 —— 水平周一日期 chips(选中 primary 实底,同过刊页刊期条视觉语言)。
- * 期次总量有限(索引保留 52 期),暂不做「更多」弹层。
- */
-@Composable
-private fun WeeklyIssueStrip(
-    weeks: List<String>,
-    selected: String?,
-    onSelect: (String) -> Unit
-) {
-    val context = LocalContext.current
-    val cs = MaterialTheme.colorScheme
-    LazyRow(
-        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        itemsIndexed(weeks, key = { _, w -> w }) { _, w ->
-            val isSelected = w == selected
-            Text(
-                text = archiveDateLabel(context, w),
-                style = AppText.bodySmall,
-                fontWeight = if (isSelected) FontWeight.SemiBold else null,
-                color = if (isSelected) cs.onPrimary else cs.onSurfaceVariant,
-                modifier = Modifier
-                    .clip(CircleShape)
-                    .background(if (isSelected) cs.primary else cs.surfaceContainerHigh)
-                    .clickable { onSelect(w) }
-                    .padding(horizontal = 12.dp, vertical = 6.dp)
-            )
+    // 往期选择弹层:行 = 周一日期(倒序,最新在前,首行即「回到最新」),
+    // 选中 ✓ 高亮(同过刊页「更多日期」弹层行式样)
+    if (showHistory) {
+        ModalBottomSheet(onDismissRequest = { showHistory = false }) {
+            LazyColumn(
+                contentPadding = PaddingValues(bottom = 24.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                item(key = "history-title") {
+                    Text(
+                        text = stringResource(R.string.weekly_history_sheet_title),
+                        style = AppText.titleSection,
+                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 6.dp)
+                    )
+                }
+                itemsIndexed(dates, key = { _, w -> w }) { _, w ->
+                    val isSelected = w == week
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                selectedWeek = w
+                                showHistory = false
+                            }
+                            .padding(horizontal = 18.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = archiveDateLabel(LocalContext.current, w),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f)
+                        )
+                        if (isSelected) {
+                            Text(
+                                text = "✓",
+                                style = AppText.bodySmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -247,30 +280,14 @@ private fun WeeklyIssueContent(
             is UiState.Success -> {
                 val digest = s.data
 
-                // ===== 刊头:期号 + 周区间 + 覆盖注记 + 生成时刻,双细线收底 =====
+                // ===== 刊头:覆盖注记 + 生成时刻,双细线收底
+                //(期号与周区间已上移顶栏标题/副标题,此处不重复) =====
                 item(key = "weekly-head", contentType = "lead") {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(start = 18.dp, end = 18.dp, top = 10.dp)
                     ) {
-                        Text(
-                            text = stringResource(R.string.weekly_issue_label, digest.issueNo),
-                            style = AppText.titleSection,
-                            fontWeight = FontWeight.SemiBold,
-                            color = cs.onSurface
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        val range = stringResource(
-                            R.string.weekly_entry_range,
-                            archiveDateLabel(context, digest.weekStart),
-                            archiveDateLabel(context, digest.weekEnd)
-                        )
-                        Text(
-                            text = range,
-                            style = AppText.bodySmall,
-                            color = cs.onSurfaceVariant
-                        )
                         // 如实标注覆盖不足(流水线如实记录实际读到归档的天数)
                         if (digest.coverageDays in 1..6) {
                             Spacer(Modifier.height(2.dp))

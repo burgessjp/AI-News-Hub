@@ -19,4 +19,7 @@
     <string name="weekly_no_data_subtitle">每周一发布上周的 AI 周刊,请稍后再来</string>
     <!-- 错误态标题 -->
     <string name="weekly_error_title">周刊加载失败</string>
+    <!-- 顶栏右上角往期入口动作 / 弹层标题 -->
+    <string name="weekly_history_action">往期</string>
+    <string name="weekly_history_sheet_title">往期周刊</string>
 </resources>

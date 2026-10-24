@@ -11,4 +11,6 @@
     <string name="weekly_no_data_title">Weekly not ready yet</string>
     <string name="weekly_no_data_subtitle">A new issue is published every Monday covering the previous week</string>
     <string name="weekly_error_title">Failed to load weekly</string>
+    <string name="weekly_history_action">Archive</string>
+    <string name="weekly_history_sheet_title">Past Issues</string>
 </resources>
