@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Debug 专属自适应图标(圆形):debug 圆形变体,同 ic_launcher.xml:墨底头版(红 = 正式 / 墨 = debug) -->
+<!-- Debug 专属自适应图标(圆形):debug 圆形变体,同 ic_launcher.xml:红底纸白雷达(墨 = 正式 / 红 = debug) -->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
     <background android:drawable="@drawable/ic_launcher_background" />
     <foreground android:drawable="@drawable/ic_launcher_debug" />
+    <monochrome android:drawable="@drawable/ic_launcher_debug" />
 </adaptive-icon>

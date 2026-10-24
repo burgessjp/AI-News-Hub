@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Debug 专属自适应图标:墨色刊头底(红 = 正式 / 墨 = debug,纸墨双色系内一眼可分)
-     + 与正式包同款「头版」前景;背景经 debug 源集覆盖同名 drawable 生效。
+<!-- Debug 专属自适应图标:报纸红印章底(墨 = 正式 / 红 = debug,纸墨双色系内一眼可分)
+     + 纸白「热点雷达」前景;背景经 debug 源集覆盖同名 drawable 生效。
      资产由 scripts/gen_icon.py 的 debug 模式生成,改版重跑即可。 -->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
     <background android:drawable="@drawable/ic_launcher_background" />
     <foreground android:drawable="@drawable/ic_launcher_debug" />
+    <monochrome android:drawable="@drawable/ic_launcher_debug" />
 </adaptive-icon>
