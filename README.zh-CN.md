@@ -37,11 +37,11 @@
 - 单模块工程，包名 `com.peng.ainewshub`
 - 目标 Android 7.0（API 24）及以上
 
-## 截图
+## 演示
 
-| 今天 | 热词 | 更多 |
-|:---:|:---:|:---:|
-| <img src="docs/screenshots/01-today.png" width="200" alt="今天"> | <img src="docs/screenshots/02-hotwords.png" width="200" alt="热词"> | <img src="docs/screenshots/03-more.png" width="200" alt="更多"> |
+<video src="docs/promo/ai_news_hub_promo_creative_169.mp4" controls muted preload="metadata" width="800"></video>
+
+35 秒看懂:8 源聚合 → AI 排序 → 一屏读懂。视频工程见 [docs/promo](docs/promo/README.md)。
 
 ---
 

@@ -37,11 +37,11 @@ Download the latest APK from the [Releases](https://github.com/burgessjp/AI-News
 - Single-module project, package name `com.peng.ainewshub`
 - Targets Android 7.0 (API 24) and above
 
-## Screenshots
+## Demo
 
-| Today | Hotwords | More |
-|:---:|:---:|:---:|
-| <img src="docs/screenshots/01-today.png" width="200" alt="Today"> | <img src="docs/screenshots/02-hotwords.png" width="200" alt="Hotwords"> | <img src="docs/screenshots/03-more.png" width="200" alt="More"> |
+<video src="docs/promo/ai_news_hub_promo_creative_169.mp4" controls muted preload="metadata" width="800"></video>
+
+35 seconds: 8 sources aggregated → AI-ranked → one screen. Video pipeline lives in [docs/promo](docs/promo/README.md).
 
 ---
 
