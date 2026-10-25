@@ -11,6 +11,8 @@
 [![minSdk](https://img.shields.io/badge/minSDK-24%20(Android%207.0)-green.svg)](https://developer.android.com/about/versions/nougat)
 [![Platform](https://img.shields.io/badge/Platform-Android-3DDC84.svg)](https://www.android.com)
 
+[![AI News Hub 宣传片](docs/promo/demo_loop.webp)](https://github.com/burgessjp/AI-News-Hub/blob/main/docs/promo/ai_news_hub_promo_creative_169.mp4)
+
 ## 下载
 
 [![Release](https://img.shields.io/github/v/release/burgessjp/AI-News-Hub?label=最新版本)](https://github.com/burgessjp/AI-News-Hub/releases/latest)
@@ -36,12 +38,6 @@
 - 技术栈：Kotlin + Jetpack Compose + Material 3
 - 单模块工程，包名 `com.peng.ainewshub`
 - 目标 Android 7.0（API 24）及以上
-
-## 演示
-
-[![AI News Hub 宣传片循环](docs/promo/demo_loop.webp)](https://github.com/burgessjp/AI-News-Hub/blob/main/docs/promo/ai_news_hub_promo_creative_169.mp4)
-
-35 秒看懂:8 源聚合 → AI 排序 → 一屏读懂——点击动图播放完整视频。视频工程见 [docs/promo](docs/promo/README.md)。
 
 ---
 

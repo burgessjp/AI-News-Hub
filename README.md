@@ -11,6 +11,8 @@
 [![minSdk](https://img.shields.io/badge/minSDK-24%20(Android%207.0)-green.svg)](https://developer.android.com/about/versions/nougat)
 [![Platform](https://img.shields.io/badge/Platform-Android-3DDC84.svg)](https://www.android.com)
 
+[![AI News Hub promo](docs/promo/demo_loop.webp)](https://github.com/burgessjp/AI-News-Hub/blob/main/docs/promo/ai_news_hub_promo_creative_169.mp4)
+
 ## Download
 
 [![Release](https://img.shields.io/github/v/release/burgessjp/AI-News-Hub?label=Latest%20release)](https://github.com/burgessjp/AI-News-Hub/releases/latest)
@@ -36,12 +38,6 @@ Download the latest APK from the [Releases](https://github.com/burgessjp/AI-News
 - Tech stack: Kotlin + Jetpack Compose + Material 3
 - Single-module project, package name `com.peng.ainewshub`
 - Targets Android 7.0 (API 24) and above
-
-## Demo
-
-[![AI News Hub promo loop](docs/promo/demo_loop.webp)](https://github.com/burgessjp/AI-News-Hub/blob/main/docs/promo/ai_news_hub_promo_creative_169.mp4)
-
-35 seconds: 8 sources aggregated → AI-ranked → one screen — click the loop to play the full video. Pipeline lives in [docs/promo](docs/promo/README.md).
 
 ---
 
