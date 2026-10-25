@@ -44,6 +44,21 @@ bash docs/promo/compose.sh
   且同步 `render_motion.py` 的 `BG_SEGS` 段时长)
 - 配乐:`docs/promo/assets/music_wallpaper.mp3`(自放)缺失时回落 `design/promo/assets/` 曲源
 
+## README 动图
+
+GitHub README 不支持相对路径 mp4 内嵌(仅 user-attachments 链接可内嵌),采用
+「开场 6s 循环动图(结尾闪白无缝接回开头白场淡入)+ 点击跳 blob 页原生播放器」方案:
+
+```bash
+# 从 HQ 母版截前 6s → 轻降噪 → 800 宽 15fps 动画 WebP(ffmpeg 无 libwebp,帧经 Pillow 合成)
+ffmpeg -v error -y -t 6.03 -i design/promo2/ai_news_hub_promo_creative_169_hq.mp4 \
+  -vf "hqdn3d=1.5:1.5:4:4,scale=800:-1:flags=lanczos,fps=15" /tmp/loop_%03d.png
+scripts/.venv/bin/python -c "from PIL import Image; import glob; \
+fs=[Image.open(p).convert('RGB') for p in sorted(glob.glob('/tmp/loop_*.png'))]; \
+fs[0].save('docs/promo/demo_loop.webp', save_all=True, append_images=fs[1:], duration=67, loop=0, quality=72, method=4)"
+# GIF 备胎(兼容性最强,~1MB):palettegen/paletteuse 同参数,产物 demo_loop.gif
+```
+
 ## 配乐署名(发布必读)
 
 **"Wallpaper" — Kevin MacLeod (incompetech.com),CC-BY 4.0**
