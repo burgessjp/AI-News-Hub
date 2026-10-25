@@ -59,8 +59,8 @@ ffmpeg -v error -y \
 [v6][7]xfade=transition=fade:duration=0.4:offset=30.2[vout];\
 [8:a]atrim=0:36.2,loudnorm=I=-14:TP=-1.5:LRA=11,afade=t=in:st=0:d=0.3,afade=t=out:st=34.4:d=1.2[aout]" \
   -map "[vout]" -map "[aout]" -t 35.6 \
-  -c:v libx264 -preset slow -crf 17 -pix_fmt yuv420p \
-  -c:a aac -b:a 192k -movflags +faststart \
+  -c:v libx264 -preset slow -crf 21 -pix_fmt yuv420p \
+  -c:a aac -b:a 160k -movflags +faststart \
   "$DOCS"/ai_news_hub_promo_creative_169.mp4
 
 ffprobe -v error -show_entries format=duration,size -of default=nw=1 "$DOCS"/ai_news_hub_promo_creative_169.mp4

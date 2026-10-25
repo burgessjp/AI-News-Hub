@@ -78,7 +78,8 @@ design/promo/                      # v1 工程(本地):曲源 music_wallpaper.mp
 - 渲染:3840×2160 超采样绘制 → LANCZOS 缩至 1920×1080。帧量 ≈1134,约 1 分钟。
   缓动 easeOutCubic / easeInOutCubic;点击坐标标定用 `uiautomator dump`。
 - 合成:帧序列成段 → normalize(录屏叠版面)→ xfade 串接 →
-  `libx264 crf 17 preset slow, yuv420p, aac 192k, +faststart`。
+  `libx264 crf 21 preset slow, yuv420p, aac 160k, +faststart`(SSIM 0.998 视觉无损,
+  体积 ~5.3MB,避开 GitHub README 内嵌视频 10MB 上限)。
 - 依赖:scripts/.venv(PIL)、ffmpeg、模拟器录屏(debug 包)。零外部新依赖。
 
 ## 7. 验收标准

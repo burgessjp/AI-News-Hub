@@ -1,6 +1,6 @@
 # AI News Hub 宣传视频 · 创意版工程
 
-创意版宣传片源工程:`ai_news_hub_promo_creative_169.mp4`(1920×1080 · 35.6s · 30fps · H.264+AAC · ~9MB),
+创意版宣传片源工程:`ai_news_hub_promo_creative_169.mp4`(1920×1080 · 35.6s · 30fps · H.264+AAC · ~5.3MB,crf 21 视觉无损,避开 GitHub README 内嵌视频 10MB 上限;高码母版存 `design/promo2/*_hq.mp4`),
 设计 spec 见 [SPEC.md](SPEC.md)。核心创意:产品逻辑「8 源聚合 → AI 排序 → 一屏读懂」
 做成开场叙事动效(铅字汇聚成报 → 雷达扫描锁定今日真实 Top 3),版面段文字动态滑入 +
 翻页转场,结尾雷达 logo 呼应收束。
