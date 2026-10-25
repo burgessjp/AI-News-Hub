@@ -39,9 +39,9 @@
 
 ## 演示
 
-![AI News Hub 宣传片](docs/promo/ai_news_hub_promo_creative_169.mp4)
+[![AI News Hub 宣传片](docs/promo/promo_poster.jpg)](https://github.com/burgessjp/AI-News-Hub/blob/main/docs/promo/ai_news_hub_promo_creative_169.mp4)
 
-35 秒看懂:8 源聚合 → AI 排序 → 一屏读懂。视频工程见 [docs/promo](docs/promo/README.md)。
+35 秒看懂:8 源聚合 → AI 排序 → 一屏读懂——点击播放。视频工程见 [docs/promo](docs/promo/README.md)。
 
 ---
 
