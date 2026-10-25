@@ -39,7 +39,7 @@ Download the latest APK from the [Releases](https://github.com/burgessjp/AI-News
 
 ## Demo
 
-<video src="docs/promo/ai_news_hub_promo_creative_169.mp4" controls muted preload="metadata" width="800"></video>
+![AI News Hub promo](docs/promo/ai_news_hub_promo_creative_169.mp4)
 
 35 seconds: 8 sources aggregated → AI-ranked → one screen. Video pipeline lives in [docs/promo](docs/promo/README.md).
 

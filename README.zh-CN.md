@@ -39,7 +39,7 @@
 
 ## 演示
 
-<video src="docs/promo/ai_news_hub_promo_creative_169.mp4" controls muted preload="metadata" width="800"></video>
+![AI News Hub 宣传片](docs/promo/ai_news_hub_promo_creative_169.mp4)
 
 35 秒看懂:8 源聚合 → AI 排序 → 一屏读懂。视频工程见 [docs/promo](docs/promo/README.md)。
 
