@@ -1,5 +1,6 @@
 package com.peng.ainewshub.ui.overview
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -292,7 +293,12 @@ fun TodayScreen(
  * 日报主体:单 LazyColumn 自上而下 = 总览段(Hero / 骨架 / 内嵌提示 + Top10)
  * → 我的关注入口行(点开弹命中底部弹层)→ 分源摘要区块 ×8 → 终章符。
  * 各段状态独立分支,互不阻塞。
+ *
+ * 「今日重点」大节头与 8 个分源区块头走 stickyHeader 吸顶(报头正下方),
+ * 交接为标准替换:下一个节头滚到时把当前吸顶头顶上去;吸顶头保持可点
+ * (「查看全部」可直接弹层)。吸顶头传实底 surface 遮住底下滚过的内容。
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun TodayContent(
     overviewState: OverviewState,
@@ -362,8 +368,13 @@ private fun TodayContent(
                     }
                 }
                 // 大节头用真实 SectionHeader 占位:标题文字已知,数据到位后不跳现
-                item(key = "focus_head", contentType = "focus-head") {
-                    SectionHeader(title = stringResource(R.string.today_focus_section), large = true)
+                stickyHeader(key = "focus_head", contentType = "focus-head") {
+                    // 吸顶节头:实底 surface 遮住底下滚过的内容(SectionHeader 本身透明底)
+                    SectionHeader(
+                        title = stringResource(R.string.today_focus_section),
+                        large = true,
+                        modifier = Modifier.background(cs.surface)
+                    )
                 }
                 // 行距 10dp 对齐 TopEntryRow(共享骨架默认 14dp 是 Hub 屏节奏)
                 item(key = "rows_skeleton", contentType = "skeleton") {
@@ -393,9 +404,14 @@ private fun TodayContent(
                     item(key = "lead", contentType = "lead") { OverviewLead(digest = digest) }
                 }
                 if (digest.items.isNotEmpty()) {
-                    item(key = "focus_head", contentType = "focus-head") {
-                        // 报纸大节头:红角标 + 衬线 sectionHead(线收敛后的层级锚点)
-                        SectionHeader(title = stringResource(R.string.today_focus_section), large = true)
+                    stickyHeader(key = "focus_head", contentType = "focus-head") {
+                        // 报纸大节头:红角标 + 衬线 sectionHead(线收敛后的层级锚点);
+                        // 吸顶实底 surface 遮住底下滚过的内容(SectionHeader 本身透明底)
+                        SectionHeader(
+                            title = stringResource(R.string.today_focus_section),
+                            large = true,
+                            modifier = Modifier.background(cs.surface)
+                        )
                     }
                     val items = digest.items
                     itemsIndexed(
@@ -431,12 +447,18 @@ private fun TodayContent(
         // ===== 分源摘要段:按用户 source_order 逐源一节 =====
         sourceKeys.forEach { key ->
             val state = sourceStates[key] ?: UiState.Loading
-            item(key = "src-$key-head", contentType = "src-head") {
-                // 报纸分源区块:无线起头(线收敛:靠区块头排版与留白分层)
+            stickyHeader(key = "src-$key-head", contentType = "src-head") {
+                // 报纸分源区块:无线起头(线收敛:靠区块头排版与留白分层);
+                // 吸顶实底 surface 遮住底下滚过的内容
                 SourceSectionHeader(
                     source = key,
                     state = state,
                     hasUnseen = hasUnseenDigest(state, seen[key]),
+                    // 实底后再垫 6dp:吸顶时标题与滚过内容只隔区块头自带 4dp 底距
+                    // 会贴死;background 在 padding 外层,实底覆盖到垫高层
+                    modifier = Modifier
+                        .background(cs.surface)
+                        .padding(bottom = 6.dp),
                     onOpen = {
                         // 摘要就绪且有条目 → 弹层呈现全量(数据已在手);
                         // Loading/Error/空摘要 → 源完整列表二级页兜底(页面自带加载/错误态)

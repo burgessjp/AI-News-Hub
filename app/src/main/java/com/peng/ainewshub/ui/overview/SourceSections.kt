@@ -71,6 +71,8 @@ internal const val SOURCE_SECTION_MAX_ITEMS = 3
  *
  * @param viewAllEnabled false(过刊页)时隐藏「查看全部」出口、整行不可点:
  *        源列表页展示的是今日数据,从历史日期跳转语义不符
+ * @param modifier 外层扩展位:今天页作 stickyHeader 吸顶时传实底 background
+ *        遮住底下滚过的内容(组件本身透明底)
  */
 @Composable
 internal fun SourceSectionHeader(
@@ -78,6 +80,7 @@ internal fun SourceSectionHeader(
     state: UiState<SourceSummary>,
     hasUnseen: Boolean,
     onOpen: () -> Unit,
+    modifier: Modifier = Modifier,
     viewAllEnabled: Boolean = true
 ) {
     val cs = MaterialTheme.colorScheme
@@ -85,7 +88,7 @@ internal fun SourceSectionHeader(
     val structuredCount =
         ((state as? UiState.Success)?.data?.content as? SummaryContent.Structured)?.items?.size ?: 0
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .then(if (viewAllEnabled) Modifier.clickable(onClick = onOpen) else Modifier)
             // 区块头上方留白 16dp:删线后区块间隔靠这里的段落感
