@@ -14,8 +14,8 @@
     <string name="follows_section_guide">关注关键词，每天只看你想看的</string>
     <!-- 统计行:%1$d=关注词数,%2$d=今天命中条数 -->
     <string name="follows_stats_caption">已关注 %1$d 个关键词</string>
-    <!-- 今天页关注入口行的命中数:%1$d=今天命中条数 -->
-    <string name="follows_hits_count">今天命中 %1$d 条</string>
+    <!-- 今天页右下浮动入口 pill:%1$d=今天命中条数 -->
+    <string name="follows_float_entry">关注 %1$d</string>
     <!-- 热词页管理行 chips 预览余量:%1$d=未展示的词数 -->
     <string name="follows_more_count">+%1$d</string>
 

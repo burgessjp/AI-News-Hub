@@ -2,6 +2,7 @@ package com.peng.ainewshub.ui.overview
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -39,7 +40,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -73,9 +73,7 @@ import com.peng.ainewshub.ui.theme.AppText
 /**
  * 「今天」Tab 根屏 —— 一份垂直日报(v1.4.0 合并原 总览 + 摘要 两个根 tab)。
  *
- * 单条滚动叙事:综述 Hero → 「今日重点」Top10 → 「我的关注」入口行(原独立
- * 关注根 tab 降级并入;点开经底部弹层呈现命中流,无关注词时不渲染)
- * → 分源摘要区块 ×8(按用户
+ * 单条滚动叙事:综述 Hero → 「今日重点」Top10 → 分源摘要区块 ×8(按用户
  * `source_order` 顺序,每源最多平铺 [SOURCE_SECTION_MAX_ITEMS] 条,余量经
  * 区块头「查看全部 N 条 ›」弹 [SourceListSheet] 呈现全量)→ 终章符(整份日报读完的完稿记号)。
  * 读完重点顺着往下扫完分源,不再横向切页 —— 「今天」页是日报导览,不是全量流。
@@ -232,7 +230,6 @@ fun TodayScreen(
             ) {
                 TodayContent(
                     overviewState = overviewState,
-                    followsUi = followsUi,
                     sourceKeys = sourceKeys,
                     sourceStates = sourceStates,
                     seen = seen,
@@ -242,8 +239,19 @@ fun TodayScreen(
                     onRetrySource = { summaryVm.retry(it) },
                     onSeen = { source, fingerprint -> summaryVm.markSeen(source, fingerprint) },
                     onOpenSource = onOpenSource,
-                    onOpenSourceSheet = { sheetSource = it },
-                    onOpenFollows = { showFollows = true }
+                    onOpenSourceSheet = { sheetSource = it }
+                )
+            }
+            // 「我的关注」右下浮动入口:关注是个人工具非报纸内容,不进单栏叙事;
+            // 有关注词且语料就绪才渲染(原正文入口行降级为该恒可达浮动位)
+            if (followsUi != null && followsUi.keywords.isNotEmpty()) {
+                FollowsFloatPill(
+                    hitCount = followsUi.items.size,
+                    onOpen = { showFollows = true },
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        // 页脚条上缘 8dp 呼吸(条高 62dp - 8dp),右缘对齐列表 18dp 缩进
+                        .padding(end = 18.dp, bottom = BottomBarPillHeight - 8.dp)
                 )
             }
         }
@@ -291,8 +299,8 @@ fun TodayScreen(
 
 /**
  * 日报主体:单 LazyColumn 自上而下 = 总览段(Hero / 骨架 / 内嵌提示 + Top10)
- * → 我的关注入口行(点开弹命中底部弹层)→ 分源摘要区块 ×8 → 终章符。
- * 各段状态独立分支,互不阻塞。
+ * → 分源摘要区块 ×8 → 终章符。各段状态独立分支,互不阻塞。
+ * 「我的关注」不入正文流(右下浮动入口见 [FollowsFloatPill])。
  *
  * 「今日重点」大节头与 8 个分源区块头走 stickyHeader 吸顶(报头正下方),
  * 交接为标准替换:下一个节头滚到时把当前吸顶头顶上去;吸顶头保持可点
@@ -302,8 +310,6 @@ fun TodayScreen(
 @Composable
 private fun TodayContent(
     overviewState: OverviewState,
-    // 关注行快照(null = 语料未就绪/出错,整段不渲染)
-    followsUi: FollowsUi?,
     sourceKeys: List<String>,
     sourceStates: Map<String, UiState<SourceSummary>>,
     seen: Map<String, Long>,
@@ -314,9 +320,7 @@ private fun TodayContent(
     onSeen: (String, Long) -> Unit,
     onOpenSource: (String) -> Unit,
     // 分源区块头「查看全部」→ 全量弹层(弹层由 TodayScreen 层托管)
-    onOpenSourceSheet: (String) -> Unit,
-    // 关注入口行点击 → 命中弹层(弹层由 TodayScreen 层托管)
-    onOpenFollows: () -> Unit
+    onOpenSourceSheet: (String) -> Unit
 ) {
     val context = LocalContext.current
     val cs = MaterialTheme.colorScheme
@@ -431,16 +435,6 @@ private fun TodayContent(
                         }
                     }
                 }
-            }
-        }
-
-        // ===== 我的关注:入口行(无关注词/语料未就绪时整段不渲染;点开弹命中底部弹层) =====
-        if (followsUi != null && followsUi.keywords.isNotEmpty()) {
-            item(key = "follows-head", contentType = "follows-entry-row") {
-                FollowsEntryRow(
-                    hitCount = followsUi.items.size,
-                    onOpen = onOpenFollows
-                )
             }
         }
 
@@ -564,44 +558,32 @@ private fun TodayContent(
 }
 
 /**
- * 「我的关注」入口行 —— 浅底长条(同热词页管理行视觉语言):标签 + 今日命中数 +
- * 尾随「查看」文字动作。点击整行弹出命中底部弹层([FollowsHitsSheet]),
- * 今天页正文不直接展示关注内容。
+ * 「我的关注」右下浮动入口 —— 墨色小 pill(同页脚条铅字块的 inverseSurface
+ * 语言,纸墨版面里唯一浮动元素):有关注词且语料就绪才渲染,悬浮于列表右下
+ * 呼吸带(页脚条带之上),点击弹命中底部弹层([FollowsHitsSheet])。
+ * 原正文入口行(v1.4.0)降级为该恒可达浮动位:关注是个人工具非报纸内容,
+ * 不再打断单栏叙事,滚动任意位置可达。
  */
 @Composable
-private fun FollowsEntryRow(
+private fun FollowsFloatPill(
     hitCount: Int,
-    onOpen: () -> Unit
+    onOpen: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    val cs = MaterialTheme.colorScheme
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            // top 12:与上方 Top10 的段分界拉到 22dp(≈源间 21dp),匹配大段分界权重
-            .padding(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 4.dp)
-            .clip(MaterialTheme.shapes.small)
-            .background(cs.surfaceContainerLow)
+        modifier = modifier
+            .clip(CircleShape)
+            // 近实底档透明度(同底栏浮层语义):透一丝内容、不显脏(Compose 无真模糊)
+            .background(MaterialTheme.colorScheme.inverseSurface.copy(alpha = AppAlpha.bottomBarSurface))
             .clickable(onClick = onOpen)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .padding(horizontal = 16.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = stringResource(R.string.follows_section_title),
-            style = AppText.bodySmall,
-            color = cs.onSurfaceVariant
-        )
-        Spacer(Modifier.width(10.dp))
-        Text(
-            text = stringResource(R.string.follows_hits_count, hitCount),
-            style = AppText.bodySmall,
-            color = cs.onSurfaceVariant,
-            modifier = Modifier.weight(1f)
-        )
-        Text(
-            text = stringResource(R.string.common_view),
-            style = AppText.bodySmall,
-            fontWeight = FontWeight.SemiBold,
-            color = cs.primary
+            // 「关注 ·12」:命中数随语料实时变
+            text = stringResource(R.string.follows_float_entry, hitCount),
+            style = AppText.caption,
+            color = MaterialTheme.colorScheme.inverseOnSurface
         )
     }
 }

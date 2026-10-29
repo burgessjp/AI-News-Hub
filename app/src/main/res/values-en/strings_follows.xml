@@ -7,8 +7,8 @@
     <string name="follows_section_guide">Follow keywords to see only what matters to you</string>
     <!-- Stats line: %1$d=keyword count, %2$d=today\'s matched items -->
     <string name="follows_stats_caption">Following %1$d keywords</string>
-    <!-- Hit count on Today's follows entry row: %1$d=today\'s matched items -->
-    <string name="follows_hits_count">%1$d matches today</string>
+    <!-- Floating entry pill on Today, bottom-right: %1$d=today\'s matched items -->
+    <string name="follows_float_entry">Following %1$d</string>
     <!-- Chip-preview overflow on the Hotwords manage row: %1$d=hidden keyword count -->
     <string name="follows_more_count">+%1$d</string>
 
