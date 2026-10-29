@@ -74,8 +74,12 @@ ALL_OK_SOURCES = {name: (_hn_fetcher() if name == "hackernews" else _ok_fetcher(
 OLD_LATEST = {name: "2026-08-28/22-00-data.json" for name in fd.SOURCES}
 
 
-def test_main_全成功_退出码0_全本地指向(monkeypatch, tmp_path):
-    rc = _run(monkeypatch, tmp_path, ALL_OK_SOURCES)
+def test_main_全成功_退出码0_全本地指向(monkeypatch, tmp_path, requests_mock):
+    # 同款 mock 上一索引:本用例断言「全部成功时 latest 全指向本次本地快照」,
+    # 与上一索引内容无关,但不 mock 会真打 api.gitcode.com(违背本文件
+    # 「零真实网络」承诺;匿名读被 GitCode WAF 429 限流时此用例会间歇性红)。
+    rc = _run(monkeypatch, tmp_path, ALL_OK_SOURCES,
+              extra_args=_mock_previous(monkeypatch, requests_mock, OLD_LATEST))
     assert rc == 0
     index = _read(tmp_path / "index.json")
     assert index["latest"] == {name: "2026-08-29/11-01-data.json" for name in fd.SOURCES}
