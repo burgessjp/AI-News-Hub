@@ -229,7 +229,8 @@ internal fun TopEntryRow(
                     text = bodyText,
                     style = AppText.bodySmall,
                     color = cs.onSurfaceVariant,
-                    maxLines = 2,
+                    // 描述位多句短评(流水线 80~160 字,约 3~6 行),放行 6 行上限
+                    maxLines = 6,
                     overflow = TextOverflow.Ellipsis
                 )
             }
