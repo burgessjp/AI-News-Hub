@@ -1,5 +1,7 @@
 package com.peng.ainewshub.ui.weekly
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -239,7 +241,12 @@ fun WeeklyScreen(
 /**
  * 单期周刊主体 —— 单 LazyColumn 自上而下:刊头 → 本周综述 → 主题板块 ×N
  * (短评 + 精选条目行)→ 终章符。二级页无下拉刷新;错误态带重试。
+ *
+ * 「本周综述」大节头与各主题板块节头走 stickyHeader 吸顶(顶栏正下方,与
+ * 今天页同款):交接为标准替换,吸顶头实底 surface 遮住底下滚过的内容;
+ * 小节头实底内再垫 6dp 呼吸(短评行无自带上边距,不垫会贴死)。
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun WeeklyIssueContent(
     digestState: UiState<WeeklyDigest>,
@@ -310,8 +317,13 @@ private fun WeeklyIssueContent(
 
                 // ===== 本周综述(AI 总综述;空串不渲染) =====
                 if (digest.digest.isNotBlank()) {
-                    item(key = "weekly-digest-head", contentType = "digest-head") {
-                        SectionHeader(title = stringResource(R.string.weekly_digest_heading), large = true)
+                    stickyHeader(key = "weekly-digest-head", contentType = "digest-head") {
+                        // 吸顶节头:实底 surface 遮住底下滚过的内容(SectionHeader 本身透明底)
+                        SectionHeader(
+                            title = stringResource(R.string.weekly_digest_heading),
+                            large = true,
+                            modifier = Modifier.background(cs.surface)
+                        )
                     }
                     item(key = "weekly-digest-body", contentType = "digest-body") {
                         Text(
@@ -327,8 +339,16 @@ private fun WeeklyIssueContent(
 
                 // ===== 主题板块 ×N:章节头 + AI 短评 + 精选条目行 =====
                 digest.sections.forEachIndexed { si, section ->
-                    item(key = "weekly-sec-$si-head", contentType = "sec-head") {
-                        SectionHeader(title = section.title)
+                    stickyHeader(key = "weekly-sec-$si-head", contentType = "sec-head") {
+                        // 吸顶实底 + 底部 6dp 呼吸(下方短评行无自带上边距,
+                        // 只靠节头自带 6dp 底距吸顶时会贴死;background 在
+                        // padding 外层,实底覆盖到垫高层)
+                        SectionHeader(
+                            title = section.title,
+                            modifier = Modifier
+                                .background(cs.surface)
+                                .padding(bottom = 6.dp)
+                        )
                     }
                     if (section.summary.isNotBlank()) {
                         item(key = "weekly-sec-$si-summary", contentType = "sec-summary") {
