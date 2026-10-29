@@ -31,8 +31,13 @@ import org.json.JSONObject
  * 缓存与刷新:index 与各根级文件有 2 分钟内存缓存(多源并发去重);快照本体按路径
  * 缓存(内容不可变)。手动刷新(根 Tab 与源列表二级页下拉)经 force=true 绕过 TTL,
  * 锁内秒级去重窗口把同一波并发 force 收敛为 1 次网络请求;自动加载/重击 tab 走缓存。
- * 断网兜底:仅传输层失败读盘([ArchiveDiskCache],7 天时效,write-through 落盘),
- * HTTP 层错误不兜底直接走 Error 态 —— 盘上旧数据不能冒充最新数据。
+ * 今日聚合包(today.json):「今天」页冷启动单请求载体(overview + 8 源摘要 + 周刊),
+ * Overview/Summary/Weekly 三 Repository 取数入口 bundle 优先、共享一次请求;
+ * 缺失(404)逐段回退 index/快照旧路径(见各 Repository)。
+ * 断网兜底:传输层失败与限流(429)读盘([ArchiveDiskCache],7 天时效,write-through
+ * 落盘)——限流是通道问题不是数据故障(数据一天两批,盘上几乎必新鲜),旧数据顶上
+ * + 离线胶囊提示优于整页 Error;其余 HTTP 层错误不兜底直接走 Error 态 —— 服务端
+ * 故障时盘上旧数据不能冒充最新数据。
  * 任一步失败(HTTP 错误 / index 无该源 / items 为空)抛 RuntimeException,
  * 交由 ViewModel 显示 Error 态。
  */
@@ -108,6 +113,18 @@ object ArchiveHttpClient {
         absentAsNull = true
     )
 
+    // today.json 聚合包:「今天」页冷启动单请求载体(latest_overview + 各源
+    // ai_summary_v2 + 最新周刊,push 阶段组装)。404 = 流水线旧版本/组装失败
+    // 未写 → absentAsNull 返回 null,调用方(Overview/Summary/Weekly 三个
+    // Repository 的 bundle 优先路径)自动回退 index + 快照旧路径,灰度安全
+    private val todayBundleFileCache = ArchiveJsonCache(
+        fetcher = ArchiveFetcher,
+        cacheKey = "today.json",
+        url = { ArchiveEndpoints.rootUrl("today.json") },
+        hint = "读取今日聚合包失败",
+        absentAsNull = true
+    )
+
     private val weeklyHistoryFileCache = ArchiveJsonCache(
         fetcher = ArchiveFetcher,
         cacheKey = "weekly_history.json",
@@ -137,6 +154,7 @@ object ArchiveHttpClient {
         appConfigFileCache.clearForTest()
         weeklyFileCache.clearForTest()
         weeklyHistoryFileCache.clearForTest()
+        todayBundleFileCache.clearForTest()
         snapshotCache.clearForTest()
     }
 
@@ -337,6 +355,22 @@ object ArchiveHttpClient {
     suspend fun fetchLatestWeekly(force: Boolean = false): JSONObject? = withContext(Dispatchers.IO) {
         weeklyFileCache.fetch(force)?.takeIf { it.has("sections") }
     }
+
+    /**
+     * 拉根级今日聚合包 `today.json`(「今天」页冷启动单请求载体:latest_overview +
+     * 各源 ai_summary_v2 + 最新周刊,push 阶段 today_bundle.py 组装)。
+     * Overview / Summary / Weekly 三个 Repository 的取数入口 bundle 优先,
+     * 三方共享本缓存(内存去重,一次网络请求全员复用)。
+     *
+     * 404(流水线旧版本 / 组装失败未写)返回 null —— 调用方逐段回退既有
+     * index + 快照路径,灰度安全;其余网络/解析失败照常抛错(429 走盘上兜底,
+     * 见 [ArchiveFetcher])。
+     *
+     * @param force true 绕过缓存(Today 页下拉刷新:三 Repository 联动 force,
+     *               锁内去重窗口收敛为 1 次请求)
+     */
+    suspend fun fetchTodayBundle(force: Boolean = false): JSONObject? =
+        todayBundleFileCache.fetch(force)
 
     /**
      * 读根级独立索引文件 `weekly_history.json`(周刊往期按周寻址)。

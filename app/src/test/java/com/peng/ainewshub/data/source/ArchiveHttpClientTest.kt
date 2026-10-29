@@ -173,6 +173,35 @@ class ArchiveHttpClientTest {
         assertTrue(ArchiveHttpClient.offlineMode.value)
     }
 
+    @Test
+    fun `429 限流读盘兜底返回旧数据并置 offlineMode`() = runBlocking {
+        // 1) 网络成功一次 → write-through 落盘;2) 服务端改回 429(匿名配额被
+        // WAF 打满的真实形态)→ 限流与断网同档:读盘兜底,不整页 Error
+        ArchiveHttpClient.fetchTodayBundle()
+        dispatcher.overrides["today.json"] = MockResponse().setResponseCode(429)
+        Thread.sleep(2_100) // 越过 force 锁内去重窗口,force 才会真打网络吃到 429
+        val bundle = ArchiveHttpClient.fetchTodayBundle(force = true)
+        assertNotNull(bundle)
+        assertTrue(bundle!!.has("sources"))
+        assertTrue(ArchiveHttpClient.offlineMode.value)
+    }
+
+    @Test
+    fun `429 无盘上兜底抛 RateLimited`() = runBlocking {
+        // 盘上无缓存(唯一 cacheKey,不受其它用例落盘影响)+ 429 → 如实抛
+        // RateLimited(UI「访问受限」文案)
+        dispatcher.overrides["unique-429-probe.json"] = MockResponse().setResponseCode(429)
+        val error = runCatching {
+            ArchiveFetcher.fetchJsonWithDiskFallback(
+                "unique-429-probe.json",
+                server.url(pathPrefix.trimEnd('/') + "/unique-429-probe.json").toString(),
+                "读取探针失败"
+            )
+        }.exceptionOrNull()
+        assertTrue(error is AppException.RateLimited)
+        assertFalse(ArchiveHttpClient.offlineMode.value)
+    }
+
     // ===== 4. 根级独立文件 =====
 
     @Test
@@ -183,6 +212,18 @@ class ArchiveHttpClientTest {
         val trends = ArchiveHttpClient.fetchLatestTrends()
         assertNotNull(trends)
         assertTrue(trends!!.has("keywords"))
+    }
+
+    @Test
+    fun `今日聚合包 成功才写语义 404 返回 null 存在则返回内容`() = runBlocking {
+        dispatcher.overrides["today.json"] = MockResponse().setResponseCode(404)
+        assertNull(ArchiveHttpClient.fetchTodayBundle())
+        dispatcher.overrides.remove("today.json")
+        val bundle = ArchiveHttpClient.fetchTodayBundle(force = true)
+        assertNotNull(bundle)
+        assertTrue(bundle!!.has("overview"))
+        assertTrue(bundle.has("sources"))
+        assertTrue(bundle.has("weekly"))
     }
 
     @Test

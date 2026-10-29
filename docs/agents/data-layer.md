@@ -9,7 +9,8 @@
 - **Product Hunt 只归档**（Developer Token 是服务端 secret 不进 APK，两种模式都走归档）。
 - 归档走 `ArchiveHttpClient`（gitcode **REST API raw 端点**，**不要**用 raw 直链——背后是 WAF 会 403）。
 - 7 个归档源列表二级页 Repository 的 `fetch()` 走 index 2 分钟缓存、`forceRefresh()` 经 `fetchItemsList(force=true)` 绕过 TTL 强制重读 index（下拉刷新，与 4 个根 Tab 语义对齐）；快照本体按路径不可变，无 force 语义（index 强刷拿到新路径自然换缓存键）。
-- **归档断网兜底**：index / 快照 / 根级文件网络成功后 write-through 落盘（`ArchiveDiskCache`，`cacheDir/archives/`，64MB 上限最旧淘汰 + 读取 7 天时效，`App.onCreate` init 保证小组件等无 Activity 入口也能落盘）；**仅传输层失败（IOException：连不上/DNS/读超时）读盘兜底**，命中且未过期则置 `ArchiveHttpClient.offlineMode` 并返回旧数据（Repository/VM 签名零改动），UI 层每次离线事件弹一次性顶部胶囊提示（`NoticePill`，5 秒、恢复联网提前消失；下拉刷新无新批次为 2.5 秒对勾胶囊）；**HTTP 层错误（4xx/5xx/空响应）不兜底**，直接走 Error 态——服务端故障不得伪装成「离线」拿旧数据顶上。
+- **归档断网兜底**：index / 快照 / 根级文件网络成功后 write-through 落盘（`ArchiveDiskCache`，`cacheDir/archives/`，64MB 上限最旧淘汰 + 读取 7 天时效，`App.onCreate` init 保证小组件等无 Activity 入口也能落盘）；**传输层失败（IOException：连不上/DNS/读超时）与限流（429 → `AppException.RateLimited`）读盘兜底**，命中且未过期则置 `ArchiveHttpClient.offlineMode` 并返回旧数据（Repository/VM 签名零改动），UI 层每次离线事件弹一次性顶部胶囊提示（`NoticePill`，5 秒、恢复联网提前消失；下拉刷新无新批次为 2.5 秒对勾胶囊）；**其余 HTTP 层错误（4xx/5xx/空响应）不兜底**，直接走 Error 态——服务端故障不得伪装成「离线」拿旧数据顶上（429 单列：限流是通道问题不是数据故障，数据一天两批盘上几乎必新鲜；无盘上兜底时走「访问受限」文案）。
+- **今日聚合包 `today.json`（2026-10-29 起）**：push 阶段组装的「今天」页冷启动单请求载体（`latest_overview` + 各源 `ai_summary_v2`（带 `fetchedAtMs`）+ 最新 `weekly.json`，原样内嵌不改写；格式见 docs/news-hub-data-usage.md）。App 端 `OverviewRepository.loadDigest` / `SummaryRepository.summarize` / `WeeklyRepository.loadLatest` 三入口 **bundle 优先**（三方共享 `fetchTodayBundle` 一次请求，关注语料随三路自动复用）——冷启动请求 11 → 2（app_config + today.json；动因：api.gitcode.com 匿名读受 WAF 严格限流）。回退完整保留：包 404（流水线旧版本/组装失败）/包内缺段（overview/某源/weekly）逐段回退既有 index/快照路径，灰度安全；bundle 取数网络失败如实失败不回退（避免同 host 重复打网络）。
 - **归档失败（盘上也无兜底）直接显示 Error 态。**
 
 ## 内容页的数据语义（今天根 Tab + 热词二级页）

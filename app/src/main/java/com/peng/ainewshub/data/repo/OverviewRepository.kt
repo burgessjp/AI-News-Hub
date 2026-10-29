@@ -74,15 +74,19 @@ class OverviewRepository {
     /**
      * 加载今日总览。
      *
-     * 归档只读:经 [ArchiveHttpClient.fetchLatestOverview](复用 index.json 2 分钟缓存)
-     * 拉取流水线预生成的 `latest_overview` 字段并反序列化。
+     * 归档只读,**聚合包优先**:先取根级 `today.json`(「今天」页单请求载体,
+     * 与 Summary/Weekly 两 Repository 共享一次网络请求)内的 `overview` 键
+     * (内容与 index `latest_overview` 完全同构,原样内嵌);包缺失(404 = 流水线
+     * 旧版本/组装失败)或包内无该键时回退 [ArchiveHttpClient.fetchLatestOverview]
+     * 的 index 路径。
      *
-     * @param force true 绕过 index.json 2 分钟缓存(总览 Tab 下拉刷新)
+     * @param force true 绕过 2 分钟缓存(总览 Tab 下拉刷新)
      * @return 成功为 [OverviewDigest];失败为 [AppException.NoData](字段缺失)/
      * 网络/解析失败
      */
     suspend fun loadDigest(force: Boolean = false): Result<OverviewDigest> = runCatching {
-        val json = ArchiveHttpClient.fetchLatestOverview(force)
+        val json = ArchiveHttpClient.fetchTodayBundle(force)?.optJSONObject("overview")
+            ?: ArchiveHttpClient.fetchLatestOverview(force)
             ?: throw AppException.NoData()
         parseDigest(json)
     }

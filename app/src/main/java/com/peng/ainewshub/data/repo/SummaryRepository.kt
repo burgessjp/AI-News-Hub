@@ -96,15 +96,37 @@ class SummaryRepository {
      * 读取某归档源当日的 AI 摘要。返回 [Result]:成功为 [SourceSummary](含正文与快照时刻),
      * 失败为异常(归档拉取失败 / ai_summary 缺失)。
      *
+     * **聚合包优先**:先取根级 `today.json`(「今天」页单请求载体,与 Overview/
+     * Weekly 两 Repository 共享一次网络请求)内该源的 `summary` 全量条目(「查看
+     * 全部」弹层同源数据);包缺失 / 该源键缺席(单源抓取失败批次、v1 纯文本
+     * 批次)/ 条目全空时回退快照路径(该源独立一次请求)。
+     *
      * @param source 归档源 key(hackernews / github-trending / huggingface-papers /
      * stormzhang-ai / producthunt / rundown-ai / openai-anthropic-news / aihot-featured)
-     * @param force true 绕过 index.json 2 分钟缓存(摘要 Tab 下拉刷新)
+     * @param force true 绕过 2 分钟缓存(摘要 Tab 下拉刷新)
      */
     suspend fun summarize(source: String, force: Boolean = false): Result<SourceSummary> {
         val src = SummarySource.fromKey(source)
             ?: return Result.failure(IllegalArgumentException("未知源:$source"))
 
-        // 拉归档快照(fetchLatestSnapshot 内部已切 IO,返回整个顶层 JSONObject,含 ai_summary_v2 / ai_summary)
+        // 聚合包路径:sources.<key> = { fetchedAtMs, summary[] },字段口径与快照
+        // 顶层 ai_summary_v2 完全一致(pipeline 原样搬运),过滤规则同 parseSummary。
+        // 取包失败(网络/5xx)如实失败,不回退旧路径重复打网络(与 loadDigest 同语义)
+        val bundle = runCatching { ArchiveHttpClient.fetchTodayBundle(force) }
+            .getOrElse { return Result.failure(it) }
+        bundle?.optJSONObject("sources")
+            ?.optJSONObject(src.key)
+            ?.let { entry ->
+                val content = parseBundleSummary(entry.optJSONArray("summary"))
+                if (content != null) {
+                    indexStructured(src.key, content)
+                    return Result.success(
+                        SourceSummary(content = content, fetchedAtMs = entry.optLong("fetchedAtMs", 0L))
+                    )
+                }
+            }
+
+        // 回退:拉归档快照(含 ai_summary_v2 / ai_summary,覆盖 Plain/Unavailable 旧形态)
         val snapshot = runCatching { ArchiveHttpClient.fetchLatestSnapshot(src.key, force) }
             .getOrElse { return Result.failure(it) }
 
@@ -114,6 +136,23 @@ class SummaryRepository {
             indexStructured(src.key, content)
             SourceSummary(content = content, fetchedAtMs = snapshot.optLong("fetched_at_ms", 0L))
         }
+    }
+
+    /**
+     * 解析聚合包内单源摘要数组(`today.json sources.<key>.summary`,口径同快照
+     * 顶层 `ai_summary_v2`):逐条过滤 title/desc 为空的项;全空返回 null
+     * (调用方回退快照路径,由其给出 Plain/Unavailable/NoData 完整语义)。
+     */
+    private fun parseBundleSummary(arr: org.json.JSONArray?): SummaryContent.Structured? {
+        if (arr == null || arr.length() == 0) return null
+        val items = (0 until arr.length()).mapNotNull { i ->
+            val obj = arr.optJSONObject(i) ?: return@mapNotNull null
+            val title = obj.optString("title").orEmpty().trim()
+            val desc = obj.optString("desc").orEmpty().trim()
+            val url = obj.optString("url").orEmpty().trim()
+            if (title.isNotEmpty() && desc.isNotEmpty()) SummaryItem(title, desc, url) else null
+        }
+        return items.takeIf { it.isNotEmpty() }?.let { SummaryContent.Structured(it) }
     }
 
     /**

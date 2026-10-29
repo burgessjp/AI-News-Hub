@@ -139,13 +139,16 @@ class WeeklyRepository {
     }
 
     /**
-     * 加载最新一期(根级 weekly.json)。
+     * 加载最新一期。**聚合包优先**:先取根级 `today.json`(「今天」页单请求载体,
+     * 与 Overview/Summary 两 Repository 共享一次网络请求)内原样内嵌的 `weekly`
+     * 键;包缺失(404)/包内无周刊键(缺刊批次)时回退根级 `weekly.json` 路径。
      *
      * @param force true 绕过 2 分钟缓存(Today 页下拉刷新联动)
      * @return 成功为 [WeeklyDigest];文件缺失(尚未生成)/空刊 → [AppException.NoData]
      */
     suspend fun loadLatest(force: Boolean = false): Result<WeeklyDigest> = runCatching {
-        val json = ArchiveHttpClient.fetchLatestWeekly(force)
+        val json = ArchiveHttpClient.fetchTodayBundle(force)?.optJSONObject("weekly")
+            ?: ArchiveHttpClient.fetchLatestWeekly(force)
             ?: throw AppException.NoData()
         parseDigest(json)
     }

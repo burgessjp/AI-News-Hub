@@ -48,6 +48,10 @@ sealed class AppException(
      */
     class AiAuth : AppException("ai_auth")
 
-    /** 第三方限流/拦截:Cloudflare 挑战、反爬。用户语义:访问受限,请稍后重试。 */
-    class RateLimited : AppException("rate_limited")
+    /**
+     * 限流/拦截:第三方 Cloudflare 挑战、反爬,或数据仓 API 匿名配额 429。
+     * 用户语义:访问受限,请稍后重试。[detail] 只进诊断报告(如「HTTP 429 · 读取
+     * 归档索引失败」),不进 UI 文案(走 error_rate_limited 词条)。
+     */
+    class RateLimited(detail: String? = null) : AppException(detail ?: "rate_limited")
 }

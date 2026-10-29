@@ -33,6 +33,7 @@ from datetime import datetime, timedelta
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from common import BEIJING_TZ as CST
 
+import today_bundle
 import trend_keywords
 import weekly_digest
 
@@ -144,6 +145,10 @@ def _clone_overlay_commit_push(data_dir, repo_dir, authed_url, branch, repo_url,
     # AI 周刊:同款 push 阶段挂载理由(这里才有上周的 overview 归档);
     # 每周一首批自动生成上周刊,幂等(索引已含该周则跳过);失败只告警不阻断
     weekly_digest.write_weekly(repo_dir)
+
+    # 今日聚合包:overlay + 周刊后,checkout 已含本批全量产物 → 组装根级
+    # today.json(App「今天」页单请求载体);失败只告警不阻断,保持上一版
+    today_bundle.write_today_bundle(repo_dir)
 
     # 语音速报音频滚动清理:overlay 只增不删,过期日期目录在这里显式删除,
     # 随后的 git add -A 捕获删除并随本次提交推走(工作区稳定 ≈34MB)

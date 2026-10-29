@@ -51,15 +51,18 @@ internal object ArchiveFetcher {
     /**
      * 网络取 JSON + 磁盘兜底的统一骨架(index / 快照 / 根级独立文件共用):
      *  1. 网络成功 → 解析 → write-through 落盘(静默失败)→ 复位 [offlineMode]
-     *  2. 传输层失败([IOException]:连不上/DNS/读超时)→ 读盘兜底:命中且未过期
-     *     ([ArchiveDiskCache] 7 天 TTL)则置 [offlineMode] 为 true 并返回盘上旧数据;
-     *     未命中或盘上数据损坏则抛回原异常(走原错误态)
+     *  2. 传输层失败([IOException]:连不上/DNS/读超时)与限流(429 →
+     *     [AppException.RateLimited])→ 读盘兜底:命中且未过期([ArchiveDiskCache]
+     *     7 天 TTL)则置 [offlineMode] 为 true 并返回盘上旧数据;未命中或盘上
+     *     数据损坏则抛回原异常(走原错误态)。429 与断网同档:限流是通道问题
+     *     不是数据故障(数据一天两批,盘上几乎必是新鲜),匿名配额被打满时拿
+     *     旧数据顶上 + 离线胶囊提示,优于整页 Error
      *  3. [tolerateMissing] 语义不变:404 返回 null,不落盘也不兜底(「成功才写」的
      *     文件尚未生成时盘上本就不会有)
      *
-     * 不兜底的失败:HTTP 层错误(非 2xx、空响应,服务端已应答)抛 [AppException.Network]、
-     * 解析失败抛 [AppException.ServerError] —— 服务端故障不能伪装成「离线」拿旧数据
-     * 顶上,须如实走 Error 态。
+     * 不兜底的失败:其余 HTTP 层错误(非 2xx、空响应,服务端已应答)抛
+     * [AppException.Network]、解析失败抛 [AppException.ServerError] —— 服务端故障
+     * 不能伪装成「离线」拿旧数据顶上,须如实走 Error 态。
      *
      * @param cacheKey 磁盘缓存键(与内存缓存同键:index.json / source/relPath / 根级文件名)
      */
@@ -73,16 +76,15 @@ internal object ArchiveFetcher {
             getRaw(url, hint, tolerateMissing) ?: return null
         } catch (e: CancellationException) {
             throw e
+        } catch (e: AppException.RateLimited) {
+            // 429 限流:与传输层失败同走盘上兜底(见方法注释);盘上无兜底时
+            // 原样抛回(ErrorKind.RateLimited 文案如实告知访问受限)
+            return diskFallbackOrThrow(cacheKey, e)
         } catch (e: IOException) {
             // 传输层失败(连不上):读盘兜底(盘上是上次网络成功时落下的旧数据);
             // 兜底未命中时带场景与原始异常包成 Network 上抛 —— 诊断报告能看到
             // 是哪个文件、什么传输层错误
-            val wrapped = AppException.Network(hint, e)
-            val disk = withContext(Dispatchers.IO) { ArchiveDiskCache.read(cacheKey) }
-                ?: throw wrapped
-            return runCatching { JSONObject(disk) }
-                .map { parsed -> parsed.also { _offlineMode.value = true } }
-                .getOrElse { throw wrapped }
+            return diskFallbackOrThrow(cacheKey, AppException.Network(hint, e))
         }
         // AppException(HTTP 错误/空响应)与其他非预期异常不捕获,直接向上抛
         val parsed = runCatching { JSONObject(text) }
@@ -90,6 +92,18 @@ internal object ArchiveFetcher {
         withContext(Dispatchers.IO) { ArchiveDiskCache.write(cacheKey, text) }
         _offlineMode.value = false
         return parsed
+    }
+
+    /**
+     * 盘上兜底共用骨架:命中且可解析 → 置 [offlineMode] 返回旧数据;
+     * 未命中/损坏 → 抛回 [original](调用方语义的错误态)。
+     */
+    private suspend fun diskFallbackOrThrow(cacheKey: String, original: RuntimeException): JSONObject? {
+        val disk = withContext(Dispatchers.IO) { ArchiveDiskCache.read(cacheKey) }
+            ?: throw original
+        return runCatching { JSONObject(disk) }
+            .map { parsed -> parsed.also { _offlineMode.value = true } }
+            .getOrElse { throw original }
     }
 
     /**
@@ -115,6 +129,9 @@ internal object ArchiveFetcher {
         client.newCall(req).execute().use { resp ->
             when {
                 resp.code == 404 && tolerateMissing -> null
+                // 429 = 匿名配额被 WAF 限流:单列 RateLimited(上层与断网同走盘上
+                // 兜底,见 fetchJsonWithDiskFallback;无兜底时 UI 走「访问受限」文案)
+                resp.code == 429 -> throw AppException.RateLimited("HTTP 429 · $hint")
                 !resp.isSuccessful -> throw AppException.Network("HTTP ${resp.code} · $hint")
                 else -> resp.body?.string()?.takeIf { it.isNotBlank() }
                     ?: throw AppException.Network("空响应 · $hint")

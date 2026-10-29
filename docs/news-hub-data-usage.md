@@ -25,6 +25,8 @@ news-hub-data 分支/
 ├── trends_history.json                 ← 趋势归档索引:{日期: relpath}(保留 90 天;App 热词页「历史热词」按日期寻址,流水线亦用作排名变化基准)
 ├── weekly.json                         ← AI 周刊最新一期(每周一首批生成上周刊,成功才写)
 ├── weekly_history.json                 ← 周刊归档索引:{周一日期: relpath}(倒序,保留 52 期;App 周刊页往期按周寻址)
+├── today.json                          ← 今日聚合包(App「今天」页单请求载体:latest_overview + 各源
+│                                         ai_summary_v2 + 最新周刊,每次批次组装覆盖,成功才写)
 ├── manifest.json                       ← 最近一次运行总览(成功/失败状态)
 ├── overview/                           ← 今日总览按日归档(内容与 index 的 latest_overview 同构)
 │   └── 2026-08-15/
@@ -406,6 +408,32 @@ print(hn['items'][0]['title'])
 - **归档文件内容与当期 `weekly.json` 完全同构**(同一对象两处落盘)。
 - **历史期次可追至 2026-09-21 周**(周刊纪元;2026-10-24 上线时的往期由 `backfill_weekly.py` 一次性回填)。
 - **用途**:App 周刊页期次条切换往期(经 `weekly_history.json` 寻址,归档按路径不可变,切换零重复下载)。
+
+## 今日聚合包(today.json 独立文件)
+
+「今天」页冷启动的**单请求载体**(`scripts/today_bundle.py` 在 push 阶段组装):一个文件聚合当天首屏全部内容——`latest_overview` + 8 源 `ai_summary_v2` + 最新一期周刊,App 端命中即 1 次请求完成 Hero / Top10 / 分源摘要 / 关注语料 / 周刊入口(冷启动总请求 11 → 2)。各段语义与原路径完全一致,聚合只是搬运不改写:
+
+```json
+{
+  "schema": 1,
+  "generatedAt": 1793285695000,
+  "dataFetchedAt": 1793285694275,
+  "overview": { "…与 index.json 顶层 latest_overview 完全同构,原样内嵌…" },
+  "sources": {
+    "hackernews": {
+      "fetchedAtMs": 1793285694275,
+      "summary": [ { "title": "…", "desc": "…", "url": "…" } ]
+    }
+  },
+  "weekly": { "…与根级 weekly.json 完全同构,原样内嵌…" }
+}
+```
+
+- **`overview`**:index `latest_overview` 原样内嵌;缺失 → 键缺席,App 总览段回退 index 路径。
+- **`sources.<key>.summary`**:该源 latest 快照顶层 `ai_summary_v2` **全量条目**(「查看全部」弹层同源);`fetchedAtMs` = 快照 `fetched_at_ms`(App「已查看」指纹与断供判定依赖)。快照缺失 / 无 `ai_summary_v2`(v1 纯文本批次)→ 该源键缺席,App 单源回退快照路径。
+- **`weekly`**:根级 `weekly.json` 原样内嵌;缺失(周一前/缺刊批次)→ 键缺席,App 周刊回退 `weekly.json` 路径。
+- **失败语义**:成功才写(组装异常保持上一版),每次批次覆盖,无继承语义;体量 ≈50~150KB。
+- **App 回退完整保留**:文件 404(流水线旧版本/组装失败)时 App 自动走既有 index + 快照多请求路径,新旧两态并存,灰度安全。
 
 ## 语音速报音频(audio/ 目录 + index.json 顶层 latest_audio 字段)
 
