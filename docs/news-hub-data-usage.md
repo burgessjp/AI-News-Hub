@@ -94,7 +94,7 @@ news-hub-data 分支/
       {
         "source": "hackernews",
         "title": "...", "url": "...", "metrics": "得分 630 · 评论 61",
-        "comment": "AI 写的一句话重要性",
+        "comment": "AI 短评(80~160 字 2~4 句)",
         "breaking": false, "breakingReason": ""
       }
     ]
@@ -207,7 +207,7 @@ print(hn['items'][0]['title'])
         "title": "PGSimCity - How PostgreSQL Works",
         "url": "https://...",
         "metrics": "得分 630 · 评论 61",
-        "comment": "AI 写的一句话重要性",
+        "comment": "AI 短评(80~160 字 2~4 句)",
         "breaking": false,
         "breakingReason": ""
       }
@@ -222,7 +222,7 @@ print(hn['items'][0]['title'])
 | `dataFetchedAt` | 输入快照里最大的 `fetched_at_ms`(「数据截至」) |
 | `missingSources` | 本次生成时未能加载的源 key 数组(页脚标注用) |
 | `digest` | 跨源「今日综述」(3-4 句简体中文,AI 生成;长度上限演变:初版 ≤120 字 → 2026-09-26 收紧 3-4 句/≤180 → 2026-10-01 放宽 ≤300 字符,现产出 262-295 字)。可能为空串(AI 未返回/旧数据无此字段),消费方空串不渲染 |
-| `items` | 今日热点 Top10,breaking 条目排最前。每项含 `source`/`title`/`url`/`metrics`(从快照回填的最终值) + `comment`(AI 写的一句话) + `breaking` + `breakingReason`(仅 breaking=true 有) |
+| `items` | 今日热点 Top10,breaking 条目排最前。每项含 `source`/`title`/`url`/`metrics`(从快照回填的最终值) + `comment`(AI 短评;长度演变:初版一句话 ≤40 字 → 2026-10-29 放宽 80~160 字、2~4 句、首句给结论) + `breaking` + `breakingReason`(仅 breaking=true 有,同步放宽至 80~160 字) |
 
 **与单源 `ai_summary_v2` 的区别**:`ai_summary_v2` 是各源快照内的分源要点(8 个独立摘要);`latest_overview` 是跨 8 源的综合研判(1 个总榜),AI 会按跨源归一化热度档位排序、合并同事件、标 breaking。
 
@@ -368,7 +368,7 @@ print(hn['items'][0]['title'])
           "source": "hackernews",
           "date": "2026-10-15",
           "metrics": "得分 892 · 评论 524",
-          "comment": "AI 写的一句话点评(来自日报总览)",
+          "comment": "AI 短评(来自日报总览,80~160 字)",
           "breaking": false,
           "daysSeen": 3
         }
@@ -390,7 +390,7 @@ print(hn['items'][0]['title'])
 | `items[].daysSeen` | 该条目本周在 overview Top10 的在榜天数(持续主线信号,≥2 优先入选) |
 | `items[].date` | 条目所在 overview 归档日(「哪天上的榜」) |
 
-**失败语义**:与 `trends.json` 同款「成功才写」——生成失败(含上周归档 <5 天的 coverage 闸)的批次 `weekly.json` 暂缺,404 是正常暂态,下次批次(最迟次日)自愈;App 今天页「AI 周刊」入口行随之隐藏,不显示占位。
+**失败语义**:与 `trends.json` 同款「成功才写」——生成失败(含上周归档 <5 天的 coverage 闸)的批次 `weekly.json` 暂缺,404 是正常暂态,下次批次(最迟次日)自愈;App 今天页报头「周刊」动作随之隐藏,不显示占位。
 
 ## 周刊历史归档(weekly/ 目录 + weekly_history.json 独立索引)
 
