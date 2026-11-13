@@ -35,13 +35,15 @@ enum class Mode(val api: String) {
 }
 
 /**
- * 单条 AI 动态。字段对齐官方公开 API `/api/public/items`。
+ * 单条 AI 动态。字段对齐官方公开 API `/api/v1/items`。
  *
  * 注意:
- *  - title_en / summary / publishedAt / category / score 均可为空(JSON null)
+ *  - originalTitle / summary / publishedAt / category / score 均可为空(JSON null)
  *  - score 是 0-100 总分,非排序字段(列表仍按 publishedAt 倒序)
  *  - id 是 cuid(25 字符),不是数字
  *  - permalink 是站内中文翻译阅读页,深链优先用之;url 是第三方原文
+ *  - v1 嵌套字段:原文链接在 links.original,站内深链在 links.aihot,
+ *    来源名在 source.name(旧版顶层平铺字段已停服)
  */
 @Immutable
 @Parcelize
@@ -68,11 +70,11 @@ data class NewsItem(
         fun fromJson(json: JSONObject): NewsItem = NewsItem(
             id = json.optString("id").asClean().orEmpty(),
             title = json.optString("title").asClean().orEmpty(),
-            titleEn = json.optString("title_en").asClean(),
+            titleEn = json.optString("originalTitle").asClean(),
             summary = json.optString("summary").asClean(),
-            url = json.optString("url").asClean().orEmpty(),
-            permalink = json.optString("permalink").asClean().orEmpty(),
-            source = json.optString("source").asClean().orEmpty(),
+            url = json.optJSONObject("links")?.optString("original").asClean().orEmpty(),
+            permalink = json.optJSONObject("links")?.optString("aihot").asClean().orEmpty(),
+            source = json.optJSONObject("source")?.optString("name").asClean().orEmpty(),
             publishedAt = json.optString("publishedAt").asClean(),
             category = json.optString("category").asClean(),
             score = json.optInt("score", 0),
@@ -81,7 +83,7 @@ data class NewsItem(
     }
 }
 
-// ===== 日报相关模型(/api/public/daily 系列) =====
+// ===== 日报相关模型(/api/v1/dailies 系列,报告本体在响应 report 字段下) =====
 
 data class DailyReport(
     val date: String,                       // YYYY-MM-DD UTC
@@ -129,7 +131,7 @@ data class DailySummary(
 )
 
 /**
- * 今日热点(/api/public/hot-topics)的单条。
+ * 今日热点(/api/v1/hot-topics)的单条。
  *
  * 与 [NewsItem] 的区别:热点是「同一事件跨多源聚合」,故额外带
  * sourceCount(聚合来源数)与 sourceNames(来源清单);没有 score/category 等字段。
@@ -155,9 +157,9 @@ data class HotTopic(
             return HotTopic(
                 id = json.optString("id"),
                 title = json.optString("title"),
-                url = json.optString("url"),
-                permalink = json.optString("permalink").asClean().orEmpty(),
-                source = json.optString("source"),
+                url = json.optJSONObject("links")?.optString("original").asClean().orEmpty(),
+                permalink = json.optJSONObject("links")?.optString("aihot").asClean().orEmpty(),
+                source = json.optJSONObject("source")?.optString("name").asClean().orEmpty(),
                 sourceCount = json.optInt("sourceCount", 0),
                 sourceNames = (0 until namesArr.length())
                     .mapNotNull { namesArr.optString(it).asClean() },

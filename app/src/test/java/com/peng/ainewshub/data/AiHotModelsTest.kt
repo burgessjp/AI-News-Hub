@@ -25,11 +25,13 @@ class AiHotModelsTest {
                 {
                   "id": "ckabc123def456ghi789012",
                   "title": "Claude 4 发布",
-                  "title_en": "Claude 4 Released",
+                  "originalTitle": "Claude 4 Released",
                   "summary": "Anthropic 发布新一代模型",
-                  "url": "https://example.com/a",
-                  "permalink": "https://aihot.virxact.com/read/1",
-                  "source": "anthropic",
+                  "source": {"name": "anthropic"},
+                  "links": {
+                    "aihot": "https://aihot.news/read/1",
+                    "original": "https://example.com/a"
+                  },
                   "publishedAt": "2026-08-29T10:00:00Z",
                   "category": "ai-models",
                   "score": 88,
@@ -42,6 +44,8 @@ class AiHotModelsTest {
         assertEquals("Claude 4 发布", item.title)
         assertEquals("Claude 4 Released", item.titleEn)
         assertEquals("https://example.com/a", item.url)
+        assertEquals("https://aihot.news/read/1", item.permalink)
+        assertEquals("anthropic", item.source)
         assertEquals("ai-models", item.category)
         assertEquals(NewsCategory.AI_MODELS, NewsCategory.fromApi(item.category))
         assertEquals(88, item.score)
@@ -52,13 +56,17 @@ class AiHotModelsTest {
     @Test
     fun `JSON null 与缺失字段统一清洗为 null 而非字面量`() {
         val item = NewsItem.fromJson(
-            JSONObject("""{"id":"x","title":"t","title_en":null,"summary":null,"score":null}""")
+            JSONObject("""{"id":"x","title":"t","originalTitle":null,"summary":null,"score":null}""")
         )
         assertNull(item.titleEn)
         assertNull(item.summary)
         assertNull(item.publishedAt)
         assertEquals(0, item.score)
         assertNull(item.categoryLabelRes())
+        // links / source 嵌套对象整体缺失时,派生字段回退空串而非字面 "null"
+        assertEquals("", item.url)
+        assertEquals("", item.permalink)
+        assertEquals("", item.source)
     }
 
     @Test
@@ -83,9 +91,11 @@ class AiHotModelsTest {
                 {
                   "id": "topic-1",
                   "title": "同一事件跨多源",
-                  "url": "https://example.com/main",
-                  "permalink": "https://aihot.virxact.com/topic/1",
-                  "source": "hackernews",
+                  "source": {"name": "hackernews"},
+                  "links": {
+                    "aihot": "https://aihot.news/topic/1",
+                    "original": "https://example.com/main"
+                  },
                   "sourceCount": 3,
                   "sourceNames": ["Hacker News", "Reddit", null],
                   "latestAt": "2026-08-29T09:00:00Z"
@@ -94,6 +104,9 @@ class AiHotModelsTest {
             )
         )
         assertEquals("topic-1", topic.id)
+        assertEquals("https://example.com/main", topic.url)
+        assertEquals("https://aihot.news/topic/1", topic.permalink)
+        assertEquals("hackernews", topic.source)
         assertEquals(3, topic.sourceCount)
         // JSON null 的数组成员被 asClean 过滤,不产出字面 "null"
         assertEquals(listOf("Hacker News", "Reddit"), topic.sourceNames)
@@ -105,5 +118,9 @@ class AiHotModelsTest {
         val topic = HotTopic.fromJson(JSONObject("""{"id":"t","title":"x"}"""))
         assertEquals(emptyList<String>(), topic.sourceNames)
         assertNull(topic.latestAt)
+        // links / source 嵌套对象缺失时回退空串
+        assertEquals("", topic.url)
+        assertEquals("", topic.permalink)
+        assertEquals("", topic.source)
     }
 }

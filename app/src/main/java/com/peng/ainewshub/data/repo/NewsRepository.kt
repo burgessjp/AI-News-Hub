@@ -6,6 +6,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.net.URLEncoder
 import com.peng.ainewshub.data.AppException
+import com.peng.ainewshub.data.asClean
 import com.peng.ainewshub.data.model.DailyEntry
 import com.peng.ainewshub.data.model.DailyReport
 import com.peng.ainewshub.data.model.DailySection
@@ -19,18 +20,20 @@ import com.peng.ainewshub.data.model.NewsItem
 import com.peng.ainewshub.data.net.HttpClients
 
 /**
- * `aihot.virxact.com` 公开 API 客户端(第三方服务,非本项目自有后端)。
- * 文档: https://aihot.virxact.com/agent (匿名免费,无需 token)
+ * `aihot.news` 公开 API v1 客户端(第三方服务,非本项目自有后端;原域名
+ * aihot.virxact.com 已 301 至此,旧 `/api/public` 系列接口已于 2026-10-31 停服)。
+ * 文档: https://aihot.news/agent?tab=api (匿名免费,无需 token)
  *
  * 重要约定:
  *  - User-Agent 必须带(默认 curl UA 会被 nginx 黑名单 403)
- *  - cursor 视作不透明 token,原样回传,不要解析/递增/跨端点复用
- *  - take 上限 100;since 必须 ISO 8601 UTC
+ *  - cursor 视作不透明 token,原样回传,不要解析/递增/跨端点复用,也不要跨天持久化
+ *  - limit 上限 100;window 默认 7d(不显式传)
  *  - category 5 选 1,不可多选
+ *  - v1 严格拒绝未声明/重复参数(400),拼参只允许文档列出的键
  */
 class NewsRepository {
 
-    private val base = "https://aihot.virxact.com/api/public"
+    private val base = "https://aihot.news/api/v1"
 
     // ===== /items =====
 
@@ -40,24 +43,21 @@ class NewsRepository {
      * @param mode 精选(selected,默认)/ 全部(all)
      * @param category 5 类之一,可选
      * @param query 关键词搜索(2-200 字,<2 字视作不搜索)
-     * @param since ISO 8601 起始时间(7 天内)
-     * @param take 每页条数 1-100
-     * @param cursor 上次响应的 nextCursor
+     * @param limit 每页条数 1-100
+     * @param cursor 上次响应 page.nextCursor
      */
     suspend fun fetchItems(
         mode: Mode = Mode.SELECTED,
         category: NewsCategory? = null,
         query: String? = null,
-        since: String? = null,
-        take: Int = 50,
+        limit: Int = 50,
         cursor: String? = null
     ): NewsPage = withContext(Dispatchers.IO) {
         val params = buildList {
             add("mode" to mode.api)
-            add("take" to take.coerceIn(1, 100).toString())
+            add("limit" to limit.coerceIn(1, 100).toString())
             category?.let { add("category" to it.api) }
             query?.takeIf { it.trim().length >= 2 }?.let { add("q" to enc(it)) }
-            since?.takeIf { it.isNotBlank() }?.let { add("since" to it) }
             cursor?.takeIf { it.isNotBlank() }?.let { add("cursor" to enc(it)) }
         }
         val root = getJson("$base/items", params) ?: throw AppException.ServerError()
@@ -66,10 +66,12 @@ class NewsRepository {
         // 注意:这里刻意不做本地搜索索引回填 —— 本流是 aihot 第三方 API 的实时精选流,
         // permalink 指向其站内阅读页,与「本地搜索 = 本 App 归档数据」的定位不符;
         // aihot 内容经流水线归档后由 SummaryRepository 按原文 URL 回填
+        // v1 分页信封从顶层挪进 page 对象(count/hasMore/nextCursor)
+        val page = root.optJSONObject("page")
         NewsPage(
             items = items,
-            hasNext = root.optBoolean("hasNext", false),
-            nextCursor = root.optString("nextCursor").takeIf { it.isNotBlank() && it != "null" }
+            hasNext = page?.optBoolean("hasMore", false) ?: false,
+            nextCursor = page?.optString("nextCursor").asClean()
         )
     }
 
@@ -91,14 +93,15 @@ class NewsRepository {
 
     /** 最新日报(date=null)或指定日期日报(YYYY-MM-DD)。 */
     suspend fun fetchDaily(date: String? = null): DailyReport = withContext(Dispatchers.IO) {
-        val url = if (date.isNullOrBlank()) "$base/daily" else "$base/daily/${enc(date)}"
+        val url = if (date.isNullOrBlank()) "$base/dailies/latest" else "$base/dailies/${enc(date)}"
         val root = getJson(url, emptyList()) ?: throw AppException.ServerError()
-        parseDaily(root)
+        // v1 日报响应带稳定外层(schemaVersion 等),报告本体在 report 字段下
+        parseDaily(root.optJSONObject("report") ?: throw AppException.ServerError())
     }
 
     /** 日报归档索引(默认 30 期,上限 180)。 */
-    suspend fun fetchDailies(take: Int = 30): List<DailySummary> = withContext(Dispatchers.IO) {
-        val root = getJson("$base/dailies", listOf("take" to take.coerceIn(1, 180).toString()))
+    suspend fun fetchDailies(limit: Int = 30): List<DailySummary> = withContext(Dispatchers.IO) {
+        val root = getJson("$base/dailies", listOf("limit" to limit.coerceIn(1, 180).toString()))
             ?: throw AppException.ServerError()
         val arr = root.optJSONArray("items") ?: JSONArray()
         (0 until arr.length()).map { i ->
@@ -134,10 +137,10 @@ class NewsRepository {
             val f = flashesArr.getJSONObject(i)
             Flash(
                 title = f.optString("title"),
-                sourceName = f.optString("sourceName"),
-                sourceUrl = f.optString("sourceUrl"),
+                sourceName = f.optJSONObject("source")?.optString("name").asClean().orEmpty(),
+                sourceUrl = f.optJSONObject("links")?.optString("original").asClean().orEmpty(),
                 publishedAt = f.optString("publishedAt").takeIf { it.isNotBlank() },
-                permalink = f.optString("permalink").takeIf { it.isNotBlank() && it != "null" }
+                permalink = f.optJSONObject("links")?.optString("aihot").asClean()
             )
         }
         return DailyReport(
@@ -154,9 +157,9 @@ class NewsRepository {
     private fun parseDailyEntry(o: JSONObject): DailyEntry = DailyEntry(
         title = o.optString("title"),
         summary = o.optString("summary").takeIf { it.isNotBlank() },
-        sourceUrl = o.optString("sourceUrl"),
-        sourceName = o.optString("sourceName"),
-        permalink = o.optString("permalink").takeIf { it.isNotBlank() && it != "null" }
+        sourceUrl = o.optJSONObject("links")?.optString("original").asClean().orEmpty(),
+        sourceName = o.optJSONObject("source")?.optString("name").asClean().orEmpty(),
+        permalink = o.optJSONObject("links")?.optString("aihot").asClean()
     )
 
     // ===== HTTP =====

@@ -18,7 +18,7 @@ AI News Hub「Hub」tab 浏览区域数据抓取脚本(编排层)。
   - huggingface-papers   HuggingFace Trending Papers(HTML 抓取)
   - producthunt          Product Hunt 当日热门(GraphQL API,需 PRODUCT_HUNT_KEY)
   - rundown-ai           The Rundown AI newsletter(/articles 列表页,RSC 内嵌 JSON 主路径 + DOM 卡片兜底)
-  - aihot-featured       AIHot 精选 TOP20(第三方服务 aihot.virxact.com 公开 API,仅供摘要卡消费)
+  - aihot-featured       AIHot 精选 TOP20(第三方服务 aihot.news 公开 API v1,仅供摘要卡消费)
   - openai-anthropic-news OpenAI x Anthropic 厂商动态(OpenAI RSS + Anthropic HTML 合并源)
 
 输出目录结构:

@@ -63,7 +63,7 @@ fun sourceMeta(key: String): SourceMeta = when (key) {
     )
     SourceKeys.AIHOT_FEATURED -> SourceMeta(
         key, SourceBrand.AiHot,
-        stringResource(R.string.source_title_aihot_featured), stringResource(R.string.source_subtitle_aihot_featured), "https://aihot.virxact.com"
+        stringResource(R.string.source_title_aihot_featured), stringResource(R.string.source_subtitle_aihot_featured), "https://aihot.news"
     )
     SourceKeys.STORMZHANG_AI -> SourceMeta(
         key, SourceBrand.Stormzhang,

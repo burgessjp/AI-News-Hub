@@ -3,7 +3,7 @@
 数据仓库:[gitcode.com/peng1818/AI-News-Hub-Data](https://gitcode.com/peng1818/AI-News-Hub-Data)
 分支:`news-hub-data`
 
-本仓库定时抓取 [AI News Hub](../) App 浏览区域(更多 → 信息源)的 8 个数据源(7 个第三方站点源 + AIHot 精选 TOP20,后者来自第三方服务 aihot.virxact.com),解析成 JSON 后按日期归档。本文档说明数据结构、获取方式与消费示例。
+本仓库定时抓取 [AI News Hub](../) App 浏览区域(更多 → 信息源)的 8 个数据源(7 个第三方站点源 + AIHot 精选 TOP20,后者来自第三方服务 aihot.news),解析成 JSON 后按日期归档。本文档说明数据结构、获取方式与消费示例。
 
 ## 更新频率
 
@@ -60,7 +60,7 @@ news-hub-data 分支/
 ├── rundown-ai/                          ← The Rundown AI 文章列表(/articles 列表页,无 token)
 │   └── 2026-07-15/
 │       └── 08-00-data.json
-└── aihot-featured/                      ← AIHot 精选(第三方服务 aihot.virxact.com /items?mode=selected&take=20,公开 API,无 token)
+└── aihot-featured/                      ← AIHot 精选(第三方服务 aihot.news /api/v1/items?mode=selected&limit=20,公开 API,无 token)
     └── 2026-07-15/
         └── 08-00-data.json
 ```
@@ -606,7 +606,7 @@ The Rundown AI(beehiiv 托管的头部英文 AI 日更 newsletter)文章列表,�
 
 ### aihot-featured(AIHot 精选 TOP20,第三方源)
 
-第三方服务 `aihot.virxact.com` 的「精选」列表 TOP20,来自 `/api/public/items?mode=selected&take=20` 公开 JSON API(无 token,UA 必填否则 nginx 403)。该服务已聚合多源 RSS/X 等并人工/算法筛选,字段对齐 App 端 `NewsItem.fromJson`。
+第三方服务 `aihot.news` 的「精选」列表 TOP20,来自 `/api/v1/items?mode=selected&limit=20` 公开 JSON API(无 token,UA 必填否则 nginx 403;2026-11 迁移到 v1,原域名 `aihot.virxact.com` 的旧链接仍可 301 到达)。该服务已聚合多源 RSS/X 等并人工/算法筛选,v1 嵌套字段(`links.original`/`links.aihot`/`source.name`/`originalTitle`)由抓取器映射为下方归档 schema,对齐 App 端 `NewsItem.fromJson`。
 
 > 📌 **此源特殊性**:aihot-featured 与其它第三方源一样都是第三方源,但它是 App 唯一「只取归档供摘要 Tab、二级页仍走实时接口」的源。归档仅供 App 摘要 Tab 消费(`ai_summary_v2`,兼容旧 `ai_summary`);App「AIHot 精选」二级页本身继续实时拉该服务分页接口(数据更新鲜),不走此归档。
 
@@ -618,7 +618,7 @@ The Rundown AI(beehiiv 托管的头部英文 AI 日更 newsletter)文章列表,�
 | `titleEn` | string | 英文原标题;可能为空 |
 | `summary` | string | 中文一句话摘要;可能为空 |
 | `url` | string | 第三方原文地址(TechCrunch / The Verge / X 等) |
-| `permalink` | string | 站内中文阅读页深链 `https://aihot.virxact.com/items/<id>`;点击优先用此 |
+| `permalink` | string | 站内中文阅读页深链 `https://aihot.news/items/<id>`(2026-11 前的旧快照为 `aihot.virxact.com` 域名,仍可 301 到达);点击优先用此 |
 | `source` | string | 来源信源名,如 `TechCrunch:AI(RSS)` / `X:宝玉 (@dotey)` |
 | `publishedAt` | string | 发布时刻 ISO 8601(UTC),如 `2026-07-18T04:47:25.000Z` |
 | `category` | string | 分类,如 `tip` / `industry` / `paper`;可能为空 |
